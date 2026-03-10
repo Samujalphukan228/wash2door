@@ -1,4 +1,4 @@
-// models/User.js - FIXED: Added generateEmailVerificationToken method
+// models/User.js - FIXED: Removed duplicate email index
 
 import mongoose from 'mongoose';
 import argon2 from 'argon2';
@@ -49,7 +49,7 @@ const userSchema = new mongoose.Schema({
         default: 'pending'
     },
     registrationCompletedAt: Date,
-    
+
     // OTP
     otp: String,
     otpExpire: Date,
@@ -62,7 +62,7 @@ const userSchema = new mongoose.Schema({
         default: false
     },
     otpVerifiedAt: Date,
-    
+
     // EMAIL VERIFICATION
     isEmailVerified: {
         type: Boolean,
@@ -70,7 +70,7 @@ const userSchema = new mongoose.Schema({
     },
     emailVerificationToken: String,
     emailVerificationExpire: Date,
-    
+
     // ACCOUNT STATUS
     isActive: {
         type: Boolean,
@@ -82,14 +82,14 @@ const userSchema = new mongoose.Schema({
     },
     blockedReason: String,
     blockedAt: Date,
-    
+
     // PASSWORD RESET
     passwordResetToken: String,
     passwordResetExpire: Date,
-    
+
     // REFRESH TOKEN
     refreshToken: String,
-    
+
     // SECURITY
     loginAttempts: {
         type: Number,
@@ -115,11 +115,12 @@ userSchema.virtual('fullName').get(function() {
 
 // ============================================
 // INDEXES
+// ✅ FIXED: Removed duplicate email index
+// email index is auto created by unique: true above
 // ============================================
 
 userSchema.index({ role: 1 });
 userSchema.index({ isActive: 1 });
-userSchema.index({ email: 1 });
 userSchema.index({ registrationStatus: 1 });
 
 // ============================================
@@ -130,7 +131,7 @@ userSchema.pre('save', async function(next) {
     if (!this.isModified('password')) {
         return next();
     }
-    
+
     try {
         this.password = await argon2.hash(this.password, {
             type: argon2.argon2id,
@@ -139,11 +140,11 @@ userSchema.pre('save', async function(next) {
             parallelism: 4,
             hashLength: 32
         });
-        
+
         if (!this.isNew) {
             this.passwordChangedAt = Date.now() - 1000;
         }
-        
+
         next();
     } catch (error) {
         next(error);
@@ -175,15 +176,15 @@ userSchema.methods.changedPasswordAfter = function(JWTTimestamp) {
 
 userSchema.methods.generateOTP = function() {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    
+
     this.otp = crypto
         .createHash('sha256')
         .update(otp)
         .digest('hex');
-    
+
     this.otpExpire = Date.now() + 10 * 60 * 1000;
     this.otpAttempts = 0;
-    
+
     return otp;
 };
 
@@ -213,7 +214,7 @@ userSchema.methods.verifyOTP = async function(candidateOTP) {
         if (!isValid) {
             this.otpAttempts += 1;
             await this.save({ validateBeforeSave: false });
-            
+
             return {
                 success: false,
                 message: 'Invalid OTP',
@@ -240,30 +241,29 @@ userSchema.methods.verifyOTP = async function(candidateOTP) {
     }
 };
 
-// ✅ FIXED: Added missing method that authController uses
 userSchema.methods.generateEmailVerificationToken = function() {
     const verificationToken = crypto.randomBytes(32).toString('hex');
-    
+
     this.emailVerificationToken = crypto
         .createHash('sha256')
         .update(verificationToken)
         .digest('hex');
-    
-    this.emailVerificationExpire = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
-    
+
+    this.emailVerificationExpire = Date.now() + 24 * 60 * 60 * 1000;
+
     return verificationToken;
 };
 
 userSchema.methods.generatePasswordResetToken = function() {
     const resetToken = crypto.randomBytes(32).toString('hex');
-    
+
     this.passwordResetToken = crypto
         .createHash('sha256')
         .update(resetToken)
         .digest('hex');
-    
-    this.passwordResetExpire = Date.now() + 60 * 60 * 1000; // 1 hour
-    
+
+    this.passwordResetExpire = Date.now() + 60 * 60 * 1000;
+
     return resetToken;
 };
 
@@ -278,13 +278,15 @@ userSchema.methods.incrementLoginAttempts = async function() {
             $unset: { lockUntil: 1 }
         });
     }
-    
+
     const updates = { $inc: { loginAttempts: 1 } };
-    
+
     if (this.loginAttempts + 1 >= 5 && !this.isLocked()) {
-        updates.$set = { lockUntil: Date.now() + 2 * 60 * 60 * 1000 };
+        updates.$set = {
+            lockUntil: Date.now() + 2 * 60 * 60 * 1000
+        };
     }
-    
+
     return await this.updateOne(updates);
 };
 
@@ -301,50 +303,50 @@ userSchema.methods.resetLoginAttempts = async function() {
 
 userSchema.statics.cleanupUnverifiedRegistrations = async function() {
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-    
+
     const result = await this.deleteMany({
         registrationStatus: { $ne: 'completed' },
         otpVerified: false,
         createdAt: { $lt: oneHourAgo }
     });
-    
+
     return result.deletedCount;
 };
 
 userSchema.statics.findForRegistration = async function(email) {
     const user = await this.findOne({ email: email.toLowerCase() });
-    
+
     if (!user) {
-        return { 
-            exists: false, 
-            canRegister: true, 
-            user: null 
+        return {
+            exists: false,
+            canRegister: true,
+            user: null
         };
     }
-    
+
     if (user.registrationStatus === 'completed') {
-        return { 
-            exists: true, 
-            canRegister: false, 
+        return {
+            exists: true,
+            canRegister: false,
             user,
             message: 'User with this email already exists'
         };
     }
-    
+
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-    
+
     if (user.createdAt < oneHourAgo) {
         await user.deleteOne();
-        return { 
-            exists: false, 
-            canRegister: true, 
-            user: null 
+        return {
+            exists: false,
+            canRegister: true,
+            user: null
         };
     }
-    
-    return { 
-        exists: true, 
-        canRegister: false, 
+
+    return {
+        exists: true,
+        canRegister: false,
         user,
         isPending: true,
         registrationStatus: user.registrationStatus,

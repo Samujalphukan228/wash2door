@@ -1,12 +1,13 @@
-// controllers/adminController.js - COMPLETE FIXED
+// controllers/adminController.js - COMPLETE FILE
 
 import User from '../models/User.js';
 import Service from '../models/Service.js';
 import Booking from '../models/Booking.js';
 import Review from '../models/Review.js';
 import { sendBookingStatusEmail } from '../utils/sendEmail.js';
+import { getIO } from '../config/socket.js';
+import { SOCKET_EVENTS } from '../utils/socketEvents.js';
 import mongoose from 'mongoose';
-import { deleteCloudinaryImage } from '../config/cloudinary.js';
 
 const isValidObjectId = (id) =>
     mongoose.Types.ObjectId.isValid(id) &&
@@ -29,7 +30,6 @@ export const getDashboardStats = async (req, res) => {
             1
         );
 
-        // Basic counts
         const [
             totalUsers,
             totalAdmins,
@@ -63,7 +63,6 @@ export const getDashboardStats = async (req, res) => {
             })
         ]);
 
-        // Revenue this month (completed bookings)
         const revenueThisMonth = await Booking.aggregate([
             {
                 $match: {
@@ -79,7 +78,6 @@ export const getDashboardStats = async (req, res) => {
             }
         ]);
 
-        // Total revenue all time
         const totalRevenue = await Booking.aggregate([
             { $match: { status: 'completed' } },
             {
@@ -90,13 +88,11 @@ export const getDashboardStats = async (req, res) => {
             }
         ]);
 
-        // Recent 5 bookings
         const recentBookings = await Booking.find()
             .sort({ createdAt: -1 })
             .limit(5)
             .populate('customerId', 'firstName lastName email');
 
-        // Popular services
         const popularServices = await Booking.aggregate([
             { $match: { status: { $ne: 'cancelled' } } },
             {
@@ -111,7 +107,6 @@ export const getDashboardStats = async (req, res) => {
             { $limit: 5 }
         ]);
 
-        // Bookings by category
         const bookingsByCategory = await Booking.aggregate([
             { $match: { status: { $ne: 'cancelled' } } },
             {
@@ -182,13 +177,11 @@ export const getAllUsers = async (req, res) => {
         const pageNum = parseInt(page);
         const limitNum = parseInt(limit);
 
-        // Build query
         const query = {
             role: 'user',
             registrationStatus: 'completed'
         };
 
-        // Search by name or email
         if (search) {
             query.$or = [
                 { firstName: { $regex: search, $options: 'i' } },
@@ -197,7 +190,6 @@ export const getAllUsers = async (req, res) => {
             ];
         }
 
-        // Filter by blocked status
         if (isBlocked !== undefined) {
             query.isBlocked = isBlocked === 'true';
         }
@@ -255,12 +247,10 @@ export const getUserById = async (req, res) => {
             });
         }
 
-        // Get user bookings
         const bookings = await Booking.find({ customerId: userId })
             .sort({ createdAt: -1 })
             .limit(10);
 
-        // Get user stats
         const [
             totalBookings,
             completedBookings,
@@ -292,7 +282,6 @@ export const getUserById = async (req, res) => {
             ])
         ]);
 
-        // Get user reviews
         const reviews = await Review.find({ customerId: userId })
             .populate('serviceId', 'name')
             .sort({ createdAt: -1 })
@@ -706,7 +695,7 @@ export const deleteService = async (req, res) => {
 };
 
 // ============================================
-// GET ALL BOOKINGS (ADMIN) - FIXED
+// GET ALL BOOKINGS (ADMIN)
 // ============================================
 
 export const getAllBookings = async (req, res) => {
@@ -720,16 +709,15 @@ export const getAllBookings = async (req, res) => {
             search,
             serviceCategory,
             startDate,
-            endDate
+            endDate,
+            bookingType
         } = req.query;
 
         const pageNum = parseInt(page);
         const limitNum = parseInt(limit);
 
-        // Build query
         const query = {};
 
-        // Filter by status
         if (status) {
             const validStatuses = [
                 'pending', 'confirmed',
@@ -740,12 +728,15 @@ export const getAllBookings = async (req, res) => {
             }
         }
 
-        // Filter by service category
         if (serviceCategory) {
             query.serviceCategory = serviceCategory;
         }
 
-        // Filter by city
+        // ✅ Filter by booking type (walkin or online)
+        if (bookingType) {
+            query.bookingType = bookingType;
+        }
+
         if (city) {
             query['location.city'] = {
                 $regex: city,
@@ -753,7 +744,6 @@ export const getAllBookings = async (req, res) => {
             };
         }
 
-        // Filter by specific date
         if (date) {
             const bookingDate = new Date(date);
             const startOfDay = new Date(bookingDate);
@@ -766,7 +756,6 @@ export const getAllBookings = async (req, res) => {
             };
         }
 
-        // Filter by date range
         if (startDate || endDate) {
             query.createdAt = {};
             if (startDate) {
@@ -777,7 +766,6 @@ export const getAllBookings = async (req, res) => {
             }
         }
 
-        // Search by booking code
         if (search) {
             query.$or = [
                 {
@@ -791,6 +779,20 @@ export const getAllBookings = async (req, res) => {
                         $regex: search,
                         $options: 'i'
                     }
+                },
+                // ✅ Search by walk-in customer name
+                {
+                    'walkInCustomer.name': {
+                        $regex: search,
+                        $options: 'i'
+                    }
+                },
+                // ✅ Search by walk-in customer phone
+                {
+                    'walkInCustomer.phone': {
+                        $regex: search,
+                        $options: 'i'
+                    }
                 }
             ];
         }
@@ -799,6 +801,7 @@ export const getAllBookings = async (req, res) => {
 
         const bookings = await Booking.find(query)
             .populate('customerId', 'firstName lastName email')
+            .populate('createdBy', 'firstName lastName')
             .sort({ createdAt: -1 })
             .limit(limitNum)
             .skip((pageNum - 1) * limitNum);
@@ -822,7 +825,7 @@ export const getAllBookings = async (req, res) => {
 };
 
 // ============================================
-// UPDATE BOOKING STATUS (ADMIN) - FIXED
+// UPDATE BOOKING STATUS - WITH SOCKET ✅
 // ============================================
 
 export const updateBookingStatus = async (req, res) => {
@@ -849,7 +852,6 @@ export const updateBookingStatus = async (req, res) => {
             });
         }
 
-        // Build update data
         const updateData = { status };
 
         if (status === 'completed') {
@@ -876,7 +878,52 @@ export const updateBookingStatus = async (req, res) => {
             });
         }
 
-        // Send status email to customer
+        // ============================================
+        // 🔌 SOCKET - Status Updated
+        // ============================================
+        try {
+            const io = getIO();
+
+            const socketPayload = {
+                bookingId: booking._id,
+                bookingCode: booking.bookingCode,
+                status: booking.status,
+                serviceName: booking.serviceName,
+                vehicleTypeName: booking.vehicleTypeName,
+                bookingDate: booking.bookingDate,
+                timeSlot: booking.timeSlot,
+                updatedAt: new Date()
+            };
+
+            // Notify the specific customer
+            if (booking.customerId) {
+                io.to(`user_${booking.customerId._id}`).emit(
+                    SOCKET_EVENTS.BOOKING_STATUS_UPDATED,
+                    socketPayload
+                );
+            }
+
+            // Notify all admins
+            io.to('admin_room').emit(
+                SOCKET_EVENTS.BOOKING_STATUS_UPDATED,
+                socketPayload
+            );
+
+            // If cancelled free up the slot
+            if (status === 'cancelled') {
+                io.emit(SOCKET_EVENTS.SLOT_AVAILABLE, {
+                    serviceId: booking.serviceId,
+                    bookingDate: booking.bookingDate,
+                    timeSlot: booking.timeSlot
+                });
+            }
+
+            console.log(`🔌 Socket emitted: status → ${status}`);
+        } catch (socketError) {
+            console.error('Socket emit error:', socketError.message);
+        }
+
+        // Send email
         try {
             if (booking.customerId?.email) {
                 await sendBookingStatusEmail(
@@ -905,7 +952,325 @@ export const updateBookingStatus = async (req, res) => {
 };
 
 // ============================================
-// REVENUE REPORT - FIXED
+// CREATE ADMIN BOOKING - WITH SOCKET ✅
+// ============================================
+
+export const createAdminBooking = async (req, res) => {
+    try {
+        const {
+            bookingType,
+            customerId,
+            walkInCustomer,
+            serviceId,
+            vehicleTypeId,
+            bookingDate,
+            timeSlot,
+            specialNotes,
+            paymentMethod,
+            paymentStatus,
+            location,
+            vehicleDetails
+        } = req.body;
+
+        // Validate booking type
+        const validBookingTypes = ['walkin', 'online'];
+        if (!bookingType || !validBookingTypes.includes(bookingType)) {
+            return res.status(400).json({
+                success: false,
+                message: 'bookingType must be "walkin" or "online"'
+            });
+        }
+
+        // Validate customer
+        if (bookingType === 'walkin') {
+            if (!walkInCustomer || !walkInCustomer.name) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Walk-in customer name is required'
+                });
+            }
+        }
+
+        if (bookingType === 'online') {
+            if (!customerId) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Customer ID is required for online booking type'
+                });
+            }
+
+            if (!isValidObjectId(customerId)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Invalid customer ID'
+                });
+            }
+
+            const customerExists = await User.findById(customerId);
+            if (!customerExists) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Customer not found'
+                });
+            }
+        }
+
+        // Validate service
+        if (!serviceId || !isValidObjectId(serviceId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Valid service ID is required'
+            });
+        }
+
+        const service = await Service.findOne({
+            _id: serviceId,
+            isActive: true
+        });
+
+        if (!service) {
+            return res.status(404).json({
+                success: false,
+                message: 'Service not found or not active'
+            });
+        }
+
+        // Validate vehicle type
+        if (!vehicleTypeId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Vehicle type ID is required'
+            });
+        }
+
+        const selectedVehicleType = service.vehicleTypes.id(vehicleTypeId);
+
+        if (!selectedVehicleType) {
+            return res.status(404).json({
+                success: false,
+                message: 'Vehicle type not found in this service'
+            });
+        }
+
+        if (!selectedVehicleType.isActive) {
+            return res.status(400).json({
+                success: false,
+                message: 'This vehicle type is currently not available'
+            });
+        }
+
+        // Validate vehicle details
+        if (!vehicleDetails || !vehicleDetails.type) {
+            return res.status(400).json({
+                success: false,
+                message: 'Vehicle details with type are required'
+            });
+        }
+
+        // Validate date and time
+        if (!bookingDate || !timeSlot) {
+            return res.status(400).json({
+                success: false,
+                message: 'Booking date and time slot are required'
+            });
+        }
+
+        const requestedDate = new Date(bookingDate);
+        if (isNaN(requestedDate.getTime())) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid date format. Use YYYY-MM-DD'
+            });
+        }
+
+        if (requestedDate.getDay() === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'We are closed on Sundays'
+            });
+        }
+
+        const validTimeSlots = [
+            '08:00-09:00', '09:00-10:00', '10:00-11:00',
+            '11:00-12:00', '12:00-13:00', '13:00-14:00',
+            '14:00-15:00', '15:00-16:00', '16:00-17:00',
+            '17:00-18:00'
+        ];
+
+        if (!validTimeSlots.includes(timeSlot)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid time slot'
+            });
+        }
+
+        // Check slot availability
+        const startOfDay = new Date(requestedDate);
+        startOfDay.setHours(0, 0, 0, 0);
+
+        const endOfDay = new Date(requestedDate);
+        endOfDay.setHours(23, 59, 59, 999);
+
+        const existingBooking = await Booking.findOne({
+            serviceId,
+            bookingDate: { $gte: startOfDay, $lte: endOfDay },
+            timeSlot,
+            status: { $nin: ['cancelled'] }
+        });
+
+        if (existingBooking) {
+            return res.status(400).json({
+                success: false,
+                message: `Time slot ${timeSlot} is already booked. Please choose another slot.`
+            });
+        }
+
+        // Set location
+        const bookingLocation = location || {
+            address: 'Walk-in / At Shop',
+            city: 'Walk-in',
+            state: '',
+            zipCode: '',
+            landmark: ''
+        };
+
+        // Create booking
+        const booking = await Booking.create({
+            bookingType,
+            customerId: bookingType === 'online' ? customerId : null,
+            walkInCustomer: bookingType === 'walkin' ? {
+                name: walkInCustomer.name,
+                phone: walkInCustomer.phone || '',
+                email: walkInCustomer.email || ''
+            } : {
+                name: '',
+                phone: '',
+                email: ''
+            },
+            serviceId: service._id,
+            serviceName: service.name,
+            serviceCategory: service.category,
+            vehicleTypeId: selectedVehicleType._id,
+            vehicleTypeName: selectedVehicleType.label,
+            vehicleType: selectedVehicleType.type,
+            price: selectedVehicleType.price,
+            duration: selectedVehicleType.duration,
+            bookingDate: requestedDate,
+            timeSlot,
+            location: bookingLocation,
+            vehicleDetails,
+            specialNotes: specialNotes || '',
+            paymentMethod: paymentMethod || 'cash',
+            paymentStatus: paymentStatus || 'pending',
+            createdBy: req.user._id,
+            status: 'confirmed'
+        });
+
+        // Update service total bookings
+        await Service.findByIdAndUpdate(serviceId, {
+            $inc: { totalBookings: 1 }
+        });
+
+        // ============================================
+        // 🔌 SOCKET - Admin Created Booking
+        // ============================================
+        try {
+            const io = getIO();
+
+            const customerName = bookingType === 'walkin'
+                ? walkInCustomer.name
+                : `Customer ${customerId}`;
+
+            // Notify all admins
+            io.to('admin_room').emit(SOCKET_EVENTS.NEW_BOOKING, {
+                bookingId: booking._id,
+                bookingCode: booking.bookingCode,
+                bookingType: booking.bookingType,
+                customerName,
+                serviceName: booking.serviceName,
+                vehicleTypeName: booking.vehicleTypeName,
+                bookingDate: booking.bookingDate,
+                timeSlot: booking.timeSlot,
+                price: booking.price,
+                status: booking.status,
+                createdAt: booking.createdAt
+            });
+
+            // Tell everyone slot is now booked
+            io.emit(SOCKET_EVENTS.SLOT_BOOKED, {
+                serviceId: booking.serviceId,
+                bookingDate: booking.bookingDate,
+                timeSlot: booking.timeSlot
+            });
+
+            // If online booking notify the customer
+            if (bookingType === 'online' && customerId) {
+                io.to(`user_${customerId}`).emit(
+                    SOCKET_EVENTS.BOOKING_STATUS_UPDATED,
+                    {
+                        bookingId: booking._id,
+                        bookingCode: booking.bookingCode,
+                        status: booking.status,
+                        serviceName: booking.serviceName,
+                        bookingDate: booking.bookingDate,
+                        timeSlot: booking.timeSlot
+                    }
+                );
+            }
+
+            console.log('🔌 Socket emitted for admin booking');
+        } catch (socketError) {
+            console.error('Socket emit error:', socketError.message);
+        }
+
+        res.status(201).json({
+            success: true,
+            message: `${bookingType === 'walkin'
+                ? 'Walk-in'
+                : 'Online'} booking created successfully!`,
+            data: {
+                bookingId: booking._id,
+                bookingCode: booking.bookingCode,
+                bookingType: booking.bookingType,
+                customer: bookingType === 'walkin'
+                    ? booking.walkInCustomer
+                    : { customerId },
+                serviceName: booking.serviceName,
+                serviceCategory: booking.serviceCategory,
+                vehicleTypeName: booking.vehicleTypeName,
+                price: booking.price,
+                duration: booking.duration,
+                bookingDate: booking.bookingDate,
+                timeSlot: booking.timeSlot,
+                location: booking.location,
+                vehicleDetails: booking.vehicleDetails,
+                status: booking.status,
+                paymentMethod: booking.paymentMethod,
+                paymentStatus: booking.paymentStatus,
+                specialNotes: booking.specialNotes
+            }
+        });
+
+    } catch (error) {
+        console.error('Admin create booking error:', error);
+
+        if (error.code === 11000) {
+            return res.status(400).json({
+                success: false,
+                message: 'This time slot was just booked. Please choose another slot.'
+            });
+        }
+
+        res.status(500).json({
+            success: false,
+            message: 'Failed to create booking',
+            error: error.message
+        });
+    }
+};
+
+// ============================================
+// REVENUE REPORT
 // ============================================
 
 export const getRevenueReport = async (req, res) => {
@@ -924,12 +1289,10 @@ export const getRevenueReport = async (req, res) => {
             }
         }
 
-        // Group by day or month
         const dateFormat = groupBy === 'month'
             ? '%Y-%m'
             : '%Y-%m-%d';
 
-        // Daily/Monthly revenue
         const revenueData = await Booking.aggregate([
             { $match: matchCondition },
             {
@@ -947,7 +1310,6 @@ export const getRevenueReport = async (req, res) => {
             { $sort: { _id: 1 } }
         ]);
 
-        // Revenue by service category
         const revenueByCategory = await Booking.aggregate([
             { $match: matchCondition },
             {
@@ -960,7 +1322,6 @@ export const getRevenueReport = async (req, res) => {
             { $sort: { revenue: -1 } }
         ]);
 
-        // Revenue by vehicle type
         const revenueByVehicle = await Booking.aggregate([
             { $match: matchCondition },
             {
@@ -974,7 +1335,6 @@ export const getRevenueReport = async (req, res) => {
             { $sort: { revenue: -1 } }
         ]);
 
-        // Revenue by city
         const revenueByCity = await Booking.aggregate([
             { $match: matchCondition },
             {
@@ -1102,7 +1462,9 @@ export const toggleReviewVisibility = async (req, res) => {
 
         res.status(200).json({
             success: true,
-            message: `Review ${review.isVisible ? 'shown' : 'hidden'} successfully`,
+            message: `Review ${review.isVisible
+                ? 'shown'
+                : 'hidden'} successfully`,
             data: review
         });
 
@@ -1136,7 +1498,6 @@ export const getBookingReport = async (req, res) => {
             }
         }
 
-        // Bookings by status
         const byStatus = await Booking.aggregate([
             { $match: matchCondition },
             {
@@ -1147,7 +1508,6 @@ export const getBookingReport = async (req, res) => {
             }
         ]);
 
-        // Bookings by vehicle type
         const byVehicleType = await Booking.aggregate([
             { $match: matchCondition },
             {
@@ -1161,7 +1521,6 @@ export const getBookingReport = async (req, res) => {
             { $sort: { count: -1 } }
         ]);
 
-        // Bookings by service
         const byService = await Booking.aggregate([
             { $match: matchCondition },
             {
@@ -1175,7 +1534,6 @@ export const getBookingReport = async (req, res) => {
             { $sort: { count: -1 } }
         ]);
 
-        // Bookings by time slot
         const byTimeSlot = await Booking.aggregate([
             { $match: matchCondition },
             {
@@ -1187,7 +1545,6 @@ export const getBookingReport = async (req, res) => {
             { $sort: { count: -1 } }
         ]);
 
-        // Bookings by city
         const byCity = await Booking.aggregate([
             { $match: matchCondition },
             {
@@ -1200,6 +1557,18 @@ export const getBookingReport = async (req, res) => {
             { $limit: 10 }
         ]);
 
+        // ✅ NEW: By booking type (walkin vs online)
+        const byBookingType = await Booking.aggregate([
+            { $match: matchCondition },
+            {
+                $group: {
+                    _id: '$bookingType',
+                    count: { $sum: 1 },
+                    revenue: { $sum: '$price' }
+                }
+            }
+        ]);
+
         res.status(200).json({
             success: true,
             data: {
@@ -1207,7 +1576,8 @@ export const getBookingReport = async (req, res) => {
                 byVehicleType,
                 byService,
                 byTimeSlot,
-                byCity
+                byCity,
+                byBookingType
             }
         });
 
@@ -1216,369 +1586,6 @@ export const getBookingReport = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Error fetching booking report',
-            error: error.message
-        });
-    }
-};
-
-// ============================================
-// UPDATE AVATAR
-// ============================================
-
-export const updateAvatar = async (req, res) => {
-    try {
-        if (!req.file) {
-            return res.status(400).json({
-                success: false,
-                message: 'No image uploaded'
-            });
-        }
-
-        const user = await User.findById(req.user._id);
-
-        if (!user) {
-            return res.status(404).json({
-                success: false,
-                message: 'User not found'
-            });
-        }
-
-        // Delete old avatar from cloudinary if not default
-        if (user.avatar && !user.avatar.includes('default')) {
-            await deleteCloudinaryImage(user.avatar);
-        }
-
-        const updatedUser = await User.findByIdAndUpdate(
-            req.user._id,
-            { avatar: req.file.path },
-            { new: true }
-        );
-
-        res.status(200).json({
-            success: true,
-            message: 'Avatar updated successfully',
-            data: {
-                avatar: updatedUser.avatar
-            }
-        });
-
-    } catch (error) {
-        console.error('Update avatar error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to update avatar'
-        });
-    }
-};
-
-
-
-// ============================================
-// CREATE BOOKING (ADMIN - Walk-in or Registered)
-// ============================================
-
-export const createAdminBooking = async (req, res) => {
-    try {
-        const {
-            // Customer info
-            bookingType,        // 'walkin' or 'online'
-            customerId,         // optional - if registered user
-            walkInCustomer,     // { name, phone, email } - if walk-in
-
-            // Booking info
-            serviceId,
-            vehicleTypeId,
-            bookingDate,
-            timeSlot,
-            specialNotes,
-            paymentMethod,
-            paymentStatus,
-
-            // Location - optional for walkin (defaults to shop)
-            location,
-
-            // Vehicle details
-            vehicleDetails
-        } = req.body;
-
-        // ============================================
-        // VALIDATE BOOKING TYPE
-        // ============================================
-        const validBookingTypes = ['walkin', 'online'];
-        if (!bookingType || !validBookingTypes.includes(bookingType)) {
-            return res.status(400).json({
-                success: false,
-                message: 'bookingType must be "walkin" or "online"'
-            });
-        }
-
-        // ============================================
-        // VALIDATE CUSTOMER
-        // ============================================
-        if (bookingType === 'walkin') {
-            // Walk-in needs at least a name
-            if (!walkInCustomer || !walkInCustomer.name) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Walk-in customer name is required'
-                });
-            }
-        }
-
-        if (bookingType === 'online') {
-            // Online booking needs a registered user
-            if (!customerId) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Customer ID is required for online booking type'
-                });
-            }
-
-            if (!isValidObjectId(customerId)) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Invalid customer ID'
-                });
-            }
-
-            // Check if user exists
-            const customerExists = await User.findById(customerId);
-            if (!customerExists) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Customer not found'
-                });
-            }
-        }
-
-        // ============================================
-        // VALIDATE SERVICE
-        // ============================================
-        if (!serviceId || !isValidObjectId(serviceId)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Valid service ID is required'
-            });
-        }
-
-        const service = await Service.findOne({
-            _id: serviceId,
-            isActive: true
-        });
-
-        if (!service) {
-            return res.status(404).json({
-                success: false,
-                message: 'Service not found or not active'
-            });
-        }
-
-        // ============================================
-        // VALIDATE VEHICLE TYPE
-        // ============================================
-        if (!vehicleTypeId) {
-            return res.status(400).json({
-                success: false,
-                message: 'Vehicle type ID is required'
-            });
-        }
-
-        const selectedVehicleType = service.vehicleTypes.id(vehicleTypeId);
-
-        if (!selectedVehicleType) {
-            return res.status(404).json({
-                success: false,
-                message: 'Vehicle type not found in this service'
-            });
-        }
-
-        if (!selectedVehicleType.isActive) {
-            return res.status(400).json({
-                success: false,
-                message: 'This vehicle type is currently not available'
-            });
-        }
-
-        // ============================================
-        // VALIDATE VEHICLE DETAILS
-        // ============================================
-        if (!vehicleDetails || !vehicleDetails.type) {
-            return res.status(400).json({
-                success: false,
-                message: 'Vehicle details with type are required'
-            });
-        }
-
-        // ============================================
-        // VALIDATE DATE & TIME
-        // ============================================
-        if (!bookingDate || !timeSlot) {
-            return res.status(400).json({
-                success: false,
-                message: 'Booking date and time slot are required'
-            });
-        }
-
-        const requestedDate = new Date(bookingDate);
-        if (isNaN(requestedDate.getTime())) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid date format. Use YYYY-MM-DD'
-            });
-        }
-
-        // Check Sunday
-        if (requestedDate.getDay() === 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'We are closed on Sundays'
-            });
-        }
-
-        const validTimeSlots = [
-            '08:00-09:00', '09:00-10:00', '10:00-11:00',
-            '11:00-12:00', '12:00-13:00', '13:00-14:00',
-            '14:00-15:00', '15:00-16:00', '16:00-17:00',
-            '17:00-18:00'
-        ];
-
-        if (!validTimeSlots.includes(timeSlot)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid time slot'
-            });
-        }
-
-        // ============================================
-        // CHECK SLOT AVAILABILITY
-        // ============================================
-        const startOfDay = new Date(requestedDate);
-        startOfDay.setHours(0, 0, 0, 0);
-
-        const endOfDay = new Date(requestedDate);
-        endOfDay.setHours(23, 59, 59, 999);
-
-        const existingBooking = await Booking.findOne({
-            serviceId,
-            bookingDate: { $gte: startOfDay, $lte: endOfDay },
-            timeSlot,
-            status: { $nin: ['cancelled'] }
-        });
-
-        if (existingBooking) {
-            return res.status(400).json({
-                success: false,
-                message: `Time slot ${timeSlot} is already booked. Please choose another slot.`
-            });
-        }
-
-        // ============================================
-        // SET LOCATION
-        // Admin walk-in defaults to shop location
-        // ============================================
-        const bookingLocation = location || {
-            address: 'Walk-in / At Shop',
-            city: 'Walk-in',
-            state: '',
-            zipCode: '',
-            landmark: ''
-        };
-
-        // ============================================
-        // CREATE BOOKING
-        // ============================================
-        const booking = await Booking.create({
-            bookingType,
-
-            // Customer
-            customerId: bookingType === 'online' ? customerId : null,
-            walkInCustomer: bookingType === 'walkin' ? {
-                name: walkInCustomer.name,
-                phone: walkInCustomer.phone || '',
-                email: walkInCustomer.email || ''
-            } : {
-                name: '',
-                phone: '',
-                email: ''
-            },
-
-            // Service
-            serviceId: service._id,
-            serviceName: service.name,
-            serviceCategory: service.category,
-
-            // Vehicle type
-            vehicleTypeId: selectedVehicleType._id,
-            vehicleTypeName: selectedVehicleType.label,
-            vehicleType: selectedVehicleType.type,
-            price: selectedVehicleType.price,
-            duration: selectedVehicleType.duration,
-
-            // Schedule
-            bookingDate: requestedDate,
-            timeSlot,
-
-            // Location & vehicle
-            location: bookingLocation,
-            vehicleDetails,
-            specialNotes: specialNotes || '',
-
-            // Payment
-            paymentMethod: paymentMethod || 'cash',
-            paymentStatus: paymentStatus || 'pending',
-
-            // Admin who created
-            createdBy: req.user._id,
-
-            // Admin created bookings start as confirmed
-            status: 'confirmed'
-        });
-
-        // Update service total bookings
-        await Service.findByIdAndUpdate(serviceId, {
-            $inc: { totalBookings: 1 }
-        });
-
-        res.status(201).json({
-            success: true,
-            message: `${bookingType === 'walkin' ? 'Walk-in' : 'Online'} booking created successfully!`,
-            data: {
-                bookingId: booking._id,
-                bookingCode: booking.bookingCode,
-                bookingType: booking.bookingType,
-                customer: bookingType === 'walkin'
-                    ? booking.walkInCustomer
-                    : { customerId },
-                serviceName: booking.serviceName,
-                serviceCategory: booking.serviceCategory,
-                vehicleTypeName: booking.vehicleTypeName,
-                price: booking.price,
-                duration: booking.duration,
-                bookingDate: booking.bookingDate,
-                timeSlot: booking.timeSlot,
-                location: booking.location,
-                vehicleDetails: booking.vehicleDetails,
-                status: booking.status,
-                paymentMethod: booking.paymentMethod,
-                paymentStatus: booking.paymentStatus,
-                specialNotes: booking.specialNotes,
-                createdBy: req.user._id
-            }
-        });
-
-    } catch (error) {
-        console.error('Admin create booking error:', error);
-
-        if (error.code === 11000) {
-            return res.status(400).json({
-                success: false,
-                message: 'This time slot was just booked. Please choose another slot.'
-            });
-        }
-
-        res.status(500).json({
-            success: false,
-            message: 'Failed to create booking',
             error: error.message
         });
     }

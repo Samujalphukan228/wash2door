@@ -1,3 +1,5 @@
+// config/socket.js - FIXED
+
 import { Server } from 'socket.io';
 
 let io;
@@ -10,7 +12,7 @@ export const initSocket = (server) => {
             credentials: true
         }
     });
-socket.js
+
     io.on('connection', (socket) => {
         console.log(`✅ Socket connected: ${socket.id}`);
 
@@ -19,7 +21,6 @@ socket.js
         // ============================================
 
         // Customer joins their own room
-        // Frontend sends: socket.emit('join', { userId: 'xxx' })
         socket.on('join', ({ userId, role }) => {
             if (userId) {
                 socket.join(`user_${userId}`);
