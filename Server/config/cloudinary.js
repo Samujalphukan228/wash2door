@@ -1,5 +1,3 @@
-// config/cloudinary.js
-
 import { v2 as cloudinary } from 'cloudinary';
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import multer from 'multer';
@@ -60,8 +58,8 @@ const fileFilter = (req, file, cb) => {
 export const uploadServiceImages = multer({
     storage: serviceStorage,
     fileFilter,
-    limits: { fileSize: 5 * 1024 * 1024 } // 5MB per image
-}).array('images', 3); // max 3 images
+    limits: { fileSize: 5 * 1024 * 1024 }
+}).array('images', 3);
 
 export const uploadVehicleImage = multer({
     storage: vehicleStorage,
@@ -75,17 +73,10 @@ export const uploadAvatar = multer({
     limits: { fileSize: 2 * 1024 * 1024 }
 }).single('avatar');
 
-// Delete image from cloudinary
-export const deleteCloudinaryImage = async (imageUrl) => {
+// ✅ FIXED: Accept publicId directly instead of URL
+export const deleteCloudinaryImage = async (publicId) => {
     try {
-        if (!imageUrl || imageUrl.includes('default')) return;
-
-        // Extract public_id from URL
-        const urlParts = imageUrl.split('/');
-        const fileName = urlParts[urlParts.length - 1].split('.')[0];
-        const folder = urlParts[urlParts.length - 2];
-        const publicId = `${folder}/${fileName}`;
-
+        if (!publicId || publicId.includes('default')) return;
         await cloudinary.uploader.destroy(publicId);
         console.log(`🗑️ Deleted image: ${publicId}`);
     } catch (error) {

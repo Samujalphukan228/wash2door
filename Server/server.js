@@ -1,5 +1,3 @@
-// server.js
-
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
@@ -14,6 +12,8 @@ import adminRoutes from './routes/adminRoutes.js';
 import publicRoutes from './routes/publicRoutes.js';
 import bookingRoutes from './routes/bookingRoutes.js';
 import reviewRoutes from './routes/reviewRoutes.js';
+// ✅ ADDED: serviceRoutes was missing
+import serviceRoutes from './routes/serviceRoutes.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { generalLimiter } from './middleware/rateLimiter.js';
 import { startCleanupScheduler } from './utils/cleanup.js';
@@ -57,6 +57,8 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/reviews', reviewRoutes);
+// ✅ ADDED: serviceRoutes mounted
+app.use('/api/services', serviceRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
@@ -73,6 +75,7 @@ const server = app.listen(PORT, () => {
     ║   Public:   /api/public/*                                 ║
     ║   Bookings: /api/bookings/*                               ║
     ║   Reviews:  /api/reviews/*                                ║
+    ║   Services: /api/services/*                               ║
     ╚═══════════════════════════════════════════════════════════╝
     `);
 });

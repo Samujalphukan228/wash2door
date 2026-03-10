@@ -1,6 +1,5 @@
-// controllers/serviceController.js - COMPLETE
-
 import Service from '../models/Service.js';
+import Booking from '../models/Booking.js';
 import mongoose from 'mongoose';
 import { deleteCloudinaryImage } from '../config/cloudinary.js';
 
@@ -23,15 +22,14 @@ export const createService = async (req, res) => {
             includes,
             excludes,
             displayOrder,
-            vehicleTypes  // JSON string from form-data
+            vehicleTypes
         } = req.body;
 
         // Validate required fields
         if (!name || !description || !category) {
-            // Delete uploaded images if validation fails
             if (req.files) {
                 for (const file of req.files) {
-                    await deleteCloudinaryImage(file.path);
+                    await deleteCloudinaryImage(file.filename);
                 }
             }
             return res.status(400).json({
@@ -73,7 +71,11 @@ export const createService = async (req, res) => {
         }
 
         // Validate each vehicle type
-        const validVehicleTypes = ['sedan', 'suv', 'hatchback', 'truck', 'van', 'bike', 'other'];
+        const validVehicleTypes = [
+            'sedan', 'suv', 'hatchback',
+            'truck', 'van', 'bike', 'other'
+        ];
+
         for (const vehicle of parsedVehicleTypes) {
             if (!vehicle.type || !validVehicleTypes.includes(vehicle.type)) {
                 return res.status(400).json({
@@ -107,7 +109,7 @@ export const createService = async (req, res) => {
             });
         }
 
-        // Parse arrays
+        // Parse arrays helper
         const parseArray = (value) => {
             if (!value) return [];
             if (Array.isArray(value)) return value;
@@ -141,7 +143,7 @@ export const createService = async (req, res) => {
         // Cleanup uploaded images on error
         if (req.files) {
             for (const file of req.files) {
-                await deleteCloudinaryImage(file.path);
+                await deleteCloudinaryImage(file.filename);
             }
         }
 
@@ -203,7 +205,7 @@ export const updateService = async (req, res) => {
             displayOrder,
             isActive,
             vehicleTypes,
-            removeImages  // array of publicIds to remove
+            removeImages
         } = req.body;
 
         // Parse arrays helper
@@ -230,9 +232,8 @@ export const updateService = async (req, res) => {
             const availableSlots = 3 - currentCount;
 
             if (availableSlots <= 0) {
-                // Delete newly uploaded files since no space
                 for (const file of req.files) {
-                    await deleteCloudinaryImage(file.path);
+                    await deleteCloudinaryImage(file.filename);
                 }
                 return res.status(400).json({
                     success: false,
@@ -240,7 +241,6 @@ export const updateService = async (req, res) => {
                 });
             }
 
-            // Add only available slots
             const filesToAdd = req.files.slice(0, availableSlots);
             filesToAdd.forEach((file, index) => {
                 service.images.push({
@@ -254,7 +254,9 @@ export const updateService = async (req, res) => {
         // Update basic fields
         if (name) service.name = name;
         if (description) service.description = description;
-        if (shortDescription !== undefined) service.shortDescription = shortDescription;
+        if (shortDescription !== undefined) {
+            service.shortDescription = shortDescription;
+        }
         if (category) service.category = category;
         if (displayOrder !== undefined) service.displayOrder = displayOrder;
         if (isActive !== undefined) service.isActive = isActive;
@@ -267,7 +269,6 @@ export const updateService = async (req, res) => {
         if (parsedIncludes) service.includes = parsedIncludes;
         if (parsedExcludes) service.excludes = parsedExcludes;
 
-        // Update vehicle types if provided
         if (vehicleTypes) {
             const parsedVehicleTypes = parseArray(vehicleTypes);
             if (parsedVehicleTypes && parsedVehicleTypes.length > 0) {
@@ -326,33 +327,29 @@ export const addVehicleType = async (req, res) => {
             displayOrder
         } = req.body;
 
-        // Validate required
         if (!type || !price || !duration) {
-            if (req.file) await deleteCloudinaryImage(req.file.path);
+            if (req.file) await deleteCloudinaryImage(req.file.filename);
             return res.status(400).json({
                 success: false,
                 message: 'Vehicle type, price and duration are required'
             });
         }
 
-        // Check if vehicle type already exists
         const exists = service.vehicleTypes.find(v => v.type === type);
         if (exists) {
-            if (req.file) await deleteCloudinaryImage(req.file.path);
+            if (req.file) await deleteCloudinaryImage(req.file.filename);
             return res.status(400).json({
                 success: false,
                 message: `Vehicle type "${type}" already exists in this service`
             });
         }
 
-        // Parse features
         const parseArray = (value) => {
             if (!value) return [];
             if (Array.isArray(value)) return value;
             try { return JSON.parse(value); } catch { return [value]; }
         };
 
-        // Vehicle image
         let vehicleImage = 'default-vehicle.jpg';
         let vehicleImagePublicId = '';
         if (req.file) {
@@ -360,7 +357,6 @@ export const addVehicleType = async (req, res) => {
             vehicleImagePublicId = req.file.filename;
         }
 
-        // Add vehicle type
         service.vehicleTypes.push({
             type,
             label: label || type,
@@ -383,7 +379,7 @@ export const addVehicleType = async (req, res) => {
 
     } catch (error) {
         console.error('Add vehicle type error:', error);
-        if (req.file) await deleteCloudinaryImage(req.file.path);
+        if (req.file) await deleteCloudinaryImage(req.file.filename);
         res.status(500).json({
             success: false,
             message: 'Error adding vehicle type'
@@ -415,7 +411,6 @@ export const updateVehicleType = async (req, res) => {
             });
         }
 
-        // Find vehicle type
         const vehicleType = service.vehicleTypes.id(vehicleTypeId);
 
         if (!vehicleType) {
@@ -441,9 +436,7 @@ export const updateVehicleType = async (req, res) => {
             try { return JSON.parse(value); } catch { return [value]; }
         };
 
-        // Update vehicle image if new one uploaded
         if (req.file) {
-            // Delete old image
             if (vehicleType.imagePublicId) {
                 await deleteCloudinaryImage(vehicleType.imagePublicId);
             }
@@ -451,13 +444,14 @@ export const updateVehicleType = async (req, res) => {
             vehicleType.imagePublicId = req.file.filename;
         }
 
-        // Update fields
         if (label) vehicleType.label = label;
         if (description !== undefined) vehicleType.description = description;
         if (price) vehicleType.price = Number(price);
         if (duration) vehicleType.duration = Number(duration);
         if (isActive !== undefined) vehicleType.isActive = isActive;
-        if (displayOrder !== undefined) vehicleType.displayOrder = Number(displayOrder);
+        if (displayOrder !== undefined) {
+            vehicleType.displayOrder = Number(displayOrder);
+        }
 
         const parsedFeatures = parseArray(features);
         if (parsedFeatures) vehicleType.features = parsedFeatures;
@@ -472,7 +466,7 @@ export const updateVehicleType = async (req, res) => {
 
     } catch (error) {
         console.error('Update vehicle type error:', error);
-        if (req.file) await deleteCloudinaryImage(req.file.path);
+        if (req.file) await deleteCloudinaryImage(req.file.filename);
         res.status(500).json({
             success: false,
             message: 'Error updating vehicle type'
@@ -504,7 +498,6 @@ export const deleteVehicleType = async (req, res) => {
             });
         }
 
-        // Must have at least 1 vehicle type
         if (service.vehicleTypes.length <= 1) {
             return res.status(400).json({
                 success: false,
@@ -521,12 +514,10 @@ export const deleteVehicleType = async (req, res) => {
             });
         }
 
-        // Delete vehicle image from cloudinary
         if (vehicleType.imagePublicId) {
             await deleteCloudinaryImage(vehicleType.imagePublicId);
         }
 
-        // Remove vehicle type
         service.vehicleTypes.pull(vehicleTypeId);
         await service.save();
 
@@ -569,6 +560,19 @@ export const deleteService = async (req, res) => {
             });
         }
 
+        // ✅ ADDED: Check for active bookings before deleting
+        const activeBookings = await Booking.countDocuments({
+            serviceId,
+            status: { $in: ['pending', 'confirmed', 'in-progress'] }
+        });
+
+        if (activeBookings > 0) {
+            return res.status(400).json({
+                success: false,
+                message: `Cannot delete service with ${activeBookings} active booking(s). Cancel them first.`
+            });
+        }
+
         // Delete all service images from cloudinary
         for (const image of service.images) {
             if (image.publicId) {
@@ -605,7 +609,13 @@ export const deleteService = async (req, res) => {
 
 export const getAllServicesAdmin = async (req, res) => {
     try {
-        const { category, isActive, page = 1, limit = 10 } = req.query;
+        const {
+            category,
+            isActive,
+            page = 1,
+            limit = 10
+        } = req.query;
+
         const pageNum = parseInt(page);
         const limitNum = parseInt(limit);
 
@@ -699,10 +709,8 @@ export const setPrimaryImage = async (req, res) => {
             });
         }
 
-        // Reset all to non-primary
         service.images.forEach(img => { img.isPrimary = false; });
 
-        // Set selected as primary
         const image = service.images.id(imageId);
         if (!image) {
             return res.status(404).json({

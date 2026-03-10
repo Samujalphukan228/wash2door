@@ -1,5 +1,3 @@
-// middleware/errorHandler.js
-
 // Not found handler
 export const notFound = (req, res, next) => {
     const error = new Error(`Not Found - ${req.originalUrl}`);
@@ -9,7 +7,8 @@ export const notFound = (req, res, next) => {
 
 // Global error handler
 export const errorHandler = (err, req, res, next) => {
-    let statusCode = res.statusCode === 200 ? 500 : res.statusCode;
+    // ✅ FIXED: was === 200, now handles all 2xx codes
+    let statusCode = res.statusCode < 400 ? 500 : res.statusCode;
     let message = err.message;
 
     // Mongoose bad ObjectId

@@ -1,5 +1,3 @@
-// routes/authRoutes.js
-
 import express from 'express';
 import {
     register,
@@ -15,7 +13,9 @@ import {
     changePassword,
     getMe,
     updateProfile,
+    updateAvatar,
     deactivateAccount,
+    getUserStats,
     checkRegistrationStatus,
     debugUserStatus,
     deleteUserCompletely
@@ -27,7 +27,6 @@ import {
     passwordResetLimiter,
     emailVerificationLimiter
 } from '../middleware/rateLimiter.js';
-
 import {
     registerValidator,
     loginValidator,
@@ -36,15 +35,14 @@ import {
     changePasswordValidator,
     verifyEmailValidator
 } from '../validators/authValidator.js';
-
+import { handleAvatarUpload } from '../middleware/uploadMiddleware.js';
 import User from '../models/User.js';
 
 const router = express.Router();
 
 // ============================================
-// REGISTRATION FLOW
+// REGISTRATION
 // ============================================
-
 router.post('/register', authLimiter, registerValidator, register);
 router.post('/verify-otp', authLimiter, verifyOTP);
 router.post('/resend-otp', authLimiter, resendOTP);
@@ -52,7 +50,6 @@ router.post('/resend-otp', authLimiter, resendOTP);
 // ============================================
 // AUTHENTICATION
 // ============================================
-
 router.post('/login', authLimiter, loginValidator, login);
 router.post('/logout', protect, logout);
 router.post('/refresh-token', refreshToken);
@@ -60,41 +57,63 @@ router.post('/refresh-token', refreshToken);
 // ============================================
 // EMAIL VERIFICATION
 // ============================================
-
-router.get('/verify-email/:token', emailVerificationLimiter, verifyEmailValidator, verifyEmail);
-router.post('/resend-verification', protect, emailVerificationLimiter, resendVerificationEmail);
+router.get(
+    '/verify-email/:token',
+    emailVerificationLimiter,
+    verifyEmailValidator,
+    verifyEmail
+);
+router.post(
+    '/resend-verification',
+    protect,
+    emailVerificationLimiter,
+    resendVerificationEmail
+);
 
 // ============================================
-// PASSWORD MANAGEMENT
+// PASSWORD
 // ============================================
-
-router.post('/forgot-password', passwordResetLimiter, forgotPasswordValidator, forgotPassword);
-router.post('/reset-password/:token', resetPasswordValidator, resetPassword);
-router.put('/change-password', protect, changePasswordValidator, changePassword);
+router.post(
+    '/forgot-password',
+    passwordResetLimiter,
+    forgotPasswordValidator,
+    forgotPassword
+);
+router.post(
+    '/reset-password/:token',
+    resetPasswordValidator,
+    resetPassword
+);
+router.put(
+    '/change-password',
+    protect,
+    changePasswordValidator,
+    changePassword
+);
 
 // ============================================
 // USER PROFILE
 // ============================================
-
 router.get('/me', protect, getMe);
 router.put('/update-profile', protect, updateProfile);
+router.put('/update-avatar', protect, handleAvatarUpload, updateAvatar);
 router.delete('/deactivate', protect, deactivateAccount);
 
 // ============================================
-// DEBUG ROUTES
+// USER STATS
 // ============================================
+router.get('/me/stats', protect, getUserStats);
 
+// ============================================
+// UTILITY
+// ============================================
 router.post('/check-registration', checkRegistrationStatus);
-router.get('/debug/:email', debugUserStatus);
-router.delete('/delete-user/:email', deleteUserCompletely);
 
 // ============================================
 // SETUP FIRST ADMIN (ONE TIME USE)
 // ============================================
-
 router.post('/setup-admin', async (req, res) => {
     try {
-        // Check if any admin exists
         const adminExists = await User.findOne({ role: 'admin' });
 
         if (adminExists) {
@@ -113,8 +132,7 @@ router.post('/setup-admin', async (req, res) => {
             });
         }
 
-        // Find user
-        const user = await User.findOne({ 
+        const user = await User.findOne({
             email: email.toLowerCase(),
             registrationStatus: 'completed'
         });
@@ -122,12 +140,13 @@ router.post('/setup-admin', async (req, res) => {
         if (!user) {
             return res.status(404).json({
                 success: false,
-                message: 'User not found. Register first, then use this route.'
+                message: 'User not found. Register first.'
             });
         }
 
-        // Verify password
-        const userWithPassword = await User.findById(user._id).select('+password');
+        const userWithPassword = await User.findById(user._id)
+            .select('+password');
+
         const isValid = await userWithPassword.comparePassword(password);
 
         if (!isValid) {
@@ -137,7 +156,6 @@ router.post('/setup-admin', async (req, res) => {
             });
         }
 
-        // Make admin
         user.role = 'admin';
         await user.save({ validateBeforeSave: false });
 
@@ -147,8 +165,6 @@ router.post('/setup-admin', async (req, res) => {
             data: {
                 id: user._id,
                 email: user.email,
-                firstName: user.firstName,
-                lastName: user.lastName,
                 role: user.role
             }
         });
@@ -161,5 +177,13 @@ router.post('/setup-admin', async (req, res) => {
         });
     }
 });
+
+// ============================================
+// DEBUG ROUTES (Development only)
+// ============================================
+if (process.env.NODE_ENV === 'development') {
+    router.get('/debug/:email', debugUserStatus);
+    router.delete('/delete-user/:email', deleteUserCompletely);
+}
 
 export default router;

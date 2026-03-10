@@ -1,9 +1,8 @@
-// routes/adminRoutes.js
-
 import express from 'express';
 import {
     getDashboardStats,
     getAllUsers,
+    getUserById,
     blockUser,
     unblockUser,
     changeUserRole,
@@ -13,7 +12,9 @@ import {
     deleteService,
     getAllBookings,
     updateBookingStatus,
+    createAdminBooking,
     getRevenueReport,
+    getBookingReport,
     getAllReviews,
     toggleReviewVisibility
 } from '../controllers/adminController.js';
@@ -29,6 +30,7 @@ router.get('/dashboard/stats', getDashboardStats);
 
 // USERS
 router.get('/users', getAllUsers);
+router.get('/users/:userId', getUserById);
 router.put('/users/:userId/block', blockUser);
 router.put('/users/:userId/unblock', unblockUser);
 router.put('/users/:userId/role', changeUserRole);
@@ -41,6 +43,7 @@ router.delete('/services/:serviceId', deleteService);
 
 // BOOKINGS
 router.get('/bookings', getAllBookings);
+router.post('/bookings', createAdminBooking);
 router.put('/bookings/:bookingId/status', updateBookingStatus);
 
 // REVIEWS
@@ -49,5 +52,6 @@ router.put('/reviews/:reviewId/toggle', toggleReviewVisibility);
 
 // REPORTS
 router.get('/reports/revenue', getRevenueReport);
+router.get('/reports/bookings', getBookingReport);
 
 export default router;

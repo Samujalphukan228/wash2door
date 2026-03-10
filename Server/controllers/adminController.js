@@ -1,4 +1,4 @@
-// controllers/adminController.js - FIXED: Added service validation
+// controllers/adminController.js - COMPLETE FIXED
 
 import User from '../models/User.js';
 import Service from '../models/Service.js';
@@ -6,85 +6,360 @@ import Booking from '../models/Booking.js';
 import Review from '../models/Review.js';
 import { sendBookingStatusEmail } from '../utils/sendEmail.js';
 import mongoose from 'mongoose';
+import { deleteCloudinaryImage } from '../config/cloudinary.js';
 
-const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
+const isValidObjectId = (id) =>
+    mongoose.Types.ObjectId.isValid(id) &&
+    /^[0-9a-fA-F]{24}$/.test(id);
 
-// DASHBOARD
+// ============================================
+// DASHBOARD STATS
+// ============================================
+
 export const getDashboardStats = async (req, res) => {
     try {
-        const totalUsers = await User.countDocuments({ 
-            role: 'user',
-            registrationStatus: 'completed' 
-        });
-        
-        const totalAdmins = await User.countDocuments({ role: 'admin' });
-        const totalBookings = await Booking.countDocuments();
-        const totalServices = await Service.countDocuments({ isActive: true });
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const todayEnd = new Date();
+        todayEnd.setHours(23, 59, 59, 999);
+
+        const thisMonthStart = new Date(
+            today.getFullYear(),
+            today.getMonth(),
+            1
+        );
+
+        // Basic counts
+        const [
+            totalUsers,
+            totalAdmins,
+            totalBookings,
+            totalServices,
+            bookingsToday,
+            pendingBookings,
+            confirmedBookings,
+            inProgressBookings,
+            completedBookings,
+            cancelledBookings,
+            bookingsThisMonth
+        ] = await Promise.all([
+            User.countDocuments({
+                role: 'user',
+                registrationStatus: 'completed'
+            }),
+            User.countDocuments({ role: 'admin' }),
+            Booking.countDocuments(),
+            Service.countDocuments({ isActive: true }),
+            Booking.countDocuments({
+                createdAt: { $gte: today, $lte: todayEnd }
+            }),
+            Booking.countDocuments({ status: 'pending' }),
+            Booking.countDocuments({ status: 'confirmed' }),
+            Booking.countDocuments({ status: 'in-progress' }),
+            Booking.countDocuments({ status: 'completed' }),
+            Booking.countDocuments({ status: 'cancelled' }),
+            Booking.countDocuments({
+                createdAt: { $gte: thisMonthStart }
+            })
+        ]);
+
+        // Revenue this month (completed bookings)
+        const revenueThisMonth = await Booking.aggregate([
+            {
+                $match: {
+                    status: 'completed',
+                    completedAt: { $gte: thisMonthStart }
+                }
+            },
+            {
+                $group: {
+                    _id: null,
+                    total: { $sum: '$price' }
+                }
+            }
+        ]);
+
+        // Total revenue all time
+        const totalRevenue = await Booking.aggregate([
+            { $match: { status: 'completed' } },
+            {
+                $group: {
+                    _id: null,
+                    total: { $sum: '$price' }
+                }
+            }
+        ]);
+
+        // Recent 5 bookings
+        const recentBookings = await Booking.find()
+            .sort({ createdAt: -1 })
+            .limit(5)
+            .populate('customerId', 'firstName lastName email');
+
+        // Popular services
+        const popularServices = await Booking.aggregate([
+            { $match: { status: { $ne: 'cancelled' } } },
+            {
+                $group: {
+                    _id: '$serviceId',
+                    serviceName: { $first: '$serviceName' },
+                    totalBookings: { $sum: 1 },
+                    totalRevenue: { $sum: '$price' }
+                }
+            },
+            { $sort: { totalBookings: -1 } },
+            { $limit: 5 }
+        ]);
+
+        // Bookings by category
+        const bookingsByCategory = await Booking.aggregate([
+            { $match: { status: { $ne: 'cancelled' } } },
+            {
+                $group: {
+                    _id: '$serviceCategory',
+                    count: { $sum: 1 },
+                    revenue: { $sum: '$price' }
+                }
+            },
+            { $sort: { count: -1 } }
+        ]);
 
         res.status(200).json({
             success: true,
-            data: { totalUsers, totalAdmins, totalBookings, totalServices }
+            data: {
+                users: {
+                    total: totalUsers,
+                    admins: totalAdmins
+                },
+                services: {
+                    total: totalServices
+                },
+                bookings: {
+                    total: totalBookings,
+                    today: bookingsToday,
+                    thisMonth: bookingsThisMonth,
+                    byStatus: {
+                        pending: pendingBookings,
+                        confirmed: confirmedBookings,
+                        inProgress: inProgressBookings,
+                        completed: completedBookings,
+                        cancelled: cancelledBookings
+                    }
+                },
+                revenue: {
+                    total: totalRevenue[0]?.total || 0,
+                    thisMonth: revenueThisMonth[0]?.total || 0
+                },
+                recentBookings,
+                popularServices,
+                bookingsByCategory
+            }
         });
 
     } catch (error) {
         console.error('Dashboard error:', error);
         res.status(500).json({
             success: false,
-            message: 'Error fetching dashboard stats'
+            message: 'Error fetching dashboard stats',
+            error: error.message
         });
     }
 };
 
+// ============================================
 // GET ALL USERS
+// ============================================
+
 export const getAllUsers = async (req, res) => {
     try {
-        const { page = 1, limit = 10 } = req.query;
+        const {
+            page = 1,
+            limit = 10,
+            search,
+            isBlocked
+        } = req.query;
+
         const pageNum = parseInt(page);
         const limitNum = parseInt(limit);
 
-        const total = await User.countDocuments({ 
-            role: 'user', 
-            registrationStatus: 'completed' 
-        });
+        // Build query
+        const query = {
+            role: 'user',
+            registrationStatus: 'completed'
+        };
 
-        const users = await User.find({ 
-            role: 'user', 
-            registrationStatus: 'completed' 
-        })
-            .select('-password -otp -refreshToken')
+        // Search by name or email
+        if (search) {
+            query.$or = [
+                { firstName: { $regex: search, $options: 'i' } },
+                { lastName: { $regex: search, $options: 'i' } },
+                { email: { $regex: search, $options: 'i' } }
+            ];
+        }
+
+        // Filter by blocked status
+        if (isBlocked !== undefined) {
+            query.isBlocked = isBlocked === 'true';
+        }
+
+        const total = await User.countDocuments(query);
+
+        const users = await User.find(query)
+            .select('-password -otp -refreshToken -passwordResetToken -emailVerificationToken')
             .sort({ createdAt: -1 })
             .limit(limitNum)
             .skip((pageNum - 1) * limitNum);
 
         res.status(200).json({
             success: true,
-            data: { users, total, pages: Math.ceil(total / limitNum), currentPage: pageNum }
+            data: {
+                users,
+                total,
+                pages: Math.ceil(total / limitNum),
+                currentPage: pageNum
+            }
         });
 
     } catch (error) {
         console.error('Get users error:', error);
-        res.status(500).json({ success: false, message: 'Error fetching users' });
+        res.status(500).json({
+            success: false,
+            message: 'Error fetching users',
+            error: error.message
+        });
     }
 };
 
+// ============================================
+// GET SINGLE USER WITH BOOKINGS
+// ============================================
+
+export const getUserById = async (req, res) => {
+    try {
+        const { userId } = req.params;
+
+        if (!isValidObjectId(userId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid user ID'
+            });
+        }
+
+        const user = await User.findById(userId)
+            .select('-password -otp -refreshToken -passwordResetToken -emailVerificationToken');
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        // Get user bookings
+        const bookings = await Booking.find({ customerId: userId })
+            .sort({ createdAt: -1 })
+            .limit(10);
+
+        // Get user stats
+        const [
+            totalBookings,
+            completedBookings,
+            cancelledBookings,
+            totalSpent
+        ] = await Promise.all([
+            Booking.countDocuments({ customerId: userId }),
+            Booking.countDocuments({
+                customerId: userId,
+                status: 'completed'
+            }),
+            Booking.countDocuments({
+                customerId: userId,
+                status: 'cancelled'
+            }),
+            Booking.aggregate([
+                {
+                    $match: {
+                        customerId: new mongoose.Types.ObjectId(userId),
+                        status: 'completed'
+                    }
+                },
+                {
+                    $group: {
+                        _id: null,
+                        total: { $sum: '$price' }
+                    }
+                }
+            ])
+        ]);
+
+        // Get user reviews
+        const reviews = await Review.find({ customerId: userId })
+            .populate('serviceId', 'name')
+            .sort({ createdAt: -1 })
+            .limit(5);
+
+        res.status(200).json({
+            success: true,
+            data: {
+                user,
+                stats: {
+                    totalBookings,
+                    completedBookings,
+                    cancelledBookings,
+                    totalSpent: totalSpent[0]?.total || 0
+                },
+                recentBookings: bookings,
+                recentReviews: reviews
+            }
+        });
+
+    } catch (error) {
+        console.error('Get user error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error fetching user',
+            error: error.message
+        });
+    }
+};
+
+// ============================================
 // BLOCK USER
+// ============================================
+
 export const blockUser = async (req, res) => {
     try {
         const { userId } = req.params;
         const { reason } = req.body;
 
         if (!isValidObjectId(userId)) {
-            return res.status(400).json({ success: false, message: 'Invalid user ID' });
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid user ID'
+            });
         }
 
         const user = await User.findById(userId);
 
         if (!user) {
-            return res.status(404).json({ success: false, message: 'User not found' });
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
         }
 
         if (user.role === 'admin') {
-            return res.status(403).json({ success: false, message: 'Cannot block admin users' });
+            return res.status(403).json({
+                success: false,
+                message: 'Cannot block admin users'
+            });
+        }
+
+        if (user.isBlocked) {
+            return res.status(400).json({
+                success: false,
+                message: 'User is already blocked'
+            });
         }
 
         user.isBlocked = true;
@@ -105,23 +380,43 @@ export const blockUser = async (req, res) => {
 
     } catch (error) {
         console.error('Block user error:', error);
-        res.status(500).json({ success: false, message: 'Error blocking user' });
+        res.status(500).json({
+            success: false,
+            message: 'Error blocking user',
+            error: error.message
+        });
     }
 };
 
+// ============================================
 // UNBLOCK USER
+// ============================================
+
 export const unblockUser = async (req, res) => {
     try {
         const { userId } = req.params;
 
         if (!isValidObjectId(userId)) {
-            return res.status(400).json({ success: false, message: 'Invalid user ID' });
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid user ID'
+            });
         }
 
         const user = await User.findById(userId);
 
         if (!user) {
-            return res.status(404).json({ success: false, message: 'User not found' });
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        if (!user.isBlocked) {
+            return res.status(400).json({
+                success: false,
+                message: 'User is not blocked'
+            });
         }
 
         user.isBlocked = false;
@@ -142,28 +437,51 @@ export const unblockUser = async (req, res) => {
 
     } catch (error) {
         console.error('Unblock user error:', error);
-        res.status(500).json({ success: false, message: 'Error unblocking user' });
+        res.status(500).json({
+            success: false,
+            message: 'Error unblocking user',
+            error: error.message
+        });
     }
 };
 
+// ============================================
 // CHANGE USER ROLE
+// ============================================
+
 export const changeUserRole = async (req, res) => {
     try {
         const { userId } = req.params;
         const { role } = req.body;
 
         if (!isValidObjectId(userId)) {
-            return res.status(400).json({ success: false, message: 'Invalid user ID' });
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid user ID'
+            });
         }
 
         if (!['user', 'admin'].includes(role)) {
-            return res.status(400).json({ success: false, message: 'Invalid role' });
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid role. Must be "user" or "admin"'
+            });
         }
 
         const user = await User.findById(userId);
 
         if (!user) {
-            return res.status(404).json({ success: false, message: 'User not found' });
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        if (user.role === role) {
+            return res.status(400).json({
+                success: false,
+                message: `User is already a ${role}`
+            });
         }
 
         user.role = role;
@@ -182,27 +500,73 @@ export const changeUserRole = async (req, res) => {
 
     } catch (error) {
         console.error('Change role error:', error);
-        res.status(500).json({ success: false, message: 'Error changing role' });
+        res.status(500).json({
+            success: false,
+            message: 'Error changing role',
+            error: error.message
+        });
     }
 };
 
-// GET ALL SERVICES
+// ============================================
+// GET ALL SERVICES (ADMIN)
+// ============================================
+
 export const getAllServices = async (req, res) => {
     try {
-        const services = await Service.find().sort({ createdAt: -1 });
-        res.status(200).json({ success: true, total: services.length, data: services });
+        const {
+            page = 1,
+            limit = 10,
+            category,
+            isActive
+        } = req.query;
+
+        const pageNum = parseInt(page);
+        const limitNum = parseInt(limit);
+
+        const query = {};
+        if (category) query.category = category;
+        if (isActive !== undefined) query.isActive = isActive === 'true';
+
+        const total = await Service.countDocuments(query);
+
+        const services = await Service.find(query)
+            .sort({ displayOrder: 1, createdAt: -1 })
+            .limit(limitNum)
+            .skip((pageNum - 1) * limitNum);
+
+        res.status(200).json({
+            success: true,
+            total,
+            pages: Math.ceil(total / limitNum),
+            currentPage: pageNum,
+            data: services
+        });
+
     } catch (error) {
         console.error('Get services error:', error);
-        res.status(500).json({ success: false, message: 'Error fetching services' });
+        res.status(500).json({
+            success: false,
+            message: 'Error fetching services',
+            error: error.message
+        });
     }
 };
 
-// CREATE SERVICE - FIXED: Added validation
+// ============================================
+// CREATE SERVICE
+// ============================================
+
 export const createService = async (req, res) => {
     try {
-        const { name, description, price, duration, category } = req.body;
+        const {
+            name,
+            description,
+            price,
+            duration,
+            category
+        } = req.body;
 
-        // ✅ FIXED: Validate required fields
         if (!name || !description || !price || !duration || !category) {
             return res.status(400).json({
                 success: false,
@@ -210,24 +574,19 @@ export const createService = async (req, res) => {
             });
         }
 
-        // ✅ FIXED: Validate category
-        const validCategories = ['basic', 'premium', 'deluxe', 'interior', 'exterior', 'full-package'];
+        const validCategories = ['basic', 'standard', 'premium'];
         if (!validCategories.includes(category)) {
             return res.status(400).json({
                 success: false,
-                message: `Invalid category. Must be one of: ${validCategories.join(', ')}`
+                message: `Invalid category. Must be: ${validCategories.join(', ')}`
             });
         }
 
-        // ✅ FIXED: Validate price
-        if (price < 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'Price cannot be negative'
-            });
-        }
+        const serviceData = {
+            ...req.body,
+            createdBy: req.user._id
+        };
 
-        const serviceData = { ...req.body, createdBy: req.user._id };
         const service = await Service.create(serviceData);
 
         res.status(201).json({
@@ -239,7 +598,6 @@ export const createService = async (req, res) => {
     } catch (error) {
         console.error('Create service error:', error);
 
-        // ✅ FIXED: Handle duplicate name error
         if (error.code === 11000) {
             return res.status(400).json({
                 success: false,
@@ -256,17 +614,27 @@ export const createService = async (req, res) => {
             });
         }
 
-        res.status(500).json({ success: false, message: 'Error creating service' });
+        res.status(500).json({
+            success: false,
+            message: 'Error creating service',
+            error: error.message
+        });
     }
 };
 
+// ============================================
 // UPDATE SERVICE
+// ============================================
+
 export const updateService = async (req, res) => {
     try {
         const { serviceId } = req.params;
 
         if (!isValidObjectId(serviceId)) {
-            return res.status(400).json({ success: false, message: 'Invalid service ID' });
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid service ID'
+            });
         }
 
         const service = await Service.findByIdAndUpdate(
@@ -276,7 +644,10 @@ export const updateService = async (req, res) => {
         );
 
         if (!service) {
-            return res.status(404).json({ success: false, message: 'Service not found' });
+            return res.status(404).json({
+                success: false,
+                message: 'Service not found'
+            });
         }
 
         res.status(200).json({
@@ -287,48 +658,147 @@ export const updateService = async (req, res) => {
 
     } catch (error) {
         console.error('Update service error:', error);
-        res.status(500).json({ success: false, message: 'Error updating service' });
+        res.status(500).json({
+            success: false,
+            message: 'Error updating service',
+            error: error.message
+        });
     }
 };
 
+// ============================================
 // DELETE SERVICE
+// ============================================
+
 export const deleteService = async (req, res) => {
     try {
         const { serviceId } = req.params;
 
         if (!isValidObjectId(serviceId)) {
-            return res.status(400).json({ success: false, message: 'Invalid service ID' });
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid service ID'
+            });
         }
 
         const service = await Service.findByIdAndDelete(serviceId);
 
         if (!service) {
-            return res.status(404).json({ success: false, message: 'Service not found' });
+            return res.status(404).json({
+                success: false,
+                message: 'Service not found'
+            });
         }
 
-        res.status(200).json({ success: true, message: 'Service deleted successfully' });
+        res.status(200).json({
+            success: true,
+            message: 'Service deleted successfully'
+        });
 
     } catch (error) {
         console.error('Delete service error:', error);
-        res.status(500).json({ success: false, message: 'Error deleting service' });
+        res.status(500).json({
+            success: false,
+            message: 'Error deleting service',
+            error: error.message
+        });
     }
 };
 
-// GET ALL BOOKINGS
+// ============================================
+// GET ALL BOOKINGS (ADMIN) - FIXED
+// ============================================
+
 export const getAllBookings = async (req, res) => {
     try {
-        const { status, page = 1, limit = 10 } = req.query;
+        const {
+            page = 1,
+            limit = 10,
+            status,
+            date,
+            city,
+            search,
+            serviceCategory,
+            startDate,
+            endDate
+        } = req.query;
+
         const pageNum = parseInt(page);
         const limitNum = parseInt(limit);
 
+        // Build query
         const query = {};
-        if (status) query.status = status;
+
+        // Filter by status
+        if (status) {
+            const validStatuses = [
+                'pending', 'confirmed',
+                'in-progress', 'completed', 'cancelled'
+            ];
+            if (validStatuses.includes(status)) {
+                query.status = status;
+            }
+        }
+
+        // Filter by service category
+        if (serviceCategory) {
+            query.serviceCategory = serviceCategory;
+        }
+
+        // Filter by city
+        if (city) {
+            query['location.city'] = {
+                $regex: city,
+                $options: 'i'
+            };
+        }
+
+        // Filter by specific date
+        if (date) {
+            const bookingDate = new Date(date);
+            const startOfDay = new Date(bookingDate);
+            startOfDay.setHours(0, 0, 0, 0);
+            const endOfDay = new Date(bookingDate);
+            endOfDay.setHours(23, 59, 59, 999);
+            query.bookingDate = {
+                $gte: startOfDay,
+                $lte: endOfDay
+            };
+        }
+
+        // Filter by date range
+        if (startDate || endDate) {
+            query.createdAt = {};
+            if (startDate) {
+                query.createdAt.$gte = new Date(startDate);
+            }
+            if (endDate) {
+                query.createdAt.$lte = new Date(endDate);
+            }
+        }
+
+        // Search by booking code
+        if (search) {
+            query.$or = [
+                {
+                    bookingCode: {
+                        $regex: search,
+                        $options: 'i'
+                    }
+                },
+                {
+                    serviceName: {
+                        $regex: search,
+                        $options: 'i'
+                    }
+                }
+            ];
+        }
 
         const total = await Booking.countDocuments(query);
 
         const bookings = await Booking.find(query)
             .populate('customerId', 'firstName lastName email')
-            .populate('serviceId', 'name price')
             .sort({ createdAt: -1 })
             .limit(limitNum)
             .skip((pageNum - 1) * limitNum);
@@ -343,32 +813,49 @@ export const getAllBookings = async (req, res) => {
 
     } catch (error) {
         console.error('Get bookings error:', error);
-        res.status(500).json({ success: false, message: 'Error fetching bookings' });
+        res.status(500).json({
+            success: false,
+            message: 'Error fetching bookings',
+            error: error.message
+        });
     }
 };
 
-// UPDATE BOOKING STATUS
+// ============================================
+// UPDATE BOOKING STATUS (ADMIN) - FIXED
+// ============================================
+
 export const updateBookingStatus = async (req, res) => {
     try {
         const { bookingId } = req.params;
         const { status, reason } = req.body;
 
         if (!isValidObjectId(bookingId)) {
-            return res.status(400).json({ success: false, message: 'Invalid booking ID' });
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid booking ID'
+            });
         }
 
-        const validStatuses = ['pending', 'confirmed', 'in-progress', 'completed', 'cancelled'];
+        const validStatuses = [
+            'pending', 'confirmed',
+            'in-progress', 'completed', 'cancelled'
+        ];
 
         if (!validStatuses.includes(status)) {
             return res.status(400).json({
                 success: false,
-                message: `Invalid status. Must be one of: ${validStatuses.join(', ')}`
+                message: `Invalid status. Must be: ${validStatuses.join(', ')}`
             });
         }
 
+        // Build update data
         const updateData = { status };
 
-        if (status === 'completed') updateData.completedAt = new Date();
+        if (status === 'completed') {
+            updateData.completedAt = new Date();
+            updateData.paymentStatus = 'completed';
+        }
 
         if (status === 'cancelled') {
             updateData.cancelledAt = new Date();
@@ -376,17 +863,26 @@ export const updateBookingStatus = async (req, res) => {
             updateData.cancellationReason = reason || 'Cancelled by admin';
         }
 
-        const booking = await Booking.findByIdAndUpdate(bookingId, updateData, { new: true })
-            .populate('customerId', 'firstName lastName email')
-            .populate('serviceId', 'name price');
+        const booking = await Booking.findByIdAndUpdate(
+            bookingId,
+            updateData,
+            { new: true }
+        ).populate('customerId', 'firstName lastName email');
 
         if (!booking) {
-            return res.status(404).json({ success: false, message: 'Booking not found' });
+            return res.status(404).json({
+                success: false,
+                message: 'Booking not found'
+            });
         }
 
+        // Send status email to customer
         try {
             if (booking.customerId?.email) {
-                await sendBookingStatusEmail(booking.customerId, booking);
+                await sendBookingStatusEmail(
+                    booking.customerId,
+                    booking
+                );
             }
         } catch (emailError) {
             console.error('Status email failed:', emailError.message);
@@ -400,28 +896,50 @@ export const updateBookingStatus = async (req, res) => {
 
     } catch (error) {
         console.error('Update booking error:', error);
-        res.status(500).json({ success: false, message: 'Error updating booking status' });
+        res.status(500).json({
+            success: false,
+            message: 'Error updating booking status',
+            error: error.message
+        });
     }
 };
 
-// REVENUE REPORT
+// ============================================
+// REVENUE REPORT - FIXED
+// ============================================
+
 export const getRevenueReport = async (req, res) => {
     try {
-        const { startDate, endDate } = req.query;
+        const { startDate, endDate, groupBy = 'day' } = req.query;
 
         const matchCondition = { status: 'completed' };
 
         if (startDate || endDate) {
             matchCondition.completedAt = {};
-            if (startDate) matchCondition.completedAt.$gte = new Date(startDate);
-            if (endDate) matchCondition.completedAt.$lte = new Date(endDate);
+            if (startDate) {
+                matchCondition.completedAt.$gte = new Date(startDate);
+            }
+            if (endDate) {
+                matchCondition.completedAt.$lte = new Date(endDate);
+            }
         }
 
+        // Group by day or month
+        const dateFormat = groupBy === 'month'
+            ? '%Y-%m'
+            : '%Y-%m-%d';
+
+        // Daily/Monthly revenue
         const revenueData = await Booking.aggregate([
             { $match: matchCondition },
             {
                 $group: {
-                    _id: { $dateToString: { format: '%Y-%m-%d', date: '$completedAt' } },
+                    _id: {
+                        $dateToString: {
+                            format: dateFormat,
+                            date: '$completedAt'
+                        }
+                    },
                     revenue: { $sum: '$price' },
                     bookings: { $sum: 1 }
                 }
@@ -429,50 +947,154 @@ export const getRevenueReport = async (req, res) => {
             { $sort: { _id: 1 } }
         ]);
 
-        const totalRevenue = revenueData.reduce((sum, day) => sum + day.revenue, 0);
-        const totalBookings = revenueData.reduce((sum, day) => sum + day.bookings, 0);
+        // Revenue by service category
+        const revenueByCategory = await Booking.aggregate([
+            { $match: matchCondition },
+            {
+                $group: {
+                    _id: '$serviceCategory',
+                    revenue: { $sum: '$price' },
+                    bookings: { $sum: 1 }
+                }
+            },
+            { $sort: { revenue: -1 } }
+        ]);
+
+        // Revenue by vehicle type
+        const revenueByVehicle = await Booking.aggregate([
+            { $match: matchCondition },
+            {
+                $group: {
+                    _id: '$vehicleType',
+                    vehicleTypeName: { $first: '$vehicleTypeName' },
+                    revenue: { $sum: '$price' },
+                    bookings: { $sum: 1 }
+                }
+            },
+            { $sort: { revenue: -1 } }
+        ]);
+
+        // Revenue by city
+        const revenueByCity = await Booking.aggregate([
+            { $match: matchCondition },
+            {
+                $group: {
+                    _id: '$location.city',
+                    revenue: { $sum: '$price' },
+                    bookings: { $sum: 1 }
+                }
+            },
+            { $sort: { revenue: -1 } },
+            { $limit: 10 }
+        ]);
+
+        const totalRevenue = revenueData.reduce(
+            (sum, day) => sum + day.revenue, 0
+        );
+
+        const totalBookings = revenueData.reduce(
+            (sum, day) => sum + day.bookings, 0
+        );
 
         res.status(200).json({
             success: true,
-            data: { totalRevenue, totalBookings, dailyData: revenueData }
+            data: {
+                totalRevenue,
+                totalBookings,
+                averageOrderValue: totalBookings > 0
+                    ? Math.round(totalRevenue / totalBookings)
+                    : 0,
+                revenueData,
+                revenueByCategory,
+                revenueByVehicle,
+                revenueByCity
+            }
         });
 
     } catch (error) {
         console.error('Revenue report error:', error);
-        res.status(500).json({ success: false, message: 'Error fetching revenue report' });
+        res.status(500).json({
+            success: false,
+            message: 'Error fetching revenue report',
+            error: error.message
+        });
     }
 };
 
-// GET ALL REVIEWS
+// ============================================
+// GET ALL REVIEWS (ADMIN)
+// ============================================
+
 export const getAllReviews = async (req, res) => {
     try {
-        const reviews = await Review.find()
-            .populate('customerId', 'firstName lastName email')
-            .populate('serviceId', 'name')
-            .populate('bookingId', 'bookingCode')
-            .sort({ createdAt: -1 });
+        const {
+            page = 1,
+            limit = 10,
+            isVisible,
+            serviceId
+        } = req.query;
 
-        res.status(200).json({ success: true, total: reviews.length, data: reviews });
+        const pageNum = parseInt(page);
+        const limitNum = parseInt(limit);
+
+        const query = {};
+        if (isVisible !== undefined) {
+            query.isVisible = isVisible === 'true';
+        }
+        if (serviceId && isValidObjectId(serviceId)) {
+            query.serviceId = serviceId;
+        }
+
+        const total = await Review.countDocuments(query);
+
+        const reviews = await Review.find(query)
+            .populate('customerId', 'firstName lastName email')
+            .populate('serviceId', 'name category')
+            .populate('bookingId', 'bookingCode')
+            .sort({ createdAt: -1 })
+            .limit(limitNum)
+            .skip((pageNum - 1) * limitNum);
+
+        res.status(200).json({
+            success: true,
+            total,
+            pages: Math.ceil(total / limitNum),
+            currentPage: pageNum,
+            data: reviews
+        });
 
     } catch (error) {
         console.error('Get reviews error:', error);
-        res.status(500).json({ success: false, message: 'Error fetching reviews' });
+        res.status(500).json({
+            success: false,
+            message: 'Error fetching reviews',
+            error: error.message
+        });
     }
 };
 
+// ============================================
 // TOGGLE REVIEW VISIBILITY
+// ============================================
+
 export const toggleReviewVisibility = async (req, res) => {
     try {
         const { reviewId } = req.params;
 
         if (!isValidObjectId(reviewId)) {
-            return res.status(400).json({ success: false, message: 'Invalid review ID' });
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid review ID'
+            });
         }
 
         const review = await Review.findById(reviewId);
 
         if (!review) {
-            return res.status(404).json({ success: false, message: 'Review not found' });
+            return res.status(404).json({
+                success: false,
+                message: 'Review not found'
+            });
         }
 
         review.isVisible = !review.isVisible;
@@ -486,6 +1108,478 @@ export const toggleReviewVisibility = async (req, res) => {
 
     } catch (error) {
         console.error('Toggle review error:', error);
-        res.status(500).json({ success: false, message: 'Error toggling review visibility' });
+        res.status(500).json({
+            success: false,
+            message: 'Error toggling review visibility',
+            error: error.message
+        });
+    }
+};
+
+// ============================================
+// BOOKING REPORT
+// ============================================
+
+export const getBookingReport = async (req, res) => {
+    try {
+        const { startDate, endDate } = req.query;
+
+        const matchCondition = {};
+
+        if (startDate || endDate) {
+            matchCondition.createdAt = {};
+            if (startDate) {
+                matchCondition.createdAt.$gte = new Date(startDate);
+            }
+            if (endDate) {
+                matchCondition.createdAt.$lte = new Date(endDate);
+            }
+        }
+
+        // Bookings by status
+        const byStatus = await Booking.aggregate([
+            { $match: matchCondition },
+            {
+                $group: {
+                    _id: '$status',
+                    count: { $sum: 1 }
+                }
+            }
+        ]);
+
+        // Bookings by vehicle type
+        const byVehicleType = await Booking.aggregate([
+            { $match: matchCondition },
+            {
+                $group: {
+                    _id: '$vehicleType',
+                    vehicleTypeName: { $first: '$vehicleTypeName' },
+                    count: { $sum: 1 },
+                    revenue: { $sum: '$price' }
+                }
+            },
+            { $sort: { count: -1 } }
+        ]);
+
+        // Bookings by service
+        const byService = await Booking.aggregate([
+            { $match: matchCondition },
+            {
+                $group: {
+                    _id: '$serviceId',
+                    serviceName: { $first: '$serviceName' },
+                    count: { $sum: 1 },
+                    revenue: { $sum: '$price' }
+                }
+            },
+            { $sort: { count: -1 } }
+        ]);
+
+        // Bookings by time slot
+        const byTimeSlot = await Booking.aggregate([
+            { $match: matchCondition },
+            {
+                $group: {
+                    _id: '$timeSlot',
+                    count: { $sum: 1 }
+                }
+            },
+            { $sort: { count: -1 } }
+        ]);
+
+        // Bookings by city
+        const byCity = await Booking.aggregate([
+            { $match: matchCondition },
+            {
+                $group: {
+                    _id: '$location.city',
+                    count: { $sum: 1 }
+                }
+            },
+            { $sort: { count: -1 } },
+            { $limit: 10 }
+        ]);
+
+        res.status(200).json({
+            success: true,
+            data: {
+                byStatus,
+                byVehicleType,
+                byService,
+                byTimeSlot,
+                byCity
+            }
+        });
+
+    } catch (error) {
+        console.error('Booking report error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error fetching booking report',
+            error: error.message
+        });
+    }
+};
+
+// ============================================
+// UPDATE AVATAR
+// ============================================
+
+export const updateAvatar = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: 'No image uploaded'
+            });
+        }
+
+        const user = await User.findById(req.user._id);
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        // Delete old avatar from cloudinary if not default
+        if (user.avatar && !user.avatar.includes('default')) {
+            await deleteCloudinaryImage(user.avatar);
+        }
+
+        const updatedUser = await User.findByIdAndUpdate(
+            req.user._id,
+            { avatar: req.file.path },
+            { new: true }
+        );
+
+        res.status(200).json({
+            success: true,
+            message: 'Avatar updated successfully',
+            data: {
+                avatar: updatedUser.avatar
+            }
+        });
+
+    } catch (error) {
+        console.error('Update avatar error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to update avatar'
+        });
+    }
+};
+
+
+
+// ============================================
+// CREATE BOOKING (ADMIN - Walk-in or Registered)
+// ============================================
+
+export const createAdminBooking = async (req, res) => {
+    try {
+        const {
+            // Customer info
+            bookingType,        // 'walkin' or 'online'
+            customerId,         // optional - if registered user
+            walkInCustomer,     // { name, phone, email } - if walk-in
+
+            // Booking info
+            serviceId,
+            vehicleTypeId,
+            bookingDate,
+            timeSlot,
+            specialNotes,
+            paymentMethod,
+            paymentStatus,
+
+            // Location - optional for walkin (defaults to shop)
+            location,
+
+            // Vehicle details
+            vehicleDetails
+        } = req.body;
+
+        // ============================================
+        // VALIDATE BOOKING TYPE
+        // ============================================
+        const validBookingTypes = ['walkin', 'online'];
+        if (!bookingType || !validBookingTypes.includes(bookingType)) {
+            return res.status(400).json({
+                success: false,
+                message: 'bookingType must be "walkin" or "online"'
+            });
+        }
+
+        // ============================================
+        // VALIDATE CUSTOMER
+        // ============================================
+        if (bookingType === 'walkin') {
+            // Walk-in needs at least a name
+            if (!walkInCustomer || !walkInCustomer.name) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Walk-in customer name is required'
+                });
+            }
+        }
+
+        if (bookingType === 'online') {
+            // Online booking needs a registered user
+            if (!customerId) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Customer ID is required for online booking type'
+                });
+            }
+
+            if (!isValidObjectId(customerId)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Invalid customer ID'
+                });
+            }
+
+            // Check if user exists
+            const customerExists = await User.findById(customerId);
+            if (!customerExists) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Customer not found'
+                });
+            }
+        }
+
+        // ============================================
+        // VALIDATE SERVICE
+        // ============================================
+        if (!serviceId || !isValidObjectId(serviceId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Valid service ID is required'
+            });
+        }
+
+        const service = await Service.findOne({
+            _id: serviceId,
+            isActive: true
+        });
+
+        if (!service) {
+            return res.status(404).json({
+                success: false,
+                message: 'Service not found or not active'
+            });
+        }
+
+        // ============================================
+        // VALIDATE VEHICLE TYPE
+        // ============================================
+        if (!vehicleTypeId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Vehicle type ID is required'
+            });
+        }
+
+        const selectedVehicleType = service.vehicleTypes.id(vehicleTypeId);
+
+        if (!selectedVehicleType) {
+            return res.status(404).json({
+                success: false,
+                message: 'Vehicle type not found in this service'
+            });
+        }
+
+        if (!selectedVehicleType.isActive) {
+            return res.status(400).json({
+                success: false,
+                message: 'This vehicle type is currently not available'
+            });
+        }
+
+        // ============================================
+        // VALIDATE VEHICLE DETAILS
+        // ============================================
+        if (!vehicleDetails || !vehicleDetails.type) {
+            return res.status(400).json({
+                success: false,
+                message: 'Vehicle details with type are required'
+            });
+        }
+
+        // ============================================
+        // VALIDATE DATE & TIME
+        // ============================================
+        if (!bookingDate || !timeSlot) {
+            return res.status(400).json({
+                success: false,
+                message: 'Booking date and time slot are required'
+            });
+        }
+
+        const requestedDate = new Date(bookingDate);
+        if (isNaN(requestedDate.getTime())) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid date format. Use YYYY-MM-DD'
+            });
+        }
+
+        // Check Sunday
+        if (requestedDate.getDay() === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'We are closed on Sundays'
+            });
+        }
+
+        const validTimeSlots = [
+            '08:00-09:00', '09:00-10:00', '10:00-11:00',
+            '11:00-12:00', '12:00-13:00', '13:00-14:00',
+            '14:00-15:00', '15:00-16:00', '16:00-17:00',
+            '17:00-18:00'
+        ];
+
+        if (!validTimeSlots.includes(timeSlot)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid time slot'
+            });
+        }
+
+        // ============================================
+        // CHECK SLOT AVAILABILITY
+        // ============================================
+        const startOfDay = new Date(requestedDate);
+        startOfDay.setHours(0, 0, 0, 0);
+
+        const endOfDay = new Date(requestedDate);
+        endOfDay.setHours(23, 59, 59, 999);
+
+        const existingBooking = await Booking.findOne({
+            serviceId,
+            bookingDate: { $gte: startOfDay, $lte: endOfDay },
+            timeSlot,
+            status: { $nin: ['cancelled'] }
+        });
+
+        if (existingBooking) {
+            return res.status(400).json({
+                success: false,
+                message: `Time slot ${timeSlot} is already booked. Please choose another slot.`
+            });
+        }
+
+        // ============================================
+        // SET LOCATION
+        // Admin walk-in defaults to shop location
+        // ============================================
+        const bookingLocation = location || {
+            address: 'Walk-in / At Shop',
+            city: 'Walk-in',
+            state: '',
+            zipCode: '',
+            landmark: ''
+        };
+
+        // ============================================
+        // CREATE BOOKING
+        // ============================================
+        const booking = await Booking.create({
+            bookingType,
+
+            // Customer
+            customerId: bookingType === 'online' ? customerId : null,
+            walkInCustomer: bookingType === 'walkin' ? {
+                name: walkInCustomer.name,
+                phone: walkInCustomer.phone || '',
+                email: walkInCustomer.email || ''
+            } : {
+                name: '',
+                phone: '',
+                email: ''
+            },
+
+            // Service
+            serviceId: service._id,
+            serviceName: service.name,
+            serviceCategory: service.category,
+
+            // Vehicle type
+            vehicleTypeId: selectedVehicleType._id,
+            vehicleTypeName: selectedVehicleType.label,
+            vehicleType: selectedVehicleType.type,
+            price: selectedVehicleType.price,
+            duration: selectedVehicleType.duration,
+
+            // Schedule
+            bookingDate: requestedDate,
+            timeSlot,
+
+            // Location & vehicle
+            location: bookingLocation,
+            vehicleDetails,
+            specialNotes: specialNotes || '',
+
+            // Payment
+            paymentMethod: paymentMethod || 'cash',
+            paymentStatus: paymentStatus || 'pending',
+
+            // Admin who created
+            createdBy: req.user._id,
+
+            // Admin created bookings start as confirmed
+            status: 'confirmed'
+        });
+
+        // Update service total bookings
+        await Service.findByIdAndUpdate(serviceId, {
+            $inc: { totalBookings: 1 }
+        });
+
+        res.status(201).json({
+            success: true,
+            message: `${bookingType === 'walkin' ? 'Walk-in' : 'Online'} booking created successfully!`,
+            data: {
+                bookingId: booking._id,
+                bookingCode: booking.bookingCode,
+                bookingType: booking.bookingType,
+                customer: bookingType === 'walkin'
+                    ? booking.walkInCustomer
+                    : { customerId },
+                serviceName: booking.serviceName,
+                serviceCategory: booking.serviceCategory,
+                vehicleTypeName: booking.vehicleTypeName,
+                price: booking.price,
+                duration: booking.duration,
+                bookingDate: booking.bookingDate,
+                timeSlot: booking.timeSlot,
+                location: booking.location,
+                vehicleDetails: booking.vehicleDetails,
+                status: booking.status,
+                paymentMethod: booking.paymentMethod,
+                paymentStatus: booking.paymentStatus,
+                specialNotes: booking.specialNotes,
+                createdBy: req.user._id
+            }
+        });
+
+    } catch (error) {
+        console.error('Admin create booking error:', error);
+
+        if (error.code === 11000) {
+            return res.status(400).json({
+                success: false,
+                message: 'This time slot was just booked. Please choose another slot.'
+            });
+        }
+
+        res.status(500).json({
+            success: false,
+            message: 'Failed to create booking',
+            error: error.message
+        });
     }
 };

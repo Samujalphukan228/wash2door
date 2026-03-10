@@ -1,7 +1,12 @@
-// controllers/reviewController.js
+// controllers/reviewController.js - COMPLETE FIXED
 
 import Review from '../models/Review.js';
 import Booking from '../models/Booking.js';
+import mongoose from 'mongoose';
+
+const isValidObjectId = (id) =>
+    mongoose.Types.ObjectId.isValid(id) &&
+    /^[0-9a-fA-F]{24}$/.test(id);
 
 // ============================================
 // CREATE REVIEW
@@ -11,6 +16,7 @@ export const createReview = async (req, res) => {
     try {
         const { bookingId, rating, comment } = req.body;
 
+        // Validate required
         if (!bookingId || !rating) {
             return res.status(400).json({
                 success: false,
@@ -18,14 +24,24 @@ export const createReview = async (req, res) => {
             });
         }
 
-        if (rating < 1 || rating > 5) {
+        // Validate bookingId
+        if (!isValidObjectId(bookingId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid booking ID'
+            });
+        }
+
+        // Validate rating
+        const ratingNum = Number(rating);
+        if (isNaN(ratingNum) || ratingNum < 1 || ratingNum > 5) {
             return res.status(400).json({
                 success: false,
                 message: 'Rating must be between 1 and 5'
             });
         }
 
-        // Check if booking exists and belongs to user
+        // Find booking
         const booking = await Booking.findOne({
             _id: bookingId,
             customerId: req.user._id
@@ -38,7 +54,7 @@ export const createReview = async (req, res) => {
             });
         }
 
-        // Can only review completed bookings
+        // Only completed bookings can be reviewed
         if (booking.status !== 'completed') {
             return res.status(400).json({
                 success: false,
@@ -54,21 +70,29 @@ export const createReview = async (req, res) => {
             });
         }
 
-        // Create review
+        // Create review with new booking fields
         const review = await Review.create({
-            bookingId,
+            bookingId: booking._id,
             customerId: req.user._id,
             serviceId: booking.serviceId,
-            rating,
-            comment: comment || ''
+            rating: ratingNum,
+            comment: comment || '',
+
+            // Extra info from new booking model
+            vehicleType: booking.vehicleType,
+            vehicleTypeName: booking.vehicleTypeName,
+            serviceName: booking.serviceName,
+            serviceCategory: booking.serviceCategory
         });
 
         // Mark booking as reviewed
         booking.isReviewed = true;
         await booking.save();
 
+        // Populate review
         const populatedReview = await Review.findById(review._id)
-            .populate('customerId', 'firstName lastName avatar');
+            .populate('customerId', 'firstName lastName avatar')
+            .populate('serviceId', 'name category');
 
         res.status(201).json({
             success: true,
@@ -88,7 +112,68 @@ export const createReview = async (req, res) => {
 
         res.status(500).json({
             success: false,
-            message: 'Failed to submit review'
+            message: 'Failed to submit review',
+            error: error.message
+        });
+    }
+};
+
+// ============================================
+// CHECK IF CAN REVIEW
+// ============================================
+
+export const canReview = async (req, res) => {
+    try {
+        const { bookingId } = req.params;
+
+        if (!isValidObjectId(bookingId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid booking ID'
+            });
+        }
+
+        const booking = await Booking.findOne({
+            _id: bookingId,
+            customerId: req.user._id
+        });
+
+        if (!booking) {
+            return res.status(404).json({
+                success: false,
+                message: 'Booking not found'
+            });
+        }
+
+        const canReview =
+            booking.status === 'completed' &&
+            !booking.isReviewed;
+
+        res.status(200).json({
+            success: true,
+            data: {
+                canReview,
+                reason: !canReview
+                    ? booking.isReviewed
+                        ? 'Already reviewed'
+                        : `Booking is ${booking.status}`
+                    : null,
+                booking: {
+                    bookingCode: booking.bookingCode,
+                    serviceName: booking.serviceName,
+                    vehicleTypeName: booking.vehicleTypeName,
+                    status: booking.status,
+                    isReviewed: booking.isReviewed
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error('Can review error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error checking review status',
+            error: error.message
         });
     }
 };
@@ -99,14 +184,28 @@ export const createReview = async (req, res) => {
 
 export const getMyReviews = async (req, res) => {
     try {
-        const reviews = await Review.find({ customerId: req.user._id })
-            .populate('serviceId', 'name image')
-            .populate('bookingId', 'bookingCode bookingDate')
-            .sort({ createdAt: -1 });
+        const { page = 1, limit = 10 } = req.query;
+        const pageNum = parseInt(page);
+        const limitNum = parseInt(limit);
+
+        const total = await Review.countDocuments({
+            customerId: req.user._id
+        });
+
+        const reviews = await Review.find({
+            customerId: req.user._id
+        })
+            .populate('serviceId', 'name category images')
+            .populate('bookingId', 'bookingCode bookingDate timeSlot')
+            .sort({ createdAt: -1 })
+            .limit(limitNum)
+            .skip((pageNum - 1) * limitNum);
 
         res.status(200).json({
             success: true,
-            total: reviews.length,
+            total,
+            pages: Math.ceil(total / limitNum),
+            currentPage: pageNum,
             data: reviews
         });
 
@@ -114,19 +213,27 @@ export const getMyReviews = async (req, res) => {
         console.error('Get my reviews error:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to fetch reviews'
+            message: 'Failed to fetch reviews',
+            error: error.message
         });
     }
 };
 
 // ============================================
-// UPDATE MY REVIEW
+// UPDATE REVIEW
 // ============================================
 
 export const updateReview = async (req, res) => {
     try {
         const { reviewId } = req.params;
         const { rating, comment } = req.body;
+
+        if (!isValidObjectId(reviewId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid review ID'
+            });
+        }
 
         const review = await Review.findOne({
             _id: reviewId,
@@ -140,44 +247,59 @@ export const updateReview = async (req, res) => {
             });
         }
 
-        if (rating) {
-            if (rating < 1 || rating > 5) {
+        // Update rating
+        if (rating !== undefined) {
+            const ratingNum = Number(rating);
+            if (isNaN(ratingNum) || ratingNum < 1 || ratingNum > 5) {
                 return res.status(400).json({
                     success: false,
                     message: 'Rating must be between 1 and 5'
                 });
             }
-            review.rating = rating;
+            review.rating = ratingNum;
         }
 
+        // Update comment
         if (comment !== undefined) {
             review.comment = comment;
         }
 
         await review.save();
 
+        const updatedReview = await Review.findById(review._id)
+            .populate('customerId', 'firstName lastName avatar')
+            .populate('serviceId', 'name category');
+
         res.status(200).json({
             success: true,
             message: 'Review updated successfully',
-            data: review
+            data: updatedReview
         });
 
     } catch (error) {
         console.error('Update review error:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to update review'
+            message: 'Failed to update review',
+            error: error.message
         });
     }
 };
 
 // ============================================
-// DELETE MY REVIEW
+// DELETE REVIEW
 // ============================================
 
 export const deleteReview = async (req, res) => {
     try {
         const { reviewId } = req.params;
+
+        if (!isValidObjectId(reviewId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid review ID'
+            });
+        }
 
         const review = await Review.findOneAndDelete({
             _id: reviewId,
@@ -191,7 +313,7 @@ export const deleteReview = async (req, res) => {
             });
         }
 
-        // Mark booking as not reviewed
+        // Reset booking isReviewed flag
         await Booking.findByIdAndUpdate(review.bookingId, {
             isReviewed: false
         });
@@ -205,7 +327,8 @@ export const deleteReview = async (req, res) => {
         console.error('Delete review error:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to delete review'
+            message: 'Failed to delete review',
+            error: error.message
         });
     }
 };

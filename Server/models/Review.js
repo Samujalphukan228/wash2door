@@ -1,4 +1,4 @@
-// models/Review.js
+// models/Review.js - UPDATED with new fields
 
 import mongoose from 'mongoose';
 
@@ -19,6 +19,26 @@ const reviewSchema = new mongoose.Schema({
         ref: 'Service',
         required: true
     },
+
+    // ✅ NEW: Extra info from booking
+    serviceName: {
+        type: String,
+        default: ''
+    },
+    serviceCategory: {
+        type: String,
+        enum: ['basic', 'standard', 'premium', ''],
+        default: ''
+    },
+    vehicleType: {
+        type: String,
+        default: ''
+    },
+    vehicleTypeName: {
+        type: String,
+        default: ''
+    },
+
     rating: {
         type: Number,
         required: [true, 'Rating is required'],
@@ -41,15 +61,22 @@ const reviewSchema = new mongoose.Schema({
 
 reviewSchema.index({ serviceId: 1 });
 reviewSchema.index({ customerId: 1 });
+reviewSchema.index({ isVisible: 1 });
+reviewSchema.index({ rating: 1 });
 
-// Update service average rating after saving review
+// Auto update service rating after save
 reviewSchema.post('save', async function() {
     try {
         const Review = this.constructor;
         const Service = mongoose.model('Service');
-        
+
         const stats = await Review.aggregate([
-            { $match: { serviceId: this.serviceId, isVisible: true } },
+            {
+                $match: {
+                    serviceId: this.serviceId,
+                    isVisible: true
+                }
+            },
             {
                 $group: {
                     _id: '$serviceId',
@@ -61,7 +88,9 @@ reviewSchema.post('save', async function() {
 
         if (stats.length > 0) {
             await Service.findByIdAndUpdate(this.serviceId, {
-                averageRating: Math.round(stats[0].averageRating * 10) / 10,
+                averageRating: Math.round(
+                    stats[0].averageRating * 10
+                ) / 10,
                 totalReviews: stats[0].totalReviews
             });
         }

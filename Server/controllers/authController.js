@@ -1,8 +1,12 @@
-// controllers/authController.js
+// controllers/authController.js - COMPLETE FILE
 
 import crypto from 'crypto';
 import { validationResult } from 'express-validator';
+import mongoose from 'mongoose';
 import User from '../models/User.js';
+import Booking from '../models/Booking.js';
+import Review from '../models/Review.js';
+import { deleteCloudinaryImage } from '../config/cloudinary.js'; // ✅ ADDED
 import {
     generateTokens,
     setTokenCookies,
@@ -18,7 +22,7 @@ import {
 } from '../utils/sendEmail.js';
 
 // ============================================
-// REGISTRATION FLOW
+// REGISTER
 // ============================================
 
 export const register = async (req, res) => {
@@ -35,7 +39,7 @@ export const register = async (req, res) => {
         const { firstName, lastName, email, password } = req.body;
 
         const registrationCheck = await User.findForRegistration(email);
-        
+
         if (!registrationCheck.canRegister) {
             return res.status(409).json({
                 success: false,
@@ -56,19 +60,15 @@ export const register = async (req, res) => {
         const otp = user.generateOTP();
         await user.save({ validateBeforeSave: false });
 
-        let otpSent = false;
         try {
             await sendOTPEmail(user, otp);
-            otpSent = true;
-            
             user.registrationStatus = 'otp-sent';
             await user.save({ validateBeforeSave: false });
         } catch (emailError) {
             console.error('OTP email failed:', emailError.message);
-            
             user.registrationStatus = 'failed';
             await user.save({ validateBeforeSave: false });
-            
+
             return res.status(503).json({
                 success: false,
                 message: 'Failed to send OTP. Please try again.',
@@ -78,7 +78,7 @@ export const register = async (req, res) => {
 
         res.status(201).json({
             success: true,
-            message: 'Registration initiated! Check your email for the OTP code.',
+            message: 'Registration initiated! Check your email for OTP.',
             data: {
                 email: user.email,
                 nextStep: 'verify-otp',
@@ -95,6 +95,10 @@ export const register = async (req, res) => {
     }
 };
 
+// ============================================
+// VERIFY OTP
+// ============================================
+
 export const verifyOTP = async (req, res) => {
     try {
         const { email, otp } = req.body;
@@ -106,7 +110,9 @@ export const verifyOTP = async (req, res) => {
             });
         }
 
-        const user = await User.findOne({ email: email.toLowerCase() });
+        const user = await User.findOne({
+            email: email.toLowerCase()
+        });
 
         if (!user) {
             return res.status(404).json({
@@ -151,7 +157,7 @@ export const verifyOTP = async (req, res) => {
 
         res.status(200).json({
             success: true,
-            message: 'OTP verified successfully! Registration complete.',
+            message: 'OTP verified! Registration complete.',
             data: {
                 user: {
                     id: user._id,
@@ -161,8 +167,7 @@ export const verifyOTP = async (req, res) => {
                     isEmailVerified: user.isEmailVerified,
                     role: user.role
                 },
-                accessToken,
-                nextStep: 'dashboard'
+                accessToken
             }
         });
 
@@ -170,10 +175,14 @@ export const verifyOTP = async (req, res) => {
         console.error('OTP verification error:', error);
         res.status(500).json({
             success: false,
-            message: 'OTP verification failed. Please try again.'
+            message: 'OTP verification failed.'
         });
     }
 };
+
+// ============================================
+// RESEND OTP
+// ============================================
 
 export const resendOTP = async (req, res) => {
     try {
@@ -186,12 +195,14 @@ export const resendOTP = async (req, res) => {
             });
         }
 
-        const user = await User.findOne({ email: email.toLowerCase() });
+        const user = await User.findOne({
+            email: email.toLowerCase()
+        });
 
         if (!user) {
             return res.status(404).json({
                 success: false,
-                message: 'User not found. Please register first.'
+                message: 'User not found.'
             });
         }
 
@@ -208,7 +219,6 @@ export const resendOTP = async (req, res) => {
         try {
             await sendOTPEmail(user, otp);
         } catch (emailError) {
-            console.error('Resend OTP email failed:', emailError.message);
             return res.status(503).json({
                 success: false,
                 message: 'Failed to send OTP. Please try again.'
@@ -228,13 +238,13 @@ export const resendOTP = async (req, res) => {
         console.error('Resend OTP error:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to resend OTP. Please try again.'
+            message: 'Failed to resend OTP.'
         });
     }
 };
 
 // ============================================
-// LOGIN & AUTHENTICATION
+// LOGIN
 // ============================================
 
 export const login = async (req, res) => {
@@ -250,7 +260,9 @@ export const login = async (req, res) => {
 
         const { email, password } = req.body;
 
-        const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
+        const user = await User.findOne({
+            email: email.toLowerCase()
+        }).select('+password');
 
         if (!user) {
             return res.status(401).json({
@@ -262,24 +274,34 @@ export const login = async (req, res) => {
         if (user.registrationStatus !== 'completed') {
             return res.status(403).json({
                 success: false,
-                message: `Registration incomplete. Status: ${user.registrationStatus}. Please complete OTP verification.`,
+                message: 'Registration incomplete. Please verify OTP.',
                 registrationStatus: user.registrationStatus,
                 nextStep: 'verify-otp'
             });
         }
 
         if (user.isLocked()) {
-            const lockTimeRemaining = Math.ceil((user.lockUntil - Date.now()) / 1000 / 60);
+            const lockTimeRemaining = Math.ceil(
+                (user.lockUntil - Date.now()) / 1000 / 60
+            );
             return res.status(423).json({
                 success: false,
-                message: `Account is locked due to too many failed login attempts. Try again in ${lockTimeRemaining} minutes.`
+                message: `Account locked. Try again in ${lockTimeRemaining} minutes.`
             });
         }
 
         if (!user.isActive) {
             return res.status(401).json({
                 success: false,
-                message: 'Account has been deactivated. Please contact support.'
+                message: 'Account deactivated. Contact support.'
+            });
+        }
+
+        if (user.isBlocked) {
+            return res.status(403).json({
+                success: false,
+                message: 'Account blocked. Contact support.',
+                reason: user.blockedReason
             });
         }
 
@@ -287,20 +309,23 @@ export const login = async (req, res) => {
 
         if (!isPasswordValid) {
             await user.incrementLoginAttempts();
-            
-            const remainingAttempts = Math.max(0, 5 - (user.loginAttempts + 1));
-            
+
+            // ✅ FIXED: Correct remaining attempts calculation
+            const updatedAttempts = user.loginAttempts + 1;
+            const remainingAttempts = Math.max(0, 5 - updatedAttempts);
+
             return res.status(401).json({
                 success: false,
                 message: 'Invalid email or password',
-                remainingAttempts: remainingAttempts > 0 ? remainingAttempts : undefined
+                remainingAttempts: remainingAttempts > 0
+                    ? remainingAttempts
+                    : undefined
             });
         }
 
         await user.resetLoginAttempts();
 
         const { accessToken, refreshToken } = generateTokens(user._id);
-
         user.refreshToken = refreshToken;
         await user.save({ validateBeforeSave: false });
 
@@ -316,7 +341,8 @@ export const login = async (req, res) => {
                     lastName: user.lastName,
                     email: user.email,
                     isEmailVerified: user.isEmailVerified,
-                    role: user.role
+                    role: user.role,
+                    avatar: user.avatar
                 },
                 accessToken
             }
@@ -326,10 +352,14 @@ export const login = async (req, res) => {
         console.error('Login error:', error);
         res.status(500).json({
             success: false,
-            message: 'Login failed. Please try again.'
+            message: 'Login failed.'
         });
     }
 };
+
+// ============================================
+// LOGOUT
+// ============================================
 
 export const logout = async (req, res) => {
     try {
@@ -353,6 +383,10 @@ export const logout = async (req, res) => {
     }
 };
 
+// ============================================
+// REFRESH TOKEN
+// ============================================
+
 export const refreshToken = async (req, res) => {
     try {
         const token = req.cookies?.refreshToken || req.body.refreshToken;
@@ -370,7 +404,7 @@ export const refreshToken = async (req, res) => {
             clearTokenCookies(res);
             return res.status(401).json({
                 success: false,
-                message: 'Invalid or expired refresh token. Please login again.'
+                message: 'Invalid or expired refresh token'
             });
         }
 
@@ -380,23 +414,18 @@ export const refreshToken = async (req, res) => {
             registrationStatus: 'completed'
         });
 
-        if (!user) {
+        if (!user || !user.isActive) {
             clearTokenCookies(res);
             return res.status(401).json({
                 success: false,
-                message: 'Invalid refresh token. Please login again.'
+                message: 'Invalid refresh token'
             });
         }
 
-        if (!user.isActive) {
-            clearTokenCookies(res);
-            return res.status(401).json({
-                success: false,
-                message: 'Account has been deactivated'
-            });
-        }
-
-        const { accessToken, refreshToken: newRefreshToken } = generateTokens(user._id);
+        const {
+            accessToken,
+            refreshToken: newRefreshToken
+        } = generateTokens(user._id);
 
         user.refreshToken = newRefreshToken;
         await user.save({ validateBeforeSave: false });
@@ -405,7 +434,7 @@ export const refreshToken = async (req, res) => {
 
         res.status(200).json({
             success: true,
-            message: 'Token refreshed successfully',
+            message: 'Token refreshed',
             data: { accessToken }
         });
 
@@ -414,25 +443,18 @@ export const refreshToken = async (req, res) => {
         clearTokenCookies(res);
         res.status(500).json({
             success: false,
-            message: 'Token refresh failed. Please login again.'
+            message: 'Token refresh failed'
         });
     }
 };
 
 // ============================================
-// EMAIL VERIFICATION
+// VERIFY EMAIL
 // ============================================
 
 export const verifyEmail = async (req, res) => {
     try {
         const { token } = req.params;
-
-        if (!token) {
-            return res.status(400).json({
-                success: false,
-                message: 'Verification token is required'
-            });
-        }
 
         const hashedToken = crypto
             .createHash('sha256')
@@ -448,14 +470,14 @@ export const verifyEmail = async (req, res) => {
         if (!user) {
             return res.status(400).json({
                 success: false,
-                message: 'Invalid or expired verification token.'
+                message: 'Invalid or expired verification token'
             });
         }
 
         if (user.isEmailVerified) {
             return res.status(400).json({
                 success: false,
-                message: 'Email is already verified'
+                message: 'Email already verified'
             });
         }
 
@@ -473,10 +495,14 @@ export const verifyEmail = async (req, res) => {
         console.error('Email verification error:', error);
         res.status(500).json({
             success: false,
-            message: 'Email verification failed. Please try again.'
+            message: 'Email verification failed'
         });
     }
 };
+
+// ============================================
+// RESEND VERIFICATION EMAIL
+// ============================================
 
 export const resendVerificationEmail = async (req, res) => {
     try {
@@ -492,7 +518,7 @@ export const resendVerificationEmail = async (req, res) => {
         if (user.isEmailVerified) {
             return res.status(400).json({
                 success: false,
-                message: 'Email is already verified'
+                message: 'Email already verified'
             });
         }
 
@@ -502,16 +528,15 @@ export const resendVerificationEmail = async (req, res) => {
         try {
             await sendVerificationEmail(user, verificationToken);
         } catch (emailError) {
-            console.error('Resend verification email failed:', emailError.message);
             return res.status(503).json({
                 success: false,
-                message: 'Unable to send verification email. Please try again later.'
+                message: 'Unable to send verification email'
             });
         }
 
         res.status(200).json({
             success: true,
-            message: 'Verification email sent successfully. Please check your inbox.'
+            message: 'Verification email sent!'
         });
 
     } catch (error) {
@@ -524,7 +549,7 @@ export const resendVerificationEmail = async (req, res) => {
 };
 
 // ============================================
-// PASSWORD MANAGEMENT
+// FORGOT PASSWORD
 // ============================================
 
 export const forgotPassword = async (req, res) => {
@@ -539,22 +564,14 @@ export const forgotPassword = async (req, res) => {
         }
 
         const { email } = req.body;
+        const successMessage = 'If an account exists, a reset link has been sent';
 
-        const user = await User.findOne({ 
+        const user = await User.findOne({
             email: email.toLowerCase(),
             registrationStatus: 'completed'
         });
 
-        const successMessage = 'If an account with that email exists, a password reset link has been sent';
-
-        if (!user) {
-            return res.status(200).json({
-                success: true,
-                message: successMessage
-            });
-        }
-
-        if (!user.isActive) {
+        if (!user || !user.isActive) {
             return res.status(200).json({
                 success: true,
                 message: successMessage
@@ -567,15 +584,13 @@ export const forgotPassword = async (req, res) => {
         try {
             await sendPasswordResetEmail(user, resetToken);
         } catch (emailError) {
-            console.error('Password reset email failed:', emailError.message);
-            
             user.passwordResetToken = undefined;
             user.passwordResetExpire = undefined;
             await user.save({ validateBeforeSave: false });
 
             return res.status(503).json({
                 success: false,
-                message: 'Email could not be sent. Please try again later.'
+                message: 'Email could not be sent'
             });
         }
 
@@ -588,10 +603,14 @@ export const forgotPassword = async (req, res) => {
         console.error('Forgot password error:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to process password reset request'
+            message: 'Failed to process request'
         });
     }
 };
+
+// ============================================
+// RESET PASSWORD
+// ============================================
 
 export const resetPassword = async (req, res) => {
     try {
@@ -621,7 +640,7 @@ export const resetPassword = async (req, res) => {
         if (!user) {
             return res.status(400).json({
                 success: false,
-                message: 'Invalid or expired reset token. Please request a new password reset.'
+                message: 'Invalid or expired reset token'
             });
         }
 
@@ -638,22 +657,26 @@ export const resetPassword = async (req, res) => {
         try {
             await sendPasswordChangeConfirmation(user);
         } catch (emailError) {
-            console.error('Password change confirmation email failed:', emailError.message);
+            console.error('Password change email failed:', emailError.message);
         }
 
         res.status(200).json({
             success: true,
-            message: 'Password reset successful. Please login with your new password.'
+            message: 'Password reset successful. Please login.'
         });
 
     } catch (error) {
         console.error('Reset password error:', error);
         res.status(500).json({
             success: false,
-            message: 'Password reset failed. Please try again.'
+            message: 'Password reset failed'
         });
     }
 };
+
+// ============================================
+// CHANGE PASSWORD
+// ============================================
 
 export const changePassword = async (req, res) => {
     try {
@@ -698,7 +721,7 @@ export const changePassword = async (req, res) => {
         try {
             await sendPasswordChangeConfirmation(user);
         } catch (emailError) {
-            console.error('Password change confirmation email failed:', emailError.message);
+            console.error('Password change email failed:', emailError.message);
         }
 
         res.status(200).json({
@@ -711,13 +734,13 @@ export const changePassword = async (req, res) => {
         console.error('Change password error:', error);
         res.status(500).json({
             success: false,
-            message: 'Password change failed. Please try again.'
+            message: 'Password change failed'
         });
     }
 };
 
 // ============================================
-// USER PROFILE
+// GET ME
 // ============================================
 
 export const getMe = async (req, res) => {
@@ -743,7 +766,7 @@ export const getMe = async (req, res) => {
                     avatar: user.avatar,
                     role: user.role,
                     isEmailVerified: user.isEmailVerified,
-                    twoFactorEnabled: user.twoFactorEnabled,
+                    isBlocked: user.isBlocked,
                     lastLogin: user.lastLogin,
                     createdAt: user.createdAt
                 }
@@ -758,6 +781,10 @@ export const getMe = async (req, res) => {
         });
     }
 };
+
+// ============================================
+// UPDATE PROFILE
+// ============================================
 
 export const updateProfile = async (req, res) => {
     try {
@@ -806,18 +833,66 @@ export const updateProfile = async (req, res) => {
 
     } catch (error) {
         console.error('Update profile error:', error);
-        
-        let message = 'Profile update failed';
-        if (error.name === 'ValidationError') {
-            message = Object.values(error.errors).map(e => e.message).join(', ');
-        }
-        
         res.status(500).json({
             success: false,
-            message
+            message: 'Profile update failed'
         });
     }
 };
+
+// ============================================
+// UPDATE AVATAR - ✅ ADDED
+// ============================================
+
+export const updateAvatar = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: 'No image uploaded'
+            });
+        }
+
+        const user = await User.findById(req.user._id);
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        // Delete old avatar from cloudinary if not default
+        if (user.avatar && !user.avatar.includes('default')) {
+            await deleteCloudinaryImage(user.avatar);
+        }
+
+        const updatedUser = await User.findByIdAndUpdate(
+            req.user._id,
+            { avatar: req.file.path },
+            { new: true }
+        );
+
+        res.status(200).json({
+            success: true,
+            message: 'Avatar updated successfully',
+            data: {
+                avatar: updatedUser.avatar
+            }
+        });
+
+    } catch (error) {
+        console.error('Update avatar error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to update avatar'
+        });
+    }
+};
+
+// ============================================
+// DEACTIVATE ACCOUNT
+// ============================================
 
 export const deactivateAccount = async (req, res) => {
     try {
@@ -826,7 +901,7 @@ export const deactivateAccount = async (req, res) => {
         if (!password) {
             return res.status(400).json({
                 success: false,
-                message: 'Password is required to deactivate account'
+                message: 'Password required to deactivate account'
             });
         }
 
@@ -855,7 +930,7 @@ export const deactivateAccount = async (req, res) => {
 
         res.status(200).json({
             success: true,
-            message: 'Account deactivated successfully. You can reactivate by contacting support.'
+            message: 'Account deactivated. Contact support to reactivate.'
         });
 
     } catch (error) {
@@ -868,7 +943,132 @@ export const deactivateAccount = async (req, res) => {
 };
 
 // ============================================
-// UTILITY ENDPOINTS
+// GET USER STATS
+// ============================================
+
+export const getUserStats = async (req, res) => {
+    try {
+        const userId = req.user._id;
+
+        const [
+            totalBookings,
+            pendingBookings,
+            confirmedBookings,
+            inProgressBookings,
+            completedBookings,
+            cancelledBookings,
+            totalReviews
+        ] = await Promise.all([
+            Booking.countDocuments({ customerId: userId }),
+            Booking.countDocuments({ customerId: userId, status: 'pending' }),
+            Booking.countDocuments({ customerId: userId, status: 'confirmed' }),
+            Booking.countDocuments({ customerId: userId, status: 'in-progress' }),
+            Booking.countDocuments({ customerId: userId, status: 'completed' }),
+            Booking.countDocuments({ customerId: userId, status: 'cancelled' }),
+            Review.countDocuments({ customerId: userId })
+        ]);
+
+        const totalSpentData = await Booking.aggregate([
+            {
+                $match: {
+                    customerId: new mongoose.Types.ObjectId(userId),
+                    status: 'completed'
+                }
+            },
+            {
+                $group: {
+                    _id: null,
+                    total: { $sum: '$price' }
+                }
+            }
+        ]);
+
+        const mostUsedService = await Booking.aggregate([
+            {
+                $match: {
+                    customerId: new mongoose.Types.ObjectId(userId),
+                    status: { $ne: 'cancelled' }
+                }
+            },
+            {
+                $group: {
+                    _id: '$serviceId',
+                    serviceName: { $first: '$serviceName' },
+                    count: { $sum: 1 }
+                }
+            },
+            { $sort: { count: -1 } },
+            { $limit: 1 }
+        ]);
+
+        const mostUsedVehicle = await Booking.aggregate([
+            {
+                $match: {
+                    customerId: new mongoose.Types.ObjectId(userId),
+                    status: { $ne: 'cancelled' }
+                }
+            },
+            {
+                $group: {
+                    _id: '$vehicleType',
+                    vehicleTypeName: { $first: '$vehicleTypeName' },
+                    count: { $sum: 1 }
+                }
+            },
+            { $sort: { count: -1 } },
+            { $limit: 1 }
+        ]);
+
+        const recentBookings = await Booking.find({ customerId: userId })
+            .sort({ createdAt: -1 })
+            .limit(5)
+            .select(
+                'bookingCode serviceName vehicleTypeName ' +
+                'bookingDate timeSlot status price'
+            );
+
+        const activeBookings = await Booking.find({
+            customerId: userId,
+            status: { $in: ['pending', 'confirmed', 'in-progress'] }
+        })
+            .sort({ bookingDate: 1 })
+            .select(
+                'bookingCode serviceName vehicleTypeName ' +
+                'bookingDate timeSlot status price location'
+            );
+
+        res.status(200).json({
+            success: true,
+            data: {
+                bookings: {
+                    total: totalBookings,
+                    pending: pendingBookings,
+                    confirmed: confirmedBookings,
+                    inProgress: inProgressBookings,
+                    completed: completedBookings,
+                    cancelled: cancelledBookings
+                },
+                totalSpent: totalSpentData[0]?.total || 0,
+                totalReviews,
+                mostUsedService: mostUsedService[0] || null,
+                mostUsedVehicle: mostUsedVehicle[0] || null,
+                recentBookings,
+                activeBookings
+            }
+        });
+
+    } catch (error) {
+        console.error('Get user stats error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch user stats',
+            error: error.message
+        });
+    }
+};
+
+// ============================================
+// CHECK REGISTRATION STATUS
 // ============================================
 
 export const checkRegistrationStatus = async (req, res) => {
@@ -882,7 +1082,9 @@ export const checkRegistrationStatus = async (req, res) => {
             });
         }
 
-        const user = await User.findOne({ email: email.toLowerCase() });
+        const user = await User.findOne({
+            email: email.toLowerCase()
+        });
 
         if (!user) {
             return res.status(200).json({
@@ -901,7 +1103,7 @@ export const checkRegistrationStatus = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Check registration status error:', error);
+        console.error('Check registration error:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to check registration status'
@@ -909,30 +1111,28 @@ export const checkRegistrationStatus = async (req, res) => {
     }
 };
 
+// ============================================
+// DEBUG ROUTES (Development only)
+// ============================================
+
 export const debugUserStatus = async (req, res) => {
     try {
         const { email } = req.params;
 
-        if (!email) {
-            return res.status(400).json({
-                success: false,
-                message: 'Email is required'
-            });
-        }
-
-        const user = await User.findOne({ email: email.toLowerCase() });
+        const user = await User.findOne({
+            email: email.toLowerCase()
+        });
 
         if (!user) {
             return res.status(404).json({
                 success: false,
-                message: 'User not found in database',
-                debug: { email: email, exists: false }
+                message: 'User not found',
+                debug: { email, exists: false }
             });
         }
 
         res.status(200).json({
             success: true,
-            message: 'User found',
             debug: {
                 id: user._id,
                 email: user.email,
@@ -942,14 +1142,13 @@ export const debugUserStatus = async (req, res) => {
                 otpVerified: user.otpVerified,
                 isEmailVerified: user.isEmailVerified,
                 isActive: user.isActive,
+                isBlocked: user.isBlocked,
                 role: user.role,
-                createdAt: user.createdAt,
-                updatedAt: user.updatedAt
+                createdAt: user.createdAt
             }
         });
 
     } catch (error) {
-        console.error('Debug error:', error);
         res.status(500).json({
             success: false,
             message: 'Debug failed',
@@ -963,22 +1162,16 @@ export const deleteUserCompletely = async (req, res) => {
         const { email } = req.params;
         const { confirm } = req.query;
 
-        if (!email) {
-            return res.status(400).json({
-                success: false,
-                message: 'Email is required'
-            });
-        }
-
         if (confirm !== 'yes') {
             return res.status(400).json({
                 success: false,
-                message: 'This action requires confirmation. Add ?confirm=yes to the URL',
-                example: `/api/auth/delete-user/${email}?confirm=yes`
+                message: 'Add ?confirm=yes to confirm deletion'
             });
         }
 
-        const user = await User.findOne({ email: email.toLowerCase() });
+        const user = await User.findOne({
+            email: email.toLowerCase()
+        });
 
         if (!user) {
             return res.status(404).json({
@@ -987,28 +1180,18 @@ export const deleteUserCompletely = async (req, res) => {
             });
         }
 
-        const deletedData = {
-            id: user._id,
-            email: user.email,
-            previousStatus: user.registrationStatus
-        };
-
         await User.deleteOne({ _id: user._id });
 
         res.status(200).json({
             success: true,
-            message: `User ${email} has been completely removed from the database.`,
-            data: {
-                ...deletedData,
-                deletedAt: new Date()
-            }
+            message: `User ${email} deleted successfully`
         });
 
     } catch (error) {
-        console.error('Delete user error:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to delete user'
+            message: 'Failed to delete user',
+            error: error.message
         });
     }
 };
