@@ -1,6 +1,8 @@
 import Booking from '../models/Booking.js';
 import Service from '../models/Service.js';
 import mongoose from 'mongoose';
+import { getIO } from '../config/socket.js';
+import { SOCKET_EVENTS } from '../utils/socketEvents.js';
 import {
     sendBookingConfirmationEmail,
     sendAdminNewBookingEmail,
@@ -111,7 +113,6 @@ export const checkAvailability = async (req, res) => {
             });
         }
 
-        // Check Sunday
         if (bookingDate.getDay() === 0) {
             return res.status(200).json({
                 success: true,
@@ -169,7 +170,7 @@ export const checkAvailability = async (req, res) => {
 };
 
 // ============================================
-// STEP 4 & 5 - CREATE BOOKING
+// CREATE BOOKING - WITH SOCKET
 // ============================================
 
 export const createBooking = async (req, res) => {
@@ -184,7 +185,6 @@ export const createBooking = async (req, res) => {
             specialNotes
         } = req.body;
 
-        // Validate required fields
         if (!serviceId || !vehicleTypeId || !bookingDate ||
             !timeSlot || !location || !vehicleDetails) {
             return res.status(400).json({
@@ -262,7 +262,7 @@ export const createBooking = async (req, res) => {
             });
         }
 
-        // ✅ ADDED: Max active bookings check
+        // Max active bookings check
         const activeBookings = await Booking.countDocuments({
             customerId: req.user._id,
             status: { $in: ['pending', 'confirmed'] }
@@ -348,17 +348,49 @@ export const createBooking = async (req, res) => {
         const populatedBooking = await Booking.findById(booking._id)
             .populate('customerId', 'firstName lastName email');
 
+        // ============================================
+        // 🔌 SOCKET EVENTS - New Booking
+        // ============================================
+        try {
+            const io = getIO();
+
+            // Tell admin about new booking
+            io.to('admin_room').emit(SOCKET_EVENTS.NEW_BOOKING, {
+                bookingId: booking._id,
+                bookingCode: booking.bookingCode,
+                bookingType: 'online',
+                customerName: `${req.user.firstName} ${req.user.lastName}`,
+                serviceName: booking.serviceName,
+                vehicleTypeName: booking.vehicleTypeName,
+                bookingDate: booking.bookingDate,
+                timeSlot: booking.timeSlot,
+                price: booking.price,
+                status: booking.status,
+                location: booking.location,
+                createdAt: booking.createdAt
+            });
+
+            // Tell everyone that this slot is now booked
+            io.emit(SOCKET_EVENTS.SLOT_BOOKED, {
+                serviceId: booking.serviceId,
+                bookingDate: booking.bookingDate,
+                timeSlot: booking.timeSlot
+            });
+
+            console.log('🔌 Socket events emitted for new booking');
+        } catch (socketError) {
+            console.error('Socket emit error:', socketError.message);
+        }
+
         // Send emails
         try {
             await sendBookingConfirmationEmail(req.user, populatedBooking);
-            console.log(`✅ Confirmation email sent to: ${req.user.email}`);
         } catch (emailError) {
             console.error('Customer email failed:', emailError.message);
         }
 
         try {
             await sendAdminNewBookingEmail(populatedBooking, req.user);
-            console.log(`✅ Admin notification sent`);
         } catch (emailError) {
             console.error('Admin email failed:', emailError.message);
         }
@@ -387,7 +419,6 @@ export const createBooking = async (req, res) => {
     } catch (error) {
         console.error('Create booking error:', error);
 
-        // ✅ ADDED: Handle duplicate key error from unique index
         if (error.code === 11000) {
             return res.status(400).json({
                 success: false,
@@ -512,7 +543,7 @@ export const getBookingById = async (req, res) => {
 };
 
 // ============================================
-// CANCEL BOOKING
+// CANCEL BOOKING - WITH SOCKET
 // ============================================
 
 export const cancelBooking = async (req, res) => {
@@ -546,7 +577,7 @@ export const cancelBooking = async (req, res) => {
             });
         }
 
-        // ✅ ADDED: 2 hour cancellation limit
+        // 2 hour cancellation limit
         const bookingDateTime = new Date(booking.bookingDate);
         const [startHour] = booking.timeSlot.split('-')[0].split(':');
         bookingDateTime.setHours(parseInt(startHour), 0, 0, 0);
@@ -567,6 +598,35 @@ export const cancelBooking = async (req, res) => {
         booking.cancelledBy = 'user';
         booking.cancelledAt = new Date();
         await booking.save();
+
+        // ============================================
+        // 🔌 SOCKET EVENTS - Booking Cancelled
+        // ============================================
+        try {
+            const io = getIO();
+
+            // Tell admin booking was cancelled
+            io.to('admin_room').emit(SOCKET_EVENTS.BOOKING_CANCELLED, {
+                bookingId: booking._id,
+                bookingCode: booking.bookingCode,
+                serviceName: booking.serviceName,
+                timeSlot: booking.timeSlot,
+                bookingDate: booking.bookingDate,
+                cancelledBy: 'user',
+                reason: booking.cancellationReason
+            });
+
+            // Tell everyone this slot is now available
+            io.emit(SOCKET_EVENTS.SLOT_AVAILABLE, {
+                serviceId: booking.serviceId,
+                bookingDate: booking.bookingDate,
+                timeSlot: booking.timeSlot
+            });
+
+            console.log('🔌 Socket events emitted for cancellation');
+        } catch (socketError) {
+            console.error('Socket emit error:', socketError.message);
+        }
 
         try {
             await sendBookingCancellationEmail(req.user, booking);

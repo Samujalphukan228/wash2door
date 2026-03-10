@@ -1,4 +1,5 @@
 import express from 'express';
+import { createServer } from 'http';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -7,12 +8,12 @@ import hpp from 'hpp';
 import cookieParser from 'cookie-parser';
 
 import connectDB from './config/db.js';
+import { initSocket } from './config/socket.js';
 import authRoutes from './routes/authRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import publicRoutes from './routes/publicRoutes.js';
 import bookingRoutes from './routes/bookingRoutes.js';
 import reviewRoutes from './routes/reviewRoutes.js';
-// ✅ ADDED: serviceRoutes was missing
 import serviceRoutes from './routes/serviceRoutes.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { generalLimiter } from './middleware/rateLimiter.js';
@@ -21,6 +22,12 @@ import { startCleanupScheduler } from './utils/cleanup.js';
 dotenv.config();
 
 const app = express();
+
+// ✅ Create HTTP server for Socket.io
+const server = createServer(app);
+
+// ✅ Initialize Socket.io
+initSocket(server);
 
 connectDB().then(() => {
     startCleanupScheduler();
@@ -57,7 +64,6 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/reviews', reviewRoutes);
-// ✅ ADDED: serviceRoutes mounted
 app.use('/api/services', serviceRoutes);
 
 app.use(notFound);
@@ -65,7 +71,8 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-const server = app.listen(PORT, () => {
+// ✅ Use server.listen instead of app.listen
+server.listen(PORT, () => {
     console.log(`
     ╔═══════════════════════════════════════════════════════════╗
     ║        🚀 SERVER RUNNING - Port ${PORT}                     ║
@@ -76,6 +83,7 @@ const server = app.listen(PORT, () => {
     ║   Bookings: /api/bookings/*                               ║
     ║   Reviews:  /api/reviews/*                                ║
     ║   Services: /api/services/*                               ║
+    ║   Socket:   ws://localhost:${PORT}                          ║
     ╚═══════════════════════════════════════════════════════════╝
     `);
 });
