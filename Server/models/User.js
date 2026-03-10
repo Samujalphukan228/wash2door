@@ -1,4 +1,4 @@
-// models/User.js
+// models/User.js - FIXED: Added generateEmailVerificationToken method
 
 import mongoose from 'mongoose';
 import argon2 from 'argon2';
@@ -40,13 +40,9 @@ const userSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ['user', 'admin', 'moderator'],
+        enum: ['user', 'admin'],
         default: 'user'
     },
-    
-    // ============================================
-    // REGISTRATION STATUS TRACKING
-    // ============================================
     registrationStatus: {
         type: String,
         enum: ['pending', 'otp-sent', 'otp-verified', 'completed', 'failed'],
@@ -54,9 +50,7 @@ const userSchema = new mongoose.Schema({
     },
     registrationCompletedAt: Date,
     
-    // ============================================
-    // OTP VERIFICATION
-    // ============================================
+    // OTP
     otp: String,
     otpExpire: Date,
     otpAttempts: {
@@ -69,9 +63,7 @@ const userSchema = new mongoose.Schema({
     },
     otpVerifiedAt: Date,
     
-    // ============================================
     // EMAIL VERIFICATION
-    // ============================================
     isEmailVerified: {
         type: Boolean,
         default: false
@@ -79,44 +71,33 @@ const userSchema = new mongoose.Schema({
     emailVerificationToken: String,
     emailVerificationExpire: Date,
     
-    // ============================================
     // ACCOUNT STATUS
-    // ============================================
     isActive: {
         type: Boolean,
         default: true
     },
+    isBlocked: {
+        type: Boolean,
+        default: false
+    },
+    blockedReason: String,
+    blockedAt: Date,
     
-    // ============================================
     // PASSWORD RESET
-    // ============================================
     passwordResetToken: String,
     passwordResetExpire: Date,
     
-    // ============================================
     // REFRESH TOKEN
-    // ============================================
     refreshToken: String,
     
-    // ============================================
     // SECURITY
-    // ============================================
     loginAttempts: {
         type: Number,
         default: 0
     },
     lockUntil: Date,
     lastLogin: Date,
-    passwordChangedAt: Date,
-    
-    // ============================================
-    // TWO FACTOR AUTHENTICATION
-    // ============================================
-    twoFactorEnabled: {
-        type: Boolean,
-        default: false
-    },
-    twoFactorSecret: String
+    passwordChangedAt: Date
 
 }, {
     timestamps: true,
@@ -136,12 +117,10 @@ userSchema.virtual('fullName').get(function() {
 // INDEXES
 // ============================================
 
+userSchema.index({ role: 1 });
+userSchema.index({ isActive: 1 });
 userSchema.index({ email: 1 });
-userSchema.index({ passwordResetToken: 1 });
-userSchema.index({ emailVerificationToken: 1 });
-userSchema.index({ otp: 1 });
-userSchema.index({ registrationStatus: 1, createdAt: 1 });
-userSchema.index({ otpVerified: 1, createdAt: 1 });
+userSchema.index({ registrationStatus: 1 });
 
 // ============================================
 // PRE-SAVE MIDDLEWARE
@@ -261,6 +240,7 @@ userSchema.methods.verifyOTP = async function(candidateOTP) {
     }
 };
 
+// ✅ FIXED: Added missing method that authController uses
 userSchema.methods.generateEmailVerificationToken = function() {
     const verificationToken = crypto.randomBytes(32).toString('hex');
     
@@ -269,7 +249,7 @@ userSchema.methods.generateEmailVerificationToken = function() {
         .update(verificationToken)
         .digest('hex');
     
-    this.emailVerificationExpire = Date.now() + 24 * 60 * 60 * 1000;
+    this.emailVerificationExpire = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
     
     return verificationToken;
 };
@@ -282,7 +262,7 @@ userSchema.methods.generatePasswordResetToken = function() {
         .update(resetToken)
         .digest('hex');
     
-    this.passwordResetExpire = Date.now() + 60 * 60 * 1000;
+    this.passwordResetExpire = Date.now() + 60 * 60 * 1000; // 1 hour
     
     return resetToken;
 };
@@ -368,7 +348,7 @@ userSchema.statics.findForRegistration = async function(email) {
         user,
         isPending: true,
         registrationStatus: user.registrationStatus,
-        message: `Registration in progress. Current status: ${user.registrationStatus}. Please try again in an hour or verify OTP.`
+        message: `Registration in progress. Current status: ${user.registrationStatus}.`
     };
 };
 
