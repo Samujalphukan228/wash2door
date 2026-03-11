@@ -221,6 +221,38 @@ export default function Sidebar({ open, onClose }) {
                         <span className="font-medium">Logout</span>
                     )}
                 </button>
+
+                {/* ✅ ADDED: Made by Nexxupp */}
+                <div className={`
+                    pt-3 mt-2 border-t border-neutral-800
+                    ${collapsed ? 'px-1' : 'px-3'}
+                `}>
+                    {!collapsed ? (
+                        <p className="text-[10px] text-neutral-600 text-center tracking-wide">
+                            Made by{' '}
+                            <a 
+                                href="https://nexxupp.com" 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-neutral-500 hover:text-white transition-colors"
+                            >
+                                Nexxupp
+                            </a>
+                        </p>
+                    ) : (
+                        <p className="text-[8px] text-neutral-600 text-center">
+                            <a 
+                                href="https://nexxupp.com" 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="hover:text-white transition-colors"
+                                title="Made by Nexxupp"
+                            >
+                                NX
+                            </a>
+                        </p>
+                    )}
+                </div>
             </div>
         </aside>
     );
