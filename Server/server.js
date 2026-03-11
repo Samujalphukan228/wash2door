@@ -22,11 +22,7 @@ import { startCleanupScheduler } from './utils/cleanup.js';
 dotenv.config();
 
 const app = express();
-
-// ✅ Create HTTP server for Socket.io
 const server = createServer(app);
-
-// ✅ Initialize Socket.io
 initSocket(server);
 
 connectDB().then(() => {
@@ -36,13 +32,29 @@ connectDB().then(() => {
     process.exit(1);
 });
 
-app.use(helmet());
+// ── allowed origins ──
+const ALLOWED_ORIGINS = [
+    'http://localhost:3000',  // public frontend dev
+    'http://localhost:3001',  // admin frontend dev (if different port)
+    'http://localhost:3002',
+    process.env.FRONTEND_URL,
+    process.env.ADMIN_URL,
+].filter(Boolean) // remove undefined
+
+app.use(helmet())
 app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: (origin, callback) => {
+        // allow requests with no origin (mobile apps, curl, Postman)
+        if (!origin) return callback(null, true)
+        if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true)
+        console.warn(`⚠️  CORS blocked: ${origin}`)
+        callback(new Error(`CORS: origin ${origin} not allowed`))
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-}));
+    allowedHeaders: ['Content-Type', 'Authorization'],
+}))
+
 app.use(generalLimiter);
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
@@ -71,7 +83,6 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-// ✅ Use server.listen instead of app.listen
 server.listen(PORT, () => {
     console.log(`
     ╔═══════════════════════════════════════════════════════════╗
@@ -84,6 +95,7 @@ server.listen(PORT, () => {
     ║   Reviews:  /api/reviews/*                                ║
     ║   Services: /api/services/*                               ║
     ║   Socket:   ws://localhost:${PORT}                          ║
+    ║   CORS:     ${ALLOWED_ORIGINS.join(', ')}
     ╚═══════════════════════════════════════════════════════════╝
     `);
 });
