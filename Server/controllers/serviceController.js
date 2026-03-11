@@ -1,17 +1,149 @@
 import Service from '../models/Service.js';
-import Booking from '../models/Booking.js';
 import mongoose from 'mongoose';
-import { deleteCloudinaryImage } from '../config/cloudinary.js';
+
+// Check if Booking model exists, if not create a dummy
+let Booking;
+try {
+    Booking = (await import('../models/Booking.js')).default;
+} catch (e) {
+    console.log('⚠️ Booking model not found, skipping booking checks');
+    Booking = null;
+}
+
+// Import cloudinary delete function safely
+let deleteCloudinaryImage;
+try {
+    const cloudinaryModule = await import('../config/cloudinary.js');
+    deleteCloudinaryImage = cloudinaryModule.deleteCloudinaryImage;
+} catch (e) {
+    console.log('⚠️ Cloudinary config not found');
+    deleteCloudinaryImage = async () => {};
+}
 
 const isValidObjectId = (id) =>
-    mongoose.Types.ObjectId.isValid(id) &&
-    /^[0-9a-fA-F]{24}$/.test(id);
+    mongoose.Types.ObjectId.isValid(id) && /^[0-9a-fA-F]{24}$/.test(id);
+
+const parseArray = (value) => {
+    if (!value) return [];
+    if (Array.isArray(value)) return value;
+    try {
+        return JSON.parse(value);
+    } catch {
+        return [value];
+    }
+};
+
+// ============================================
+// GET ALL SERVICES (ADMIN)
+// ============================================
+export const getAllServicesAdmin = async (req, res) => {
+    console.log('🔥 getAllServicesAdmin CALLED');
+    console.log('📦 Query params:', req.query);
+
+    try {
+        const {
+            category,
+            isActive,
+            page = 1,
+            limit = 12
+        } = req.query;
+
+        const pageNum = parseInt(page) || 1;
+        const limitNum = parseInt(limit) || 12;
+
+        // Build query
+        const query = {};
+
+        if (category && category !== '') {
+            query.category = category;
+        }
+
+        if (isActive !== undefined && isActive !== '') {
+            query.isActive = isActive === 'true';
+        }
+
+        console.log('📦 MongoDB query:', query);
+
+        // Get total count
+        const total = await Service.countDocuments(query);
+        console.log('📦 Total services:', total);
+
+        // Get services
+        const services = await Service.find(query)
+            .sort({ displayOrder: 1, createdAt: -1 })
+            .limit(limitNum)
+            .skip((pageNum - 1) * limitNum)
+            .lean();
+
+        console.log('📦 Services found:', services.length);
+
+        res.status(200).json({
+            success: true,
+            total,
+            pages: Math.ceil(total / limitNum),
+            page: pageNum,
+            data: services
+        });
+
+    } catch (error) {
+        console.error('❌ getAllServicesAdmin ERROR:', error.message);
+        console.error('Stack:', error.stack);
+
+        res.status(500).json({
+            success: false,
+            message: 'Error fetching services',
+            error: error.message
+        });
+    }
+};
+
+// ============================================
+// GET SINGLE SERVICE (ADMIN)
+// ============================================
+export const getServiceById = async (req, res) => {
+    console.log('🔥 getServiceById CALLED:', req.params.serviceId);
+
+    try {
+        const { serviceId } = req.params;
+
+        if (!isValidObjectId(serviceId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid service ID'
+            });
+        }
+
+        const service = await Service.findById(serviceId);
+
+        if (!service) {
+            return res.status(404).json({
+                success: false,
+                message: 'Service not found'
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            data: service
+        });
+
+    } catch (error) {
+        console.error('❌ getServiceById ERROR:', error.message);
+        res.status(500).json({
+            success: false,
+            message: 'Error fetching service'
+        });
+    }
+};
 
 // ============================================
 // CREATE SERVICE (ADMIN)
 // ============================================
-
 export const createService = async (req, res) => {
+    console.log('🔥 createService CALLED');
+    console.log('📦 Body:', req.body);
+    console.log('📦 Files:', req.files?.length || 0);
+
     try {
         const {
             name,
@@ -47,7 +179,7 @@ export const createService = async (req, res) => {
             });
         }
 
-        // Parse vehicleTypes from JSON string
+        // Parse vehicleTypes
         let parsedVehicleTypes = [];
         if (vehicleTypes) {
             try {
@@ -57,12 +189,11 @@ export const createService = async (req, res) => {
             } catch (e) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Invalid vehicle types format. Must be valid JSON.'
+                    message: 'Invalid vehicle types format'
                 });
             }
         }
 
-        // Validate vehicle types
         if (!parsedVehicleTypes || parsedVehicleTypes.length === 0) {
             return res.status(400).json({
                 success: false,
@@ -70,11 +201,8 @@ export const createService = async (req, res) => {
             });
         }
 
-        // Validate each vehicle type
-        const validVehicleTypes = [
-            'sedan', 'suv', 'hatchback',
-            'truck', 'van', 'bike', 'other'
-        ];
+        // Validate vehicle types
+        const validVehicleTypes = ['sedan', 'suv', 'hatchback', 'truck', 'van', 'bike', 'other'];
 
         for (const vehicle of parsedVehicleTypes) {
             if (!vehicle.type || !validVehicleTypes.includes(vehicle.type)) {
@@ -95,9 +223,14 @@ export const createService = async (req, res) => {
                     message: `Duration is required for vehicle type: ${vehicle.type}`
                 });
             }
+            // Set defaults
+            vehicle.label = vehicle.label || vehicle.type;
+            vehicle.price = Number(vehicle.price);
+            vehicle.duration = Number(vehicle.duration);
+            vehicle.features = parseArray(vehicle.features);
         }
 
-        // Process uploaded service images (max 3)
+        // Process images
         const serviceImages = [];
         if (req.files && req.files.length > 0) {
             req.files.forEach((file, index) => {
@@ -108,13 +241,6 @@ export const createService = async (req, res) => {
                 });
             });
         }
-
-        // Parse arrays helper
-        const parseArray = (value) => {
-            if (!value) return [];
-            if (Array.isArray(value)) return value;
-            try { return JSON.parse(value); } catch { return [value]; }
-        };
 
         // Create service
         const service = await Service.create({
@@ -127,9 +253,11 @@ export const createService = async (req, res) => {
             highlights: parseArray(highlights),
             includes: parseArray(includes),
             excludes: parseArray(excludes),
-            displayOrder: displayOrder || 0,
+            displayOrder: Number(displayOrder) || 0,
             createdBy: req.user._id
         });
+
+        console.log('✅ Service created:', service._id);
 
         res.status(201).json({
             success: true,
@@ -138,9 +266,8 @@ export const createService = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Create service error:', error);
+        console.error('❌ createService ERROR:', error.message);
 
-        // Cleanup uploaded images on error
         if (req.files) {
             for (const file of req.files) {
                 await deleteCloudinaryImage(file.filename);
@@ -165,7 +292,8 @@ export const createService = async (req, res) => {
 
         res.status(500).json({
             success: false,
-            message: 'Error creating service'
+            message: 'Error creating service',
+            error: error.message
         });
     }
 };
@@ -173,8 +301,9 @@ export const createService = async (req, res) => {
 // ============================================
 // UPDATE SERVICE (ADMIN)
 // ============================================
-
 export const updateService = async (req, res) => {
+    console.log('🔥 updateService CALLED:', req.params.serviceId);
+
     try {
         const { serviceId } = req.params;
 
@@ -208,13 +337,6 @@ export const updateService = async (req, res) => {
             removeImages
         } = req.body;
 
-        // Parse arrays helper
-        const parseArray = (value) => {
-            if (!value) return undefined;
-            if (Array.isArray(value)) return value;
-            try { return JSON.parse(value); } catch { return [value]; }
-        };
-
         // Handle image removal
         if (removeImages) {
             const imagesToRemove = parseArray(removeImages);
@@ -226,7 +348,7 @@ export const updateService = async (req, res) => {
             }
         }
 
-        // Add new uploaded images
+        // Add new images
         if (req.files && req.files.length > 0) {
             const currentCount = service.images.length;
             const availableSlots = 3 - currentCount;
@@ -237,7 +359,7 @@ export const updateService = async (req, res) => {
                 }
                 return res.status(400).json({
                     success: false,
-                    message: 'Maximum 3 images allowed. Remove existing images first.'
+                    message: 'Maximum 3 images allowed'
                 });
             }
 
@@ -251,32 +373,34 @@ export const updateService = async (req, res) => {
             });
         }
 
-        // Update basic fields
+        // Update fields
         if (name) service.name = name;
         if (description) service.description = description;
-        if (shortDescription !== undefined) {
-            service.shortDescription = shortDescription;
-        }
+        if (shortDescription !== undefined) service.shortDescription = shortDescription;
         if (category) service.category = category;
-        if (displayOrder !== undefined) service.displayOrder = displayOrder;
-        if (isActive !== undefined) service.isActive = isActive;
+        if (displayOrder !== undefined) service.displayOrder = Number(displayOrder);
+        if (isActive !== undefined) service.isActive = isActive === 'true' || isActive === true;
 
-        const parsedHighlights = parseArray(highlights);
-        const parsedIncludes = parseArray(includes);
-        const parsedExcludes = parseArray(excludes);
-
-        if (parsedHighlights) service.highlights = parsedHighlights;
-        if (parsedIncludes) service.includes = parsedIncludes;
-        if (parsedExcludes) service.excludes = parsedExcludes;
+        if (highlights !== undefined) service.highlights = parseArray(highlights);
+        if (includes !== undefined) service.includes = parseArray(includes);
+        if (excludes !== undefined) service.excludes = parseArray(excludes);
 
         if (vehicleTypes) {
             const parsedVehicleTypes = parseArray(vehicleTypes);
             if (parsedVehicleTypes && parsedVehicleTypes.length > 0) {
-                service.vehicleTypes = parsedVehicleTypes;
+                service.vehicleTypes = parsedVehicleTypes.map(v => ({
+                    ...v,
+                    label: v.label || v.type,
+                    price: Number(v.price),
+                    duration: Number(v.duration),
+                    features: parseArray(v.features)
+                }));
             }
         }
 
         await service.save();
+
+        console.log('✅ Service updated:', service._id);
 
         res.status(200).json({
             success: true,
@@ -285,7 +409,7 @@ export const updateService = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Update service error:', error);
+        console.error('❌ updateService ERROR:', error.message);
         res.status(500).json({
             success: false,
             message: 'Error updating service'
@@ -294,10 +418,11 @@ export const updateService = async (req, res) => {
 };
 
 // ============================================
-// ADD VEHICLE TYPE TO SERVICE (ADMIN)
+// DELETE SERVICE (ADMIN)
 // ============================================
+export const deleteService = async (req, res) => {
+    console.log('🔥 deleteService CALLED:', req.params.serviceId);
 
-export const addVehicleType = async (req, res) => {
     try {
         const { serviceId } = req.params;
 
@@ -317,21 +442,84 @@ export const addVehicleType = async (req, res) => {
             });
         }
 
-        const {
-            type,
-            label,
-            description,
-            price,
-            duration,
-            features,
-            displayOrder
-        } = req.body;
+        // Check for active bookings (if Booking model exists)
+        if (Booking) {
+            const activeBookings = await Booking.countDocuments({
+                service: serviceId,
+                status: { $in: ['pending', 'confirmed', 'in-progress'] }
+            });
+
+            if (activeBookings > 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Cannot delete service with ${activeBookings} active booking(s)`
+                });
+            }
+        }
+
+        // Delete images
+        for (const image of service.images) {
+            if (image.publicId) {
+                await deleteCloudinaryImage(image.publicId);
+            }
+        }
+
+        for (const vehicle of service.vehicleTypes) {
+            if (vehicle.imagePublicId) {
+                await deleteCloudinaryImage(vehicle.imagePublicId);
+            }
+        }
+
+        await service.deleteOne();
+
+        console.log('✅ Service deleted:', serviceId);
+
+        res.status(200).json({
+            success: true,
+            message: 'Service deleted successfully'
+        });
+
+    } catch (error) {
+        console.error('❌ deleteService ERROR:', error.message);
+        res.status(500).json({
+            success: false,
+            message: 'Error deleting service'
+        });
+    }
+};
+
+// ============================================
+// ADD VEHICLE TYPE (ADMIN)
+// ============================================
+export const addVehicleType = async (req, res) => {
+    console.log('🔥 addVehicleType CALLED');
+
+    try {
+        const { serviceId } = req.params;
+
+        if (!isValidObjectId(serviceId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid service ID'
+            });
+        }
+
+        const service = await Service.findById(serviceId);
+
+        if (!service) {
+            return res.status(404).json({
+                success: false,
+                message: 'Service not found'
+            });
+        }
+
+        const { type, label, description, price, duration, features, displayOrder } = req.body;
 
         if (!type || !price || !duration) {
             if (req.file) await deleteCloudinaryImage(req.file.filename);
             return res.status(400).json({
                 success: false,
-                message: 'Vehicle type, price and duration are required'
+                message: 'Type, price and duration are required'
             });
         }
 
@@ -340,15 +528,9 @@ export const addVehicleType = async (req, res) => {
             if (req.file) await deleteCloudinaryImage(req.file.filename);
             return res.status(400).json({
                 success: false,
-                message: `Vehicle type "${type}" already exists in this service`
+                message: `Vehicle type "${type}" already exists`
             });
         }
-
-        const parseArray = (value) => {
-            if (!value) return [];
-            if (Array.isArray(value)) return value;
-            try { return JSON.parse(value); } catch { return [value]; }
-        };
 
         let vehicleImage = 'default-vehicle.jpg';
         let vehicleImagePublicId = '';
@@ -366,19 +548,22 @@ export const addVehicleType = async (req, res) => {
             price: Number(price),
             duration: Number(duration),
             features: parseArray(features),
-            displayOrder: displayOrder || 0
+            displayOrder: Number(displayOrder) || 0,
+            isActive: true
         });
 
         await service.save();
 
+        console.log('✅ Vehicle type added:', type);
+
         res.status(200).json({
             success: true,
-            message: `Vehicle type "${type}" added successfully`,
+            message: `Vehicle type "${type}" added`,
             data: service
         });
 
     } catch (error) {
-        console.error('Add vehicle type error:', error);
+        console.error('❌ addVehicleType ERROR:', error.message);
         if (req.file) await deleteCloudinaryImage(req.file.filename);
         res.status(500).json({
             success: false,
@@ -390,8 +575,9 @@ export const addVehicleType = async (req, res) => {
 // ============================================
 // UPDATE VEHICLE TYPE (ADMIN)
 // ============================================
-
 export const updateVehicleType = async (req, res) => {
+    console.log('🔥 updateVehicleType CALLED');
+
     try {
         const { serviceId, vehicleTypeId } = req.params;
 
@@ -420,21 +606,7 @@ export const updateVehicleType = async (req, res) => {
             });
         }
 
-        const {
-            label,
-            description,
-            price,
-            duration,
-            features,
-            isActive,
-            displayOrder
-        } = req.body;
-
-        const parseArray = (value) => {
-            if (!value) return undefined;
-            if (Array.isArray(value)) return value;
-            try { return JSON.parse(value); } catch { return [value]; }
-        };
+        const { label, description, price, duration, features, isActive, displayOrder } = req.body;
 
         if (req.file) {
             if (vehicleType.imagePublicId) {
@@ -448,24 +620,22 @@ export const updateVehicleType = async (req, res) => {
         if (description !== undefined) vehicleType.description = description;
         if (price) vehicleType.price = Number(price);
         if (duration) vehicleType.duration = Number(duration);
-        if (isActive !== undefined) vehicleType.isActive = isActive;
-        if (displayOrder !== undefined) {
-            vehicleType.displayOrder = Number(displayOrder);
-        }
-
-        const parsedFeatures = parseArray(features);
-        if (parsedFeatures) vehicleType.features = parsedFeatures;
+        if (isActive !== undefined) vehicleType.isActive = isActive === 'true' || isActive === true;
+        if (displayOrder !== undefined) vehicleType.displayOrder = Number(displayOrder);
+        if (features !== undefined) vehicleType.features = parseArray(features);
 
         await service.save();
 
+        console.log('✅ Vehicle type updated');
+
         res.status(200).json({
             success: true,
-            message: 'Vehicle type updated successfully',
+            message: 'Vehicle type updated',
             data: service
         });
 
     } catch (error) {
-        console.error('Update vehicle type error:', error);
+        console.error('❌ updateVehicleType ERROR:', error.message);
         if (req.file) await deleteCloudinaryImage(req.file.filename);
         res.status(500).json({
             success: false,
@@ -477,8 +647,9 @@ export const updateVehicleType = async (req, res) => {
 // ============================================
 // DELETE VEHICLE TYPE (ADMIN)
 // ============================================
-
 export const deleteVehicleType = async (req, res) => {
+    console.log('🔥 deleteVehicleType CALLED');
+
     try {
         const { serviceId, vehicleTypeId } = req.params;
 
@@ -501,7 +672,7 @@ export const deleteVehicleType = async (req, res) => {
         if (service.vehicleTypes.length <= 1) {
             return res.status(400).json({
                 success: false,
-                message: 'Cannot delete the only vehicle type. Service must have at least one.'
+                message: 'Cannot delete the only vehicle type'
             });
         }
 
@@ -521,14 +692,16 @@ export const deleteVehicleType = async (req, res) => {
         service.vehicleTypes.pull(vehicleTypeId);
         await service.save();
 
+        console.log('✅ Vehicle type deleted');
+
         res.status(200).json({
             success: true,
-            message: 'Vehicle type deleted successfully',
+            message: 'Vehicle type deleted',
             data: service
         });
 
     } catch (error) {
-        console.error('Delete vehicle type error:', error);
+        console.error('❌ deleteVehicleType ERROR:', error.message);
         res.status(500).json({
             success: false,
             message: 'Error deleting vehicle type'
@@ -537,159 +710,11 @@ export const deleteVehicleType = async (req, res) => {
 };
 
 // ============================================
-// DELETE SERVICE (ADMIN)
-// ============================================
-
-export const deleteService = async (req, res) => {
-    try {
-        const { serviceId } = req.params;
-
-        if (!isValidObjectId(serviceId)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid service ID'
-            });
-        }
-
-        const service = await Service.findById(serviceId);
-
-        if (!service) {
-            return res.status(404).json({
-                success: false,
-                message: 'Service not found'
-            });
-        }
-
-        // ✅ ADDED: Check for active bookings before deleting
-        const activeBookings = await Booking.countDocuments({
-            serviceId,
-            status: { $in: ['pending', 'confirmed', 'in-progress'] }
-        });
-
-        if (activeBookings > 0) {
-            return res.status(400).json({
-                success: false,
-                message: `Cannot delete service with ${activeBookings} active booking(s). Cancel them first.`
-            });
-        }
-
-        // Delete all service images from cloudinary
-        for (const image of service.images) {
-            if (image.publicId) {
-                await deleteCloudinaryImage(image.publicId);
-            }
-        }
-
-        // Delete all vehicle type images from cloudinary
-        for (const vehicle of service.vehicleTypes) {
-            if (vehicle.imagePublicId) {
-                await deleteCloudinaryImage(vehicle.imagePublicId);
-            }
-        }
-
-        await service.deleteOne();
-
-        res.status(200).json({
-            success: true,
-            message: 'Service and all images deleted successfully'
-        });
-
-    } catch (error) {
-        console.error('Delete service error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error deleting service'
-        });
-    }
-};
-
-// ============================================
-// GET ALL SERVICES (ADMIN)
-// ============================================
-
-export const getAllServicesAdmin = async (req, res) => {
-    try {
-        const {
-            category,
-            isActive,
-            page = 1,
-            limit = 10
-        } = req.query;
-
-        const pageNum = parseInt(page);
-        const limitNum = parseInt(limit);
-
-        const query = {};
-        if (category) query.category = category;
-        if (isActive !== undefined) query.isActive = isActive === 'true';
-
-        const total = await Service.countDocuments(query);
-
-        const services = await Service.find(query)
-            .sort({ displayOrder: 1, createdAt: -1 })
-            .limit(limitNum)
-            .skip((pageNum - 1) * limitNum);
-
-        res.status(200).json({
-            success: true,
-            total,
-            pages: Math.ceil(total / limitNum),
-            currentPage: pageNum,
-            data: services
-        });
-
-    } catch (error) {
-        console.error('Get all services error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error fetching services'
-        });
-    }
-};
-
-// ============================================
-// GET SINGLE SERVICE (ADMIN)
-// ============================================
-
-export const getServiceById = async (req, res) => {
-    try {
-        const { serviceId } = req.params;
-
-        if (!isValidObjectId(serviceId)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid service ID'
-            });
-        }
-
-        const service = await Service.findById(serviceId);
-
-        if (!service) {
-            return res.status(404).json({
-                success: false,
-                message: 'Service not found'
-            });
-        }
-
-        res.status(200).json({
-            success: true,
-            data: service
-        });
-
-    } catch (error) {
-        console.error('Get service error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error fetching service'
-        });
-    }
-};
-
-// ============================================
 // SET PRIMARY IMAGE (ADMIN)
 // ============================================
-
 export const setPrimaryImage = async (req, res) => {
+    console.log('🔥 setPrimaryImage CALLED');
+
     try {
         const { serviceId, imageId } = req.params;
 
@@ -709,7 +734,9 @@ export const setPrimaryImage = async (req, res) => {
             });
         }
 
-        service.images.forEach(img => { img.isPrimary = false; });
+        service.images.forEach(img => {
+            img.isPrimary = false;
+        });
 
         const image = service.images.id(imageId);
         if (!image) {
@@ -722,6 +749,8 @@ export const setPrimaryImage = async (req, res) => {
         image.isPrimary = true;
         await service.save();
 
+        console.log('✅ Primary image set');
+
         res.status(200).json({
             success: true,
             message: 'Primary image updated',
@@ -729,10 +758,10 @@ export const setPrimaryImage = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Set primary image error:', error);
+        console.error('❌ setPrimaryImage ERROR:', error.message);
         res.status(500).json({
             success: false,
-            message: 'Error updating primary image'
+            message: 'Error setting primary image'
         });
     }
 };
