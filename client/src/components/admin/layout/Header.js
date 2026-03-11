@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useSocket } from '@/context/SocketContext';
+import Image from 'next/image';
 import {
     Bell,
     Menu,
@@ -33,7 +34,22 @@ const pageTitles = {
     '/admin/reports': {
         title: 'Reports',
         subtitle: 'Analytics and reports'
+    },
+    '/admin/settings': {
+        title: 'Settings',
+        subtitle: 'Account settings'
     }
+};
+
+// Helper to get avatar URL
+const getAvatarUrl = (avatar) => {
+    if (!avatar) return null;
+    if (typeof avatar === 'object' && avatar?.url) return avatar.url;
+    if (typeof avatar === 'string') {
+        if (avatar === 'default-avatar.png') return null;
+        if (avatar.startsWith('http')) return avatar;
+    }
+    return null;
 };
 
 export default function Header({ onMenuClick }) {
@@ -48,6 +64,8 @@ export default function Header({ onMenuClick }) {
         title: 'Admin',
         subtitle: ''
     };
+
+    const avatarUrl = getAvatarUrl(user?.avatar);
 
     useEffect(() => {
         const updateTime = () => {
@@ -67,8 +85,6 @@ export default function Header({ onMenuClick }) {
 
             {/* Left */}
             <div className="flex items-center gap-3 sm:gap-4">
-
-                {/* Mobile Menu Button */}
                 <button
                     onClick={onMenuClick}
                     className="lg:hidden w-8 h-8 flex items-center justify-center text-neutral-400 hover:text-white transition-colors"
@@ -76,7 +92,6 @@ export default function Header({ onMenuClick }) {
                     <Menu className="w-5 h-5" />
                 </button>
 
-                {/* Page Title */}
                 <div>
                     <h1 className="text-sm sm:text-base font-semibold text-white">
                         {pageInfo.title}
@@ -119,7 +134,6 @@ export default function Header({ onMenuClick }) {
                         )}
                     </button>
 
-                    {/* Dropdown */}
                     {showNotifications && (
                         <div className="absolute right-0 top-10 w-72 sm:w-80 bg-black border border-neutral-800 shadow-xl z-50">
                             <div className="px-4 py-3 border-b border-neutral-800 flex items-center justify-between">
@@ -162,12 +176,23 @@ export default function Header({ onMenuClick }) {
                     )}
                 </div>
 
-                {/* User Avatar */}
+                {/* User Avatar + Name */}
                 <div className="flex items-center gap-2 sm:gap-3">
-                    <div className="w-8 h-8 bg-white rounded-sm flex items-center justify-center shrink-0">
-                        <span className="text-black text-xs font-medium">
-                            {user?.firstName?.[0]}{user?.lastName?.[0]}
-                        </span>
+                    <div className="relative w-8 h-8 rounded-sm overflow-hidden bg-white shrink-0">
+                        {avatarUrl ? (
+                            <Image
+                                src={avatarUrl}
+                                alt={user?.firstName || 'Avatar'}
+                                fill
+                                className="object-cover"
+                            />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                                <span className="text-black text-xs font-medium">
+                                    {user?.firstName?.[0]}{user?.lastName?.[0]}
+                                </span>
+                            </div>
+                        )}
                     </div>
                     <div className="hidden md:block">
                         <p className="text-xs font-medium text-white">
@@ -178,7 +203,6 @@ export default function Header({ onMenuClick }) {
                         </p>
                     </div>
                 </div>
-
             </div>
         </header>
     );

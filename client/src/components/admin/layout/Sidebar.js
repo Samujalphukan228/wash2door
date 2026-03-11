@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import Image from 'next/image';
 import {
     LayoutDashboard,
     CalendarDays,
@@ -28,10 +29,23 @@ const navItems = [
     { label: 'Reports',   href: '/admin/reports',   icon: BarChart3       },
 ];
 
+// Helper to get avatar URL
+const getAvatarUrl = (avatar) => {
+    if (!avatar) return null;
+    if (typeof avatar === 'object' && avatar?.url) return avatar.url;
+    if (typeof avatar === 'string') {
+        if (avatar === 'default-avatar.png') return null;
+        if (avatar.startsWith('http')) return avatar;
+    }
+    return null;
+};
+
 export default function Sidebar({ open, onClose }) {
     const pathname = usePathname();
     const { user, logout } = useAuth();
     const [collapsed, setCollapsed] = useState(false);
+
+    const avatarUrl = getAvatarUrl(user?.avatar);
 
     return (
         <aside className={`
@@ -47,7 +61,6 @@ export default function Sidebar({ open, onClose }) {
                 flex items-center border-b border-neutral-800 shrink-0
                 ${collapsed ? 'justify-center p-4 flex-col gap-3' : 'justify-between px-5 py-4'}
             `}>
-                {/* Brand */}
                 <div className={`flex items-center gap-3 ${collapsed ? 'justify-center' : ''}`}>
                     <div className="w-7 h-7 bg-white rounded-sm flex items-center justify-center shrink-0">
                         <Car className="w-4 h-4 text-black" />
@@ -59,17 +72,13 @@ export default function Sidebar({ open, onClose }) {
                     )}
                 </div>
 
-                {/* Controls */}
                 <div className="flex items-center gap-1">
-                    {/* Mobile close */}
                     <button
                         onClick={onClose}
                         className="lg:hidden w-6 h-6 flex items-center justify-center text-neutral-500 hover:text-white transition-colors"
                     >
                         <X className="w-4 h-4" />
                     </button>
-
-                    {/* Desktop collapse */}
                     <button
                         onClick={() => setCollapsed(!collapsed)}
                         className="hidden lg:flex w-6 h-6 items-center justify-center text-neutral-500 hover:text-white transition-colors"
@@ -130,12 +139,19 @@ export default function Sidebar({ open, onClose }) {
                     onClick={onClose}
                     className={`
                         flex items-center gap-3 px-3 py-2.5
-                        text-sm text-neutral-400 hover:text-white
-                        hover:bg-neutral-800 rounded-sm transition-all
+                        text-sm transition-all rounded-sm
+                        ${pathname === '/admin/settings'
+                            ? 'bg-white text-black'
+                            : 'text-neutral-400 hover:text-white hover:bg-neutral-800'
+                        }
                         ${collapsed ? 'justify-center' : ''}
                     `}
                 >
-                    <Settings className="w-4 h-4 shrink-0 text-neutral-500" />
+                    <Settings className={`w-4 h-4 shrink-0 ${
+                        pathname === '/admin/settings'
+                            ? 'text-black'
+                            : 'text-neutral-500'
+                    }`} />
                     {!collapsed && (
                         <span className="font-medium">Settings</span>
                     )}
@@ -143,13 +159,49 @@ export default function Sidebar({ open, onClose }) {
 
                 {/* User Info */}
                 {!collapsed && (
-                    <div className="px-3 py-3 border-t border-neutral-800 mt-1">
-                        <p className="text-xs font-medium text-white truncate">
-                            {user?.firstName} {user?.lastName}
-                        </p>
-                        <p className="text-xs text-neutral-500 truncate mt-0.5">
-                            {user?.email}
-                        </p>
+                    <div className="px-3 py-3 border-t border-neutral-800 mt-1 flex items-center gap-3">
+                        <div className="relative w-8 h-8 rounded-full overflow-hidden bg-neutral-800 shrink-0">
+                            {avatarUrl ? (
+                                <Image
+                                    src={avatarUrl}
+                                    alt={user?.firstName || 'Avatar'}
+                                    fill
+                                    className="object-cover"
+                                />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center text-xs text-neutral-500 uppercase">
+                                    {user?.firstName?.[0]}{user?.lastName?.[0]}
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-white truncate">
+                                {user?.firstName} {user?.lastName}
+                            </p>
+                            <p className="text-xs text-neutral-500 truncate mt-0.5">
+                                {user?.email}
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                {/* Collapsed - just show avatar */}
+                {collapsed && (
+                    <div className="flex justify-center py-2">
+                        <div className="relative w-8 h-8 rounded-full overflow-hidden bg-neutral-800">
+                            {avatarUrl ? (
+                                <Image
+                                    src={avatarUrl}
+                                    alt={user?.firstName || 'Avatar'}
+                                    fill
+                                    className="object-cover"
+                                />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center text-xs text-neutral-500 uppercase">
+                                    {user?.firstName?.[0]}{user?.lastName?.[0]}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
 

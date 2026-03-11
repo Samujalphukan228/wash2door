@@ -41,6 +41,7 @@ export const AuthProvider = ({ children }) => {
 
                 setUser(userData);
                 setIsAuthenticated(true);
+                localStorage.setItem('user', JSON.stringify(userData));
             }
         } catch (error) {
             localStorage.removeItem('accessToken');
@@ -55,6 +56,30 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         loadUser();
     }, [loadUser]);
+
+    // ✅ NEW: Refresh user data from backend
+    const refreshUser = useCallback(async () => {
+        try {
+            const response = await axiosInstance.get('/auth/me');
+
+            if (response.data.success) {
+                const userData = response.data.data.user;
+                setUser(userData);
+                localStorage.setItem('user', JSON.stringify(userData));
+            }
+        } catch (error) {
+            console.error('Refresh user error:', error);
+        }
+    }, []);
+
+    // ✅ NEW: Update user state directly (for instant UI update)
+    const updateUser = useCallback((updates) => {
+        setUser(prev => {
+            const updated = { ...prev, ...updates };
+            localStorage.setItem('user', JSON.stringify(updated));
+            return updated;
+        });
+    }, []);
 
     const login = async (email, password) => {
         try {
@@ -101,8 +126,6 @@ export const AuthProvider = ({ children }) => {
             const message = data?.message || 'Login failed';
             const remainingAttempts = data?.remainingAttempts;
 
-            // Don't show toast for remaining attempts
-            // we show it inline
             if (!remainingAttempts) {
                 toast.error(message);
             }
@@ -139,7 +162,9 @@ export const AuthProvider = ({ children }) => {
             isAuthenticated,
             login,
             logout,
-            loadUser
+            loadUser,
+            refreshUser,
+            updateUser
         }}>
             {children}
         </AuthContext.Provider>
