@@ -1,176 +1,26 @@
-/* src/app/globals.css */
 @import "tailwindcss";
 
-/* Import Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
 
-/* ================================
-   THEME CONFIGURATION
-   ================================ */
-@theme {
-  --font-family-sans: 'Inter', sans-serif;
-  
-  /* Primary Colors */
-  --color-primary-50: #eff6ff;
-  --color-primary-100: #dbeafe;
-  --color-primary-200: #bfdbfe;
-  --color-primary-300: #93c5fd;
-  --color-primary-400: #60a5fa;
-  --color-primary-500: #3b82f6;
-  --color-primary-600: #2563eb;
-  --color-primary-700: #1d4ed8;
-  --color-primary-800: #1e40af;
-  --color-primary-900: #1e3a8a;
-  --color-primary-950: #172554;
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
 
-  /* Custom Animations */
-  --animate-fade-in: fade-in 0.3s ease-out;
-  --animate-slide-up: slide-up 0.4s ease-out;
-  --animate-slide-down: slide-down 0.4s ease-out;
-  --animate-scale-in: scale-in 0.3s ease-out;
-
-  @keyframes fade-in {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
-
-  @keyframes slide-up {
-    from { 
-      opacity: 0;
-      transform: translateY(20px);
-    }
-    to { 
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  @keyframes slide-down {
-    from { 
-      opacity: 0;
-      transform: translateY(-20px);
-    }
-    to { 
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  @keyframes scale-in {
-    from { 
-      opacity: 0;
-      transform: scale(0.95);
-    }
-    to { 
-      opacity: 1;
-      transform: scale(1);
-    }
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
   }
 }
 
-/* ================================
-   BASE STYLES
-   ================================ */
-@layer base {
-  * {
-    @apply border-gray-200;
-  }
-  
-  html {
-    scroll-behavior: smooth;
-  }
-  
-  body {
-    @apply bg-white text-gray-900 font-sans antialiased;
-  }
-}
-
-/* ================================
-   COMPONENT STYLES
-   ================================ */
-@layer components {
-  .container {
-    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
-  }
-  
-  .btn-primary {
-    @apply bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold 
-           hover:bg-blue-700 transition-colors duration-200 
-           focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
-  }
-  
-  .btn-secondary {
-    @apply bg-gray-100 text-gray-900 px-6 py-3 rounded-lg font-semibold 
-           hover:bg-gray-200 transition-colors duration-200;
-  }
-  
-  .btn-outline {
-    @apply border-2 border-blue-600 text-blue-600 px-6 py-3 rounded-lg font-semibold 
-           hover:bg-blue-50 transition-colors duration-200;
-  }
-  
-  .card {
-    @apply bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden;
-  }
-  
-  .card-hover {
-    @apply transition-all duration-300 hover:shadow-lg hover:-translate-y-1;
-  }
-  
-  .input-field {
-    @apply w-full px-4 py-3 rounded-lg border border-gray-300 
-           focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 
-           outline-none transition-all duration-200;
-  }
-  
-  .section-padding {
-    @apply py-16 md:py-24;
-  }
-  
-  .text-gradient {
-    @apply bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent;
-  }
-  
-  .glass {
-    @apply bg-white/80 backdrop-blur-lg;
-  }
-}
-
-/* ================================
-   UTILITY STYLES
-   ================================ */
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
-}
-
-/* ================================
-   CUSTOM SCROLLBAR
-   ================================ */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  @apply bg-gray-100;
-}
-
-::-webkit-scrollbar-thumb {
-  @apply bg-gray-300 rounded-full;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  @apply bg-gray-400;
-}
-
-/* Hide scrollbar */
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
 }
