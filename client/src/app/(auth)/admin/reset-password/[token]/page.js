@@ -21,7 +21,7 @@ const checkPasswordStrength = (password) => {
         uppercase: /[A-Z]/.test(password),
         lowercase: /[a-z]/.test(password),
         number: /\d/.test(password),
-        special: /[@$!%*?&]/.test(password)
+        special: /[^a-zA-Z0-9]/.test(password)
     };
     const score = Object.values(checks).filter(Boolean).length;
     const strength =
@@ -57,8 +57,8 @@ export default function ResetPasswordPage() {
         if (name === 'password') {
             setStrength(value ? checkPasswordStrength(value) : null);
         }
-        if (errors[name]) {
-            setErrors(prev => ({ ...prev, [name]: '' }));
+        if (errors[name] || errors.general) {
+            setErrors(prev => ({ ...prev, [name]: '', general: '' }));
         }
     };
 
@@ -66,8 +66,6 @@ export default function ResetPasswordPage() {
         const newErrors = {};
         if (!formData.password) {
             newErrors.password = 'Password is required';
-        } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])/.test(formData.password)) {
-            newErrors.password = 'Must contain uppercase, lowercase, number and special character';
         } else if (formData.password.length < 8) {
             newErrors.password = 'At least 8 characters required';
         }
@@ -88,21 +86,31 @@ export default function ResetPasswordPage() {
         }
         try {
             setLoading(true);
+            setErrors({});
+
+            // ✅ FIXED: Now sending both password and confirmPassword
             const response = await axiosInstance.post(
                 `/auth/reset-password/${token}`,
-                {
+                { 
                     password: formData.password,
-                    confirmPassword: formData.confirmPassword
+                    confirmPassword: formData.confirmPassword 
                 }
             );
+
             if (response.data.success) {
                 setSuccess(true);
+                toast.success('Password reset successfully!');
             }
         } catch (error) {
-            const message = error.response?.data?.message
-                || 'Link expired or invalid';
-            toast.error(message);
+            const data = error.response?.data;
+            let message = data?.message || 'Reset link expired or invalid. Please request a new one.';
+
+            if (data?.errors && Array.isArray(data.errors)) {
+                message = data.errors.map(e => e.msg || e.message).join('. ') || message;
+            }
+
             setErrors({ general: message });
+            toast.error(message);
         } finally {
             setLoading(false);
         }
@@ -146,7 +154,7 @@ export default function ResetPasswordPage() {
                                 'One uppercase letter (A–Z)',
                                 'One lowercase letter (a–z)',
                                 'One number (0–9)',
-                                'One special character (@$!%*?&)'
+                                'One special character'
                             ].map((req, i) => (
                                 <div
                                     key={i}
@@ -209,7 +217,6 @@ export default function ResetPasswordPage() {
                                 onSubmit={handleSubmit}
                                 className="space-y-6"
                             >
-
                                 {/* New Password */}
                                 <div>
                                     <label className="block text-xs tracking-[0.15em] uppercase text-neutral-500 mb-2">
@@ -240,7 +247,6 @@ export default function ResetPasswordPage() {
                                         </button>
                                     </div>
 
-                                    {/* Strength Bar */}
                                     {formData.password && strength && (
                                         <div className="mt-3">
                                             <div className="flex items-center justify-between mb-2">
@@ -373,6 +379,9 @@ export default function ResetPasswordPage() {
                         /* Success */
                         <div>
                             <div className="mb-10">
+                                <div className="w-12 h-12 bg-black rounded-full flex items-center justify-center mb-6">
+                                    <Check className="w-6 h-6 text-white" />
+                                </div>
                                 <p className="text-neutral-400 text-xs tracking-[0.2em] uppercase mb-3">
                                     Success
                                 </p>

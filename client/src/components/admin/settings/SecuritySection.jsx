@@ -24,7 +24,7 @@ export default function SecuritySection() {
         if (password.length >= 12) score++;
         if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score++;
         if (/\d/.test(password)) score++;
-        if (/[^a-zA-Z0-9]/.test(password)) score++;
+        if (/[@$!%*?&]/.test(password)) score++;
 
         const levels = [
             { label: '', color: '' },
@@ -53,6 +53,11 @@ export default function SecuritySection() {
             return;
         }
 
+        if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])/.test(newPassword)) {
+            toast.error('Password must contain uppercase, lowercase, number and special character (@$!%*?&)');
+            return;
+        }
+
         if (newPassword !== confirmPassword) {
             toast.error('Passwords do not match');
             return;
@@ -68,7 +73,8 @@ export default function SecuritySection() {
 
             await axiosInstance.put('/auth/change-password', {
                 currentPassword,
-                newPassword
+                newPassword,
+                confirmNewPassword: confirmPassword
             });
 
             toast.success('Password changed successfully');
@@ -76,9 +82,14 @@ export default function SecuritySection() {
             setNewPassword('');
             setConfirmPassword('');
         } catch (error) {
-            toast.error(
-                error.response?.data?.message || 'Failed to change password'
-            );
+            const data = error.response?.data;
+            let message = data?.message || 'Failed to change password';
+
+            if (data?.errors && Array.isArray(data.errors)) {
+                message = data.errors.map(e => e.msg || e.message).join('. ') || message;
+            }
+
+            toast.error(message);
         } finally {
             setLoading(false);
         }
@@ -86,6 +97,7 @@ export default function SecuritySection() {
 
     const canSubmit = currentPassword
         && newPassword.length >= 8
+        && /(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])/.test(newPassword)
         && newPassword === confirmPassword
         && currentPassword !== newPassword;
 
@@ -174,10 +186,10 @@ export default function SecuritySection() {
                     </p>
                     {[
                         { check: newPassword.length >= 8, text: 'At least 8 characters' },
-                        { check: /[A-Z]/.test(newPassword), text: 'One uppercase letter' },
-                        { check: /[a-z]/.test(newPassword), text: 'One lowercase letter' },
-                        { check: /\d/.test(newPassword), text: 'One number' },
-                        { check: /[^a-zA-Z0-9]/.test(newPassword), text: 'One special character' }
+                        { check: /[A-Z]/.test(newPassword), text: 'One uppercase letter (A-Z)' },
+                        { check: /[a-z]/.test(newPassword), text: 'One lowercase letter (a-z)' },
+                        { check: /\d/.test(newPassword), text: 'One number (0-9)' },
+                        { check: /[@$!%*?&]/.test(newPassword), text: 'One special character (@$!%*?&)' }
                     ].map((req, i) => (
                         <div key={i} className="flex items-center gap-2">
                             <div className={`w-1.5 h-1.5 rounded-full transition-colors ${
@@ -242,6 +254,7 @@ export default function SecuritySection() {
                         'Use a unique password not used on other sites',
                         'Never share your password with anyone',
                         'Change your password regularly (every 90 days)',
+                        'Use special characters: @ $ ! % * ? &',
                         'Log out from shared or public computers'
                     ].map((tip, i) => (
                         <div key={i} className="flex items-start gap-2">
