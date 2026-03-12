@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { motion, AnimatePresence } from 'framer-motion'
 import { 
   ChevronLeft, 
   MapPin, 
@@ -73,10 +74,20 @@ export default function ConfirmStep({ data, onBack, onSuccess }) {
   // Success View
   if (success && bookingResult) {
     return (
-      <div className="text-center py-10">
-        <div className="w-20 h-20 mx-auto bg-green-100 rounded-full flex items-center justify-center mb-6">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.4 }}
+        className="text-center py-10"
+      >
+        <motion.div 
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+          className="w-20 h-20 mx-auto bg-green-100 rounded-full flex items-center justify-center mb-6"
+        >
           <CheckCircle size={40} className="text-green-600" />
-        </div>
+        </motion.div>
 
         <h2
           className="text-2xl md:text-3xl text-black mb-3"
@@ -90,7 +101,12 @@ export default function ConfirmStep({ data, onBack, onSuccess }) {
         </p>
 
         {/* Booking Code */}
-        <div className="inline-block bg-gray-100 px-8 py-4 mb-8">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="inline-block bg-gray-100 px-8 py-4 mb-8 rounded-[5px]"
+        >
           <p className="text-[9px] tracking-[0.3em] uppercase text-gray-400 mb-1">
             Booking Code
           </p>
@@ -100,10 +116,15 @@ export default function ConfirmStep({ data, onBack, onSuccess }) {
           >
             {bookingResult.bookingCode}
           </p>
-        </div>
+        </motion.div>
 
         {/* Booking Summary */}
-        <div className="max-w-md mx-auto border border-gray-200 p-6 text-left mb-8">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="max-w-md mx-auto border border-gray-200 p-6 text-left mb-8 rounded-[5px]"
+        >
           <div className="space-y-4">
             <div className="flex justify-between">
               <span className="text-[10px] tracking-[0.15em] uppercase text-gray-400">Service</span>
@@ -138,7 +159,7 @@ export default function ConfirmStep({ data, onBack, onSuccess }) {
               </span>
             </div>
           </div>
-        </div>
+        </motion.div>
 
         <p className="text-[10px] tracking-[0.1em] text-gray-400 mb-8">
           A confirmation email has been sent to your registered email address.
@@ -146,32 +167,38 @@ export default function ConfirmStep({ data, onBack, onSuccess }) {
 
         {/* Actions */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <button
-            onClick={() => router.push('/profile?tab=bookings')}
-            className="px-8 py-4 border border-black text-[10px] tracking-[0.22em] uppercase hover:bg-black hover:text-white transition-colors duration-300"
+          <motion.button
+            whileTap={{ scale: 0.98 }}
+            onClick={() => router.push('/MyBookings')}
+            className="px-8 py-4 border border-black text-[10px] tracking-[0.22em] uppercase hover:bg-black hover:text-white transition-colors duration-300 rounded-[3px]"
           >
             View My Bookings
-          </button>
-          <button
+          </motion.button>
+          <motion.button
+            whileTap={{ scale: 0.98 }}
             onClick={() => router.push('/')}
-            className="px-8 py-4 bg-black text-white text-[10px] tracking-[0.22em] uppercase hover:bg-gray-800 transition-colors duration-300"
+            className="px-8 py-4 bg-black text-white text-[10px] tracking-[0.22em] uppercase hover:bg-gray-800 transition-colors duration-300 rounded-[3px]"
           >
             Back to Home
-          </button>
+          </motion.button>
         </div>
-      </div>
+      </motion.div>
     )
   }
 
   // Confirmation View
   return (
-    <div>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+    >
       {/* Back Button */}
       <button
         onClick={onBack}
         className="flex items-center gap-2 text-[10px] tracking-[0.2em] uppercase text-gray-400 hover:text-black transition-colors duration-300 mb-8"
       >
-        <ChevronLeft size={16} />
+        <ChevronLeft size={16} strokeWidth={1.5} />
         Back to Details
       </button>
 
@@ -188,22 +215,29 @@ export default function ConfirmStep({ data, onBack, onSuccess }) {
       </div>
 
       {/* Error Message */}
-      {error && (
-        <div className="max-w-2xl mx-auto mb-6 p-4 bg-red-50 border border-red-100 flex items-start gap-3">
-          <AlertCircle size={18} className="text-red-500 shrink-0 mt-0.5" />
-          <p className="text-[11px] tracking-[0.1em] text-red-600">{error}</p>
-        </div>
-      )}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="max-w-2xl mx-auto mb-6 p-4 bg-red-50 border border-red-100 flex items-start gap-3 rounded-[5px]"
+          >
+            <AlertCircle size={18} className="text-red-500 shrink-0 mt-0.5" />
+            <p className="text-[11px] tracking-[0.1em] text-red-600">{error}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="max-w-2xl mx-auto">
         {/* Service Summary */}
-        <div className="border border-gray-200 p-6 mb-6">
+        <div className="border border-gray-200 p-6 mb-6 rounded-[5px]">
           <div className="flex items-start gap-4">
             {data.serviceImage && (
               <img
                 src={data.serviceImage}
                 alt={data.serviceName}
-                className="w-24 h-24 object-cover"
+                className="w-24 h-24 object-cover rounded-[3px]"
               />
             )}
             <div className="flex-1">
@@ -234,9 +268,9 @@ export default function ConfirmStep({ data, onBack, onSuccess }) {
         {/* Details Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           {/* Date & Time */}
-          <div className="border border-gray-200 p-6">
+          <div className="border border-gray-200 p-6 rounded-[5px]">
             <h4 className="flex items-center gap-2 text-[11px] tracking-[0.2em] uppercase text-gray-400 mb-4">
-              <Calendar size={14} />
+              <Calendar size={14} strokeWidth={1.5} />
               Schedule
             </h4>
             <p className="text-[14px] text-black" style={{ fontFamily: 'Georgia, serif' }}>
@@ -248,15 +282,15 @@ export default function ConfirmStep({ data, onBack, onSuccess }) {
               })}
             </p>
             <p className="text-[14px] text-black mt-1 flex items-center gap-2" style={{ fontFamily: 'Georgia, serif' }}>
-              <Clock size={14} />
+              <Clock size={14} strokeWidth={1.5} />
               {data.timeSlot}
             </p>
           </div>
 
           {/* Location */}
-          <div className="border border-gray-200 p-6">
+          <div className="border border-gray-200 p-6 rounded-[5px]">
             <h4 className="flex items-center gap-2 text-[11px] tracking-[0.2em] uppercase text-gray-400 mb-4">
-              <MapPin size={14} />
+              <MapPin size={14} strokeWidth={1.5} />
               Location
             </h4>
             <p className="text-[12px] text-black leading-5">
@@ -270,9 +304,9 @@ export default function ConfirmStep({ data, onBack, onSuccess }) {
           </div>
 
           {/* Vehicle */}
-          <div className="border border-gray-200 p-6">
+          <div className="border border-gray-200 p-6 rounded-[5px]">
             <h4 className="flex items-center gap-2 text-[11px] tracking-[0.2em] uppercase text-gray-400 mb-4">
-              <Car size={14} />
+              <Car size={14} strokeWidth={1.5} />
               Vehicle
             </h4>
             <p className="text-[12px] text-black">
@@ -290,9 +324,9 @@ export default function ConfirmStep({ data, onBack, onSuccess }) {
           </div>
 
           {/* Payment */}
-          <div className="border border-gray-200 p-6">
+          <div className="border border-gray-200 p-6 rounded-[5px]">
             <h4 className="flex items-center gap-2 text-[11px] tracking-[0.2em] uppercase text-gray-400 mb-4">
-              <CreditCard size={14} />
+              <CreditCard size={14} strokeWidth={1.5} />
               Payment
             </h4>
             <p className="text-[12px] text-black">Cash on Service</p>
@@ -304,7 +338,7 @@ export default function ConfirmStep({ data, onBack, onSuccess }) {
 
         {/* Special Notes */}
         {data.specialNotes && (
-          <div className="border border-gray-200 p-6 mb-6">
+          <div className="border border-gray-200 p-6 mb-6 rounded-[5px]">
             <h4 className="text-[11px] tracking-[0.2em] uppercase text-gray-400 mb-3">
               Special Instructions
             </h4>
@@ -313,7 +347,7 @@ export default function ConfirmStep({ data, onBack, onSuccess }) {
         )}
 
         {/* Price Summary */}
-        <div className="border-2 border-black p-6 mb-8">
+        <div className="border-2 border-black p-6 mb-8 rounded-[5px]">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-[9px] tracking-[0.3em] uppercase text-gray-400">Total Amount</p>
@@ -336,16 +370,18 @@ export default function ConfirmStep({ data, onBack, onSuccess }) {
 
         {/* Actions */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <button
+          <motion.button
+            whileTap={{ scale: 0.98 }}
             onClick={onBack}
-            className="px-8 py-4 border border-gray-200 text-[10px] tracking-[0.22em] uppercase hover:border-black transition-colors duration-300"
+            className="px-8 py-4 border border-gray-200 text-[10px] tracking-[0.22em] uppercase hover:border-black transition-colors duration-300 rounded-[3px]"
           >
             Edit Details
-          </button>
-          <button
+          </motion.button>
+          <motion.button
+            whileTap={{ scale: 0.98 }}
             onClick={handleConfirm}
             disabled={loading}
-            className="relative flex items-center justify-center gap-2 px-12 py-4 bg-black text-white text-[10px] tracking-[0.22em] uppercase overflow-hidden group disabled:opacity-50"
+            className="relative flex items-center justify-center gap-2 px-12 py-4 bg-black text-white text-[10px] tracking-[0.22em] uppercase overflow-hidden group disabled:opacity-50 rounded-[3px]"
           >
             <span className="absolute inset-0 bg-white origin-bottom scale-y-0 group-hover:scale-y-100 transition-transform duration-500 ease-out" />
             {loading ? (
@@ -358,9 +394,9 @@ export default function ConfirmStep({ data, onBack, onSuccess }) {
                 </span>
               </>
             )}
-          </button>
+          </motion.button>
         </div>
       </div>
-    </div>
+    </motion.div>
   )
 }

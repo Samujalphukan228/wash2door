@@ -1,5 +1,6 @@
 "use client"
 
+import { motion } from 'framer-motion'
 import { Check } from 'lucide-react'
 
 const STEPS = [
@@ -19,23 +20,30 @@ export default function StepIndicator({ currentStep }) {
           <div key={step.id} className="flex items-center flex-1">
             {/* Step Circle */}
             <div className="flex flex-col items-center">
-              <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
-                  currentStep > step.id
-                    ? 'bg-black border-black text-white'
-                    : currentStep === step.id
-                    ? 'bg-white border-black text-black'
-                    : 'bg-white border-gray-200 text-gray-300'
-                }`}
+              <motion.div
+                initial={false}
+                animate={{
+                  backgroundColor: currentStep > step.id ? '#000' : '#fff',
+                  borderColor: currentStep >= step.id ? '#000' : '#e5e7eb',
+                }}
+                className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300`}
               >
                 {currentStep > step.id ? (
-                  <Check size={16} strokeWidth={2} />
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: "spring", stiffness: 300 }}
+                  >
+                    <Check size={16} strokeWidth={2} className="text-white" />
+                  </motion.div>
                 ) : (
-                  <span className="text-[12px] font-medium">{step.id}</span>
+                  <span className={`text-[12px] font-medium ${currentStep === step.id ? 'text-black' : 'text-gray-300'}`}>
+                    {step.id}
+                  </span>
                 )}
-              </div>
+              </motion.div>
               <span
-                className={`mt-2 text-[9px] tracking-[0.2em] uppercase ${
+                className={`mt-2 text-[9px] tracking-[0.2em] uppercase transition-colors duration-300 ${
                   currentStep >= step.id ? 'text-black' : 'text-gray-300'
                 }`}
               >
@@ -46,11 +54,14 @@ export default function StepIndicator({ currentStep }) {
             {/* Connector Line */}
             {index < STEPS.length - 1 && (
               <div className="flex-1 mx-4">
-                <div
-                  className={`h-px transition-all duration-300 ${
-                    currentStep > step.id ? 'bg-black' : 'bg-gray-200'
-                  }`}
-                />
+                <div className="h-px bg-gray-200 relative overflow-hidden">
+                  <motion.div
+                    initial={{ scaleX: 0 }}
+                    animate={{ scaleX: currentStep > step.id ? 1 : 0 }}
+                    transition={{ duration: 0.4 }}
+                    className="absolute inset-0 bg-black origin-left"
+                  />
+                </div>
               </div>
             )}
           </div>
@@ -68,9 +79,11 @@ export default function StepIndicator({ currentStep }) {
           </span>
         </div>
         <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-black transition-all duration-500"
-            style={{ width: `${(currentStep / STEPS.length) * 100}%` }}
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: `${(currentStep / STEPS.length) * 100}%` }}
+            transition={{ duration: 0.4 }}
+            className="h-full bg-black"
           />
         </div>
       </div>

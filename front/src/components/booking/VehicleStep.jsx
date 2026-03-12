@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from 'react'
+import { motion } from 'framer-motion'
 import { Loader2, ChevronLeft, Clock, Check } from 'lucide-react'
 import { getServicePricing } from '@/lib/booking.api'
 
@@ -55,7 +56,7 @@ export default function VehicleStep({ data, onUpdate, onNext, onBack }) {
         </p>
         <button
           onClick={fetchPricing}
-          className="text-[10px] tracking-[0.2em] uppercase text-black border border-black px-6 py-3 hover:bg-black hover:text-white transition-colors duration-300"
+          className="text-[10px] tracking-[0.2em] uppercase text-black border border-black px-6 py-3 hover:bg-black hover:text-white transition-colors duration-300 rounded-[3px]"
         >
           Try Again
         </button>
@@ -64,13 +65,17 @@ export default function VehicleStep({ data, onUpdate, onNext, onBack }) {
   }
 
   return (
-    <div>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+    >
       {/* Back Button */}
       <button
         onClick={onBack}
         className="flex items-center gap-2 text-[10px] tracking-[0.2em] uppercase text-gray-400 hover:text-black transition-colors duration-300 mb-8"
       >
-        <ChevronLeft size={16} />
+        <ChevronLeft size={16} strokeWidth={1.5} />
         Back to Services
       </button>
 
@@ -91,14 +96,18 @@ export default function VehicleStep({ data, onUpdate, onNext, onBack }) {
 
       {/* Vehicle Types Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {pricing?.vehicleTypes?.map((vehicle) => {
+        {pricing?.vehicleTypes?.map((vehicle, index) => {
           const isSelected = data.vehicleTypeId === vehicle._id
 
           return (
-            <button
+            <motion.button
               key={vehicle._id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: index * 0.05 }}
+              whileTap={{ scale: 0.98 }}
               onClick={() => handleSelect(vehicle)}
-              className={`group text-left border transition-all duration-300 overflow-hidden ${
+              className={`group text-left border transition-all duration-300 overflow-hidden rounded-[5px] ${
                 isSelected
                   ? 'border-black ring-2 ring-black'
                   : 'border-gray-200 hover:border-black'
@@ -127,9 +136,13 @@ export default function VehicleStep({ data, onUpdate, onNext, onBack }) {
                 )}
                 {/* Selected Indicator */}
                 {isSelected && (
-                  <div className="absolute top-3 right-3 w-6 h-6 bg-black rounded-full flex items-center justify-center">
+                  <motion.div 
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className="absolute top-3 right-3 w-6 h-6 bg-black rounded-full flex items-center justify-center"
+                  >
                     <Check size={14} className="text-white" />
-                  </div>
+                  </motion.div>
                 )}
               </div>
 
@@ -159,7 +172,7 @@ export default function VehicleStep({ data, onUpdate, onNext, onBack }) {
 
                 {/* Duration */}
                 <div className="flex items-center gap-2 text-[10px] text-gray-500 mb-4">
-                  <Clock size={12} />
+                  <Clock size={12} strokeWidth={1.5} />
                   <span>{vehicle.duration} minutes</span>
                 </div>
 
@@ -169,7 +182,7 @@ export default function VehicleStep({ data, onUpdate, onNext, onBack }) {
                     <ul className="space-y-1">
                       {vehicle.features.slice(0, 3).map((feature, i) => (
                         <li key={i} className="flex items-center gap-2 text-[9px] tracking-[0.1em] uppercase text-gray-500">
-                          <Check size={10} className="text-green-500" />
+                          <Check size={10} className="text-green-500" strokeWidth={2} />
                           {feature}
                         </li>
                       ))}
@@ -182,10 +195,10 @@ export default function VehicleStep({ data, onUpdate, onNext, onBack }) {
                   </div>
                 )}
               </div>
-            </button>
+            </motion.button>
           )
         })}
       </div>
-    </div>
+    </motion.div>
   )
 }

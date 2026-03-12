@@ -3,10 +3,11 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
+import { motion, AnimatePresence } from 'framer-motion'
 import { 
   User, Mail, Calendar, Car, Settings, Lock, Trash2, 
   Edit2, Save, X, ChevronRight, Star, Clock, CheckCircle,
-  XCircle, Loader2
+  XCircle, Loader2, Eye, EyeOff
 } from 'lucide-react'
 import { 
   getUserProfile, 
@@ -153,7 +154,6 @@ export default function ProfilePage() {
     setError('')
     setSuccess('')
 
-    // Validation
     if (passwordData.newPassword.length < 8) {
       setError('New password must be at least 8 characters')
       return
@@ -164,7 +164,6 @@ export default function ProfilePage() {
       return
     }
 
-    // Password strength check
     const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/
     if (!passwordRegex.test(passwordData.newPassword)) {
       setError('Password must contain uppercase, lowercase, number, and special character')
@@ -239,6 +238,74 @@ export default function ProfilePage() {
     { id: 'settings', label: 'Settings', icon: Settings },
   ]
 
+  // ✅ Reusable Input Component with proper styling
+  const InputField = ({ 
+    label, 
+    type = 'text', 
+    value, 
+    onChange, 
+    disabled = false, 
+    icon: Icon,
+    placeholder,
+    hint,
+    showToggle = false,
+    onToggle,
+    showPassword
+  }) => (
+    <div>
+      <label className="block text-[9px] tracking-[0.3em] uppercase text-gray-400 mb-2">
+        {label}
+      </label>
+      <div className="relative">
+        {Icon && (
+          <Icon 
+            size={16} 
+            strokeWidth={1.5} 
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" 
+          />
+        )}
+        <input
+          type={showToggle ? (showPassword ? 'text' : 'password') : type}
+          value={value}
+          onChange={onChange}
+          disabled={disabled}
+          placeholder={placeholder}
+          className={`
+            w-full 
+            ${Icon ? 'pl-12' : 'px-4'} 
+            ${showToggle ? 'pr-12' : 'pr-4'} 
+            py-3.5 
+            border 
+            text-[12px] 
+            tracking-[0.05em] 
+            rounded-[3px]
+            focus:outline-none 
+            transition-all 
+            duration-300
+            ${disabled 
+              ? 'border-gray-200 bg-gray-100 text-gray-500 cursor-not-allowed' 
+              : 'border-gray-200 bg-white text-black placeholder:text-gray-400 focus:border-black hover:border-gray-300'
+            }
+          `}
+        />
+        {showToggle && (
+          <button
+            type="button"
+            onClick={onToggle}
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            {showPassword ? <EyeOff size={16} strokeWidth={1.5} /> : <Eye size={16} strokeWidth={1.5} />}
+          </button>
+        )}
+      </div>
+      {hint && (
+        <p className="text-[8px] tracking-[0.1em] text-gray-400 mt-2">
+          {hint}
+        </p>
+      )}
+    </div>
+  )
+
   return (
     <div style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }} className="min-h-screen bg-gray-50 pt-0">
       
@@ -272,7 +339,7 @@ export default function ProfilePage() {
           
           {/* Sidebar */}
           <div className="lg:col-span-1">
-            <div className="bg-white border border-gray-200 overflow-hidden">
+            <div className="bg-white border border-gray-200 overflow-hidden rounded-[5px]">
               {/* User Info */}
               <div className="p-6 border-b border-gray-100 text-center">
                 <div className="w-20 h-20 mx-auto bg-black rounded-full flex items-center justify-center">
@@ -324,7 +391,7 @@ export default function ProfilePage() {
                         setError('')
                         setSuccess('')
                       }}
-                      className={`w-full flex items-center gap-3 px-4 py-3 text-[9px] tracking-[0.2em] uppercase transition-colors duration-300 ${
+                      className={`w-full flex items-center gap-3 px-4 py-3 text-[9px] tracking-[0.2em] uppercase transition-all duration-300 rounded-[3px] ${
                         activeTab === tab.id
                           ? 'bg-black text-white'
                           : 'text-gray-500 hover:bg-gray-50'
@@ -342,30 +409,49 @@ export default function ProfilePage() {
 
           {/* Main Content */}
           <div className="lg:col-span-3">
-            <div className="bg-white border border-gray-200 p-8">
+            <div className="bg-white border border-gray-200 p-8 rounded-[5px]">
               
               {/* Messages */}
-              {error && (
-                <div className="mb-6 p-4 bg-red-50 border border-red-100">
-                  <p className="text-[10px] tracking-[0.15em] uppercase text-red-600">
-                    {error}
-                  </p>
-                </div>
-              )}
+              <AnimatePresence>
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="mb-6 p-4 bg-red-50 border border-red-100 rounded-[3px]"
+                  >
+                    <p className="text-[10px] tracking-[0.15em] uppercase text-red-600">
+                      {error}
+                    </p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
               
-              {success && (
-                <div className="mb-6 p-4 bg-green-50 border border-green-100">
-                  <p className="text-[10px] tracking-[0.15em] uppercase text-green-600">
-                    {success}
-                  </p>
-                </div>
-              )}
+              <AnimatePresence>
+                {success && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="mb-6 p-4 bg-green-50 border border-green-100 rounded-[3px]"
+                  >
+                    <p className="text-[10px] tracking-[0.15em] uppercase text-green-600 flex items-center gap-2">
+                      <CheckCircle size={14} />
+                      {success}
+                    </p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* ============================================ */}
               {/* PROFILE TAB */}
               {/* ============================================ */}
               {activeTab === 'profile' && (
-                <div>
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                >
                   <div className="flex items-center justify-between mb-8">
                     <h2 
                       className="text-xl text-black"
@@ -376,7 +462,7 @@ export default function ProfilePage() {
                     {!isEditing ? (
                       <button
                         onClick={() => setIsEditing(true)}
-                        className="flex items-center gap-2 px-4 py-2 text-[9px] tracking-[0.2em] uppercase border border-gray-200 hover:border-black transition-colors duration-300"
+                        className="flex items-center gap-2 px-4 py-2 text-[9px] tracking-[0.2em] uppercase border border-gray-200 hover:border-black hover:bg-black hover:text-white transition-all duration-300 rounded-[3px]"
                       >
                         <Edit2 size={12} strokeWidth={1.5} />
                         Edit
@@ -384,7 +470,7 @@ export default function ProfilePage() {
                     ) : (
                       <button
                         onClick={handleCancelEdit}
-                        className="flex items-center gap-2 px-4 py-2 text-[9px] tracking-[0.2em] uppercase border border-gray-200 hover:border-black transition-colors duration-300"
+                        className="flex items-center gap-2 px-4 py-2 text-[9px] tracking-[0.2em] uppercase border border-gray-200 hover:border-black transition-colors duration-300 rounded-[3px]"
                       >
                         <X size={12} strokeWidth={1.5} />
                         Cancel
@@ -404,9 +490,14 @@ export default function ProfilePage() {
                           value={formData.firstName}
                           onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                           disabled={!isEditing}
-                          className={`w-full px-4 py-3.5 border border-gray-200 text-[12px] tracking-[0.05em] ${
-                            isEditing ? 'bg-white focus:border-black' : 'bg-gray-50'
-                          } focus:outline-none transition-colors duration-300`}
+                          className={`
+                            w-full px-4 py-3.5 border text-[12px] tracking-[0.05em] rounded-[3px]
+                            focus:outline-none transition-all duration-300
+                            ${isEditing 
+                              ? 'border-gray-300 bg-white text-black focus:border-black' 
+                              : 'border-gray-200 bg-gray-50 text-gray-600 cursor-not-allowed'
+                            }
+                          `}
                         />
                       </div>
 
@@ -420,9 +511,14 @@ export default function ProfilePage() {
                           value={formData.lastName}
                           onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
                           disabled={!isEditing}
-                          className={`w-full px-4 py-3.5 border border-gray-200 text-[12px] tracking-[0.05em] ${
-                            isEditing ? 'bg-white focus:border-black' : 'bg-gray-50'
-                          } focus:outline-none transition-colors duration-300`}
+                          className={`
+                            w-full px-4 py-3.5 border text-[12px] tracking-[0.05em] rounded-[3px]
+                            focus:outline-none transition-all duration-300
+                            ${isEditing 
+                              ? 'border-gray-300 bg-white text-black focus:border-black' 
+                              : 'border-gray-200 bg-gray-50 text-gray-600 cursor-not-allowed'
+                            }
+                          `}
                         />
                       </div>
                     </div>
@@ -433,12 +529,12 @@ export default function ProfilePage() {
                         Email Address
                       </label>
                       <div className="relative">
-                        <Mail size={16} strokeWidth={1.5} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
+                        <Mail size={16} strokeWidth={1.5} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
                         <input
                           type="email"
                           value={profile?.email || ''}
                           disabled
-                          className="w-full pl-12 pr-4 py-3.5 border border-gray-200 text-[12px] tracking-[0.05em] bg-gray-100 cursor-not-allowed"
+                          className="w-full pl-12 pr-4 py-3.5 border border-gray-200 text-[12px] tracking-[0.05em] bg-gray-100 text-gray-500 cursor-not-allowed rounded-[3px]"
                         />
                       </div>
                       <p className="text-[8px] tracking-[0.1em] text-gray-400 mt-2">
@@ -481,56 +577,75 @@ export default function ProfilePage() {
                       </div>
                     </div>
 
-                    {isEditing && (
-                      <div className="pt-6">
-                        <button
-                          type="submit"
-                          disabled={saving}
-                          className="relative flex items-center justify-center gap-2 px-8 py-4 bg-black text-white text-[10px] tracking-[0.22em] uppercase overflow-hidden group disabled:opacity-50"
+                    <AnimatePresence>
+                      {isEditing && (
+                        <motion.div 
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="pt-6"
                         >
-                          <span className="absolute inset-0 bg-white origin-bottom scale-y-0 group-hover:scale-y-100 transition-transform duration-500 ease-out" />
-                          {saving ? (
-                            <Loader2 size={14} className="relative z-10 animate-spin" />
-                          ) : (
-                            <>
-                              <Save size={14} strokeWidth={1.5} className="relative z-10 group-hover:text-black transition-colors duration-500" />
-                              <span className="relative z-10 group-hover:text-black transition-colors duration-500">
-                                Save Changes
-                              </span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    )}
+                          <button
+                            type="submit"
+                            disabled={saving}
+                            className="relative flex items-center justify-center gap-2 px-8 py-4 bg-black text-white text-[10px] tracking-[0.22em] uppercase overflow-hidden group disabled:opacity-50 rounded-[3px]"
+                          >
+                            <span className="absolute inset-0 bg-white origin-bottom scale-y-0 group-hover:scale-y-100 transition-transform duration-500 ease-out" />
+                            {saving ? (
+                              <Loader2 size={14} className="relative z-10 animate-spin" />
+                            ) : (
+                              <>
+                                <Save size={14} strokeWidth={1.5} className="relative z-10 group-hover:text-black transition-colors duration-500" />
+                                <span className="relative z-10 group-hover:text-black transition-colors duration-500">
+                                  Save Changes
+                                </span>
+                              </>
+                            )}
+                          </button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </form>
-                </div>
+                </motion.div>
               )}
 
               {/* ============================================ */}
               {/* BOOKINGS TAB */}
               {/* ============================================ */}
               {activeTab === 'bookings' && (
-                <div>
-                  <h2 
-                    className="text-xl text-black mb-8"
-                    style={{ fontFamily: 'Georgia, serif', fontWeight: 300 }}
-                  >
-                    My Bookings
-                  </h2>
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <div className="flex items-center justify-between mb-8">
+                    <h2 
+                      className="text-xl text-black"
+                      style={{ fontFamily: 'Georgia, serif', fontWeight: 300 }}
+                    >
+                      My Bookings
+                    </h2>
+                    <button
+                      onClick={() => router.push('/MyBookings')}
+                      className="text-[9px] tracking-[0.2em] uppercase text-gray-400 hover:text-black transition-colors duration-300"
+                    >
+                      View All →
+                    </button>
+                  </div>
 
                   {bookingsLoading ? (
                     <div className="flex items-center justify-center py-16">
                       <Loader2 size={24} className="animate-spin text-gray-400" />
                     </div>
                   ) : bookings.length === 0 ? (
-                    <div className="text-center py-16 border border-gray-100">
+                    <div className="text-center py-16 border border-gray-100 rounded-[5px]">
                       <Car size={48} className="mx-auto text-gray-200 mb-4" strokeWidth={1} />
                       <p className="text-[11px] tracking-[0.15em] uppercase text-gray-400 mb-6">
                         No bookings yet
                       </p>
                       <button
-                        onClick={() => router.push('/services')}
-                        className="relative inline-flex items-center gap-2 px-6 py-3 bg-black text-white text-[10px] tracking-[0.22em] uppercase overflow-hidden group"
+                        onClick={() => router.push('/Bookings')}
+                        className="relative inline-flex items-center gap-2 px-6 py-3 bg-black text-white text-[10px] tracking-[0.22em] uppercase overflow-hidden group rounded-[3px]"
                       >
                         <span className="absolute inset-0 bg-white origin-bottom scale-y-0 group-hover:scale-y-100 transition-transform duration-500 ease-out" />
                         <span className="relative z-10 group-hover:text-black transition-colors duration-500">
@@ -540,12 +655,14 @@ export default function ProfilePage() {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {bookings.map((booking) => {
+                      {bookings.slice(0, 5).map((booking) => {
                         const StatusIcon = STATUS_ICONS[booking.status] || Clock
                         return (
-                          <div 
-                            key={booking._id} 
-                            className="border border-gray-100 p-5 hover:border-gray-300 transition-colors duration-300"
+                          <motion.div 
+                            key={booking._id}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="border border-gray-100 p-5 hover:border-gray-300 transition-all duration-300 rounded-[3px]"
                           >
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                               <div className="flex-1">
@@ -556,7 +673,7 @@ export default function ProfilePage() {
                                   >
                                     {booking.serviceName}
                                   </h3>
-                                  <span className={`px-2 py-1 text-[8px] tracking-[0.2em] uppercase ${STATUS_COLORS[booking.status]}`}>
+                                  <span className={`px-2 py-1 text-[8px] tracking-[0.2em] uppercase rounded-[2px] ${STATUS_COLORS[booking.status]}`}>
                                     {booking.status}
                                   </span>
                                 </div>
@@ -590,19 +707,23 @@ export default function ProfilePage() {
                                 </p>
                               </div>
                             </div>
-                          </div>
+                          </motion.div>
                         )
                       })}
                     </div>
                   )}
-                </div>
+                </motion.div>
               )}
 
               {/* ============================================ */}
               {/* SECURITY TAB */}
               {/* ============================================ */}
               {activeTab === 'security' && (
-                <div>
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                >
                   <h2 
                     className="text-xl text-black mb-8"
                     style={{ fontFamily: 'Georgia, serif', fontWeight: 300 }}
@@ -615,26 +736,37 @@ export default function ProfilePage() {
                       <label className="block text-[9px] tracking-[0.3em] uppercase text-gray-400 mb-2">
                         Current Password
                       </label>
-                      <input
-                        type={showPasswords ? 'text' : 'password'}
-                        value={passwordData.currentPassword}
-                        onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
-                        required
-                        className="w-full px-4 py-3.5 border border-gray-200 text-[12px] tracking-[0.05em] focus:outline-none focus:border-black transition-colors duration-300"
-                      />
+                      <div className="relative">
+                        <input
+                          type={showPasswords ? 'text' : 'password'}
+                          value={passwordData.currentPassword}
+                          onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                          required
+                          className="w-full px-4 pr-12 py-3.5 border border-gray-200 text-[12px] tracking-[0.05em] text-black bg-white focus:outline-none focus:border-black transition-colors duration-300 rounded-[3px]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPasswords(!showPasswords)}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                          {showPasswords ? <EyeOff size={16} strokeWidth={1.5} /> : <Eye size={16} strokeWidth={1.5} />}
+                        </button>
+                      </div>
                     </div>
 
                     <div>
                       <label className="block text-[9px] tracking-[0.3em] uppercase text-gray-400 mb-2">
                         New Password
                       </label>
-                      <input
-                        type={showPasswords ? 'text' : 'password'}
-                        value={passwordData.newPassword}
-                        onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-                        required
-                        className="w-full px-4 py-3.5 border border-gray-200 text-[12px] tracking-[0.05em] focus:outline-none focus:border-black transition-colors duration-300"
-                      />
+                      <div className="relative">
+                        <input
+                          type={showPasswords ? 'text' : 'password'}
+                          value={passwordData.newPassword}
+                          onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                          required
+                          className="w-full px-4 pr-12 py-3.5 border border-gray-200 text-[12px] tracking-[0.05em] text-black bg-white focus:outline-none focus:border-black transition-colors duration-300 rounded-[3px]"
+                        />
+                      </div>
                       <p className="text-[8px] tracking-[0.1em] text-gray-400 mt-2">
                         Min 8 characters with uppercase, lowercase, number & special character
                       </p>
@@ -649,27 +781,14 @@ export default function ProfilePage() {
                         value={passwordData.confirmNewPassword}
                         onChange={(e) => setPasswordData({ ...passwordData, confirmNewPassword: e.target.value })}
                         required
-                        className="w-full px-4 py-3.5 border border-gray-200 text-[12px] tracking-[0.05em] focus:outline-none focus:border-black transition-colors duration-300"
+                        className="w-full px-4 py-3.5 border border-gray-200 text-[12px] tracking-[0.05em] text-black bg-white focus:outline-none focus:border-black transition-colors duration-300 rounded-[3px]"
                       />
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="showPasswords"
-                        checked={showPasswords}
-                        onChange={(e) => setShowPasswords(e.target.checked)}
-                        className="w-4 h-4"
-                      />
-                      <label htmlFor="showPasswords" className="text-[10px] tracking-[0.1em] text-gray-500">
-                        Show passwords
-                      </label>
                     </div>
 
                     <button
                       type="submit"
                       disabled={saving}
-                      className="relative w-full flex items-center justify-center gap-2 px-8 py-4 bg-black text-white text-[10px] tracking-[0.22em] uppercase overflow-hidden group disabled:opacity-50"
+                      className="relative w-full flex items-center justify-center gap-2 px-8 py-4 bg-black text-white text-[10px] tracking-[0.22em] uppercase overflow-hidden group disabled:opacity-50 rounded-[3px]"
                     >
                       <span className="absolute inset-0 bg-white origin-bottom scale-y-0 group-hover:scale-y-100 transition-transform duration-500 ease-out" />
                       {saving ? (
@@ -684,14 +803,18 @@ export default function ProfilePage() {
                       )}
                     </button>
                   </form>
-                </div>
+                </motion.div>
               )}
 
               {/* ============================================ */}
               {/* SETTINGS TAB */}
               {/* ============================================ */}
               {activeTab === 'settings' && (
-                <div>
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                >
                   <h2 
                     className="text-xl text-black mb-8"
                     style={{ fontFamily: 'Georgia, serif', fontWeight: 300 }}
@@ -701,7 +824,7 @@ export default function ProfilePage() {
 
                   {/* Account Stats */}
                   {stats && (
-                    <div className="border border-gray-100 p-6 mb-8">
+                    <div className="border border-gray-100 p-6 mb-8 rounded-[5px]">
                       <h3 className="text-[9px] tracking-[0.3em] uppercase text-gray-400 mb-4">
                         Account Overview
                       </h3>
@@ -747,7 +870,7 @@ export default function ProfilePage() {
                   )}
 
                   {/* Danger Zone */}
-                  <div className="border border-red-200 bg-red-50/50 p-6">
+                  <div className="border border-red-200 bg-red-50/50 p-6 rounded-[5px]">
                     <h3 className="text-[9px] tracking-[0.3em] uppercase text-red-600 mb-2">
                       Danger Zone
                     </h3>
@@ -756,55 +879,67 @@ export default function ProfilePage() {
                       Please contact support to reactivate.
                     </p>
                     
-                    {!showDeleteConfirm ? (
-                      <button
-                        onClick={() => setShowDeleteConfirm(true)}
-                        className="flex items-center gap-2 px-6 py-3 border border-red-300 text-red-600 text-[10px] tracking-[0.2em] uppercase hover:bg-red-600 hover:text-white hover:border-red-600 transition-colors duration-300"
-                      >
-                        <Trash2 size={14} strokeWidth={1.5} />
-                        Deactivate Account
-                      </button>
-                    ) : (
-                      <div className="space-y-4">
-                        <p className="text-[10px] tracking-[0.1em] text-red-600">
-                          Enter your password to confirm:
-                        </p>
-                        <input
-                          type="password"
-                          value={deletePassword}
-                          onChange={(e) => setDeletePassword(e.target.value)}
-                          placeholder="Your password"
-                          className="w-full max-w-xs px-4 py-3 border border-red-200 text-[12px] focus:outline-none focus:border-red-400"
-                        />
-                        <div className="flex gap-3">
-                          <button
-                            onClick={handleDeactivateAccount}
-                            disabled={saving}
-                            className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white text-[10px] tracking-[0.2em] uppercase hover:bg-red-700 transition-colors duration-300 disabled:opacity-50"
-                          >
-                            {saving ? (
-                              <Loader2 size={14} className="animate-spin" />
-                            ) : (
-                              <>
-                                <Trash2 size={14} strokeWidth={1.5} />
-                                Confirm Deactivation
-                              </>
-                            )}
-                          </button>
-                          <button
-                            onClick={() => {
-                              setShowDeleteConfirm(false)
-                              setDeletePassword('')
-                            }}
-                            className="px-6 py-3 border border-gray-300 text-[10px] tracking-[0.2em] uppercase hover:border-black transition-colors duration-300"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                    <AnimatePresence mode="wait">
+                      {!showDeleteConfirm ? (
+                        <motion.button
+                          key="delete-button"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          onClick={() => setShowDeleteConfirm(true)}
+                          className="flex items-center gap-2 px-6 py-3 border border-red-300 text-red-600 text-[10px] tracking-[0.2em] uppercase hover:bg-red-600 hover:text-white hover:border-red-600 transition-colors duration-300 rounded-[3px]"
+                        >
+                          <Trash2 size={14} strokeWidth={1.5} />
+                          Deactivate Account
+                        </motion.button>
+                      ) : (
+                        <motion.div 
+                          key="delete-confirm"
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="space-y-4"
+                        >
+                          <p className="text-[10px] tracking-[0.1em] text-red-600">
+                            Enter your password to confirm:
+                          </p>
+                          <input
+                            type="password"
+                            value={deletePassword}
+                            onChange={(e) => setDeletePassword(e.target.value)}
+                            placeholder="Your password"
+                            className="w-full max-w-xs px-4 py-3 border border-red-200 text-[12px] text-black bg-white focus:outline-none focus:border-red-400 rounded-[3px]"
+                          />
+                          <div className="flex gap-3">
+                            <button
+                              onClick={handleDeactivateAccount}
+                              disabled={saving}
+                              className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white text-[10px] tracking-[0.2em] uppercase hover:bg-red-700 transition-colors duration-300 disabled:opacity-50 rounded-[3px]"
+                            >
+                              {saving ? (
+                                <Loader2 size={14} className="animate-spin" />
+                              ) : (
+                                <>
+                                  <Trash2 size={14} strokeWidth={1.5} />
+                                  Confirm Deactivation
+                                </>
+                              )}
+                            </button>
+                            <button
+                              onClick={() => {
+                                setShowDeleteConfirm(false)
+                                setDeletePassword('')
+                              }}
+                              className="px-6 py-3 border border-gray-300 text-[10px] tracking-[0.2em] uppercase hover:border-black transition-colors duration-300 rounded-[3px]"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
-                </div>
+                </motion.div>
               )}
             </div>
           </div>

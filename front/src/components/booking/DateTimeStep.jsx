@@ -1,15 +1,9 @@
 "use client"
 
 import { useEffect, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Loader2, ChevronLeft, ChevronRight, Calendar, Clock, AlertCircle } from 'lucide-react'
 import { checkAvailability } from '@/lib/booking.api'
-
-const TIME_SLOTS = [
-  '08:00-09:00', '09:00-10:00', '10:00-11:00',
-  '11:00-12:00', '12:00-13:00', '13:00-14:00',
-  '14:00-15:00', '15:00-16:00', '16:00-17:00',
-  '17:00-18:00'
-]
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
@@ -61,7 +55,7 @@ export default function DateTimeStep({ data, onUpdate, onNext, onBack }) {
     setSelectedDate(date)
     onUpdate({ 
       bookingDate: formatDateForAPI(date),
-      timeSlot: '' // Reset time slot when date changes
+      timeSlot: ''
     })
   }
 
@@ -82,12 +76,10 @@ export default function DateTimeStep({ data, onUpdate, onNext, onBack }) {
     const lastDay = new Date(year, month + 1, 0)
     const days = []
 
-    // Add empty slots for days before first day of month
     for (let i = 0; i < firstDay.getDay(); i++) {
       days.push(null)
     }
 
-    // Add days of month
     for (let i = 1; i <= lastDay.getDate(); i++) {
       days.push(new Date(year, month, i))
     }
@@ -101,15 +93,12 @@ export default function DateTimeStep({ data, onUpdate, onNext, onBack }) {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     
-    // Past dates
     if (date < today) return true
     
-    // More than 30 days in future
     const maxDate = new Date()
     maxDate.setDate(maxDate.getDate() + 30)
     if (date > maxDate) return true
 
-    // Sundays
     if (date.getDay() === 0) return true
 
     return false
@@ -149,13 +138,17 @@ export default function DateTimeStep({ data, onUpdate, onNext, onBack }) {
   const days = getDaysInMonth(currentMonth)
 
   return (
-    <div>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+    >
       {/* Back Button */}
       <button
         onClick={onBack}
         className="flex items-center gap-2 text-[10px] tracking-[0.2em] uppercase text-gray-400 hover:text-black transition-colors duration-300 mb-8"
       >
-        <ChevronLeft size={16} />
+        <ChevronLeft size={16} strokeWidth={1.5} />
         Back to Vehicle Type
       </button>
 
@@ -173,14 +166,14 @@ export default function DateTimeStep({ data, onUpdate, onNext, onBack }) {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Calendar */}
-        <div className="border border-gray-200 p-6">
+        <div className="border border-gray-200 p-6 rounded-[5px]">
           <div className="flex items-center justify-between mb-6">
             <button
               onClick={prevMonth}
               disabled={!canGoPrevMonth()}
-              className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-black disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-black disabled:opacity-30 disabled:cursor-not-allowed transition-colors rounded-[3px] hover:bg-gray-100"
             >
-              <ChevronLeft size={18} />
+              <ChevronLeft size={18} strokeWidth={1.5} />
             </button>
             <h3
               className="text-[14px] text-black"
@@ -191,9 +184,9 @@ export default function DateTimeStep({ data, onUpdate, onNext, onBack }) {
             <button
               onClick={nextMonth}
               disabled={!canGoNextMonth()}
-              className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-black disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-black disabled:opacity-30 disabled:cursor-not-allowed transition-colors rounded-[3px] hover:bg-gray-100"
             >
-              <ChevronRight size={18} />
+              <ChevronRight size={18} strokeWidth={1.5} />
             </button>
           </div>
 
@@ -214,9 +207,9 @@ export default function DateTimeStep({ data, onUpdate, onNext, onBack }) {
                 onClick={() => date && !isDateDisabled(date) && handleDateSelect(date)}
                 disabled={!date || isDateDisabled(date)}
                 className={`
-                  aspect-square flex items-center justify-center text-[12px] transition-all duration-200
+                  aspect-square flex items-center justify-center text-[12px] transition-all duration-200 rounded-[3px]
                   ${!date ? 'invisible' : ''}
-                  ${isDateDisabled(date) ? 'text-gray-200 cursor-not-allowed' : 'hover:bg-gray-100'}
+                  ${isDateDisabled(date) ? 'text-gray-200 cursor-not-allowed' : 'hover:bg-gray-100 text-black'}
                   ${isDateSelected(date) ? 'bg-black text-white hover:bg-black' : ''}
                   ${isToday(date) && !isDateSelected(date) ? 'border border-black' : ''}
                   ${date?.getDay() === 0 ? 'text-red-300' : ''}
@@ -230,15 +223,15 @@ export default function DateTimeStep({ data, onUpdate, onNext, onBack }) {
           <div className="mt-4 pt-4 border-t border-gray-100">
             <div className="flex items-center gap-4 text-[9px] tracking-[0.1em] text-gray-400">
               <span className="flex items-center gap-1">
-                <span className="w-3 h-3 border border-black"></span>
+                <span className="w-3 h-3 border border-black rounded-[2px]"></span>
                 Today
               </span>
               <span className="flex items-center gap-1">
-                <span className="w-3 h-3 bg-black"></span>
+                <span className="w-3 h-3 bg-black rounded-[2px]"></span>
                 Selected
               </span>
               <span className="flex items-center gap-1">
-                <span className="w-3 h-3 bg-gray-100"></span>
+                <span className="w-3 h-3 bg-gray-100 rounded-[2px]"></span>
                 Unavailable
               </span>
             </div>
@@ -246,19 +239,19 @@ export default function DateTimeStep({ data, onUpdate, onNext, onBack }) {
         </div>
 
         {/* Time Slots */}
-        <div className="border border-gray-200 p-6">
+        <div className="border border-gray-200 p-6 rounded-[5px]">
           <h3
             className="text-[14px] text-black mb-6 flex items-center gap-2"
             style={{ fontFamily: 'Georgia, serif', fontWeight: 400 }}
           >
-            <Clock size={16} />
+            <Clock size={16} strokeWidth={1.5} />
             Available Time Slots
           </h3>
 
           {!selectedDate ? (
             <div className="flex items-center justify-center py-16 text-center">
               <div>
-                <Calendar size={32} className="mx-auto text-gray-200 mb-4" />
+                <Calendar size={32} className="mx-auto text-gray-200 mb-4" strokeWidth={1} />
                 <p className="text-[10px] tracking-[0.15em] uppercase text-gray-400">
                   Please select a date first
                 </p>
@@ -270,14 +263,14 @@ export default function DateTimeStep({ data, onUpdate, onNext, onBack }) {
             </div>
           ) : error ? (
             <div className="text-center py-16">
-              <AlertCircle size={32} className="mx-auto text-red-300 mb-4" />
+              <AlertCircle size={32} className="mx-auto text-red-300 mb-4" strokeWidth={1} />
               <p className="text-[10px] tracking-[0.15em] uppercase text-red-500">
                 {error}
               </p>
             </div>
           ) : closedMessage ? (
             <div className="text-center py-16">
-              <AlertCircle size={32} className="mx-auto text-amber-300 mb-4" />
+              <AlertCircle size={32} className="mx-auto text-amber-300 mb-4" strokeWidth={1} />
               <p className="text-[10px] tracking-[0.15em] uppercase text-amber-600">
                 {closedMessage}
               </p>
@@ -285,62 +278,71 @@ export default function DateTimeStep({ data, onUpdate, onNext, onBack }) {
           ) : (
             <div className="grid grid-cols-2 gap-3">
               {slots.map((slot) => (
-                <button
+                <motion.button
                   key={slot.slot}
+                  whileTap={{ scale: slot.available ? 0.98 : 1 }}
                   onClick={() => slot.available && handleSlotSelect(slot.slot)}
                   disabled={!slot.available}
                   className={`
-                    px-4 py-3 text-[11px] tracking-[0.1em] border transition-all duration-200
+                    px-4 py-3 text-[11px] tracking-[0.1em] border transition-all duration-200 rounded-[3px]
                     ${!slot.available 
                       ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed line-through' 
                       : data.timeSlot === slot.slot
                         ? 'bg-black text-white border-black'
-                        : 'bg-white text-gray-600 border-gray-200 hover:border-black'
+                        : 'bg-white text-black border-gray-200 hover:border-black'
                     }
                   `}
                 >
                   {slot.slot}
-                </button>
+                </motion.button>
               ))}
             </div>
           )}
 
           {/* Selected Summary */}
-          {selectedDate && data.timeSlot && (
-            <div className="mt-6 pt-6 border-t border-gray-100">
-              <p className="text-[9px] tracking-[0.3em] uppercase text-gray-400 mb-2">
-                Selected
-              </p>
-              <p className="text-[14px] text-black" style={{ fontFamily: 'Georgia, serif' }}>
-                {selectedDate.toLocaleDateString('en-IN', {
-                  weekday: 'long',
-                  day: 'numeric',
-                  month: 'long',
-                  year: 'numeric'
-                })}
-              </p>
-              <p className="text-[14px] text-black" style={{ fontFamily: 'Georgia, serif' }}>
-                {data.timeSlot}
-              </p>
-            </div>
-          )}
+          <AnimatePresence>
+            {selectedDate && data.timeSlot && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mt-6 pt-6 border-t border-gray-100"
+              >
+                <p className="text-[9px] tracking-[0.3em] uppercase text-gray-400 mb-2">
+                  Selected
+                </p>
+                <p className="text-[14px] text-black" style={{ fontFamily: 'Georgia, serif' }}>
+                  {selectedDate.toLocaleDateString('en-IN', {
+                    weekday: 'long',
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric'
+                  })}
+                </p>
+                <p className="text-[14px] text-black" style={{ fontFamily: 'Georgia, serif' }}>
+                  {data.timeSlot}
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
       {/* Next Button */}
       <div className="mt-10 flex justify-end">
-        <button
+        <motion.button
+          whileTap={{ scale: 0.98 }}
           onClick={handleNext}
           disabled={!selectedDate || !data.timeSlot}
-          className="relative flex items-center gap-2 px-8 py-4 bg-black text-white text-[10px] tracking-[0.22em] uppercase overflow-hidden group disabled:opacity-30 disabled:cursor-not-allowed"
+          className="relative flex items-center gap-2 px-8 py-4 bg-black text-white text-[10px] tracking-[0.22em] uppercase overflow-hidden group disabled:opacity-30 disabled:cursor-not-allowed rounded-[3px]"
         >
           <span className="absolute inset-0 bg-white origin-bottom scale-y-0 group-hover:scale-y-100 transition-transform duration-500 ease-out" />
           <span className="relative z-10 group-hover:text-black transition-colors duration-500">
             Continue
           </span>
           <ChevronRight size={14} className="relative z-10 group-hover:text-black transition-colors duration-500" />
-        </button>
+        </motion.button>
       </div>
-    </div>
+    </motion.div>
   )
 }

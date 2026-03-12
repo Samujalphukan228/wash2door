@@ -1,7 +1,8 @@
 "use client"
 
 import { useEffect, useState } from 'react'
-import { Loader2, Star, Clock, ChevronRight } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { Loader2, Star, ChevronRight } from 'lucide-react'
 import { getServices } from '@/lib/booking.api'
 
 const CATEGORY_LABELS = {
@@ -70,7 +71,7 @@ export default function ServiceStep({ data, onUpdate, onNext }) {
         </p>
         <button
           onClick={fetchServices}
-          className="text-[10px] tracking-[0.2em] uppercase text-black border border-black px-6 py-3 hover:bg-black hover:text-white transition-colors duration-300"
+          className="text-[10px] tracking-[0.2em] uppercase text-black border border-black px-6 py-3 hover:bg-black hover:text-white transition-colors duration-300 rounded-[3px]"
         >
           Try Again
         </button>
@@ -79,7 +80,11 @@ export default function ServiceStep({ data, onUpdate, onNext }) {
   }
 
   return (
-    <div>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+    >
       <div className="text-center mb-10">
         <h2
           className="text-2xl md:text-3xl text-black mb-3"
@@ -95,17 +100,18 @@ export default function ServiceStep({ data, onUpdate, onNext }) {
       {/* Category Filter */}
       <div className="flex justify-center gap-2 mb-10 flex-wrap">
         {categories.map((cat) => (
-          <button
+          <motion.button
             key={cat}
+            whileTap={{ scale: 0.98 }}
             onClick={() => setSelectedCategory(cat)}
-            className={`px-5 py-2 text-[9px] tracking-[0.2em] uppercase border transition-all duration-300 ${
+            className={`px-5 py-2 text-[9px] tracking-[0.2em] uppercase border transition-all duration-300 rounded-[3px] ${
               selectedCategory === cat
                 ? 'bg-black text-white border-black'
                 : 'bg-white text-gray-500 border-gray-200 hover:border-black'
             }`}
           >
             {cat === 'all' ? 'All Services' : CATEGORY_LABELS[cat]}
-          </button>
+          </motion.button>
         ))}
       </div>
 
@@ -118,15 +124,19 @@ export default function ServiceStep({ data, onUpdate, onNext }) {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredServices.map((service) => {
+          {filteredServices.map((service, index) => {
             const isSelected = data.serviceId === service._id
             const image = service.primaryImage || service.images?.[0]?.url
 
             return (
-              <button
+              <motion.button
                 key={service._id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: index * 0.05 }}
+                whileTap={{ scale: 0.98 }}
                 onClick={() => handleSelect(service)}
-                className={`group text-left border transition-all duration-300 overflow-hidden ${
+                className={`group text-left border transition-all duration-300 overflow-hidden rounded-[5px] ${
                   isSelected
                     ? 'border-black ring-2 ring-black'
                     : 'border-gray-200 hover:border-black'
@@ -149,15 +159,19 @@ export default function ServiceStep({ data, onUpdate, onNext }) {
                   )}
                   {/* Category Badge */}
                   <div className="absolute top-3 left-3">
-                    <span className={`px-2 py-1 text-[8px] tracking-[0.2em] uppercase ${CATEGORY_COLORS[service.category]}`}>
+                    <span className={`px-2 py-1 text-[8px] tracking-[0.2em] uppercase rounded-[2px] ${CATEGORY_COLORS[service.category]}`}>
                       {CATEGORY_LABELS[service.category]}
                     </span>
                   </div>
                   {/* Selected Indicator */}
                   {isSelected && (
-                    <div className="absolute top-3 right-3 w-6 h-6 bg-black rounded-full flex items-center justify-center">
+                    <motion.div 
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      className="absolute top-3 right-3 w-6 h-6 bg-black rounded-full flex items-center justify-center"
+                    >
                       <span className="text-white text-[10px]">✓</span>
-                    </div>
+                    </motion.div>
                   )}
                 </div>
 
@@ -196,6 +210,7 @@ export default function ServiceStep({ data, onUpdate, onNext }) {
                       )}
                       <ChevronRight 
                         size={16} 
+                        strokeWidth={1.5}
                         className={`transition-transform duration-300 ${
                           isSelected ? 'translate-x-1' : 'group-hover:translate-x-1'
                         }`}
@@ -203,11 +218,11 @@ export default function ServiceStep({ data, onUpdate, onNext }) {
                     </div>
                   </div>
                 </div>
-              </button>
+              </motion.button>
             )
           })}
         </div>
       )}
-    </div>
+    </motion.div>
   )
 }
