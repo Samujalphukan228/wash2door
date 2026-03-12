@@ -7,8 +7,8 @@ import BookButton from './BookButton'
 import MobileDrawer from './MobileDrawer'
 
 const navLinks = [
-  { label: 'Home',     href: 'https://wash2door.in/' },
-  { label: 'About Us', href: 'https://wash2door.in/about-us/' },
+  { label: 'Home',     href: '/' },
+  { label: 'About Us', href: '/About' },
   { label: 'Services', href: 'https://wash2door.in/services/' },
   { label: 'Contact',  href: 'https://wash2door.in/contact-us/' },
 ]

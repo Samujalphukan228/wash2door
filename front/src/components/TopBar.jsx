@@ -11,24 +11,20 @@ export default function TopBar() {
 
     gsap.fromTo(
       containerRef.current,
-      {
-        opacity: 0,
-        y: -20,
-      },
-      {
-        opacity: 1,
-        y: 0,
-        duration: 0.6,
-        ease: "power2.out",
-      }
+      { opacity: 0, y: -20 },
+      { opacity: 1, y: 0, duration: 0.6, ease: "power2.out" }
     )
   }, [])
 
   return (
     <div
       ref={containerRef}
-      className="bg-black text-white text-center py-2 text-xs tracking-[0.18em] uppercase"
-      style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
+      className="bg-black text-white text-center py-2 uppercase"
+      style={{
+        fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
+        fontSize: 'clamp(9px, 1.8vw, 12px)',
+        letterSpacing: '0.18em',
+      }}
     >
       Doorstep Car Care &nbsp;·&nbsp; Duliajan, Assam &nbsp;·&nbsp;
       <a

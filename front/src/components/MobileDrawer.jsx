@@ -4,8 +4,8 @@ import { useEffect } from 'react'
 import { X, Phone, MapPin } from 'lucide-react'
 
 const navLinks = [
-  { label: 'Home',     href: 'https://wash2door.in/' },
-  { label: 'About Us', href: 'https://wash2door.in/about-us/' },
+  { label: 'Home',     href: '/' },
+  { label: 'About Us', href: '/About' },
   { label: 'Services', href: 'https://wash2door.in/services/' },
   { label: 'Contact',  href: 'https://wash2door.in/contact-us/' },
 ]
@@ -20,7 +20,7 @@ export default function MobileDrawer({ isOpen, onClose }) {
   return (
     <div className={`fixed inset-0 z-[9999] ${isOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}>
 
-      {/* Backdrop with Blur - Optimized for performance */}
+      {/* Backdrop */}
       <div
         onClick={onClose}
         className={`absolute inset-0 will-change-opacity transition-opacity duration-500 ${
@@ -28,10 +28,12 @@ export default function MobileDrawer({ isOpen, onClose }) {
         }`}
       />
 
-      {/* Panel - With margin from all sides */}
+      {/* Panel */}
       <div
-        className={`absolute top-3 left-3 bottom-3 right-3 md:top-4 md:left-4 md:bottom-4 md:right-4 h-[calc(100vh-24px)] md:h-[calc(100vh-32px)] bg-white flex flex-col rounded-lg
-                    will-change-transform transition-transform duration-500 ease-out shadow-2xl ${
+        className={`absolute top-3 left-3 bottom-3 right-3 md:top-4 md:left-4 md:bottom-4 md:right-4
+                    h-[calc(100vh-24px)] md:h-[calc(100vh-32px)]
+                    bg-white flex flex-col rounded-lg will-change-transform
+                    transition-transform duration-500 ease-out shadow-2xl ${
           isOpen ? 'translate-x-0' : '-translate-x-[calc(100%+24px)] md:-translate-x-[calc(100%+32px)]'
         }`}
       >
@@ -39,22 +41,29 @@ export default function MobileDrawer({ isOpen, onClose }) {
         {/* Top accent line */}
         <div className={`h-1 bg-black rounded-t-lg transition-all duration-500 delay-100 ${isOpen ? 'w-full' : 'w-0'}`} />
 
-        {/* Header with better spacing */}
+        {/* Header */}
         <div className="flex items-center justify-between px-5 md:px-8 pt-5 md:pt-6 pb-3 md:pb-4">
           <div className="flex-1">
             <p
-              className="text-lg md:text-lg tracking-[0.42em] uppercase text-black leading-tight"
-              style={{ fontFamily: 'Georgia, serif', fontWeight: 300 }}
+              className="tracking-[0.42em] uppercase text-black leading-tight"
+              style={{
+                fontFamily: 'Georgia, serif',
+                fontWeight: 300,
+                fontSize: 'clamp(14px, 4vw, 18px)',
+              }}
             >
               WASH2DOOR
             </p>
-            <p className="text-[8px] md:text-[8.5px] tracking-[0.32em] uppercase text-gray-500 mt-2">
+            <p
+              className="tracking-[0.32em] uppercase text-gray-500 mt-2"
+              style={{ fontSize: 'clamp(7px, 1.8vw, 9px)' }}
+            >
               The Shine That Finds You
             </p>
           </div>
           <button
             onClick={onClose}
-            className="w-11 h-11 md:w-10 md:h-10 flex items-center justify-center text-black hover:bg-gray-100 rounded-full transition-all duration-200 ml-4 shrink-0"
+            className="w-11 h-11 flex items-center justify-center text-black hover:bg-gray-100 rounded-full transition-all duration-200 ml-4 shrink-0"
             aria-label="Close menu"
           >
             <X size={22} strokeWidth={1.2} />
@@ -64,46 +73,57 @@ export default function MobileDrawer({ isOpen, onClose }) {
         {/* Divider */}
         <div className={`mx-5 md:mx-8 h-px bg-gray-200 transition-all duration-500 delay-75 ${isOpen ? 'opacity-100' : 'opacity-0'}`} />
 
-        {/* Nav links - Improved spacing */}
+        {/* Nav links */}
         <nav className="flex flex-col mt-3 md:mt-4">
           {navLinks.map((link, i) => (
             <a
               key={link.label}
               href={link.href}
               onClick={onClose}
-              className={`relative mx-5 md:mx-8 py-4 md:py-4 text-[10.5px] md:text-[10px] tracking-[0.26em] uppercase text-black
+              className={`relative mx-5 md:mx-8 py-4 tracking-[0.26em] uppercase text-black
                           no-underline border-b border-gray-100 last:border-0
                           hover:pl-2 hover:tracking-[0.32em] transition-all duration-300
                           ${isOpen ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-6'}`}
-              style={{ transitionDelay: isOpen ? `${i * 50 + 100}ms` : '0ms' }}
+              style={{
+                fontSize: 'clamp(10px, 2.6vw, 11px)',
+                transitionDelay: isOpen ? `${i * 50 + 100}ms` : '0ms',
+              }}
             >
               {link.label}
             </a>
           ))}
         </nav>
 
-        {/* Spacer */}
         <div className="flex-1" />
 
-        {/* Contact block - Better positioning */}
+        {/* Contact block */}
         <div
-          className={`mx-5 md:mx-8 pt-5 md:pt-6 pb-4 border-t border-gray-200 transition-all duration-300 ${
+          className={`mx-5 md:mx-8 pt-5 pb-4 border-t border-gray-200 transition-all duration-300 ${
             isOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'
           }`}
           style={{ transitionDelay: isOpen ? '350ms' : '0ms' }}
         >
-          <p className="text-[8px] md:text-[8.5px] tracking-[0.3em] uppercase text-gray-500 mb-4 font-medium">Get In Touch</p>
+          <p
+            className="tracking-[0.3em] uppercase text-gray-500 mb-4 font-medium"
+            style={{ fontSize: 'clamp(7px, 1.8vw, 9px)' }}
+          >
+            Get In Touch
+          </p>
 
           <a
             href="tel:6900706456"
-            className="flex items-center gap-3 text-[10px] md:text-[10px] tracking-[0.2em] uppercase text-black
-                       no-underline hover:opacity-60 transition-opacity duration-200 mb-4 group"
+            className="flex items-center gap-3 tracking-[0.2em] uppercase text-black
+                       no-underline hover:opacity-60 transition-opacity duration-200 mb-4"
+            style={{ fontSize: 'clamp(9px, 2.4vw, 11px)' }}
           >
             <Phone size={13} strokeWidth={1.5} className="shrink-0 text-gray-600" />
             <span>6900706456</span>
           </a>
 
-          <div className="flex items-start gap-3 text-[9px] md:text-[9px] tracking-[0.18em] uppercase text-gray-600">
+          <div
+            className="flex items-start gap-3 tracking-[0.18em] uppercase text-gray-600"
+            style={{ fontSize: 'clamp(8px, 2.2vw, 10px)' }}
+          >
             <MapPin size={13} strokeWidth={1.5} className="shrink-0 mt-0.5" />
             <span className="leading-6">
               Duliajan, Assam<br />
@@ -121,10 +141,11 @@ export default function MobileDrawer({ isOpen, onClose }) {
         >
           <a
             href="https://wash2door.in/bookin/"
-            className="block w-full text-center text-[10.5px] md:text-[10px] tracking-[0.36em] uppercase py-4 md:py-3.5
+            className="block w-full text-center tracking-[0.36em] uppercase py-4
                        bg-black text-white no-underline rounded-sm
                        hover:bg-white hover:text-black border border-black
                        transition-all duration-300 font-medium"
+            style={{ fontSize: 'clamp(9px, 2.4vw, 11px)' }}
           >
             Book Now
           </a>

@@ -1,14 +1,21 @@
+import CTABanner from '@/components/CTABanner'
+import Footer from '@/components/Footer'
 import Hero from '@/components/Hero'
-import Navbar from '@/components/Navbar'
+import HowItWorks from '@/components/HowItWorks'
 import Services from '@/components/Services'
+import Testimonials from '@/components/Testimonials'
 import React from 'react'
 
 const page = () => {
   return (
     <div>
-      <Navbar/>
+
       <Hero/>
       <Services/>
+      <HowItWorks/>
+      <Testimonials/>
+      <CTABanner/>
+      <Footer/>
     </div>
   )
 }

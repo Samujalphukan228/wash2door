@@ -37,18 +37,27 @@ function EmptyState() {
         <span className="text-3xl">🚗</span>
       </div>
       <h3
-        className="text-[20px] text-black mb-3 tracking-[-0.01em]"
-        style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontWeight: 300 }}
+        className="text-black mb-3"
+        style={{
+          fontFamily: 'Georgia, "Times New Roman", serif',
+          fontWeight: 300,
+          fontSize: 'clamp(16px, 2vw, 20px)',
+          letterSpacing: '-0.01em',
+        }}
       >
         No Services Available
       </h3>
-      <p className="text-[10px] tracking-[0.2em] uppercase text-gray-400 text-center max-w-xs leading-[1.9] mb-8">
+      <p
+        className="tracking-[0.2em] uppercase text-gray-400 text-center max-w-xs leading-[1.9] mb-8"
+        style={{ fontSize: 'clamp(8px, 1vw, 10px)' }}
+      >
         We&apos;re currently updating our services.<br />
         Please check back soon.
       </p>
       <a
         href="tel:6900706456"
-        className="relative text-[10px] tracking-[0.22em] uppercase text-black border border-black px-7 py-3.5 no-underline overflow-hidden group rounded-[5px]"
+        className="relative tracking-[0.22em] uppercase text-black border border-black px-7 py-3.5 no-underline overflow-hidden group rounded-[5px]"
+        style={{ fontSize: 'clamp(8px, 1vw, 10px)' }}
       >
         <span className="absolute inset-0 bg-black transform origin-bottom scale-y-0 group-hover:scale-y-100 transition-transform duration-500 ease-out" />
         <span className="relative z-10 group-hover:text-white transition-colors duration-500">
@@ -67,16 +76,25 @@ function ErrorState({ onRetry }) {
         <span className="text-3xl">⚠️</span>
       </div>
       <h3
-        className="text-[20px] text-black mb-3 tracking-[-0.01em]"
-        style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontWeight: 300 }}
+        className="text-black mb-3"
+        style={{
+          fontFamily: 'Georgia, "Times New Roman", serif',
+          fontWeight: 300,
+          fontSize: 'clamp(16px, 2vw, 20px)',
+          letterSpacing: '-0.01em',
+        }}
       >
         Unable to Load Services
       </h3>
-      <p className="text-[10px] tracking-[0.2em] uppercase text-gray-400 text-center max-w-xs mb-8 leading-[1.9]">
+      <p
+        className="tracking-[0.2em] uppercase text-gray-400 text-center max-w-xs mb-8 leading-[1.9]"
+        style={{ fontSize: 'clamp(8px, 1vw, 10px)' }}
+      >
         Something went wrong while fetching services.
       </p>
       <button
-        className="relative text-[10px] tracking-[0.22em] uppercase text-black border border-black px-7 py-3.5 overflow-hidden group rounded-[5px]"
+        className="relative tracking-[0.22em] uppercase text-black border border-black px-7 py-3.5 overflow-hidden group rounded-[5px]"
+        style={{ fontSize: 'clamp(8px, 1vw, 10px)' }}
         onClick={onRetry}
       >
         <span className="absolute inset-0 bg-black transform origin-bottom scale-y-0 group-hover:scale-y-100 transition-transform duration-500 ease-out" />
@@ -137,19 +155,26 @@ function ServiceCard({ service, index }) {
               alt={service.name}
               className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
             />
-            {/* Subtle gradient overlay */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
           </>
         ) : (
           <div className="w-full h-full bg-gray-100 flex items-center justify-center">
-            <span className="text-[9px] tracking-[0.28em] uppercase text-gray-300">No Image</span>
+            <span
+              className="tracking-[0.28em] uppercase text-gray-300"
+              style={{ fontSize: 'clamp(7px, 0.8vw, 9px)' }}
+            >
+              No Image
+            </span>
           </div>
         )}
 
         {/* Category badge */}
         <div className="absolute top-4 left-4 flex items-center gap-1.5 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-[3px]">
           <CategoryIcon size={10} strokeWidth={1.5} className="text-gray-500" />
-          <span className="text-[8px] tracking-[0.3em] uppercase text-gray-500">
+          <span
+            className="tracking-[0.3em] uppercase text-gray-500"
+            style={{ fontSize: 'clamp(7px, 0.8vw, 9px)' }}
+          >
             {CATEGORY_LABEL[service.category] ?? service.category}
           </span>
         </div>
@@ -157,8 +182,13 @@ function ServiceCard({ service, index }) {
         {/* Price tag on image */}
         <div className="absolute bottom-4 right-4 bg-black/80 backdrop-blur-sm px-3 py-1.5 rounded-[3px]">
           <span
-            className="text-[13px] text-white tracking-[0.01em]"
-            style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontWeight: 300 }}
+            className="text-white"
+            style={{
+              fontFamily: 'Georgia, "Times New Roman", serif',
+              fontWeight: 300,
+              fontSize: 'clamp(11px, 1.2vw, 14px)',
+              letterSpacing: '0.01em',
+            }}
           >
             ₹{service.startingPrice}
           </span>
@@ -168,13 +198,21 @@ function ServiceCard({ service, index }) {
       {/* Content */}
       <div className="flex flex-col flex-1 p-7">
         <h3
-          className="text-[17px] text-black mb-2 tracking-[-0.01em] group-hover:opacity-70 transition-opacity duration-300"
-          style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontWeight: 300 }}
+          className="text-black mb-2 group-hover:opacity-70 transition-opacity duration-300"
+          style={{
+            fontFamily: 'Georgia, "Times New Roman", serif',
+            fontWeight: 300,
+            fontSize: 'clamp(14px, 1.5vw, 18px)',
+            letterSpacing: '-0.01em',
+          }}
         >
           {service.name}
         </h3>
 
-        <p className="text-[10.5px] tracking-[0.18em] leading-[1.9] uppercase text-gray-400 flex-1 mb-6">
+        <p
+          className="tracking-[0.18em] leading-[1.9] uppercase text-gray-400 flex-1 mb-6"
+          style={{ fontSize: 'clamp(8px, 0.9vw, 11px)' }}
+        >
           {service.shortDescription}
         </p>
 
@@ -184,13 +222,17 @@ function ServiceCard({ service, index }) {
             {service.features.slice(0, 3).map((feature, i) => (
               <span
                 key={i}
-                className="text-[7.5px] tracking-[0.22em] uppercase text-gray-400 border border-gray-200 px-2.5 py-1 rounded-full"
+                className="tracking-[0.22em] uppercase text-gray-400 border border-gray-200 px-2.5 py-1 rounded-full"
+                style={{ fontSize: 'clamp(7px, 0.75vw, 8px)' }}
               >
                 {feature}
               </span>
             ))}
             {service.features.length > 3 && (
-              <span className="text-[7.5px] tracking-[0.22em] uppercase text-gray-300 px-1 py-1">
+              <span
+                className="tracking-[0.22em] uppercase text-gray-300 px-1 py-1"
+                style={{ fontSize: 'clamp(7px, 0.75vw, 8px)' }}
+              >
                 +{service.features.length - 3} more
               </span>
             )}
@@ -202,10 +244,20 @@ function ServiceCard({ service, index }) {
         {/* Bottom row */}
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-[8px] tracking-[0.28em] uppercase text-gray-400 mb-1">Starting from</p>
             <p
-              className="text-[20px] text-black tracking-[0.01em]"
-              style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontWeight: 300 }}
+              className="tracking-[0.28em] uppercase text-gray-400 mb-1"
+              style={{ fontSize: 'clamp(7px, 0.75vw, 9px)' }}
+            >
+              Starting from
+            </p>
+            <p
+              className="text-black"
+              style={{
+                fontFamily: 'Georgia, "Times New Roman", serif',
+                fontWeight: 300,
+                fontSize: 'clamp(16px, 1.8vw, 22px)',
+                letterSpacing: '0.01em',
+              }}
             >
               ₹{service.startingPrice}
             </p>
@@ -213,9 +265,10 @@ function ServiceCard({ service, index }) {
 
           <a
             href={`/book/${service._id}`}
-            className="relative flex items-center gap-2 text-[10px] tracking-[0.22em] uppercase
+            className="relative flex items-center gap-2 tracking-[0.22em] uppercase
                        text-white bg-black border border-black px-5 py-3 no-underline
                        overflow-hidden group/btn rounded-[5px]"
+            style={{ fontSize: 'clamp(8px, 0.9vw, 10px)' }}
             onClick={(e) => e.stopPropagation()}
           >
             <span className="absolute inset-0 bg-white origin-bottom scale-y-0 group-hover/btn:scale-y-100 transition-transform duration-500 ease-out" />
@@ -275,12 +328,20 @@ function TrustBar() {
             </div>
             <div>
               <p
-                className="text-[13px] text-black tracking-[-0.01em]"
-                style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontWeight: 300 }}
+                className="text-black"
+                style={{
+                  fontFamily: 'Georgia, "Times New Roman", serif',
+                  fontWeight: 300,
+                  fontSize: 'clamp(11px, 1.2vw, 14px)',
+                  letterSpacing: '-0.01em',
+                }}
               >
                 {item.label}
               </p>
-              <p className="text-[8px] tracking-[0.28em] uppercase text-gray-400 mt-0.5">
+              <p
+                className="tracking-[0.28em] uppercase text-gray-400 mt-0.5"
+                style={{ fontSize: 'clamp(7px, 0.75vw, 9px)' }}
+              >
                 {item.desc}
               </p>
             </div>
@@ -305,7 +366,6 @@ export default function Services() {
   const fetchServices = async () => {
     setLoading(true)
     setError(false)
-
     try {
       const data = await getPublicServices()
       setServices(data || [])
@@ -322,7 +382,6 @@ export default function Services() {
     fetchServices()
   }, [])
 
-  // ── heading animation ──
   useEffect(() => {
     if (loading) return
     let ctx
@@ -347,7 +406,6 @@ export default function Services() {
     return () => ctx?.revert()
   }, [loading])
 
-  // Display max 3 services
   const displayedServices = services.slice(0, 3)
   const hasMoreServices = services.length > 3
 
@@ -363,8 +421,11 @@ export default function Services() {
           <div ref={eyebrowRef} className="flex items-center gap-3 mb-6 opacity-0">
             <span className="block w-6 h-px bg-black shrink-0" />
             <span
-              className="text-[9px] tracking-[0.4em] uppercase text-gray-400"
-              style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
+              className="tracking-[0.4em] uppercase text-gray-400"
+              style={{
+                fontFamily: 'Georgia, "Times New Roman", serif',
+                fontSize: 'clamp(7px, 0.8vw, 9px)',
+              }}
             >
               What We Offer
             </span>
@@ -387,19 +448,20 @@ export default function Services() {
               </h2>
               <p
                 ref={descRef}
-                className="opacity-0 text-[10.5px] tracking-[0.18em] leading-[1.9] uppercase text-gray-400 max-w-md"
+                className="opacity-0 tracking-[0.18em] leading-[1.9] uppercase text-gray-400 max-w-md"
+                style={{ fontSize: 'clamp(8px, 0.9vw, 11px)' }}
               >
                 Professional car &amp; home cleaning at your<br className="hidden md:block" />
                 doorstep — tailored packages for every need.
               </p>
             </div>
 
-            {/* Desktop View All - only show if more than 3 services */}
             {hasMoreServices && (
               <a
                 href="/services"
-                className="hidden md:flex items-center gap-3 text-[9px] tracking-[0.28em] uppercase
+                className="hidden md:flex items-center gap-3 tracking-[0.28em] uppercase
                            text-gray-400 no-underline hover:text-black transition-colors duration-300 group mb-2"
+                style={{ fontSize: 'clamp(7px, 0.8vw, 9px)' }}
               >
                 View All
                 <span className="block h-px bg-gray-300 w-5 group-hover:w-10 group-hover:bg-black transition-all duration-300" />
@@ -429,14 +491,15 @@ export default function Services() {
           )}
         </div>
 
-        {/* ── Mobile View All - only show if more than 3 services ── */}
+        {/* ── Mobile View All ── */}
         {!loading && !error && hasMoreServices && (
           <div className="mt-12 flex md:hidden justify-center">
             <a
               href="/services"
-              className="relative flex items-center gap-3 text-[10px] tracking-[0.22em] uppercase
+              className="relative flex items-center gap-3 tracking-[0.22em] uppercase
                          text-black border border-black px-7 py-3.5 no-underline
                          overflow-hidden group rounded-[5px]"
+              style={{ fontSize: 'clamp(8px, 2.4vw, 10px)' }}
             >
               <span className="absolute inset-0 bg-black origin-bottom scale-y-0 group-hover:scale-y-100 transition-transform duration-500 ease-out" />
               <span className="relative z-10 group-hover:text-white transition-colors duration-500">
