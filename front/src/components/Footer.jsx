@@ -15,7 +15,7 @@ const QUICK_LINKS = [
   { label: 'Home',       href: '/' },
   { label: 'About Us',   href: '/About' },
   { label: 'Services',   href: '/Services' },
-  { label: 'Contact Us', href: '/Contact-us/' },
+  { label: 'Contact Us', href: '/Contact/' },
   { label: 'Book Now',   href: '/Bookings' },
 ]
 
