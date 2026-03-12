@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/context/AuthContext'
 import { 
   X, 
@@ -30,7 +31,33 @@ import {
 export default function AuthModal() {
   const { isModalOpen, modalView, closeModal } = useAuth()
   const overlayRef = useRef(null)
-  const modalRef = useRef(null)
+
+  // ✅ Lock body scroll when modal is open
+  useEffect(() => {
+    if (isModalOpen) {
+      // Save current scroll position
+      const scrollY = window.scrollY
+      
+      // Lock body
+      document.body.style.position = 'fixed'
+      document.body.style.top = `-${scrollY}px`
+      document.body.style.left = '0'
+      document.body.style.right = '0'
+      document.body.style.overflow = 'hidden'
+      document.body.style.width = '100%'
+      
+      return () => {
+        // Unlock body and restore scroll position
+        document.body.style.position = ''
+        document.body.style.top = ''
+        document.body.style.left = ''
+        document.body.style.right = ''
+        document.body.style.overflow = ''
+        document.body.style.width = ''
+        window.scrollTo(0, scrollY)
+      }
+    }
+  }, [isModalOpen])
 
   // Close on escape
   useEffect(() => {
@@ -43,65 +70,62 @@ export default function AuthModal() {
     return () => window.removeEventListener('keydown', handleEscape)
   }, [isModalOpen, closeModal])
 
-  // Animation
-  useEffect(() => {
-    if (!isModalOpen) return
-    let ctx
-    const init = async () => {
-      const { default: gsap } = await import('gsap')
-      ctx = gsap.context(() => {
-        gsap.fromTo(
-          overlayRef.current,
-          { opacity: 0 },
-          { opacity: 1, duration: 0.3, ease: 'power2.out' }
-        )
-        gsap.fromTo(
-          modalRef.current,
-          { opacity: 0, scale: 0.95, y: 20 },
-          { opacity: 1, scale: 1, y: 0, duration: 0.4, ease: 'power3.out' }
-        )
-      })
-    }
-    init()
-    return () => ctx?.revert()
-  }, [isModalOpen])
-
-  if (!isModalOpen) return null
-
   const handleOverlayClick = (e) => {
     if (e.target === overlayRef.current) closeModal()
   }
 
   return (
-    <div
-      ref={overlayRef}
-      onClick={handleOverlayClick}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-      style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
-    >
-      <div
-        ref={modalRef}
-        className="relative w-full max-w-md bg-white overflow-hidden"
-      >
-        {/* Close Button */}
-        <button
-          onClick={closeModal}
-          className="absolute top-4 right-4 z-10 w-10 h-10 flex items-center justify-center text-gray-400 hover:text-black transition-colors duration-300"
-          aria-label="Close"
+    <AnimatePresence>
+      {isModalOpen && (
+        <motion.div
+          ref={overlayRef}
+          onClick={handleOverlayClick}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.3 }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overscroll-none touch-none"
+          style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
         >
-          <X size={20} strokeWidth={1.5} />
-        </button>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+            className="relative w-full max-w-md bg-white overflow-hidden rounded-[5px] max-h-[90vh] overflow-y-auto overscroll-contain"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close Button */}
+            <button
+              onClick={closeModal}
+              className="absolute top-4 right-4 z-10 w-10 h-10 flex items-center justify-center text-gray-400 hover:text-black transition-colors duration-300"
+              aria-label="Close"
+            >
+              <X size={20} strokeWidth={1.5} />
+            </button>
 
-        {/* Content */}
-        <div className="p-8 md:p-10">
-          {modalView === 'login' && <LoginView />}
-          {modalView === 'register' && <RegisterView />}
-          {modalView === 'otp' && <OTPView />}
-          {modalView === 'forgot' && <ForgotPasswordView />}
-          {modalView === 'reset-success' && <ResetSuccessView />}
-        </div>
-      </div>
-    </div>
+            {/* Content */}
+            <div className="p-8 md:p-10">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={modalView}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {modalView === 'login' && <LoginView />}
+                  {modalView === 'register' && <RegisterView />}
+                  {modalView === 'otp' && <OTPView />}
+                  {modalView === 'forgot' && <ForgotPasswordView />}
+                  {modalView === 'reset-success' && <ResetSuccessView />}
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   )
 }
 
@@ -180,18 +204,25 @@ function LoginView() {
 
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-5">
-        {error && (
-          <div className="bg-red-50 border border-red-100 px-4 py-3">
-            <p className="text-[10px] tracking-[0.15em] uppercase text-red-600">
-              {error}
-            </p>
-            {remainingAttempts !== null && remainingAttempts > 0 && (
-              <p className="text-[9px] tracking-[0.15em] uppercase text-red-400 mt-1">
-                {remainingAttempts} attempt{remainingAttempts !== 1 ? 's' : ''} remaining
+        <AnimatePresence>
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="bg-red-50 border border-red-100 px-4 py-3 rounded-[3px]"
+            >
+              <p className="text-[10px] tracking-[0.15em] uppercase text-red-600">
+                {error}
               </p>
-            )}
-          </div>
-        )}
+              {remainingAttempts !== null && remainingAttempts > 0 && (
+                <p className="text-[9px] tracking-[0.15em] uppercase text-red-400 mt-1">
+                  {remainingAttempts} attempt{remainingAttempts !== 1 ? 's' : ''} remaining
+                </p>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Email */}
         <div>
@@ -206,7 +237,7 @@ function LoginView() {
               value={formData.email}
               onChange={handleChange}
               placeholder="you@example.com"
-              className="w-full bg-gray-50 border border-gray-200 pl-12 pr-4 py-3.5 text-[12px] tracking-[0.05em] text-black placeholder:text-gray-300 focus:outline-none focus:border-black transition-colors duration-300"
+              className="w-full bg-gray-50 border border-gray-200 pl-12 pr-4 py-3.5 text-[12px] tracking-[0.05em] text-black placeholder:text-gray-300 focus:outline-none focus:border-black transition-colors duration-300 rounded-[3px]"
             />
           </div>
         </div>
@@ -224,7 +255,7 @@ function LoginView() {
               value={formData.password}
               onChange={handleChange}
               placeholder="••••••••"
-              className="w-full bg-gray-50 border border-gray-200 pl-12 pr-12 py-3.5 text-[12px] tracking-[0.05em] text-black placeholder:text-gray-300 focus:outline-none focus:border-black transition-colors duration-300"
+              className="w-full bg-gray-50 border border-gray-200 pl-12 pr-12 py-3.5 text-[12px] tracking-[0.05em] text-black placeholder:text-gray-300 focus:outline-none focus:border-black transition-colors duration-300 rounded-[3px]"
             />
             <button
               type="button"
@@ -248,10 +279,11 @@ function LoginView() {
         </div>
 
         {/* Submit */}
-        <button
+        <motion.button
           type="submit"
           disabled={loading}
-          className="relative w-full flex items-center justify-center gap-2 text-[10px] tracking-[0.22em] uppercase text-white bg-black border border-black py-4 overflow-hidden group disabled:opacity-50"
+          whileTap={{ scale: 0.98 }}
+          className="relative w-full flex items-center justify-center gap-2 text-[10px] tracking-[0.22em] uppercase text-white bg-black border border-black py-4 overflow-hidden group disabled:opacity-50 rounded-[3px]"
         >
           <span className="absolute inset-0 bg-white origin-bottom scale-y-0 group-hover:scale-y-100 transition-transform duration-500 ease-out" />
           {loading ? (
@@ -262,7 +294,7 @@ function LoginView() {
               <ArrowRight size={14} strokeWidth={1.5} className="relative z-10 group-hover:text-black transition-colors duration-500" />
             </>
           )}
-        </button>
+        </motion.button>
       </form>
 
       {/* Switch to Register */}
@@ -286,7 +318,7 @@ function LoginView() {
 // ============================================
 
 function RegisterView() {
-  const { switchView, authEmail } = useAuth()
+  const { switchView } = useAuth()
   
   const [formData, setFormData] = useState({
     firstName: '',
@@ -325,7 +357,6 @@ function RegisterView() {
       return
     }
 
-    // Password strength check
     const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/
     if (!passwordRegex.test(password)) {
       setError('Password must contain uppercase, lowercase, number, and special character')
@@ -377,13 +408,20 @@ function RegisterView() {
 
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-4">
-        {error && (
-          <div className="bg-red-50 border border-red-100 px-4 py-3">
-            <p className="text-[10px] tracking-[0.15em] uppercase text-red-600">
-              {error}
-            </p>
-          </div>
-        )}
+        <AnimatePresence>
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="bg-red-50 border border-red-100 px-4 py-3 rounded-[3px]"
+            >
+              <p className="text-[10px] tracking-[0.15em] uppercase text-red-600">
+                {error}
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Name Fields */}
         <div className="grid grid-cols-2 gap-4">
@@ -399,7 +437,7 @@ function RegisterView() {
                 value={formData.firstName}
                 onChange={handleChange}
                 placeholder="John"
-                className="w-full bg-gray-50 border border-gray-200 pl-12 pr-4 py-3.5 text-[12px] tracking-[0.05em] text-black placeholder:text-gray-300 focus:outline-none focus:border-black transition-colors duration-300"
+                className="w-full bg-gray-50 border border-gray-200 pl-12 pr-4 py-3.5 text-[12px] tracking-[0.05em] text-black placeholder:text-gray-300 focus:outline-none focus:border-black transition-colors duration-300 rounded-[3px]"
               />
             </div>
           </div>
@@ -413,7 +451,7 @@ function RegisterView() {
               value={formData.lastName}
               onChange={handleChange}
               placeholder="Doe"
-              className="w-full bg-gray-50 border border-gray-200 px-4 py-3.5 text-[12px] tracking-[0.05em] text-black placeholder:text-gray-300 focus:outline-none focus:border-black transition-colors duration-300"
+              className="w-full bg-gray-50 border border-gray-200 px-4 py-3.5 text-[12px] tracking-[0.05em] text-black placeholder:text-gray-300 focus:outline-none focus:border-black transition-colors duration-300 rounded-[3px]"
             />
           </div>
         </div>
@@ -431,7 +469,7 @@ function RegisterView() {
               value={formData.email}
               onChange={handleChange}
               placeholder="you@example.com"
-              className="w-full bg-gray-50 border border-gray-200 pl-12 pr-4 py-3.5 text-[12px] tracking-[0.05em] text-black placeholder:text-gray-300 focus:outline-none focus:border-black transition-colors duration-300"
+              className="w-full bg-gray-50 border border-gray-200 pl-12 pr-4 py-3.5 text-[12px] tracking-[0.05em] text-black placeholder:text-gray-300 focus:outline-none focus:border-black transition-colors duration-300 rounded-[3px]"
             />
           </div>
         </div>
@@ -449,7 +487,7 @@ function RegisterView() {
               value={formData.password}
               onChange={handleChange}
               placeholder="Min 8 characters"
-              className="w-full bg-gray-50 border border-gray-200 pl-12 pr-12 py-3.5 text-[12px] tracking-[0.05em] text-black placeholder:text-gray-300 focus:outline-none focus:border-black transition-colors duration-300"
+              className="w-full bg-gray-50 border border-gray-200 pl-12 pr-12 py-3.5 text-[12px] tracking-[0.05em] text-black placeholder:text-gray-300 focus:outline-none focus:border-black transition-colors duration-300 rounded-[3px]"
             />
             <button
               type="button"
@@ -477,16 +515,17 @@ function RegisterView() {
               value={formData.confirmPassword}
               onChange={handleChange}
               placeholder="••••••••"
-              className="w-full bg-gray-50 border border-gray-200 pl-12 pr-4 py-3.5 text-[12px] tracking-[0.05em] text-black placeholder:text-gray-300 focus:outline-none focus:border-black transition-colors duration-300"
+              className="w-full bg-gray-50 border border-gray-200 pl-12 pr-4 py-3.5 text-[12px] tracking-[0.05em] text-black placeholder:text-gray-300 focus:outline-none focus:border-black transition-colors duration-300 rounded-[3px]"
             />
           </div>
         </div>
 
         {/* Submit */}
-        <button
+        <motion.button
           type="submit"
           disabled={loading}
-          className="relative w-full flex items-center justify-center gap-2 text-[10px] tracking-[0.22em] uppercase text-white bg-black border border-black py-4 overflow-hidden group disabled:opacity-50 mt-6"
+          whileTap={{ scale: 0.98 }}
+          className="relative w-full flex items-center justify-center gap-2 text-[10px] tracking-[0.22em] uppercase text-white bg-black border border-black py-4 overflow-hidden group disabled:opacity-50 mt-6 rounded-[3px]"
         >
           <span className="absolute inset-0 bg-white origin-bottom scale-y-0 group-hover:scale-y-100 transition-transform duration-500 ease-out" />
           {loading ? (
@@ -497,7 +536,7 @@ function RegisterView() {
               <ArrowRight size={14} strokeWidth={1.5} className="relative z-10 group-hover:text-black transition-colors duration-500" />
             </>
           )}
-        </button>
+        </motion.button>
       </form>
 
       {/* Switch to Login */}
@@ -532,7 +571,6 @@ function OTPView() {
   
   const inputRefs = useRef([])
 
-  // Resend timer
   useEffect(() => {
     if (resendTimer > 0) {
       const timer = setTimeout(() => setResendTimer(resendTimer - 1), 1000)
@@ -548,7 +586,6 @@ function OTPView() {
     setOtp(newOtp)
     setError('')
 
-    // Auto-focus next
     if (value && index < 5) {
       inputRefs.current[index + 1]?.focus()
     }
@@ -624,9 +661,14 @@ function OTPView() {
     <div>
       {/* Header */}
       <div className="text-center mb-8">
-        <div className="w-16 h-16 mx-auto mb-6 bg-blue-50 rounded-full flex items-center justify-center">
+        <motion.div 
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 0.3 }}
+          className="w-16 h-16 mx-auto mb-6 bg-blue-50 rounded-full flex items-center justify-center"
+        >
           <Mail size={28} strokeWidth={1.5} className="text-blue-500" />
-        </div>
+        </motion.div>
         
         <h2
           className="text-black mb-2"
@@ -650,23 +692,30 @@ function OTPView() {
 
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-6">
-        {error && (
-          <div className="bg-red-50 border border-red-100 px-4 py-3">
-            <p className="text-[10px] tracking-[0.15em] uppercase text-red-600">
-              {error}
-            </p>
-            {attemptsRemaining !== null && attemptsRemaining > 0 && (
-              <p className="text-[9px] tracking-[0.15em] uppercase text-red-400 mt-1">
-                {attemptsRemaining} attempt{attemptsRemaining !== 1 ? 's' : ''} remaining
+        <AnimatePresence>
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="bg-red-50 border border-red-100 px-4 py-3 rounded-[3px]"
+            >
+              <p className="text-[10px] tracking-[0.15em] uppercase text-red-600">
+                {error}
               </p>
-            )}
-          </div>
-        )}
+              {attemptsRemaining !== null && attemptsRemaining > 0 && (
+                <p className="text-[9px] tracking-[0.15em] uppercase text-red-400 mt-1">
+                  {attemptsRemaining} attempt{attemptsRemaining !== 1 ? 's' : ''} remaining
+                </p>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* OTP Inputs */}
         <div className="flex justify-center gap-3">
           {otp.map((digit, index) => (
-            <input
+            <motion.input
               key={index}
               ref={(el) => (inputRefs.current[index] = el)}
               type="text"
@@ -676,16 +725,20 @@ function OTPView() {
               onChange={(e) => handleChange(index, e.target.value)}
               onKeyDown={(e) => handleKeyDown(index, e)}
               onPaste={handlePaste}
-              className="w-12 h-14 text-center text-[18px] font-medium bg-gray-50 border border-gray-200 focus:border-black focus:outline-none transition-colors duration-300"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2, delay: index * 0.05 }}
+              className="w-12 h-14 text-center text-[18px] font-medium bg-gray-50 border border-gray-200 focus:border-black focus:outline-none transition-colors duration-300 rounded-[3px]"
             />
           ))}
         </div>
 
         {/* Submit */}
-        <button
+        <motion.button
           type="submit"
           disabled={loading || otp.join('').length !== 6}
-          className="relative w-full flex items-center justify-center gap-2 text-[10px] tracking-[0.22em] uppercase text-white bg-black border border-black py-4 overflow-hidden group disabled:opacity-50"
+          whileTap={{ scale: 0.98 }}
+          className="relative w-full flex items-center justify-center gap-2 text-[10px] tracking-[0.22em] uppercase text-white bg-black border border-black py-4 overflow-hidden group disabled:opacity-50 rounded-[3px]"
         >
           <span className="absolute inset-0 bg-white origin-bottom scale-y-0 group-hover:scale-y-100 transition-transform duration-500 ease-out" />
           {loading ? (
@@ -696,7 +749,7 @@ function OTPView() {
               <ArrowRight size={14} strokeWidth={1.5} className="relative z-10 group-hover:text-black transition-colors duration-500" />
             </>
           )}
-        </button>
+        </motion.button>
 
         {/* Resend */}
         <div className="text-center">
@@ -764,9 +817,14 @@ function ForgotPasswordView() {
   if (success) {
     return (
       <div className="text-center py-8">
-        <div className="w-16 h-16 mx-auto mb-6 bg-green-50 rounded-full flex items-center justify-center">
+        <motion.div 
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 0.3 }}
+          className="w-16 h-16 mx-auto mb-6 bg-green-50 rounded-full flex items-center justify-center"
+        >
           <CheckCircle size={28} strokeWidth={1.5} className="text-green-500" />
-        </div>
+        </motion.div>
         
         <h2
           className="text-black mb-3"
@@ -799,9 +857,14 @@ function ForgotPasswordView() {
     <div>
       {/* Header */}
       <div className="text-center mb-8">
-        <div className="w-16 h-16 mx-auto mb-6 bg-gray-100 rounded-full flex items-center justify-center">
+        <motion.div 
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 0.3 }}
+          className="w-16 h-16 mx-auto mb-6 bg-gray-100 rounded-full flex items-center justify-center"
+        >
           <Lock size={28} strokeWidth={1.5} className="text-gray-400" />
-        </div>
+        </motion.div>
         
         <h2
           className="text-black mb-2"
@@ -822,13 +885,20 @@ function ForgotPasswordView() {
 
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-5">
-        {error && (
-          <div className="bg-red-50 border border-red-100 px-4 py-3">
-            <p className="text-[10px] tracking-[0.15em] uppercase text-red-600">
-              {error}
-            </p>
-          </div>
-        )}
+        <AnimatePresence>
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="bg-red-50 border border-red-100 px-4 py-3 rounded-[3px]"
+            >
+              <p className="text-[10px] tracking-[0.15em] uppercase text-red-600">
+                {error}
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Email */}
         <div>
@@ -842,16 +912,17 @@ function ForgotPasswordView() {
               value={email}
               onChange={(e) => { setEmail(e.target.value); setError('') }}
               placeholder="you@example.com"
-              className="w-full bg-gray-50 border border-gray-200 pl-12 pr-4 py-3.5 text-[12px] tracking-[0.05em] text-black placeholder:text-gray-300 focus:outline-none focus:border-black transition-colors duration-300"
+              className="w-full bg-gray-50 border border-gray-200 pl-12 pr-4 py-3.5 text-[12px] tracking-[0.05em] text-black placeholder:text-gray-300 focus:outline-none focus:border-black transition-colors duration-300 rounded-[3px]"
             />
           </div>
         </div>
 
         {/* Submit */}
-        <button
+        <motion.button
           type="submit"
           disabled={loading}
-          className="relative w-full flex items-center justify-center gap-2 text-[10px] tracking-[0.22em] uppercase text-white bg-black border border-black py-4 overflow-hidden group disabled:opacity-50"
+          whileTap={{ scale: 0.98 }}
+          className="relative w-full flex items-center justify-center gap-2 text-[10px] tracking-[0.22em] uppercase text-white bg-black border border-black py-4 overflow-hidden group disabled:opacity-50 rounded-[3px]"
         >
           <span className="absolute inset-0 bg-white origin-bottom scale-y-0 group-hover:scale-y-100 transition-transform duration-500 ease-out" />
           {loading ? (
@@ -862,7 +933,7 @@ function ForgotPasswordView() {
               <ArrowRight size={14} strokeWidth={1.5} className="relative z-10 group-hover:text-black transition-colors duration-500" />
             </>
           )}
-        </button>
+        </motion.button>
       </form>
 
       {/* Back to Login */}
@@ -880,7 +951,7 @@ function ForgotPasswordView() {
 }
 
 // ============================================
-// RESET SUCCESS VIEW (after password reset via email link)
+// RESET SUCCESS VIEW
 // ============================================
 
 function ResetSuccessView() {
@@ -888,9 +959,14 @@ function ResetSuccessView() {
 
   return (
     <div className="text-center py-8">
-      <div className="w-16 h-16 mx-auto mb-6 bg-green-50 rounded-full flex items-center justify-center">
+      <motion.div 
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.3 }}
+        className="w-16 h-16 mx-auto mb-6 bg-green-50 rounded-full flex items-center justify-center"
+      >
         <CheckCircle size={28} strokeWidth={1.5} className="text-green-500" />
-      </div>
+      </motion.div>
       
       <h2
         className="text-black mb-3"
@@ -908,14 +984,15 @@ function ResetSuccessView() {
         Your password has been successfully reset. You can now sign in with your new password.
       </p>
 
-      <button
+      <motion.button
         onClick={() => switchView('login')}
-        className="relative inline-flex items-center justify-center gap-2 text-[10px] tracking-[0.22em] uppercase text-white bg-black border border-black px-8 py-4 overflow-hidden group"
+        whileTap={{ scale: 0.98 }}
+        className="relative inline-flex items-center justify-center gap-2 text-[10px] tracking-[0.22em] uppercase text-white bg-black border border-black px-8 py-4 overflow-hidden group rounded-[3px]"
       >
         <span className="absolute inset-0 bg-white origin-bottom scale-y-0 group-hover:scale-y-100 transition-transform duration-500 ease-out" />
         <span className="relative z-10 group-hover:text-black transition-colors duration-500">Sign In</span>
         <ArrowRight size={14} strokeWidth={1.5} className="relative z-10 group-hover:text-black transition-colors duration-500" />
-      </button>
+      </motion.button>
     </div>
   )
 }
