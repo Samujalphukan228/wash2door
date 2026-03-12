@@ -8,7 +8,7 @@ import {
   Calendar, Clock, MapPin, Car, Search,
   ChevronRight, Loader2, AlertCircle, CheckCircle,
   XCircle, RotateCcw, Star, X, Phone, ArrowUpRight,
-  Sparkles, Timer, Navigation
+  Timer
 } from 'lucide-react'
 import { getUserBookings, cancelBooking } from '@/lib/booking.api'
 import { createReview } from '@/lib/review.api'
@@ -42,47 +42,42 @@ function useScrollLock(isLocked) {
 }
 
 // ─────────────────────────────────────────
-// CONSTANTS
+// CONSTANTS - Original Colors
 // ─────────────────────────────────────────
 
 const STATUS_CONFIG = {
   pending: { 
     label: 'Pending', 
-    bg: 'bg-amber-50', 
-    border: 'border-amber-200',
-    text: 'text-amber-700', 
-    dot: 'bg-amber-400',
+    bg: 'bg-gray-100', 
+    text: 'text-gray-600', 
+    dot: 'bg-yellow-400',
     icon: Clock 
   },
   confirmed: { 
     label: 'Confirmed', 
-    bg: 'bg-blue-50', 
-    border: 'border-blue-200',
-    text: 'text-blue-700', 
+    bg: 'bg-gray-100', 
+    text: 'text-gray-600', 
     dot: 'bg-blue-400',
     icon: CheckCircle 
   },
   'in-progress': { 
     label: 'In Progress', 
-    bg: 'bg-purple-50', 
-    border: 'border-purple-200',
-    text: 'text-purple-700', 
+    bg: 'bg-gray-100', 
+    text: 'text-gray-600', 
     dot: 'bg-purple-400',
     icon: RotateCcw 
   },
   completed: { 
     label: 'Completed', 
-    bg: 'bg-green-50', 
-    border: 'border-green-200',
-    text: 'text-green-700', 
+    bg: 'bg-gray-100', 
+    text: 'text-gray-600', 
     dot: 'bg-green-500',
     icon: CheckCircle 
   },
   cancelled: { 
     label: 'Cancelled', 
-    bg: 'bg-red-50', 
-    border: 'border-red-200',
-    text: 'text-red-600', 
+    bg: 'bg-gray-100', 
+    text: 'text-gray-500', 
     dot: 'bg-red-400',
     icon: XCircle 
   },
@@ -98,20 +93,16 @@ const FILTER_OPTIONS = [
 ]
 
 // ─────────────────────────────────────────
-// STATUS BADGE - Redesigned
+// STATUS BADGE - Original Style
 // ─────────────────────────────────────────
 
 function StatusBadge({ status }) {
   const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.pending
-  const Icon = cfg.icon
   
   return (
-    <span className={`
-      inline-flex items-center gap-1.5 px-3 py-1.5 
-      ${cfg.bg} ${cfg.border} border rounded-full
-    `}>
-      <Icon size={11} strokeWidth={2} className={cfg.text} />
-      <span className={`text-[10px] tracking-[0.1em] uppercase font-semibold ${cfg.text}`}>
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 ${cfg.bg} rounded-full`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+      <span className={`text-[9px] tracking-[0.15em] uppercase font-medium ${cfg.text}`}>
         {cfg.label}
       </span>
     </span>
@@ -119,16 +110,13 @@ function StatusBadge({ status }) {
 }
 
 // ─────────────────────────────────────────
-// BOOKING CARD - Completely Redesigned
+// BOOKING CARD - New Design, Original Colors
 // ─────────────────────────────────────────
 
 function BookingCard({ booking, onViewDetails, onCancel, onReview }) {
   const bookingDate = new Date(booking.bookingDate)
   const isUpcoming = bookingDate > new Date() && !['cancelled', 'completed'].includes(booking.status)
   const canBeCancelled = ['pending', 'confirmed'].includes(booking.status) && isUpcoming
-  const isPast = bookingDate < new Date()
-  
-  const statusConfig = STATUS_CONFIG[booking.status] || STATUS_CONFIG.pending
 
   // Format date nicely
   const formatDate = (date) => {
@@ -152,48 +140,40 @@ function BookingCard({ booking, onViewDetails, onCancel, onReview }) {
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -2 }}
       transition={{ duration: 0.3 }}
-      className={`
-        group relative bg-white rounded-xl overflow-hidden
-        border border-gray-100 hover:border-gray-200
-        shadow-[0_2px_8px_rgba(0,0,0,0.04)] 
-        hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)]
-        transition-all duration-300
-      `}
+      className="group relative bg-white border border-gray-200 rounded-[8px] overflow-hidden
+                 hover:border-black hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)]
+                 transition-all duration-300"
     >
-      {/* Status Accent Line */}
-      <div className={`absolute top-0 left-0 right-0 h-1 ${statusConfig.dot}`} />
-
       {/* Main Content */}
       <div className="p-5 sm:p-6">
         
         {/* Top Row: Status & Code */}
-        <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="flex items-center justify-between gap-3 mb-5">
           <StatusBadge status={booking.status} />
-          <span className="text-[11px] tracking-[0.05em] text-gray-400 font-mono">
-            #{booking.bookingCode}
+          <span className="text-[10px] tracking-[0.1em] text-gray-400 font-mono uppercase">
+            {booking.bookingCode}
           </span>
         </div>
 
         {/* Service Info */}
-        <div className="flex items-start justify-between gap-4 mb-5">
+        <div className="flex items-start justify-between gap-4 mb-6">
           <div className="flex-1 min-w-0">
             <h3 
-              className="text-[17px] sm:text-[19px] text-gray-900 font-medium truncate mb-1"
-              style={{ fontFamily: 'Georgia, serif' }}
+              className="text-[18px] sm:text-[20px] text-black truncate mb-1"
+              style={{ fontFamily: 'Georgia, serif', fontWeight: 400 }}
             >
               {booking.serviceName}
             </h3>
-            <div className="flex items-center gap-2 text-gray-500">
-              <Car size={13} strokeWidth={1.5} />
-              <span className="text-[12px]">{booking.vehicleTypeName}</span>
-            </div>
+            <p className="text-[11px] tracking-[0.15em] uppercase text-gray-400">
+              {booking.vehicleTypeName}
+            </p>
           </div>
           
           {/* Price */}
           <div className="text-right shrink-0">
             <p 
-              className="text-[24px] sm:text-[28px] text-gray-900 font-light tracking-tight"
-              style={{ fontFamily: 'Georgia, serif' }}
+              className="text-[26px] sm:text-[30px] text-black leading-none"
+              style={{ fontFamily: 'Georgia, serif', fontWeight: 300 }}
             >
               ₹{booking.price}
             </p>
@@ -201,36 +181,36 @@ function BookingCard({ booking, onViewDetails, onCancel, onReview }) {
         </div>
 
         {/* Info Pills */}
-        <div className="flex flex-wrap gap-2 mb-5">
+        <div className="flex flex-wrap gap-2 mb-6">
           {/* Date */}
-          <div className="inline-flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg">
-            <Calendar size={14} strokeWidth={1.5} className="text-gray-400" />
-            <span className="text-[12px] text-gray-700 font-medium">
+          <div className="inline-flex items-center gap-2 px-3 py-2 border border-gray-100 rounded-[5px]">
+            <Calendar size={13} strokeWidth={1.5} className="text-gray-400" />
+            <span className="text-[11px] tracking-[0.05em] text-black">
               {formatDate(bookingDate)}
             </span>
           </div>
           
           {/* Time */}
-          <div className="inline-flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg">
-            <Clock size={14} strokeWidth={1.5} className="text-gray-400" />
-            <span className="text-[12px] text-gray-700 font-medium">
+          <div className="inline-flex items-center gap-2 px-3 py-2 border border-gray-100 rounded-[5px]">
+            <Clock size={13} strokeWidth={1.5} className="text-gray-400" />
+            <span className="text-[11px] tracking-[0.05em] text-black">
               {booking.timeSlot}
             </span>
           </div>
           
           {/* Duration */}
-          <div className="inline-flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg">
-            <Timer size={14} strokeWidth={1.5} className="text-gray-400" />
-            <span className="text-[12px] text-gray-700 font-medium">
+          <div className="inline-flex items-center gap-2 px-3 py-2 border border-gray-100 rounded-[5px]">
+            <Timer size={13} strokeWidth={1.5} className="text-gray-400" />
+            <span className="text-[11px] tracking-[0.05em] text-black">
               {booking.duration} min
             </span>
           </div>
           
           {/* Location */}
           {booking.location?.city && (
-            <div className="inline-flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg">
-              <MapPin size={14} strokeWidth={1.5} className="text-gray-400" />
-              <span className="text-[12px] text-gray-700 font-medium">
+            <div className="inline-flex items-center gap-2 px-3 py-2 border border-gray-100 rounded-[5px]">
+              <MapPin size={13} strokeWidth={1.5} className="text-gray-400" />
+              <span className="text-[11px] tracking-[0.05em] text-black">
                 {booking.location.city}
               </span>
             </div>
@@ -238,47 +218,48 @@ function BookingCard({ booking, onViewDetails, onCancel, onReview }) {
         </div>
 
         {/* Divider */}
-        <div className="h-px bg-gray-100 mb-4" />
+        <div className="h-px bg-gray-100 mb-5" />
 
         {/* Actions */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* View Details - Always visible */}
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* View Details */}
           <button
             onClick={() => onViewDetails(booking)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 
-                     bg-gray-900 text-white rounded-lg
-                     hover:bg-gray-800 active:scale-[0.98]
-                     transition-all duration-200 text-[12px] font-medium"
+            className="group/btn relative inline-flex items-center gap-2 px-5 py-2.5 
+                     bg-black text-white rounded-[5px] overflow-hidden
+                     active:scale-[0.98] transition-all duration-300"
           >
-            View Details
-            <ChevronRight size={14} strokeWidth={2} />
+            <span className="absolute inset-0 bg-white origin-bottom scale-y-0 group-hover/btn:scale-y-100 transition-transform duration-500 ease-out" />
+            <span className="relative z-10 text-[10px] tracking-[0.15em] uppercase group-hover/btn:text-black transition-colors duration-500">
+              Details
+            </span>
+            <ChevronRight size={13} strokeWidth={2} className="relative z-10 group-hover/btn:text-black transition-colors duration-500" />
           </button>
 
-          {/* Review Button - Only for completed */}
+          {/* Review Button */}
           {booking.status === 'completed' && !booking.isReviewed && (
             <button
               onClick={() => onReview(booking)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 
-                       bg-amber-50 text-amber-700 border border-amber-200 rounded-lg
-                       hover:bg-amber-100 active:scale-[0.98]
-                       transition-all duration-200 text-[12px] font-medium"
+              className="inline-flex items-center gap-2 px-5 py-2.5 
+                       border border-gray-200 text-black rounded-[5px]
+                       hover:border-black active:scale-[0.98]
+                       transition-all duration-300"
             >
-              <Star size={14} strokeWidth={2} />
-              Leave Review
+              <Star size={13} strokeWidth={2} />
+              <span className="text-[10px] tracking-[0.15em] uppercase">Review</span>
             </button>
           )}
 
-          {/* Cancel Button - Only for cancellable */}
+          {/* Cancel Button */}
           {canBeCancelled && (
             <button
               onClick={() => onCancel(booking)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 ml-auto
-                       text-red-600 hover:bg-red-50 rounded-lg
-                       active:scale-[0.98] transition-all duration-200 
-                       text-[12px] font-medium"
+              className="inline-flex items-center gap-2 px-5 py-2.5 ml-auto
+                       text-red-500 hover:bg-red-50 rounded-[5px]
+                       active:scale-[0.98] transition-all duration-300"
             >
-              <XCircle size={14} strokeWidth={2} />
-              Cancel
+              <XCircle size={13} strokeWidth={2} />
+              <span className="text-[10px] tracking-[0.15em] uppercase">Cancel</span>
             </button>
           )}
         </div>
@@ -286,10 +267,10 @@ function BookingCard({ booking, onViewDetails, onCancel, onReview }) {
 
       {/* Upcoming Indicator */}
       {isUpcoming && booking.status !== 'cancelled' && (
-        <div className="absolute top-4 right-4">
-          <span className="relative flex h-3 w-3">
+        <div className="absolute top-5 right-5">
+          <span className="relative flex h-2.5 w-2.5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500" />
+            <span className="relative inline-flex rounded-full h-full w-full bg-green-500" />
           </span>
         </div>
       )}
@@ -321,13 +302,13 @@ function ModalWrapper({ isOpen, onClose, children }) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 100 }}
             transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
-            className="relative w-full sm:max-w-lg bg-white sm:rounded-2xl rounded-t-[20px]
+            className="relative w-full sm:max-w-lg bg-white sm:rounded-[8px] rounded-t-[16px]
                        max-h-[92vh] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Mobile handle */}
             <div className="sm:hidden flex justify-center pt-3 pb-1">
-              <div className="w-12 h-1.5 bg-gray-200 rounded-full" />
+              <div className="w-10 h-1 bg-gray-200 rounded-full" />
             </div>
             
             <div className="max-h-[85vh] overflow-y-auto overscroll-contain">
@@ -341,47 +322,45 @@ function ModalWrapper({ isOpen, onClose, children }) {
 }
 
 // ─────────────────────────────────────────
-// DETAILS MODAL - Redesigned
+// DETAILS MODAL - Original Colors
 // ─────────────────────────────────────────
 
 function BookingDetailsModal({ booking, isOpen, onClose }) {
   if (!booking) return null
 
-  const statusConfig = STATUS_CONFIG[booking.status] || STATUS_CONFIG.pending
-
   return (
     <ModalWrapper isOpen={isOpen} onClose={onClose}>
       {/* Header */}
-      <div className={`${statusConfig.bg} px-6 pt-6 pb-5`}>
+      <div className="px-6 pt-6 pb-5 border-b border-gray-100">
         <div className="flex items-start justify-between gap-4">
           <div>
             <StatusBadge status={booking.status} />
             <h2 
-              className="text-[22px] sm:text-[26px] text-gray-900 mt-3 font-medium"
-              style={{ fontFamily: 'Georgia, serif' }}
+              className="text-[22px] sm:text-[26px] text-black mt-3"
+              style={{ fontFamily: 'Georgia, serif', fontWeight: 300 }}
             >
               {booking.serviceName}
             </h2>
-            <p className="text-[13px] text-gray-500 mt-1 font-mono">
-              #{booking.bookingCode}
+            <p className="text-[11px] tracking-[0.15em] uppercase text-gray-400 mt-1">
+              {booking.bookingCode}
             </p>
           </div>
           <button
             onClick={onClose}
             className="w-10 h-10 flex items-center justify-center 
-                     bg-white/80 hover:bg-white rounded-full
-                     transition-colors duration-200 shrink-0"
+                     border border-gray-200 hover:border-black hover:bg-black hover:text-white
+                     rounded-[5px] transition-all duration-300 shrink-0"
           >
-            <X size={18} strokeWidth={2} className="text-gray-600" />
+            <X size={18} strokeWidth={1.5} />
           </button>
         </div>
         
-        {/* Price Tag */}
-        <div className="mt-4 inline-flex items-baseline gap-1 bg-white px-4 py-2 rounded-xl shadow-sm">
-          <span className="text-[11px] text-gray-400 uppercase tracking-wider">Total</span>
+        {/* Price */}
+        <div className="mt-5 flex items-baseline gap-2">
+          <span className="text-[10px] tracking-[0.2em] uppercase text-gray-400">Total</span>
           <span 
-            className="text-[28px] text-gray-900 font-light ml-2"
-            style={{ fontFamily: 'Georgia, serif' }}
+            className="text-[32px] text-black"
+            style={{ fontFamily: 'Georgia, serif', fontWeight: 300 }}
           >
             ₹{booking.price}
           </span>
@@ -389,19 +368,17 @@ function BookingDetailsModal({ booking, isOpen, onClose }) {
       </div>
 
       {/* Content */}
-      <div className="px-6 py-6 space-y-6">
+      <div className="px-6 py-6 space-y-5">
         
-        {/* Schedule Card */}
-        <div className="bg-gray-50 rounded-xl p-4">
-          <h4 className="text-[11px] tracking-[0.15em] uppercase text-gray-400 font-semibold mb-3">
-            Schedule
-          </h4>
+        {/* Schedule */}
+        <div className="border border-gray-100 rounded-[5px] p-4">
+          <p className="text-[9px] tracking-[0.25em] uppercase text-gray-400 mb-3">Schedule</p>
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm">
-              <Calendar size={20} strokeWidth={1.5} className="text-gray-600" />
+            <div className="w-11 h-11 border border-gray-200 rounded-[5px] flex items-center justify-center">
+              <Calendar size={18} strokeWidth={1.5} className="text-gray-400" />
             </div>
             <div>
-              <p className="text-[15px] text-gray-900 font-medium">
+              <p className="text-[14px] text-black" style={{ fontFamily: 'Georgia, serif' }}>
                 {new Date(booking.bookingDate).toLocaleDateString('en-IN', {
                   weekday: 'long',
                   day: 'numeric',
@@ -409,64 +386,60 @@ function BookingDetailsModal({ booking, isOpen, onClose }) {
                   year: 'numeric',
                 })}
               </p>
-              <p className="text-[13px] text-gray-500 mt-0.5 flex items-center gap-1.5">
-                <Clock size={12} strokeWidth={2} />
+              <p className="text-[12px] text-gray-500 mt-0.5 flex items-center gap-1.5">
+                <Clock size={11} strokeWidth={2} />
                 {booking.timeSlot} · {booking.duration} minutes
               </p>
             </div>
           </div>
         </div>
 
-        {/* Location Card */}
-        <div className="bg-gray-50 rounded-xl p-4">
-          <h4 className="text-[11px] tracking-[0.15em] uppercase text-gray-400 font-semibold mb-3">
-            Location
-          </h4>
+        {/* Location */}
+        <div className="border border-gray-100 rounded-[5px] p-4">
+          <p className="text-[9px] tracking-[0.25em] uppercase text-gray-400 mb-3">Location</p>
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm shrink-0">
-              <MapPin size={20} strokeWidth={1.5} className="text-gray-600" />
+            <div className="w-11 h-11 border border-gray-200 rounded-[5px] flex items-center justify-center shrink-0">
+              <MapPin size={18} strokeWidth={1.5} className="text-gray-400" />
             </div>
             <div>
-              <p className="text-[15px] text-gray-900 font-medium">
+              <p className="text-[14px] text-black" style={{ fontFamily: 'Georgia, serif' }}>
                 {booking.location?.address || 'Address not provided'}
               </p>
               {booking.location?.landmark && (
-                <p className="text-[13px] text-gray-500 mt-0.5">
+                <p className="text-[12px] text-gray-500 mt-0.5">
                   Near {booking.location.landmark}
                 </p>
               )}
-              <p className="text-[13px] text-gray-500">
+              <p className="text-[12px] text-gray-500">
                 {[booking.location?.city, booking.location?.state].filter(Boolean).join(', ')}
               </p>
             </div>
           </div>
         </div>
 
-        {/* Vehicle Card */}
+        {/* Vehicle */}
         {(booking.vehicleDetails?.brand || booking.vehicleDetails?.type) && (
-          <div className="bg-gray-50 rounded-xl p-4">
-            <h4 className="text-[11px] tracking-[0.15em] uppercase text-gray-400 font-semibold mb-3">
-              Vehicle
-            </h4>
+          <div className="border border-gray-100 rounded-[5px] p-4">
+            <p className="text-[9px] tracking-[0.25em] uppercase text-gray-400 mb-3">Vehicle</p>
             <div className="flex items-start gap-4">
-              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm shrink-0">
-                <Car size={20} strokeWidth={1.5} className="text-gray-600" />
+              <div className="w-11 h-11 border border-gray-200 rounded-[5px] flex items-center justify-center shrink-0">
+                <Car size={18} strokeWidth={1.5} className="text-gray-400" />
               </div>
               <div>
-                <p className="text-[15px] text-gray-900 font-medium">
+                <p className="text-[14px] text-black" style={{ fontFamily: 'Georgia, serif' }}>
                   {booking.vehicleTypeName}
                 </p>
                 {booking.vehicleDetails?.brand && (
-                  <p className="text-[13px] text-gray-500 mt-0.5">
+                  <p className="text-[12px] text-gray-500 mt-0.5">
                     {booking.vehicleDetails.brand} {booking.vehicleDetails.model}
                   </p>
                 )}
-                <div className="flex items-center gap-3 mt-1 text-[12px] text-gray-400">
+                <div className="flex items-center gap-3 mt-1 text-[11px] text-gray-400">
                   {booking.vehicleDetails?.color && (
                     <span>{booking.vehicleDetails.color}</span>
                   )}
                   {booking.vehicleDetails?.plateNumber && (
-                    <span className="font-mono">{booking.vehicleDetails.plateNumber}</span>
+                    <span className="font-mono uppercase">{booking.vehicleDetails.plateNumber}</span>
                   )}
                 </div>
               </div>
@@ -476,47 +449,42 @@ function BookingDetailsModal({ booking, isOpen, onClose }) {
 
         {/* Special Notes */}
         {booking.specialNotes && (
-          <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
-            <h4 className="text-[11px] tracking-[0.15em] uppercase text-amber-600 font-semibold mb-2">
+          <div className="border border-gray-200 bg-gray-50 rounded-[5px] p-4">
+            <p className="text-[9px] tracking-[0.25em] uppercase text-gray-500 mb-2">
               Special Instructions
-            </h4>
-            <p className="text-[13px] text-amber-800">{booking.specialNotes}</p>
+            </p>
+            <p className="text-[12px] text-gray-600 leading-relaxed">{booking.specialNotes}</p>
           </div>
         )}
 
         {/* Cancellation Info */}
         {booking.status === 'cancelled' && (
-          <div className="bg-red-50 border border-red-100 rounded-xl p-4">
-            <h4 className="text-[11px] tracking-[0.15em] uppercase text-red-600 font-semibold mb-2">
+          <div className="border border-red-200 bg-red-50 rounded-[5px] p-4">
+            <p className="text-[9px] tracking-[0.25em] uppercase text-red-500 mb-2">
               Cancellation Details
-            </h4>
-            <p className="text-[13px] text-red-700">
+            </p>
+            <p className="text-[12px] text-red-600">
               Cancelled by: {booking.cancelledBy || 'User'}
             </p>
             {booking.cancellationReason && (
-              <p className="text-[13px] text-red-600 mt-1">
+              <p className="text-[12px] text-red-500 mt-1">
                 Reason: {booking.cancellationReason}
               </p>
             )}
           </div>
         )}
 
-        {/* Payment Info */}
+        {/* Payment */}
         <div className="flex items-center justify-between py-4 border-t border-gray-100">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
-              <Sparkles size={16} strokeWidth={2} className="text-gray-500" />
-            </div>
-            <div>
-              <p className="text-[13px] text-gray-900 font-medium">
-                {booking.paymentMethod === 'cash' ? 'Cash on Service' : booking.paymentMethod}
-              </p>
-              <p className={`text-[12px] ${
-                booking.paymentStatus === 'completed' ? 'text-green-600' : 'text-amber-600'
-              }`}>
-                {booking.paymentStatus === 'completed' ? '✓ Paid' : '○ Payment Pending'}
-              </p>
-            </div>
+          <div>
+            <p className="text-[12px] text-black">
+              {booking.paymentMethod === 'cash' ? 'Cash on Service' : booking.paymentMethod}
+            </p>
+            <p className={`text-[11px] mt-0.5 ${
+              booking.paymentStatus === 'completed' ? 'text-green-600' : 'text-yellow-600'
+            }`}>
+              {booking.paymentStatus === 'completed' ? '✓ Paid' : '○ Payment Pending'}
+            </p>
           </div>
         </div>
       </div>
@@ -525,18 +493,19 @@ function BookingDetailsModal({ booking, isOpen, onClose }) {
       <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-4">
         <a
           href="tel:6900706456"
-          className="inline-flex items-center gap-2 text-[13px] text-gray-500 hover:text-gray-900 transition-colors"
+          className="inline-flex items-center gap-2 text-[11px] tracking-[0.1em] uppercase text-gray-400 hover:text-black transition-colors"
         >
-          <Phone size={16} strokeWidth={1.5} />
+          <Phone size={14} strokeWidth={1.5} />
           Need Help?
         </a>
         <button
           onClick={onClose}
-          className="px-6 py-2.5 bg-gray-900 text-white rounded-lg 
-                   hover:bg-gray-800 active:scale-[0.98]
-                   transition-all duration-200 text-[13px] font-medium"
+          className="group relative px-6 py-2.5 bg-black text-white rounded-[5px] overflow-hidden"
         >
-          Close
+          <span className="absolute inset-0 bg-white origin-bottom scale-y-0 group-hover:scale-y-100 transition-transform duration-500 ease-out" />
+          <span className="relative z-10 text-[10px] tracking-[0.2em] uppercase group-hover:text-black transition-colors duration-500">
+            Close
+          </span>
         </button>
       </div>
     </ModalWrapper>
@@ -544,7 +513,7 @@ function BookingDetailsModal({ booking, isOpen, onClose }) {
 }
 
 // ─────────────────────────────────────────
-// CANCEL MODAL - Redesigned
+// CANCEL MODAL - Original Colors
 // ─────────────────────────────────────────
 
 function CancelBookingModal({ booking, isOpen, onClose, onConfirm, loading }) {
@@ -556,22 +525,27 @@ function CancelBookingModal({ booking, isOpen, onClose, onConfirm, loading }) {
     <ModalWrapper isOpen={isOpen} onClose={onClose}>
       <div className="p-6">
         {/* Icon */}
-        <div className="w-14 h-14 bg-red-100 rounded-2xl flex items-center justify-center mb-5">
-          <AlertCircle size={28} className="text-red-500" strokeWidth={1.5} />
+        <div className="w-12 h-12 border border-red-200 bg-red-50 rounded-full flex items-center justify-center mb-5">
+          <AlertCircle size={24} className="text-red-500" strokeWidth={1.5} />
         </div>
 
         {/* Title */}
         <h2 
-          className="text-[22px] text-gray-900 font-medium mb-2"
-          style={{ fontFamily: 'Georgia, serif' }}
+          className="text-[22px] text-black mb-2"
+          style={{ fontFamily: 'Georgia, serif', fontWeight: 300 }}
         >
-          Cancel this booking?
+          Cancel Booking?
         </h2>
         
         {/* Booking Summary */}
-        <div className="bg-gray-50 rounded-xl p-4 mb-6">
-          <p className="text-[15px] text-gray-900 font-medium">{booking.serviceName}</p>
-          <p className="text-[13px] text-gray-500 mt-1">
+        <div className="border border-gray-100 rounded-[5px] p-4 mb-6">
+          <p 
+            className="text-[15px] text-black"
+            style={{ fontFamily: 'Georgia, serif' }}
+          >
+            {booking.serviceName}
+          </p>
+          <p className="text-[11px] tracking-[0.1em] uppercase text-gray-400 mt-1">
             {new Date(booking.bookingDate).toLocaleDateString('en-IN', { 
               weekday: 'short', 
               day: 'numeric', 
@@ -582,18 +556,18 @@ function CancelBookingModal({ booking, isOpen, onClose, onConfirm, loading }) {
 
         {/* Reason Input */}
         <div className="mb-6">
-          <label className="block text-[12px] text-gray-500 font-medium mb-2">
-            Reason for cancellation (optional)
+          <label className="block text-[9px] tracking-[0.25em] uppercase text-gray-400 mb-2">
+            Reason (optional)
           </label>
           <textarea
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            placeholder="Help us improve by sharing why..."
+            placeholder="Let us know why..."
             rows={3}
-            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl
-                     text-[14px] text-gray-900 placeholder-gray-400
-                     focus:outline-none focus:border-gray-300 focus:bg-white
-                     transition-all duration-200 resize-none"
+            className="w-full px-4 py-3 border border-gray-200 rounded-[5px]
+                     text-[12px] text-black placeholder-gray-300
+                     focus:outline-none focus:border-black
+                     transition-colors duration-300 resize-none"
           />
         </div>
 
@@ -602,9 +576,9 @@ function CancelBookingModal({ booking, isOpen, onClose, onConfirm, loading }) {
           <button
             onClick={onClose}
             disabled={loading}
-            className="flex-1 px-4 py-3 border border-gray-200 text-gray-700 rounded-xl
-                     hover:bg-gray-50 active:scale-[0.98]
-                     transition-all duration-200 text-[14px] font-medium
+            className="flex-1 px-4 py-3.5 border border-gray-200 rounded-[5px]
+                     text-[10px] tracking-[0.2em] uppercase text-black
+                     hover:border-black transition-colors duration-300
                      disabled:opacity-50"
           >
             Keep Booking
@@ -612,18 +586,18 @@ function CancelBookingModal({ booking, isOpen, onClose, onConfirm, loading }) {
           <button
             onClick={() => onConfirm(booking._id, reason)}
             disabled={loading}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 
-                     bg-red-600 text-white rounded-xl
-                     hover:bg-red-700 active:scale-[0.98]
-                     transition-all duration-200 text-[14px] font-medium
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3.5 
+                     bg-red-600 text-white rounded-[5px]
+                     text-[10px] tracking-[0.2em] uppercase
+                     hover:bg-red-700 transition-colors duration-300
                      disabled:opacity-50"
           >
             {loading ? (
-              <Loader2 size={18} className="animate-spin" />
+              <Loader2 size={16} className="animate-spin" />
             ) : (
               <>
-                <XCircle size={16} strokeWidth={2} />
-                Cancel Booking
+                <XCircle size={14} strokeWidth={2} />
+                Cancel
               </>
             )}
           </button>
@@ -634,7 +608,7 @@ function CancelBookingModal({ booking, isOpen, onClose, onConfirm, loading }) {
 }
 
 // ─────────────────────────────────────────
-// REVIEW MODAL - Redesigned
+// REVIEW MODAL - Original Colors
 // ─────────────────────────────────────────
 
 function ReviewModal({ booking, isOpen, onClose, onSubmit, loading }) {
@@ -646,7 +620,6 @@ function ReviewModal({ booking, isOpen, onClose, onSubmit, loading }) {
   if (!booking) return null
 
   const labels = ['', 'Poor', 'Fair', 'Good', 'Very Good', 'Excellent']
-  const emojis = ['', '😞', '😐', '🙂', '😊', '🤩']
 
   const handleSubmit = () => {
     if (!rating) {
@@ -661,29 +634,31 @@ function ReviewModal({ booking, isOpen, onClose, onSubmit, loading }) {
       <div className="p-6">
         {/* Header */}
         <div className="text-center mb-6">
-          <div className="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <Star size={32} strokeWidth={1.5} className="text-amber-500" />
+          <div className="w-14 h-14 border border-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Star size={28} strokeWidth={1.5} className="text-black" />
           </div>
           <h2 
-            className="text-[22px] text-gray-900 font-medium"
-            style={{ fontFamily: 'Georgia, serif' }}
+            className="text-[22px] text-black"
+            style={{ fontFamily: 'Georgia, serif', fontWeight: 300 }}
           >
-            How was your experience?
+            Rate Your Experience
           </h2>
-          <p className="text-[14px] text-gray-500 mt-1">{booking.serviceName}</p>
+          <p className="text-[11px] tracking-[0.15em] uppercase text-gray-400 mt-1">
+            {booking.serviceName}
+          </p>
         </div>
 
         {/* Error */}
         <AnimatePresence>
           {error && (
-            <motion.div
+            <motion.p
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="bg-red-50 text-red-600 text-[13px] px-4 py-3 rounded-xl mb-4 text-center"
+              className="text-[11px] tracking-[0.1em] uppercase text-red-500 mb-4 text-center"
             >
               {error}
-            </motion.div>
+            </motion.p>
           )}
         </AnimatePresence>
 
@@ -693,63 +668,49 @@ function ReviewModal({ booking, isOpen, onClose, onSubmit, loading }) {
             {[1, 2, 3, 4, 5].map((s) => (
               <motion.button
                 key={s}
-                whileTap={{ scale: 0.85 }}
-                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
                 onClick={() => {
                   setRating(s)
                   setError('')
                 }}
                 onMouseEnter={() => setHover(s)}
                 onMouseLeave={() => setHover(0)}
-                className="p-1 transition-transform"
+                className="p-1"
               >
                 <Star
-                  size={40}
-                  strokeWidth={1.5}
-                  fill={(hover || rating) >= s ? '#F59E0B' : 'none'}
-                  stroke={(hover || rating) >= s ? '#F59E0B' : '#D1D5DB'}
+                  size={36}
+                  strokeWidth={1.2}
+                  fill={(hover || rating) >= s ? '#000' : 'none'}
+                  stroke={(hover || rating) >= s ? '#000' : '#D1D5DB'}
                   className="transition-colors duration-150"
                 />
               </motion.button>
             ))}
           </div>
           
-          {/* Rating Label with Emoji */}
-          <AnimatePresence mode="wait">
-            {(hover || rating) > 0 && (
-              <motion.div
-                key={hover || rating}
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -5 }}
-                className="flex items-center justify-center gap-2"
-              >
-                <span className="text-2xl">{emojis[hover || rating]}</span>
-                <span className="text-[14px] text-gray-600 font-medium">
-                  {labels[hover || rating]}
-                </span>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {/* Rating Label */}
+          <p className="text-[11px] tracking-[0.2em] uppercase text-gray-400 h-5">
+            {labels[hover || rating]}
+          </p>
         </div>
 
         {/* Comment */}
         <div className="mb-6">
-          <label className="block text-[12px] text-gray-500 font-medium mb-2">
-            Share more details (optional)
+          <label className="block text-[9px] tracking-[0.25em] uppercase text-gray-400 mb-2">
+            Review (optional)
           </label>
           <textarea
             value={comment}
             onChange={(e) => setComment(e.target.value)}
-            placeholder="What did you like or dislike?"
+            placeholder="Share your experience..."
             rows={3}
             maxLength={500}
-            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl
-                     text-[14px] text-gray-900 placeholder-gray-400
-                     focus:outline-none focus:border-gray-300 focus:bg-white
-                     transition-all duration-200 resize-none"
+            className="w-full px-4 py-3 border border-gray-200 rounded-[5px]
+                     text-[12px] text-black placeholder-gray-300
+                     focus:outline-none focus:border-black
+                     transition-colors duration-300 resize-none"
           />
-          <p className="text-right text-[11px] text-gray-400 mt-1">
+          <p className="text-right text-[9px] text-gray-300 mt-1">
             {comment.length}/500
           </p>
         </div>
@@ -759,28 +720,29 @@ function ReviewModal({ booking, isOpen, onClose, onSubmit, loading }) {
           <button
             onClick={onClose}
             disabled={loading}
-            className="flex-1 px-4 py-3 border border-gray-200 text-gray-700 rounded-xl
-                     hover:bg-gray-50 active:scale-[0.98]
-                     transition-all duration-200 text-[14px] font-medium
+            className="flex-1 px-4 py-3.5 border border-gray-200 rounded-[5px]
+                     text-[10px] tracking-[0.2em] uppercase text-black
+                     hover:border-black transition-colors duration-300
                      disabled:opacity-50"
           >
-            Maybe Later
+            Cancel
           </button>
           <button
             onClick={handleSubmit}
             disabled={loading || !rating}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 
-                     bg-amber-500 text-white rounded-xl
-                     hover:bg-amber-600 active:scale-[0.98]
-                     transition-all duration-200 text-[14px] font-medium
+            className="group flex-1 relative flex items-center justify-center gap-2 px-4 py-3.5 
+                     bg-black text-white rounded-[5px] overflow-hidden
                      disabled:opacity-50"
           >
+            <span className="absolute inset-0 bg-white origin-bottom scale-y-0 group-hover:scale-y-100 transition-transform duration-500 ease-out" />
             {loading ? (
-              <Loader2 size={18} className="animate-spin" />
+              <Loader2 size={16} className="relative z-10 animate-spin" />
             ) : (
               <>
-                <Star size={16} strokeWidth={2} />
-                Submit Review
+                <Star size={14} strokeWidth={2} className="relative z-10 group-hover:text-black transition-colors duration-500" />
+                <span className="relative z-10 text-[10px] tracking-[0.2em] uppercase group-hover:text-black transition-colors duration-500">
+                  Submit
+                </span>
               </>
             )}
           </button>
@@ -801,31 +763,32 @@ function EmptyState({ hasFilters }) {
       animate={{ opacity: 1, y: 0 }}
       className="flex flex-col items-center justify-center py-20 text-center"
     >
-      <div className="w-20 h-20 bg-gray-100 rounded-2xl flex items-center justify-center mb-6">
-        <Car size={36} strokeWidth={1} className="text-gray-300" />
+      <div className="w-16 h-16 border border-gray-200 rounded-full flex items-center justify-center mb-6">
+        <Car size={28} strokeWidth={1} className="text-gray-300" />
       </div>
       <h3 
-        className="text-[20px] text-gray-900 mb-2 font-medium"
-        style={{ fontFamily: 'Georgia, serif' }}
+        className="text-[18px] text-black mb-2"
+        style={{ fontFamily: 'Georgia, serif', fontWeight: 300 }}
       >
         {hasFilters ? 'No bookings found' : 'No bookings yet'}
       </h3>
-      <p className="text-[14px] text-gray-500 mb-8 max-w-xs">
+      <p className="text-[11px] tracking-[0.15em] uppercase text-gray-400 mb-8 max-w-xs">
         {hasFilters 
           ? 'Try adjusting your search or filters' 
-          : 'Book your first car wash and enjoy our doorstep service'
+          : 'Book your first service today'
         }
       </p>
       {!hasFilters && (
         <a
           href="/Bookings"
-          className="inline-flex items-center gap-2 px-6 py-3 
-                   bg-gray-900 text-white rounded-xl
-                   hover:bg-gray-800 active:scale-[0.98]
-                   transition-all duration-200 text-[14px] font-medium"
+          className="group relative inline-flex items-center gap-2 px-7 py-4 
+                   bg-black text-white rounded-[5px] overflow-hidden"
         >
-          Book Your First Wash
-          <ArrowUpRight size={16} strokeWidth={2} />
+          <span className="absolute inset-0 bg-white origin-bottom scale-y-0 group-hover:scale-y-100 transition-transform duration-500 ease-out" />
+          <span className="relative z-10 text-[10px] tracking-[0.2em] uppercase group-hover:text-black transition-colors duration-500">
+            Book Now
+          </span>
+          <ArrowUpRight size={14} strokeWidth={2} className="relative z-10 group-hover:text-black transition-colors duration-500" />
         </a>
       )}
     </motion.div>
@@ -927,8 +890,8 @@ export default function MyBookingsPage() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Loader2 size={32} className="animate-spin text-gray-400" />
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <Loader2 size={28} className="animate-spin text-gray-300" />
       </div>
     )
   }
@@ -936,62 +899,72 @@ export default function MyBookingsPage() {
   if (!user) return null
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div 
+      className="min-h-screen bg-white"
+      style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
+    >
       
       {/* ── Header ── */}
-      <div className="bg-gray-900">
-        <div className="max-w-4xl mx-auto px-5 sm:px-8 pt-16 pb-10 sm:pt-20 sm:pb-12">
+      <div className="bg-black">
+        <div className="max-w-5xl mx-auto px-5 md:px-16 pt-20 pb-10 md:pt-24 md:pb-12">
           <div className="flex items-end justify-between gap-4">
             <div>
-              <p className="text-[11px] tracking-[0.2em] uppercase text-gray-400 mb-2">
-                My Account
-              </p>
+              <div className="flex items-center gap-3 mb-4">
+                <span className="block w-6 h-px bg-white/30 shrink-0" />
+                <span
+                  className="text-[10px] tracking-[0.4em] uppercase text-white/50"
+                  style={{ fontFamily: 'Georgia, serif' }}
+                >
+                  Account
+                </span>
+              </div>
               <h1 
-                className="text-white text-[28px] sm:text-[36px] font-light"
-                style={{ fontFamily: 'Georgia, serif' }}
+                className="text-white text-[1.6rem] sm:text-[2rem] md:text-[2.2rem]"
+                style={{ fontFamily: 'Georgia, serif', fontWeight: 300 }}
               >
-                Bookings
+                My Bookings
               </h1>
-              <p className="text-[13px] text-gray-400 mt-1">
-                {total} booking{total !== 1 ? 's' : ''} total
+              <p className="text-[10px] tracking-[0.2em] uppercase text-white/40 mt-2">
+                {total} booking{total !== 1 ? 's' : ''}
               </p>
             </div>
             
             <a
               href="/Bookings"
-              className="hidden sm:inline-flex items-center gap-2 px-5 py-2.5 
-                       bg-white text-gray-900 rounded-lg
-                       hover:bg-gray-100 active:scale-[0.98]
-                       transition-all duration-200 text-[13px] font-medium"
+              className="hidden sm:inline-flex group relative items-center gap-2 
+                       px-6 py-3 bg-white text-black rounded-[5px] overflow-hidden"
             >
-              New Booking
-              <ArrowUpRight size={16} strokeWidth={2} />
+              <span className="absolute inset-0 bg-black origin-bottom scale-y-0 group-hover:scale-y-100 transition-transform duration-500 ease-out" />
+              <span className="relative z-10 text-[10px] tracking-[0.2em] uppercase group-hover:text-white transition-colors duration-500">
+                Book New
+              </span>
+              <ArrowUpRight size={14} strokeWidth={2} className="relative z-10 group-hover:text-white transition-colors duration-500" />
             </a>
           </div>
         </div>
       </div>
 
       {/* ── Filters ── */}
-      <div className="sticky top-0 z-30 bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-4xl mx-auto px-5 sm:px-8 py-4">
+      <div className="sticky top-0 z-30 bg-white border-b border-gray-200">
+        <div className="max-w-5xl mx-auto px-5 md:px-16 py-4">
           <div className="flex flex-col sm:flex-row gap-3">
             
             {/* Search */}
             <div className="relative flex-1">
               <Search 
-                size={18} 
+                size={16} 
                 strokeWidth={1.5} 
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" 
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" 
               />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by service, code..."
-                className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl
-                         text-[14px] text-gray-900 placeholder-gray-400
-                         focus:outline-none focus:border-gray-300 focus:bg-white
-                         transition-all duration-200"
+                placeholder="Search bookings..."
+                className="w-full pl-11 pr-4 py-3 border border-gray-200 rounded-[5px]
+                         text-[12px] text-black placeholder-gray-300
+                         focus:outline-none focus:border-black
+                         transition-colors duration-300"
               />
             </div>
 
@@ -1005,11 +978,12 @@ export default function MyBookingsPage() {
                     setCurrentPage(1)
                   }}
                   className={`
-                    flex-shrink-0 px-4 py-2.5 rounded-xl text-[13px] font-medium
-                    transition-all duration-200
+                    flex-shrink-0 px-4 py-2.5 rounded-[5px] 
+                    text-[10px] tracking-[0.15em] uppercase
+                    transition-all duration-300
                     ${statusFilter === opt.value
-                      ? 'bg-gray-900 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      ? 'bg-black text-white'
+                      : 'border border-gray-200 text-gray-500 hover:border-black hover:text-black'
                     }
                   `}
                 >
@@ -1022,7 +996,7 @@ export default function MyBookingsPage() {
       </div>
 
       {/* ── Content ── */}
-      <div className="max-w-4xl mx-auto px-5 sm:px-8 py-8 pb-28 sm:pb-8">
+      <div className="max-w-5xl mx-auto px-5 md:px-16 py-8 pb-28 sm:pb-8">
         
         {/* Error */}
         <AnimatePresence>
@@ -1031,18 +1005,18 @@ export default function MyBookingsPage() {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="mb-6 flex items-center gap-3 p-4 bg-red-50 border border-red-100 rounded-xl"
+              className="mb-6 flex items-center gap-3 p-4 border border-red-100 bg-red-50 rounded-[5px]"
             >
-              <AlertCircle size={18} className="text-red-500 shrink-0" />
-              <p className="text-[14px] text-red-600">{error}</p>
+              <AlertCircle size={16} className="text-red-500 shrink-0" />
+              <p className="text-[12px] text-red-600">{error}</p>
             </motion.div>
           )}
         </AnimatePresence>
 
         {/* Loading */}
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 size={32} className="animate-spin text-gray-400" />
+          <div className="flex items-center justify-center py-24">
+            <Loader2 size={28} className="animate-spin text-gray-300" />
           </div>
         ) : filtered.length === 0 ? (
           <EmptyState hasFilters={!!(searchQuery || statusFilter)} />
@@ -1076,40 +1050,38 @@ export default function MyBookingsPage() {
                 <button
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
-                  className="px-4 py-2 bg-white border border-gray-200 rounded-lg
-                           text-[13px] text-gray-600 font-medium
-                           hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed
-                           transition-all duration-200"
+                  className="px-5 py-2.5 border border-gray-200 rounded-[5px]
+                           text-[10px] tracking-[0.15em] uppercase text-black
+                           hover:border-black disabled:opacity-30 disabled:cursor-not-allowed
+                           transition-colors duration-300"
                 >
-                  Previous
+                  Prev
                 </button>
                 
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                    <button
-                      key={p}
-                      onClick={() => setCurrentPage(p)}
-                      className={`
-                        w-10 h-10 rounded-lg text-[13px] font-medium
-                        transition-all duration-200
-                        ${currentPage === p
-                          ? 'bg-gray-900 text-white'
-                          : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
-                        }
-                      `}
-                    >
-                      {p}
-                    </button>
-                  ))}
-                </div>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setCurrentPage(p)}
+                    className={`
+                      w-10 h-10 rounded-[5px] text-[11px]
+                      transition-all duration-300
+                      ${currentPage === p
+                        ? 'bg-black text-white'
+                        : 'border border-gray-200 text-black hover:border-black'
+                      }
+                    `}
+                  >
+                    {p}
+                  </button>
+                ))}
                 
                 <button
                   onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
-                  className="px-4 py-2 bg-white border border-gray-200 rounded-lg
-                           text-[13px] text-gray-600 font-medium
-                           hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed
-                           transition-all duration-200"
+                  className="px-5 py-2.5 border border-gray-200 rounded-[5px]
+                           text-[10px] tracking-[0.15em] uppercase text-black
+                           hover:border-black disabled:opacity-30 disabled:cursor-not-allowed
+                           transition-colors duration-300"
                 >
                   Next
                 </button>
@@ -1124,11 +1096,10 @@ export default function MyBookingsPage() {
         <a
           href="/Bookings"
           className="flex items-center justify-center gap-2 w-full py-4 
-                   bg-gray-900 text-white rounded-xl
-                   active:scale-[0.98] transition-all duration-200
-                   text-[14px] font-medium"
+                   bg-black text-white rounded-[5px]
+                   text-[10px] tracking-[0.2em] uppercase"
         >
-          <ArrowUpRight size={18} strokeWidth={2} />
+          <ArrowUpRight size={14} strokeWidth={2} />
           Book New Service
         </a>
       </div>
