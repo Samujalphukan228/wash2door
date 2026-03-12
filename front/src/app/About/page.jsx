@@ -28,9 +28,9 @@ const WHY_US = [
 ]
 
 const SERVICES = [
-  { label: 'Car Wash',            href: 'https://wash2door.in/services/' },
-  { label: 'Sofa Cleaning',       href: 'https://wash2door.in/services/' },
-  { label: 'Water Tank Cleaning', href: 'https://wash2door.in/services/' },
+  { label: 'Car Wash',            href: '/Services' },
+  { label: 'Sofa Cleaning',       href: '/Services' },
+  { label: 'Water Tank Cleaning', href: '/Services' },
 ]
 
 // ── Reusable animated section heading (matches site pattern) ──
@@ -163,7 +163,7 @@ function Hero() {
 
         <div ref={ctaRef} className="opacity-0 flex flex-wrap gap-4">
           <a
-            href="https://wash2door.in/bookin/"
+            href="/Bookings"
             className="relative flex items-center gap-2 tracking-[0.22em] uppercase
                        text-black bg-white border border-white px-7 py-4 no-underline
                        overflow-hidden group rounded-[5px]"
@@ -488,7 +488,7 @@ function ContactCTA() {
 
             <div className="flex flex-wrap gap-4 md:mb-2">
               <a
-                href="https://wash2door.in/bookin/"
+                href="/Bookings"
                 className="relative flex items-center gap-2 tracking-[0.22em] uppercase
                            text-black bg-white border border-white px-7 py-4 no-underline
                            overflow-hidden group rounded-[5px]"
@@ -499,7 +499,7 @@ function ContactCTA() {
                 <ArrowUpRight size={13} strokeWidth={1.5} className="relative z-10 group-hover:text-white transition-colors duration-500" />
               </a>
               <a
-                href="https://wash2door.in/services/"
+                href="/Services"
                 className="relative flex items-center gap-2 tracking-[0.22em] uppercase
                            text-white border border-white/30 px-7 py-4 no-underline
                            overflow-hidden group rounded-[5px]"

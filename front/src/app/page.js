@@ -15,7 +15,6 @@ const page = () => {
       <HowItWorks/>
       <Testimonials/>
       <CTABanner/>
-      <Footer/>
     </div>
   )
 }

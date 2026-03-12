@@ -273,12 +273,14 @@ export default function Footer() {
             © {new Date().getFullYear()} Wash2Door. All rights reserved.
           </p>
 
-          <p
+          <a href="https://nexxupp.com">
+            <p
             className="tracking-[0.2em] uppercase text-white/20 text-center"
             style={{ fontSize: 'clamp(9px, 2.2vw, 10px)' }}
           >
-            Made with ♥ in Duliajan, Assam
+            Made by Nexxupp
           </p>
+          </a>
 
           {/* Back to top */}
           <button

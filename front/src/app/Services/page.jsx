@@ -195,7 +195,7 @@ function ServiceSection({ service, index }) {
 
           {/* CTA */}
           <a
-            href="https://wash2door.in/bookin/"
+            href="/Bookings"
             className="relative inline-flex items-center gap-2 tracking-[0.22em] uppercase
                        text-white bg-black border border-black px-7 py-4 no-underline
                        overflow-hidden group rounded-[5px]"
@@ -354,7 +354,7 @@ export default function ServicesPage() {
             </div>
             <div className="flex flex-wrap gap-4 md:mb-1">
               <a
-                href="https://wash2door.in/bookin/"
+                href="/Bookings"
                 className="relative flex items-center gap-2 tracking-[0.22em] uppercase
                            text-black bg-white border border-white px-7 py-4 no-underline
                            overflow-hidden group rounded-[5px]"
