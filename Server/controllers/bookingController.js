@@ -1,3 +1,5 @@
+// controllers/bookingController.js - SIMPLIFIED & FIXED
+
 import Booking from '../models/Booking.js';
 import Service from '../models/Service.js';
 import mongoose from 'mongoose';
@@ -13,8 +15,15 @@ const isValidObjectId = (id) =>
     mongoose.Types.ObjectId.isValid(id) &&
     /^[0-9a-fA-F]{24}$/.test(id);
 
+const VALID_TIME_SLOTS = [
+    '08:00-09:00', '09:00-10:00', '10:00-11:00',
+    '11:00-12:00', '12:00-13:00', '13:00-14:00',
+    '14:00-15:00', '15:00-16:00', '16:00-17:00',
+    '17:00-18:00'
+];
+
 // ============================================
-// STEP 2 - GET SERVICE WITH VEHICLE TYPE PRICING
+// GET SERVICE WITH VARIANT PRICING
 // ============================================
 
 export const getServiceWithPricing = async (req, res) => {
@@ -31,7 +40,9 @@ export const getServiceWithPricing = async (req, res) => {
         const service = await Service.findOne({
             _id: serviceId,
             isActive: true
-        }).select('name category vehicleTypes shortDescription');
+        })
+            .select('name category tier shortDescription variants images')
+            .populate('category', 'name slug icon');
 
         if (!service) {
             return res.status(404).json({
@@ -40,16 +51,16 @@ export const getServiceWithPricing = async (req, res) => {
             });
         }
 
-        const activeVehicleTypes = service.vehicleTypes
+        const activeVariants = service.variants
             .filter(v => v.isActive)
             .sort((a, b) => a.displayOrder - b.displayOrder)
             .map(v => ({
                 _id: v._id,
-                type: v.type,
-                label: v.label,
+                name: v.name,
                 description: v.description,
                 image: v.image,
                 price: v.price,
+                discountPrice: v.discountPrice,
                 duration: v.duration,
                 features: v.features
             }));
@@ -59,8 +70,11 @@ export const getServiceWithPricing = async (req, res) => {
             data: {
                 serviceId: service._id,
                 serviceName: service.name,
-                serviceCategory: service.category,
-                vehicleTypes: activeVehicleTypes
+                serviceTier: service.tier,
+                category: service.category,
+                shortDescription: service.shortDescription,
+                primaryImage: service.primaryImage,
+                variants: activeVariants
             }
         });
 
@@ -74,7 +88,7 @@ export const getServiceWithPricing = async (req, res) => {
 };
 
 // ============================================
-// STEP 3 - CHECK TIME SLOT AVAILABILITY
+// CHECK TIME SLOT AVAILABILITY
 // ============================================
 
 export const checkAvailability = async (req, res) => {
@@ -125,13 +139,6 @@ export const checkAvailability = async (req, res) => {
             });
         }
 
-        const allSlots = [
-            '08:00-09:00', '09:00-10:00', '10:00-11:00',
-            '11:00-12:00', '12:00-13:00', '13:00-14:00',
-            '14:00-15:00', '15:00-16:00', '16:00-17:00',
-            '17:00-18:00'
-        ];
-
         const startOfDay = new Date(bookingDate);
         startOfDay.setHours(0, 0, 0, 0);
 
@@ -146,18 +153,14 @@ export const checkAvailability = async (req, res) => {
 
         const bookedSlotNames = bookedSlots.map(b => b.timeSlot);
 
-        const slots = allSlots.map(slot => ({
+        const slots = VALID_TIME_SLOTS.map(slot => ({
             slot,
             available: !bookedSlotNames.includes(slot)
         }));
 
         res.status(200).json({
             success: true,
-            data: {
-                date,
-                isAvailable: true,
-                slots
-            }
+            data: { date, isAvailable: true, slots }
         });
 
     } catch (error) {
@@ -170,26 +173,25 @@ export const checkAvailability = async (req, res) => {
 };
 
 // ============================================
-// CREATE BOOKING - WITH SOCKET
+// CREATE BOOKING
 // ============================================
 
 export const createBooking = async (req, res) => {
     try {
         const {
             serviceId,
-            vehicleTypeId,
+            variantId,
             bookingDate,
             timeSlot,
             location,
-            vehicleDetails,
             specialNotes
         } = req.body;
 
-        if (!serviceId || !vehicleTypeId || !bookingDate ||
-            !timeSlot || !location || !vehicleDetails) {
+        // ---- Validate required fields ----
+        if (!serviceId || !variantId || !bookingDate || !timeSlot || !location) {
             return res.status(400).json({
                 success: false,
-                message: 'All fields required: serviceId, vehicleTypeId, bookingDate, timeSlot, location, vehicleDetails'
+                message: 'Required: serviceId, variantId, bookingDate, timeSlot, location'
             });
         }
 
@@ -207,27 +209,14 @@ export const createBooking = async (req, res) => {
             });
         }
 
-        if (!vehicleDetails.type) {
-            return res.status(400).json({
-                success: false,
-                message: 'Vehicle type is required in vehicle details'
-            });
-        }
-
-        const validTimeSlots = [
-            '08:00-09:00', '09:00-10:00', '10:00-11:00',
-            '11:00-12:00', '12:00-13:00', '13:00-14:00',
-            '14:00-15:00', '15:00-16:00', '16:00-17:00',
-            '17:00-18:00'
-        ];
-
-        if (!validTimeSlots.includes(timeSlot)) {
+        if (!VALID_TIME_SLOTS.includes(timeSlot)) {
             return res.status(400).json({
                 success: false,
                 message: 'Invalid time slot'
             });
         }
 
+        // ---- Validate date ----
         const requestedDate = new Date(bookingDate);
         if (isNaN(requestedDate.getTime())) {
             return res.status(400).json({
@@ -262,7 +251,7 @@ export const createBooking = async (req, res) => {
             });
         }
 
-        // Max active bookings check
+        // ---- Max active bookings ----
         const activeBookings = await Booking.countDocuments({
             customerId: req.user._id,
             status: { $in: ['pending', 'confirmed'] }
@@ -271,14 +260,15 @@ export const createBooking = async (req, res) => {
         if (activeBookings >= 3) {
             return res.status(400).json({
                 success: false,
-                message: 'You cannot have more than 3 active bookings at a time'
+                message: 'Maximum 3 active bookings allowed'
             });
         }
 
+        // ---- Find service & variant ----
         const service = await Service.findOne({
             _id: serviceId,
             isActive: true
-        });
+        }).populate('category', 'name slug');
 
         if (!service) {
             return res.status(404).json({
@@ -287,81 +277,87 @@ export const createBooking = async (req, res) => {
             });
         }
 
-        const selectedVehicleType = service.vehicleTypes.id(vehicleTypeId);
+        const selectedVariant = service.variants.id(variantId);
 
-        if (!selectedVehicleType) {
+        if (!selectedVariant) {
             return res.status(404).json({
                 success: false,
-                message: 'Vehicle type not found in this service'
+                message: 'Variant not found in this service'
             });
         }
 
-        if (!selectedVehicleType.isActive) {
+        if (!selectedVariant.isActive) {
             return res.status(400).json({
                 success: false,
-                message: 'This vehicle type is currently not available'
+                message: 'This variant is currently not available'
             });
         }
 
+        // ---- Check slot availability ----
         const startOfDay = new Date(requestedDate);
         startOfDay.setHours(0, 0, 0, 0);
 
         const endOfDay = new Date(requestedDate);
         endOfDay.setHours(23, 59, 59, 999);
 
-        const existingBooking = await Booking.findOne({
+        const slotTaken = await Booking.findOne({
             serviceId,
             bookingDate: { $gte: startOfDay, $lte: endOfDay },
             timeSlot,
             status: { $nin: ['cancelled'] }
         });
 
-        if (existingBooking) {
+        if (slotTaken) {
             return res.status(400).json({
                 success: false,
-                message: 'This time slot is already booked. Please choose another slot.'
+                message: 'This time slot is already booked'
             });
         }
 
+        // ---- Calculate price ----
+        const finalPrice = selectedVariant.discountPrice ?? selectedVariant.price;
+
+        // ---- Create booking ----
         const booking = await Booking.create({
+            bookingType: 'online',
             customerId: req.user._id,
+            categoryId: service.category._id,
+            categoryName: service.category.name,
             serviceId: service._id,
             serviceName: service.name,
-            serviceCategory: service.category,
-            vehicleTypeId: selectedVehicleType._id,
-            vehicleTypeName: selectedVehicleType.label,
-            vehicleType: selectedVehicleType.type,
-            price: selectedVehicleType.price,
-            duration: selectedVehicleType.duration,
+            serviceTier: service.tier,
+            variantId: selectedVariant._id,
+            variantName: selectedVariant.name,
+            price: finalPrice,
+            duration: selectedVariant.duration,
             bookingDate: requestedDate,
             timeSlot,
-            location,
-            vehicleDetails,
+            location: {
+                address: location.address,
+                city: location.city,
+                landmark: location.landmark || ''
+            },
             specialNotes: specialNotes || '',
             paymentMethod: 'cash'
         });
 
+        // Update service booking count
         await Service.findByIdAndUpdate(serviceId, {
             $inc: { totalBookings: 1 }
         });
 
-        const populatedBooking = await Booking.findById(booking._id)
-            .populate('customerId', 'firstName lastName email');
-
-        // ============================================
-        // 🔌 SOCKET EVENTS - New Booking
-        // ============================================
+        // ---- Socket events ----
         try {
             const io = getIO();
 
-            // Tell admin about new booking
             io.to('admin_room').emit(SOCKET_EVENTS.NEW_BOOKING, {
                 bookingId: booking._id,
                 bookingCode: booking.bookingCode,
                 bookingType: 'online',
                 customerName: `${req.user.firstName} ${req.user.lastName}`,
                 serviceName: booking.serviceName,
-                vehicleTypeName: booking.vehicleTypeName,
+                variantName: booking.variantName,
+                categoryName: booking.categoryName,
                 bookingDate: booking.bookingDate,
                 timeSlot: booking.timeSlot,
                 price: booking.price,
@@ -370,49 +366,60 @@ export const createBooking = async (req, res) => {
                 createdAt: booking.createdAt
             });
 
-            // Tell everyone that this slot is now booked
             io.emit(SOCKET_EVENTS.SLOT_BOOKED, {
                 serviceId: booking.serviceId,
                 bookingDate: booking.bookingDate,
                 timeSlot: booking.timeSlot
             });
-
-            console.log('🔌 Socket events emitted for new booking');
         } catch (socketError) {
             console.error('Socket emit error:', socketError.message);
         }
 
-        // Send emails
+        // ---- Send emails ----
+        const emailData = {
+            bookingCode: booking.bookingCode,
+            serviceName: booking.serviceName,
+            serviceCategory: booking.categoryName,
+            vehicleTypeName: booking.variantName,
+            price: booking.price,
+            duration: booking.duration,
+            bookingDate: booking.bookingDate,
+            timeSlot: booking.timeSlot,
+            location: booking.location,
+            vehicleDetails: { brand: '', model: '', color: '', plateNumber: '' },
+            specialNotes: booking.specialNotes
+        };
+
         try {
-            await sendBookingConfirmationEmail(req.user, populatedBooking);
-        } catch (emailError) {
-            console.error('Customer email failed:', emailError.message);
+            await sendBookingConfirmationEmail(req.user, emailData);
+        } catch (e) {
+            console.error('Customer email failed:', e.message);
         }
 
         try {
-            await sendAdminNewBookingEmail(populatedBooking, req.user);
-        } catch (emailError) {
-            console.error('Admin email failed:', emailError.message);
+            await sendAdminNewBookingEmail(emailData, req.user);
+        } catch (e) {
+            console.error('Admin email failed:', e.message);
         }
 
+        // ---- Response ----
         res.status(201).json({
             success: true,
             message: 'Booking created successfully!',
             data: {
-                bookingId: populatedBooking._id,
-                bookingCode: populatedBooking.bookingCode,
-                serviceName: populatedBooking.serviceName,
-                serviceCategory: populatedBooking.serviceCategory,
-                vehicleTypeName: populatedBooking.vehicleTypeName,
-                price: populatedBooking.price,
-                duration: populatedBooking.duration,
-                bookingDate: populatedBooking.bookingDate,
-                timeSlot: populatedBooking.timeSlot,
-                location: populatedBooking.location,
-                vehicleDetails: populatedBooking.vehicleDetails,
-                status: populatedBooking.status,
-                paymentMethod: populatedBooking.paymentMethod,
-                specialNotes: populatedBooking.specialNotes
+                bookingId: booking._id,
+                bookingCode: booking.bookingCode,
+                categoryName: booking.categoryName,
+                serviceName: booking.serviceName,
+                serviceTier: booking.serviceTier,
+                variantName: booking.variantName,
+                price: booking.price,
+                duration: booking.duration,
+                bookingDate: booking.bookingDate,
+                timeSlot: booking.timeSlot,
+                location: booking.location,
+                status: booking.status,
+                paymentMethod: booking.paymentMethod
             }
         });
 
@@ -422,14 +429,7 @@ export const createBooking = async (req, res) => {
         if (error.code === 11000) {
             return res.status(400).json({
                 success: false,
-                message: 'This time slot was just booked. Please choose another slot.'
-            });
-        }
-
-        if (error.name === 'CastError') {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid ID format'
+                message: 'This time slot was just booked'
             });
         }
 
@@ -462,10 +462,7 @@ export const getMyBookings = async (req, res) => {
         const query = { customerId: req.user._id };
 
         if (status) {
-            const validStatuses = [
-                'pending', 'confirmed',
-                'in-progress', 'completed', 'cancelled'
-            ];
+            const validStatuses = ['pending', 'confirmed', 'in-progress', 'completed', 'cancelled'];
             if (!validStatuses.includes(status)) {
                 return res.status(400).json({
                     success: false,
@@ -543,7 +540,7 @@ export const getBookingById = async (req, res) => {
 };
 
 // ============================================
-// CANCEL BOOKING - WITH SOCKET
+// CANCEL BOOKING
 // ============================================
 
 export const cancelBooking = async (req, res) => {
@@ -582,9 +579,7 @@ export const cancelBooking = async (req, res) => {
         const [startHour] = booking.timeSlot.split('-')[0].split(':');
         bookingDateTime.setHours(parseInt(startHour), 0, 0, 0);
 
-        const twoHoursBefore = new Date(
-            bookingDateTime.getTime() - 2 * 60 * 60 * 1000
-        );
+        const twoHoursBefore = new Date(bookingDateTime.getTime() - 2 * 60 * 60 * 1000);
 
         if (new Date() > twoHoursBefore) {
             return res.status(400).json({
@@ -599,39 +594,42 @@ export const cancelBooking = async (req, res) => {
         booking.cancelledAt = new Date();
         await booking.save();
 
-        // ============================================
-        // 🔌 SOCKET EVENTS - Booking Cancelled
-        // ============================================
+        // Socket events
         try {
             const io = getIO();
 
-            // Tell admin booking was cancelled
             io.to('admin_room').emit(SOCKET_EVENTS.BOOKING_CANCELLED, {
                 bookingId: booking._id,
                 bookingCode: booking.bookingCode,
                 serviceName: booking.serviceName,
+                variantName: booking.variantName,
                 timeSlot: booking.timeSlot,
                 bookingDate: booking.bookingDate,
                 cancelledBy: 'user',
                 reason: booking.cancellationReason
             });
 
-            // Tell everyone this slot is now available
             io.emit(SOCKET_EVENTS.SLOT_AVAILABLE, {
                 serviceId: booking.serviceId,
                 bookingDate: booking.bookingDate,
                 timeSlot: booking.timeSlot
             });
-
-            console.log('🔌 Socket events emitted for cancellation');
         } catch (socketError) {
             console.error('Socket emit error:', socketError.message);
         }
 
+        // Send cancellation email
         try {
-            await sendBookingCancellationEmail(req.user, booking);
-        } catch (emailError) {
-            console.error('Cancellation email failed:', emailError.message);
+            await sendBookingCancellationEmail(req.user, {
+                bookingCode: booking.bookingCode,
+                serviceName: booking.serviceName,
+                serviceId: booking.serviceId,
+                bookingDate: booking.bookingDate,
+                timeSlot: booking.timeSlot,
+                cancellationReason: booking.cancellationReason
+            });
+        } catch (e) {
+            console.error('Cancellation email failed:', e.message);
         }
 
         res.status(200).json({

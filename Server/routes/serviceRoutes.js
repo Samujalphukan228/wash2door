@@ -1,62 +1,59 @@
+// routes/serviceRoutes.js
+
 import express from 'express';
 import { protect, isAdmin } from '../middleware/auth.js';
 import {
     handleServiceImageUpload,
-    handleVehicleImageUpload
+    handleVariantImageUpload
 } from '../middleware/uploadMiddleware.js';
 
-// Import controller functions
 import {
     getAllServicesAdmin,
     getServiceById,
     createService,
     updateService,
     deleteService,
-    addVehicleType,
-    updateVehicleType,
-    deleteVehicleType,
-    setPrimaryImage
+    addVariant,
+    updateVariant,
+    deleteVariant,
+    setPrimaryImage,
+    toggleFeatured
 } from '../controllers/serviceController.js';
 
 const router = express.Router();
 
-// Debug middleware - log all requests to this router
+// Debug middleware
 router.use((req, res, next) => {
     console.log(`📍 Service Route: ${req.method} ${req.path}`);
     next();
 });
 
-// Health check (no auth)
+// Health check
 router.get('/health', (req, res) => {
     res.json({ success: true, message: 'Service routes OK' });
 });
 
 // ============================================
-// All routes below require admin auth
+// All routes require admin auth
 // ============================================
 router.use(protect, isAdmin);
 
-// GET all services
+// Service CRUD
 router.get('/', getAllServicesAdmin);
-
-// GET single service
 router.get('/:serviceId', getServiceById);
-
-// CREATE service
 router.post('/', handleServiceImageUpload, createService);
-
-// UPDATE service
 router.put('/:serviceId', handleServiceImageUpload, updateService);
-
-// DELETE service
 router.delete('/:serviceId', deleteService);
 
-// Set primary image
+// Image management
 router.put('/:serviceId/images/:imageId/primary', setPrimaryImage);
 
-// Vehicle type routes
-router.post('/:serviceId/vehicles', handleVehicleImageUpload, addVehicleType);
-router.put('/:serviceId/vehicles/:vehicleTypeId', handleVehicleImageUpload, updateVehicleType);
-router.delete('/:serviceId/vehicles/:vehicleTypeId', deleteVehicleType);
+// Featured toggle
+router.patch('/:serviceId/featured', toggleFeatured);
+
+// Variant routes (replaces vehicle type routes)
+router.post('/:serviceId/variants', handleVariantImageUpload, addVariant);
+router.put('/:serviceId/variants/:variantId', handleVariantImageUpload, updateVariant);
+router.delete('/:serviceId/variants/:variantId', deleteVariant);
 
 export default router;

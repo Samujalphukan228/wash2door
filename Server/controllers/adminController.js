@@ -1,4 +1,4 @@
-// controllers/adminController.js - COMPLETE FILE
+// controllers/adminController.js - COMPLETE FIXED FILE
 
 import User from '../models/User.js';
 import Service from '../models/Service.js';
@@ -13,6 +13,13 @@ const isValidObjectId = (id) =>
     mongoose.Types.ObjectId.isValid(id) &&
     /^[0-9a-fA-F]{24}$/.test(id);
 
+const VALID_TIME_SLOTS = [
+    '08:00-09:00', '09:00-10:00', '10:00-11:00',
+    '11:00-12:00', '12:00-13:00', '13:00-14:00',
+    '14:00-15:00', '15:00-16:00', '16:00-17:00',
+    '17:00-18:00'
+];
+
 // ============================================
 // DASHBOARD STATS
 // ============================================
@@ -24,11 +31,7 @@ export const getDashboardStats = async (req, res) => {
         const todayEnd = new Date();
         todayEnd.setHours(23, 59, 59, 999);
 
-        const thisMonthStart = new Date(
-            today.getFullYear(),
-            today.getMonth(),
-            1
-        );
+        const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
 
         const [
             totalUsers,
@@ -43,24 +46,17 @@ export const getDashboardStats = async (req, res) => {
             cancelledBookings,
             bookingsThisMonth
         ] = await Promise.all([
-            User.countDocuments({
-                role: 'user',
-                registrationStatus: 'completed'
-            }),
+            User.countDocuments({ role: 'user', registrationStatus: 'completed' }),
             User.countDocuments({ role: 'admin' }),
             Booking.countDocuments(),
             Service.countDocuments({ isActive: true }),
-            Booking.countDocuments({
-                createdAt: { $gte: today, $lte: todayEnd }
-            }),
+            Booking.countDocuments({ createdAt: { $gte: today, $lte: todayEnd } }),
             Booking.countDocuments({ status: 'pending' }),
             Booking.countDocuments({ status: 'confirmed' }),
             Booking.countDocuments({ status: 'in-progress' }),
             Booking.countDocuments({ status: 'completed' }),
             Booking.countDocuments({ status: 'cancelled' }),
-            Booking.countDocuments({
-                createdAt: { $gte: thisMonthStart }
-            })
+            Booking.countDocuments({ createdAt: { $gte: thisMonthStart } })
         ]);
 
         const revenueThisMonth = await Booking.aggregate([
@@ -70,22 +66,12 @@ export const getDashboardStats = async (req, res) => {
                     completedAt: { $gte: thisMonthStart }
                 }
             },
-            {
-                $group: {
-                    _id: null,
-                    total: { $sum: '$price' }
-                }
-            }
+            { $group: { _id: null, total: { $sum: '$price' } } }
         ]);
 
         const totalRevenue = await Booking.aggregate([
             { $match: { status: 'completed' } },
-            {
-                $group: {
-                    _id: null,
-                    total: { $sum: '$price' }
-                }
-            }
+            { $group: { _id: null, total: { $sum: '$price' } } }
         ]);
 
         const recentBookings = await Booking.find()
@@ -111,7 +97,7 @@ export const getDashboardStats = async (req, res) => {
             { $match: { status: { $ne: 'cancelled' } } },
             {
                 $group: {
-                    _id: '$serviceCategory',
+                    _id: '$categoryName',
                     count: { $sum: 1 },
                     revenue: { $sum: '$price' }
                 }
@@ -122,13 +108,8 @@ export const getDashboardStats = async (req, res) => {
         res.status(200).json({
             success: true,
             data: {
-                users: {
-                    total: totalUsers,
-                    admins: totalAdmins
-                },
-                services: {
-                    total: totalServices
-                },
+                users: { total: totalUsers, admins: totalAdmins },
+                services: { total: totalServices },
                 bookings: {
                     total: totalBookings,
                     today: bookingsToday,
@@ -167,20 +148,12 @@ export const getDashboardStats = async (req, res) => {
 
 export const getAllUsers = async (req, res) => {
     try {
-        const {
-            page = 1,
-            limit = 10,
-            search,
-            isBlocked
-        } = req.query;
+        const { page = 1, limit = 10, search, isBlocked } = req.query;
 
         const pageNum = parseInt(page);
         const limitNum = parseInt(limit);
 
-        const query = {
-            role: 'user',
-            registrationStatus: 'completed'
-        };
+        const query = { role: 'user', registrationStatus: 'completed' };
 
         if (search) {
             query.$or = [
@@ -251,21 +224,10 @@ export const getUserById = async (req, res) => {
             .sort({ createdAt: -1 })
             .limit(10);
 
-        const [
-            totalBookings,
-            completedBookings,
-            cancelledBookings,
-            totalSpent
-        ] = await Promise.all([
+        const [totalBookings, completedBookings, cancelledBookings, totalSpent] = await Promise.all([
             Booking.countDocuments({ customerId: userId }),
-            Booking.countDocuments({
-                customerId: userId,
-                status: 'completed'
-            }),
-            Booking.countDocuments({
-                customerId: userId,
-                status: 'cancelled'
-            }),
+            Booking.countDocuments({ customerId: userId, status: 'completed' }),
+            Booking.countDocuments({ customerId: userId, status: 'cancelled' }),
             Booking.aggregate([
                 {
                     $match: {
@@ -273,12 +235,7 @@ export const getUserById = async (req, res) => {
                         status: 'completed'
                     }
                 },
-                {
-                    $group: {
-                        _id: null,
-                        total: { $sum: '$price' }
-                    }
-                }
+                { $group: { _id: null, total: { $sum: '$price' } } }
             ])
         ]);
 
@@ -503,12 +460,7 @@ export const changeUserRole = async (req, res) => {
 
 export const getAllServices = async (req, res) => {
     try {
-        const {
-            page = 1,
-            limit = 10,
-            category,
-            isActive
-        } = req.query;
+        const { page = 1, limit = 10, category, isActive } = req.query;
 
         const pageNum = parseInt(page);
         const limitNum = parseInt(limit);
@@ -520,6 +472,7 @@ export const getAllServices = async (req, res) => {
         const total = await Service.countDocuments(query);
 
         const services = await Service.find(query)
+            .populate('category', 'name slug')
             .sort({ displayOrder: 1, createdAt: -1 })
             .limit(limitNum)
             .skip((pageNum - 1) * limitNum);
@@ -548,26 +501,19 @@ export const getAllServices = async (req, res) => {
 
 export const createService = async (req, res) => {
     try {
-        const {
-            name,
-            description,
-            price,
-            duration,
-            category
-        } = req.body;
+        const { name, description, category, tier, variants } = req.body;
 
-        if (!name || !description || !price || !duration || !category) {
+        if (!name || !description || !category) {
             return res.status(400).json({
                 success: false,
-                message: 'Name, description, price, duration and category are required'
+                message: 'Name, description and category are required'
             });
         }
 
-        const validCategories = ['basic', 'standard', 'premium'];
-        if (!validCategories.includes(category)) {
+        if (!variants || !Array.isArray(variants) || variants.length === 0) {
             return res.status(400).json({
                 success: false,
-                message: `Invalid category. Must be: ${validCategories.join(', ')}`
+                message: 'At least one variant is required'
             });
         }
 
@@ -707,7 +653,7 @@ export const getAllBookings = async (req, res) => {
             date,
             city,
             search,
-            serviceCategory,
+            categoryName,
             startDate,
             endDate,
             bookingType
@@ -719,29 +665,22 @@ export const getAllBookings = async (req, res) => {
         const query = {};
 
         if (status) {
-            const validStatuses = [
-                'pending', 'confirmed',
-                'in-progress', 'completed', 'cancelled'
-            ];
+            const validStatuses = ['pending', 'confirmed', 'in-progress', 'completed', 'cancelled'];
             if (validStatuses.includes(status)) {
                 query.status = status;
             }
         }
 
-        if (serviceCategory) {
-            query.serviceCategory = serviceCategory;
+        if (categoryName) {
+            query.categoryName = { $regex: categoryName, $options: 'i' };
         }
 
-        // ✅ Filter by booking type (walkin or online)
         if (bookingType) {
             query.bookingType = bookingType;
         }
 
         if (city) {
-            query['location.city'] = {
-                $regex: city,
-                $options: 'i'
-            };
+            query['location.city'] = { $regex: city, $options: 'i' };
         }
 
         if (date) {
@@ -750,50 +689,21 @@ export const getAllBookings = async (req, res) => {
             startOfDay.setHours(0, 0, 0, 0);
             const endOfDay = new Date(bookingDate);
             endOfDay.setHours(23, 59, 59, 999);
-            query.bookingDate = {
-                $gte: startOfDay,
-                $lte: endOfDay
-            };
+            query.bookingDate = { $gte: startOfDay, $lte: endOfDay };
         }
 
         if (startDate || endDate) {
             query.createdAt = {};
-            if (startDate) {
-                query.createdAt.$gte = new Date(startDate);
-            }
-            if (endDate) {
-                query.createdAt.$lte = new Date(endDate);
-            }
+            if (startDate) query.createdAt.$gte = new Date(startDate);
+            if (endDate) query.createdAt.$lte = new Date(endDate);
         }
 
         if (search) {
             query.$or = [
-                {
-                    bookingCode: {
-                        $regex: search,
-                        $options: 'i'
-                    }
-                },
-                {
-                    serviceName: {
-                        $regex: search,
-                        $options: 'i'
-                    }
-                },
-                // ✅ Search by walk-in customer name
-                {
-                    'walkInCustomer.name': {
-                        $regex: search,
-                        $options: 'i'
-                    }
-                },
-                // ✅ Search by walk-in customer phone
-                {
-                    'walkInCustomer.phone': {
-                        $regex: search,
-                        $options: 'i'
-                    }
-                }
+                { bookingCode: { $regex: search, $options: 'i' } },
+                { serviceName: { $regex: search, $options: 'i' } },
+                { 'walkInCustomer.name': { $regex: search, $options: 'i' } },
+                { 'walkInCustomer.phone': { $regex: search, $options: 'i' } }
             ];
         }
 
@@ -825,7 +735,7 @@ export const getAllBookings = async (req, res) => {
 };
 
 // ============================================
-// UPDATE BOOKING STATUS - WITH SOCKET ✅
+// UPDATE BOOKING STATUS
 // ============================================
 
 export const updateBookingStatus = async (req, res) => {
@@ -840,10 +750,7 @@ export const updateBookingStatus = async (req, res) => {
             });
         }
 
-        const validStatuses = [
-            'pending', 'confirmed',
-            'in-progress', 'completed', 'cancelled'
-        ];
+        const validStatuses = ['pending', 'confirmed', 'in-progress', 'completed', 'cancelled'];
 
         if (!validStatuses.includes(status)) {
             return res.status(400).json({
@@ -878,9 +785,7 @@ export const updateBookingStatus = async (req, res) => {
             });
         }
 
-        // ============================================
-        // 🔌 SOCKET - Status Updated
-        // ============================================
+        // Socket events
         try {
             const io = getIO();
 
@@ -889,13 +794,12 @@ export const updateBookingStatus = async (req, res) => {
                 bookingCode: booking.bookingCode,
                 status: booking.status,
                 serviceName: booking.serviceName,
-                vehicleTypeName: booking.vehicleTypeName,
+                variantName: booking.variantName,
                 bookingDate: booking.bookingDate,
                 timeSlot: booking.timeSlot,
                 updatedAt: new Date()
             };
 
-            // Notify the specific customer
             if (booking.customerId) {
                 io.to(`user_${booking.customerId._id}`).emit(
                     SOCKET_EVENTS.BOOKING_STATUS_UPDATED,
@@ -903,13 +807,8 @@ export const updateBookingStatus = async (req, res) => {
                 );
             }
 
-            // Notify all admins
-            io.to('admin_room').emit(
-                SOCKET_EVENTS.BOOKING_STATUS_UPDATED,
-                socketPayload
-            );
+            io.to('admin_room').emit(SOCKET_EVENTS.BOOKING_STATUS_UPDATED, socketPayload);
 
-            // If cancelled free up the slot
             if (status === 'cancelled') {
                 io.emit(SOCKET_EVENTS.SLOT_AVAILABLE, {
                     serviceId: booking.serviceId,
@@ -917,8 +816,6 @@ export const updateBookingStatus = async (req, res) => {
                     timeSlot: booking.timeSlot
                 });
             }
-
-            console.log(`🔌 Socket emitted: status → ${status}`);
         } catch (socketError) {
             console.error('Socket emit error:', socketError.message);
         }
@@ -926,10 +823,7 @@ export const updateBookingStatus = async (req, res) => {
         // Send email
         try {
             if (booking.customerId?.email) {
-                await sendBookingStatusEmail(
-                    booking.customerId,
-                    booking
-                );
+                await sendBookingStatusEmail(booking.customerId, booking);
             }
         } catch (emailError) {
             console.error('Status email failed:', emailError.message);
@@ -952,7 +846,7 @@ export const updateBookingStatus = async (req, res) => {
 };
 
 // ============================================
-// CREATE ADMIN BOOKING - WITH SOCKET ✅
+// CREATE ADMIN BOOKING
 // ============================================
 
 export const createAdminBooking = async (req, res) => {
@@ -962,19 +856,17 @@ export const createAdminBooking = async (req, res) => {
             customerId,
             walkInCustomer,
             serviceId,
-            vehicleTypeId,
+            variantId,
             bookingDate,
             timeSlot,
             specialNotes,
             paymentMethod,
             paymentStatus,
-            location,
-            vehicleDetails
+            location
         } = req.body;
 
         // Validate booking type
-        const validBookingTypes = ['walkin', 'online'];
-        if (!bookingType || !validBookingTypes.includes(bookingType)) {
+        if (!bookingType || !['walkin', 'online'].includes(bookingType)) {
             return res.status(400).json({
                 success: false,
                 message: 'bookingType must be "walkin" or "online"'
@@ -983,7 +875,7 @@ export const createAdminBooking = async (req, res) => {
 
         // Validate customer
         if (bookingType === 'walkin') {
-            if (!walkInCustomer || !walkInCustomer.name) {
+            if (!walkInCustomer?.name) {
                 return res.status(400).json({
                     success: false,
                     message: 'Walk-in customer name is required'
@@ -992,17 +884,10 @@ export const createAdminBooking = async (req, res) => {
         }
 
         if (bookingType === 'online') {
-            if (!customerId) {
+            if (!customerId || !isValidObjectId(customerId)) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Customer ID is required for online booking type'
-                });
-            }
-
-            if (!isValidObjectId(customerId)) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Invalid customer ID'
+                    message: 'Valid customer ID is required for online booking'
                 });
             }
 
@@ -1026,7 +911,7 @@ export const createAdminBooking = async (req, res) => {
         const service = await Service.findOne({
             _id: serviceId,
             isActive: true
-        });
+        }).populate('category', 'name slug');
 
         if (!service) {
             return res.status(404).json({
@@ -1035,35 +920,27 @@ export const createAdminBooking = async (req, res) => {
             });
         }
 
-        // Validate vehicle type
-        if (!vehicleTypeId) {
+        // Validate variant
+        if (!variantId) {
             return res.status(400).json({
                 success: false,
-                message: 'Vehicle type ID is required'
+                message: 'Variant ID is required'
             });
         }
 
-        const selectedVehicleType = service.vehicleTypes.id(vehicleTypeId);
+        const selectedVariant = service.variants.id(variantId);
 
-        if (!selectedVehicleType) {
+        if (!selectedVariant) {
             return res.status(404).json({
                 success: false,
-                message: 'Vehicle type not found in this service'
+                message: 'Variant not found in this service'
             });
         }
 
-        if (!selectedVehicleType.isActive) {
+        if (!selectedVariant.isActive) {
             return res.status(400).json({
                 success: false,
-                message: 'This vehicle type is currently not available'
-            });
-        }
-
-        // Validate vehicle details
-        if (!vehicleDetails || !vehicleDetails.type) {
-            return res.status(400).json({
-                success: false,
-                message: 'Vehicle details with type are required'
+                message: 'This variant is currently not available'
             });
         }
 
@@ -1079,7 +956,7 @@ export const createAdminBooking = async (req, res) => {
         if (isNaN(requestedDate.getTime())) {
             return res.status(400).json({
                 success: false,
-                message: 'Invalid date format. Use YYYY-MM-DD'
+                message: 'Invalid date format'
             });
         }
 
@@ -1090,14 +967,7 @@ export const createAdminBooking = async (req, res) => {
             });
         }
 
-        const validTimeSlots = [
-            '08:00-09:00', '09:00-10:00', '10:00-11:00',
-            '11:00-12:00', '12:00-13:00', '13:00-14:00',
-            '14:00-15:00', '15:00-16:00', '16:00-17:00',
-            '17:00-18:00'
-        ];
-
-        if (!validTimeSlots.includes(timeSlot)) {
+        if (!VALID_TIME_SLOTS.includes(timeSlot)) {
             return res.status(400).json({
                 success: false,
                 message: 'Invalid time slot'
@@ -1111,54 +981,49 @@ export const createAdminBooking = async (req, res) => {
         const endOfDay = new Date(requestedDate);
         endOfDay.setHours(23, 59, 59, 999);
 
-        const existingBooking = await Booking.findOne({
+        const slotTaken = await Booking.findOne({
             serviceId,
             bookingDate: { $gte: startOfDay, $lte: endOfDay },
             timeSlot,
             status: { $nin: ['cancelled'] }
         });
 
-        if (existingBooking) {
+        if (slotTaken) {
             return res.status(400).json({
                 success: false,
-                message: `Time slot ${timeSlot} is already booked. Please choose another slot.`
+                message: `Time slot ${timeSlot} is already booked`
             });
         }
 
+        // Calculate price
+        const finalPrice = selectedVariant.discountPrice ?? selectedVariant.price;
+
         // Set location
-        const bookingLocation = location || {
-            address: 'Walk-in / At Shop',
-            city: 'Walk-in',
-            state: '',
-            zipCode: '',
-            landmark: ''
+        const bookingLocation = {
+            address: location?.address || 'Walk-in / At Shop',
+            city: location?.city || 'Walk-in',
+            landmark: location?.landmark || ''
         };
 
         // Create booking
         const booking = await Booking.create({
             bookingType,
             customerId: bookingType === 'online' ? customerId : null,
-            walkInCustomer: bookingType === 'walkin' ? {
-                name: walkInCustomer.name,
-                phone: walkInCustomer.phone || '',
-                email: walkInCustomer.email || ''
-            } : {
-                name: '',
-                phone: '',
-                email: ''
-            },
+            walkInCustomer: bookingType === 'walkin'
+                ? { name: walkInCustomer.name, phone: walkInCustomer.phone || '' }
+                : { name: '', phone: '' },
+            categoryId: service.category._id,
+            categoryName: service.category.name,
             serviceId: service._id,
             serviceName: service.name,
-            serviceCategory: service.category,
-            vehicleTypeId: selectedVehicleType._id,
-            vehicleTypeName: selectedVehicleType.label,
-            vehicleType: selectedVehicleType.type,
-            price: selectedVehicleType.price,
-            duration: selectedVehicleType.duration,
+            serviceTier: service.tier,
+            variantId: selectedVariant._id,
+            variantName: selectedVariant.name,
+            price: finalPrice,
+            duration: selectedVariant.duration,
             bookingDate: requestedDate,
             timeSlot,
             location: bookingLocation,
-            vehicleDetails,
             specialNotes: specialNotes || '',
             paymentMethod: paymentMethod || 'cash',
             paymentStatus: paymentStatus || 'pending',
@@ -1166,29 +1031,25 @@ export const createAdminBooking = async (req, res) => {
             status: 'confirmed'
         });
 
-        // Update service total bookings
         await Service.findByIdAndUpdate(serviceId, {
             $inc: { totalBookings: 1 }
         });
 
-        // ============================================
-        // 🔌 SOCKET - Admin Created Booking
-        // ============================================
+        // Socket events
         try {
             const io = getIO();
-
             const customerName = bookingType === 'walkin'
                 ? walkInCustomer.name
                 : `Customer ${customerId}`;
 
-            // Notify all admins
             io.to('admin_room').emit(SOCKET_EVENTS.NEW_BOOKING, {
                 bookingId: booking._id,
                 bookingCode: booking.bookingCode,
                 bookingType: booking.bookingType,
                 customerName,
                 serviceName: booking.serviceName,
-                vehicleTypeName: booking.vehicleTypeName,
+                variantName: booking.variantName,
+                categoryName: booking.categoryName,
                 bookingDate: booking.bookingDate,
                 timeSlot: booking.timeSlot,
                 price: booking.price,
@@ -1196,14 +1057,12 @@ export const createAdminBooking = async (req, res) => {
                 createdAt: booking.createdAt
             });
 
-            // Tell everyone slot is now booked
             io.emit(SOCKET_EVENTS.SLOT_BOOKED, {
                 serviceId: booking.serviceId,
                 bookingDate: booking.bookingDate,
                 timeSlot: booking.timeSlot
             });
 
-            // If online booking notify the customer
             if (bookingType === 'online' && customerId) {
                 io.to(`user_${customerId}`).emit(
                     SOCKET_EVENTS.BOOKING_STATUS_UPDATED,
@@ -1217,17 +1076,13 @@ export const createAdminBooking = async (req, res) => {
                     }
                 );
             }
-
-            console.log('🔌 Socket emitted for admin booking');
         } catch (socketError) {
             console.error('Socket emit error:', socketError.message);
         }
 
         res.status(201).json({
             success: true,
-            message: `${bookingType === 'walkin'
-                ? 'Walk-in'
-                : 'Online'} booking created successfully!`,
+            message: `${bookingType === 'walkin' ? 'Walk-in' : 'Online'} booking created!`,
             data: {
                 bookingId: booking._id,
                 bookingCode: booking.bookingCode,
@@ -1235,19 +1090,17 @@ export const createAdminBooking = async (req, res) => {
                 customer: bookingType === 'walkin'
                     ? booking.walkInCustomer
                     : { customerId },
+                categoryName: booking.categoryName,
                 serviceName: booking.serviceName,
-                serviceCategory: booking.serviceCategory,
-                vehicleTypeName: booking.vehicleTypeName,
+                variantName: booking.variantName,
                 price: booking.price,
                 duration: booking.duration,
                 bookingDate: booking.bookingDate,
                 timeSlot: booking.timeSlot,
                 location: booking.location,
-                vehicleDetails: booking.vehicleDetails,
                 status: booking.status,
                 paymentMethod: booking.paymentMethod,
-                paymentStatus: booking.paymentStatus,
-                specialNotes: booking.specialNotes
+                paymentStatus: booking.paymentStatus
             }
         });
 
@@ -1257,7 +1110,7 @@ export const createAdminBooking = async (req, res) => {
         if (error.code === 11000) {
             return res.status(400).json({
                 success: false,
-                message: 'This time slot was just booked. Please choose another slot.'
+                message: 'This time slot was just booked'
             });
         }
 
@@ -1281,28 +1134,17 @@ export const getRevenueReport = async (req, res) => {
 
         if (startDate || endDate) {
             matchCondition.completedAt = {};
-            if (startDate) {
-                matchCondition.completedAt.$gte = new Date(startDate);
-            }
-            if (endDate) {
-                matchCondition.completedAt.$lte = new Date(endDate);
-            }
+            if (startDate) matchCondition.completedAt.$gte = new Date(startDate);
+            if (endDate) matchCondition.completedAt.$lte = new Date(endDate);
         }
 
-        const dateFormat = groupBy === 'month'
-            ? '%Y-%m'
-            : '%Y-%m-%d';
+        const dateFormat = groupBy === 'month' ? '%Y-%m' : '%Y-%m-%d';
 
         const revenueData = await Booking.aggregate([
             { $match: matchCondition },
             {
                 $group: {
-                    _id: {
-                        $dateToString: {
-                            format: dateFormat,
-                            date: '$completedAt'
-                        }
-                    },
+                    _id: { $dateToString: { format: dateFormat, date: '$completedAt' } },
                     revenue: { $sum: '$price' },
                     bookings: { $sum: 1 }
                 }
@@ -1314,7 +1156,7 @@ export const getRevenueReport = async (req, res) => {
             { $match: matchCondition },
             {
                 $group: {
-                    _id: '$serviceCategory',
+                    _id: '$categoryName',
                     revenue: { $sum: '$price' },
                     bookings: { $sum: 1 }
                 }
@@ -1322,12 +1164,11 @@ export const getRevenueReport = async (req, res) => {
             { $sort: { revenue: -1 } }
         ]);
 
-        const revenueByVehicle = await Booking.aggregate([
+        const revenueByVariant = await Booking.aggregate([
             { $match: matchCondition },
             {
                 $group: {
-                    _id: '$vehicleType',
-                    vehicleTypeName: { $first: '$vehicleTypeName' },
+                    _id: '$variantName',
                     revenue: { $sum: '$price' },
                     bookings: { $sum: 1 }
                 }
@@ -1348,13 +1189,8 @@ export const getRevenueReport = async (req, res) => {
             { $limit: 10 }
         ]);
 
-        const totalRevenue = revenueData.reduce(
-            (sum, day) => sum + day.revenue, 0
-        );
-
-        const totalBookings = revenueData.reduce(
-            (sum, day) => sum + day.bookings, 0
-        );
+        const totalRevenue = revenueData.reduce((sum, day) => sum + day.revenue, 0);
+        const totalBookings = revenueData.reduce((sum, day) => sum + day.bookings, 0);
 
         res.status(200).json({
             success: true,
@@ -1366,7 +1202,7 @@ export const getRevenueReport = async (req, res) => {
                     : 0,
                 revenueData,
                 revenueByCategory,
-                revenueByVehicle,
+                revenueByVariant,
                 revenueByCity
             }
         });
@@ -1387,23 +1223,14 @@ export const getRevenueReport = async (req, res) => {
 
 export const getAllReviews = async (req, res) => {
     try {
-        const {
-            page = 1,
-            limit = 10,
-            isVisible,
-            serviceId
-        } = req.query;
+        const { page = 1, limit = 10, isVisible, serviceId } = req.query;
 
         const pageNum = parseInt(page);
         const limitNum = parseInt(limit);
 
         const query = {};
-        if (isVisible !== undefined) {
-            query.isVisible = isVisible === 'true';
-        }
-        if (serviceId && isValidObjectId(serviceId)) {
-            query.serviceId = serviceId;
-        }
+        if (isVisible !== undefined) query.isVisible = isVisible === 'true';
+        if (serviceId && isValidObjectId(serviceId)) query.serviceId = serviceId;
 
         const total = await Review.countDocuments(query);
 
@@ -1462,9 +1289,7 @@ export const toggleReviewVisibility = async (req, res) => {
 
         res.status(200).json({
             success: true,
-            message: `Review ${review.isVisible
-                ? 'shown'
-                : 'hidden'} successfully`,
+            message: `Review ${review.isVisible ? 'shown' : 'hidden'} successfully`,
             data: review
         });
 
@@ -1490,30 +1315,20 @@ export const getBookingReport = async (req, res) => {
 
         if (startDate || endDate) {
             matchCondition.createdAt = {};
-            if (startDate) {
-                matchCondition.createdAt.$gte = new Date(startDate);
-            }
-            if (endDate) {
-                matchCondition.createdAt.$lte = new Date(endDate);
-            }
+            if (startDate) matchCondition.createdAt.$gte = new Date(startDate);
+            if (endDate) matchCondition.createdAt.$lte = new Date(endDate);
         }
 
         const byStatus = await Booking.aggregate([
             { $match: matchCondition },
-            {
-                $group: {
-                    _id: '$status',
-                    count: { $sum: 1 }
-                }
-            }
+            { $group: { _id: '$status', count: { $sum: 1 } } }
         ]);
 
-        const byVehicleType = await Booking.aggregate([
+        const byVariant = await Booking.aggregate([
             { $match: matchCondition },
             {
                 $group: {
-                    _id: '$vehicleType',
-                    vehicleTypeName: { $first: '$vehicleTypeName' },
+                    _id: '$variantName',
                     count: { $sum: 1 },
                     revenue: { $sum: '$price' }
                 }
@@ -1536,28 +1351,17 @@ export const getBookingReport = async (req, res) => {
 
         const byTimeSlot = await Booking.aggregate([
             { $match: matchCondition },
-            {
-                $group: {
-                    _id: '$timeSlot',
-                    count: { $sum: 1 }
-                }
-            },
+            { $group: { _id: '$timeSlot', count: { $sum: 1 } } },
             { $sort: { count: -1 } }
         ]);
 
         const byCity = await Booking.aggregate([
             { $match: matchCondition },
-            {
-                $group: {
-                    _id: '$location.city',
-                    count: { $sum: 1 }
-                }
-            },
+            { $group: { _id: '$location.city', count: { $sum: 1 } } },
             { $sort: { count: -1 } },
             { $limit: 10 }
         ]);
 
-        // ✅ NEW: By booking type (walkin vs online)
         const byBookingType = await Booking.aggregate([
             { $match: matchCondition },
             {
@@ -1573,7 +1377,7 @@ export const getBookingReport = async (req, res) => {
             success: true,
             data: {
                 byStatus,
-                byVehicleType,
+                byVariant,
                 byService,
                 byTimeSlot,
                 byCity,

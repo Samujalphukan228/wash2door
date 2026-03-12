@@ -3,72 +3,96 @@
 import { format } from 'date-fns';
 import { Eye, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 
-const statusStyles = {
-    pending:      { dot: 'bg-neutral-500', text: 'text-neutral-400' },
-    confirmed:    { dot: 'bg-white',       text: 'text-white'       },
-    'in-progress':{ dot: 'bg-white',       text: 'text-white'       },
-    completed:    { dot: 'bg-white',       text: 'text-white'       },
-    cancelled:    { dot: 'bg-neutral-700', text: 'text-neutral-600' }
+const statusConfig = {
+    pending:       { dot: 'bg-yellow-400', text: 'text-yellow-400',  bg: 'bg-yellow-500/10',  ring: 'ring-yellow-500/20'  },
+    confirmed:     { dot: 'bg-blue-400',   text: 'text-blue-400',    bg: 'bg-blue-500/10',    ring: 'ring-blue-500/20'    },
+    'in-progress': { dot: 'bg-purple-400', text: 'text-purple-400',  bg: 'bg-purple-500/10',  ring: 'ring-purple-500/20'  },
+    completed:     { dot: 'bg-green-400',  text: 'text-green-400',   bg: 'bg-green-500/10',   ring: 'ring-green-500/20'   },
+    cancelled:     { dot: 'bg-red-400',    text: 'text-red-400',     bg: 'bg-red-500/10',     ring: 'ring-red-500/20'     }
 };
 
-const categoryBadge = {
-    basic:    'text-neutral-400 border-neutral-700',
-    standard: 'text-neutral-300 border-neutral-600',
-    premium:  'text-white border-neutral-400'
+const tierConfig = {
+    basic:    { text: 'text-white/30', bg: 'bg-white/[0.03]', ring: 'ring-white/[0.06]' },
+    standard: { text: 'text-white/50', bg: 'bg-white/[0.04]', ring: 'ring-white/[0.08]' },
+    premium:  { text: 'text-white/80', bg: 'bg-white/[0.06]', ring: 'ring-white/10'     },
+    custom:   { text: 'text-blue-400', bg: 'bg-blue-500/10',  ring: 'ring-blue-500/20'  }
 };
 
+const HEADERS = [
+    { key: 'code',     label: 'Code'     },
+    { key: 'customer', label: 'Customer' },
+    { key: 'service',  label: 'Service'  },
+    { key: 'schedule', label: 'Schedule' },
+    { key: 'status',   label: 'Status'   },
+    { key: 'type',     label: 'Type'     },
+    { key: 'amount',   label: 'Amount'   },
+    { key: 'actions',  label: ''         }
+];
+
+/* ── Skeleton ── */
+function TableSkeleton() {
+    return (
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-white/[0.05] flex items-center justify-between">
+                <div className="h-3 w-28 rounded-md bg-white/[0.06] animate-pulse" />
+                <div className="h-3 w-16 rounded-md bg-white/[0.04] animate-pulse" />
+            </div>
+            <div className="divide-y divide-white/[0.03]">
+                {[...Array(7)].map((_, i) => (
+                    <div key={i} className="flex items-center gap-6 px-5 py-4">
+                        <div className="h-3 w-24 rounded bg-white/[0.05] animate-pulse" />
+                        <div className="h-3 w-32 rounded bg-white/[0.05] animate-pulse" />
+                        <div className="h-3 w-28 rounded bg-white/[0.04] animate-pulse" />
+                        <div className="h-3 w-20 rounded bg-white/[0.04] animate-pulse" />
+                        <div className="h-3 w-16 rounded bg-white/[0.03] animate-pulse ml-auto" />
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+/* ── Empty ── */
+function TableEmpty() {
+    return (
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] py-24 text-center">
+            <div className="w-10 h-10 rounded-full bg-white/[0.04] border border-white/[0.06] flex items-center justify-center mx-auto mb-3">
+                <Eye className="w-4 h-4 text-white/20" />
+            </div>
+            <p className="text-sm text-white/30 font-medium">No bookings found</p>
+            <p className="text-xs text-white/15 mt-1">Try adjusting your filters</p>
+        </div>
+    );
+}
+
+/* ── Main ── */
 export default function BookingsTable({
-    bookings,
-    loading,
-    total,
-    pages,
-    currentPage,
-    onPageChange,
-    onView,
-    onUpdateStatus
+    bookings, loading, total, pages,
+    currentPage, onPageChange, onView, onUpdateStatus
 }) {
-    if (loading) {
-        return (
-            <div className="bg-neutral-950 border border-neutral-800">
-                <div className="p-6 space-y-4">
-                    {[...Array(8)].map((_, i) => (
-                        <div key={i} className="flex items-center gap-4">
-                            <div className="h-4 w-28 bg-neutral-800 animate-pulse rounded" />
-                            <div className="h-4 w-36 bg-neutral-800 animate-pulse rounded" />
-                            <div className="h-4 w-24 bg-neutral-800 animate-pulse rounded" />
-                            <div className="h-4 w-20 bg-neutral-800 animate-pulse rounded ml-auto" />
-                        </div>
-                    ))}
-                </div>
-            </div>
-        );
-    }
+    if (loading) return <TableSkeleton />;
+    if (!bookings || bookings.length === 0) return <TableEmpty />;
 
-    if (!bookings || bookings.length === 0) {
-        return (
-            <div className="bg-neutral-950 border border-neutral-800">
-                <div className="px-6 py-16 text-center">
-                    <p className="text-neutral-500 text-sm">
-                        No bookings found
-                    </p>
-                    <p className="text-neutral-700 text-xs mt-1">
-                        Try adjusting your filters
-                    </p>
-                </div>
-            </div>
-        );
-    }
+    const getPages = () => {
+        if (pages <= 5) return Array.from({ length: pages }, (_, i) => i + 1);
+        if (currentPage <= 3) return [1, 2, 3, 4, 5];
+        if (currentPage >= pages - 2) return [pages - 4, pages - 3, pages - 2, pages - 1, pages];
+        return [currentPage - 2, currentPage - 1, currentPage, currentPage + 1, currentPage + 2];
+    };
 
     return (
-        <div className="bg-neutral-950 border border-neutral-800">
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] overflow-hidden">
 
-            {/* Header */}
-            <div className="px-6 py-4 border-b border-neutral-800 flex items-center justify-between">
-                <p className="text-xs font-medium text-white tracking-[0.15em] uppercase">
+            {/* Top gradient line */}
+            <div className="h-px w-full bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+
+            {/* Table Header Bar */}
+            <div className="px-5 py-3.5 border-b border-white/[0.05] flex items-center justify-between">
+                <p className="text-xs font-medium text-white/50 tracking-wider uppercase">
                     All Bookings
                 </p>
-                <p className="text-xs text-neutral-500">
-                    {total} total
+                <p className="text-xs text-white/20 font-mono">
+                    <span className="text-white/40">{total}</span> total
                 </p>
             </div>
 
@@ -76,137 +100,138 @@ export default function BookingsTable({
             <div className="overflow-x-auto">
                 <table className="w-full">
                     <thead>
-                        <tr className="border-b border-neutral-800">
-                            {[
-                                'Code', 'Customer', 'Service',
-                                'Date', 'Slot', 'Status',
-                                'Type', 'Amount', 'Actions'
-                            ].map((h) => (
+                        <tr className="border-b border-white/[0.04]">
+                            {HEADERS.map(({ key, label }) => (
                                 <th
-                                    key={h}
-                                    className="px-4 py-3 text-left text-xs text-neutral-500 tracking-[0.15em] uppercase font-normal whitespace-nowrap"
+                                    key={key}
+                                    className="px-5 py-3 text-left text-[10px] text-white/25 tracking-widest uppercase font-medium whitespace-nowrap"
                                 >
-                                    {h}
+                                    {label}
                                 </th>
                             ))}
                         </tr>
                     </thead>
-                    <tbody>
+
+                    <tbody className="divide-y divide-white/[0.03]">
                         {bookings.map((booking) => {
-                            const style = statusStyles[booking.status]
-                                || statusStyles.pending;
+                            const status  = statusConfig[booking.status]  || statusConfig.pending;
+                            const tier    = tierConfig[booking.serviceTier] || tierConfig.basic;
+                            const canEdit = !['completed', 'cancelled'].includes(booking.status);
+                            const name    = booking.customerId
+                                ? `${booking.customerId.firstName} ${booking.customerId.lastName}`
+                                : booking.walkInCustomer?.name || '—';
+                            const sub = booking.customerId?.email
+                                || booking.walkInCustomer?.phone
+                                || '';
 
                             return (
                                 <tr
                                     key={booking._id}
-                                    className="border-b border-neutral-800/50 hover:bg-neutral-900 transition-colors"
+                                    className="group hover:bg-white/[0.02] transition-colors duration-100"
                                 >
                                     {/* Code */}
-                                    <td className="px-4 py-4">
-                                        <span className="text-xs font-mono text-white">
+                                    <td className="px-5 py-4">
+                                        <span className="font-mono text-xs text-white/50 bg-white/[0.04] border border-white/[0.06] px-2 py-0.5 rounded">
                                             {booking.bookingCode}
                                         </span>
                                     </td>
 
                                     {/* Customer */}
-                                    <td className="px-4 py-4">
-                                        <div>
-                                            <p className="text-sm text-white whitespace-nowrap">
-                                                {booking.customerId
-                                                    ? `${booking.customerId.firstName} ${booking.customerId.lastName}`
-                                                    : booking.walkInCustomer?.name || '—'
-                                                }
+                                    <td className="px-5 py-4">
+                                        <p className="text-sm text-white/80 whitespace-nowrap font-medium">
+                                            {name}
+                                        </p>
+                                        {sub && (
+                                            <p className="text-[11px] text-white/25 mt-0.5 font-mono">
+                                                {sub}
                                             </p>
-                                            <p className="text-xs text-neutral-600 mt-0.5">
-                                                {booking.customerId?.email
-                                                    || booking.walkInCustomer?.phone
-                                                    || ''
-                                                }
-                                            </p>
-                                        </div>
+                                        )}
                                     </td>
 
                                     {/* Service */}
-                                    <td className="px-4 py-4">
-                                        <div>
-                                            <p className="text-sm text-neutral-300 whitespace-nowrap">
-                                                {booking.serviceName}
-                                            </p>
-                                            <span className={`text-xs border px-1.5 py-0.5 mt-1 inline-block capitalize ${
-                                                categoryBadge[booking.serviceCategory]
-                                            }`}>
-                                                {booking.serviceCategory}
-                                            </span>
-                                        </div>
-                                    </td>
-
-                                    {/* Date */}
-                                    <td className="px-4 py-4">
-                                        <p className="text-sm text-neutral-400 whitespace-nowrap">
-                                            {format(
-                                                new Date(booking.bookingDate),
-                                                'dd MMM yyyy'
-                                            )}
+                                    <td className="px-5 py-4">
+                                        <p className="text-sm text-white/60 whitespace-nowrap">
+                                            {booking.serviceName}
                                         </p>
+                                        {booking.serviceTier && (
+                                            <span className={`
+                                                inline-flex items-center mt-1
+                                                text-[10px] font-medium px-1.5 py-0.5 rounded
+                                                ring-1 capitalize
+                                                ${tier.text} ${tier.bg} ${tier.ring}
+                                            `}>
+                                                {booking.serviceTier}
+                                            </span>
+                                        )}
+                                        {booking.variantName && (
+                                            <p className="text-[11px] text-white/25 mt-0.5">
+                                                {booking.variantName}
+                                            </p>
+                                        )}
                                     </td>
 
-                                    {/* Time Slot */}
-                                    <td className="px-4 py-4">
-                                        <p className="text-xs font-mono text-neutral-400 whitespace-nowrap">
+                                    {/* Schedule */}
+                                    <td className="px-5 py-4">
+                                        <p className="text-sm text-white/60 whitespace-nowrap">
+                                            {format(new Date(booking.bookingDate), 'dd MMM yyyy')}
+                                        </p>
+                                        <p className="text-[11px] font-mono text-white/25 mt-0.5">
                                             {booking.timeSlot}
                                         </p>
                                     </td>
 
                                     {/* Status */}
-                                    <td className="px-4 py-4">
-                                        <div className="flex items-center gap-2">
-                                            <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${style.dot}`} />
-                                            <span className={`text-xs capitalize whitespace-nowrap ${style.text}`}>
-                                                {booking.status}
-                                            </span>
-                                        </div>
+                                    <td className="px-5 py-4">
+                                        <span className={`
+                                            inline-flex items-center gap-1.5
+                                            px-2.5 py-1 rounded-full text-[11px] font-medium
+                                            ring-1 whitespace-nowrap
+                                            ${status.bg} ${status.text} ${status.ring}
+                                        `}>
+                                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${status.dot}`} />
+                                            <span className="capitalize">{booking.status}</span>
+                                        </span>
                                     </td>
 
                                     {/* Type */}
-                                    <td className="px-4 py-4">
-                                        <span className={`text-xs border px-2 py-0.5 capitalize ${
-                                            booking.bookingType === 'walkin'
-                                                ? 'border-neutral-700 text-neutral-500'
-                                                : 'border-neutral-600 text-neutral-400'
-                                        }`}>
-                                            {booking.bookingType === 'walkin'
-                                                ? 'Walk-in'
-                                                : 'Online'
+                                    <td className="px-5 py-4">
+                                        <span className={`
+                                            text-[11px] font-medium px-2 py-0.5 rounded
+                                            border whitespace-nowrap
+                                            ${booking.bookingType === 'walkin'
+                                                ? 'border-white/[0.06] text-white/25 bg-white/[0.02]'
+                                                : 'border-blue-500/20 text-blue-400/70 bg-blue-500/[0.06]'
                                             }
+                                        `}>
+                                            {booking.bookingType === 'walkin' ? 'Walk-in' : 'Online'}
                                         </span>
                                     </td>
 
                                     {/* Amount */}
-                                    <td className="px-4 py-4">
-                                        <p className="text-sm text-white font-medium whitespace-nowrap">
+                                    <td className="px-5 py-4">
+                                        <p className="text-sm font-semibold text-white whitespace-nowrap tabular-nums">
                                             ₹{booking.price?.toLocaleString('en-IN')}
                                         </p>
                                     </td>
 
                                     {/* Actions */}
-                                    <td className="px-4 py-4">
-                                        <div className="flex items-center gap-1">
-                                            <button
+                                    <td className="px-5 py-4">
+                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                                            <ActionBtn
                                                 onClick={() => onView(booking)}
-                                                className="w-7 h-7 flex items-center justify-center text-neutral-500 hover:text-white hover:bg-neutral-800 transition-colors"
                                                 title="View details"
                                             >
                                                 <Eye className="w-3.5 h-3.5" />
-                                            </button>
-                                            {booking.status !== 'completed' &&
-                                             booking.status !== 'cancelled' && (
-                                                <button
+                                            </ActionBtn>
+
+                                            {canEdit && (
+                                                <ActionBtn
                                                     onClick={() => onUpdateStatus(booking)}
-                                                    className="w-7 h-7 flex items-center justify-center text-neutral-500 hover:text-white hover:bg-neutral-800 transition-colors"
                                                     title="Update status"
+                                                    highlight
                                                 >
                                                     <RefreshCw className="w-3.5 h-3.5" />
-                                                </button>
+                                                </ActionBtn>
                                             )}
                                         </div>
                                     </td>
@@ -219,46 +244,86 @@ export default function BookingsTable({
 
             {/* Pagination */}
             {pages > 1 && (
-                <div className="px-6 py-4 border-t border-neutral-800 flex items-center justify-between">
-                    <p className="text-xs text-neutral-500">
-                        Page {currentPage} of {pages}
+                <div className="px-5 py-3.5 border-t border-white/[0.05] flex items-center justify-between">
+                    <p className="text-[11px] text-white/20 font-mono">
+                        Page <span className="text-white/40">{currentPage}</span> of {pages}
                     </p>
+
                     <div className="flex items-center gap-1">
-                        <button
+                        {/* Prev */}
+                        <PaginationBtn
                             onClick={() => onPageChange(currentPage - 1)}
                             disabled={currentPage === 1}
-                            className="w-8 h-8 flex items-center justify-center border border-neutral-800 text-neutral-500 hover:text-white hover:border-neutral-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                         >
-                            <ChevronLeft className="w-4 h-4" />
-                        </button>
+                            <ChevronLeft className="w-3.5 h-3.5" />
+                        </PaginationBtn>
 
-                        {[...Array(Math.min(pages, 5))].map((_, i) => {
-                            const page = i + 1;
-                            return (
-                                <button
-                                    key={page}
-                                    onClick={() => onPageChange(page)}
-                                    className={`w-8 h-8 text-xs border transition-colors ${
-                                        currentPage === page
-                                            ? 'border-white bg-white text-black'
-                                            : 'border-neutral-800 text-neutral-500 hover:text-white hover:border-neutral-600'
-                                    }`}
-                                >
-                                    {page}
-                                </button>
-                            );
-                        })}
+                        {/* Pages */}
+                        {getPages().map((page) => (
+                            <button
+                                key={page}
+                                onClick={() => onPageChange(page)}
+                                className={`
+                                    w-7 h-7 rounded-md text-xs font-medium transition-all duration-150
+                                    ${currentPage === page
+                                        ? 'bg-white text-black shadow-lg shadow-white/10'
+                                        : 'text-white/30 hover:text-white/70 hover:bg-white/[0.06]'
+                                    }
+                                `}
+                            >
+                                {page}
+                            </button>
+                        ))}
 
-                        <button
+                        {/* Next */}
+                        <PaginationBtn
                             onClick={() => onPageChange(currentPage + 1)}
                             disabled={currentPage === pages}
-                            className="w-8 h-8 flex items-center justify-center border border-neutral-800 text-neutral-500 hover:text-white hover:border-neutral-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                         >
-                            <ChevronRight className="w-4 h-4" />
-                        </button>
+                            <ChevronRight className="w-3.5 h-3.5" />
+                        </PaginationBtn>
                     </div>
                 </div>
             )}
         </div>
+    );
+}
+
+/* ── Sub-components ── */
+
+function ActionBtn({ onClick, title, highlight, children }) {
+    return (
+        <button
+            onClick={onClick}
+            title={title}
+            className={`
+                w-7 h-7 rounded-lg flex items-center justify-center
+                border transition-all duration-150
+                ${highlight
+                    ? 'border-white/10 text-white/60 hover:text-white hover:bg-white/[0.08] hover:border-white/20'
+                    : 'border-white/[0.06] text-white/30 hover:text-white/70 hover:bg-white/[0.06] hover:border-white/10'
+                }
+            `}
+        >
+            {children}
+        </button>
+    );
+}
+
+function PaginationBtn({ onClick, disabled, children }) {
+    return (
+        <button
+            onClick={onClick}
+            disabled={disabled}
+            className="
+                w-7 h-7 rounded-md flex items-center justify-center
+                text-white/30 hover:text-white/70
+                hover:bg-white/[0.06]
+                disabled:opacity-25 disabled:cursor-not-allowed
+                transition-all duration-150
+            "
+        >
+            {children}
+        </button>
     );
 }

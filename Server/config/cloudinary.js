@@ -1,3 +1,5 @@
+// config/cloudinary.js
+
 import { v2 as cloudinary } from 'cloudinary';
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import multer from 'multer';
@@ -6,6 +8,18 @@ cloudinary.config({
     cloud_name: process.env.CLOUDINARY_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
+// ============================================
+// CATEGORY IMAGE STORAGE (1 image)
+// ============================================
+const categoryStorage = new CloudinaryStorage({
+    cloudinary,
+    params: {
+        folder: 'wash2door/categories',
+        allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+        transformation: [{ width: 800, height: 600, crop: 'fill', quality: 'auto' }]
+    }
 });
 
 // ============================================
@@ -21,12 +35,12 @@ const serviceStorage = new CloudinaryStorage({
 });
 
 // ============================================
-// VEHICLE TYPE IMAGE STORAGE (1 image per vehicle)
+// VARIANT IMAGE STORAGE (1 image per variant)
 // ============================================
-const vehicleStorage = new CloudinaryStorage({
+const variantStorage = new CloudinaryStorage({
     cloudinary,
     params: {
-        folder: 'wash2door/vehicles',
+        folder: 'wash2door/variants',
         allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
         transformation: [{ width: 800, height: 600, crop: 'fill', quality: 'auto' }]
     }
@@ -55,14 +69,20 @@ const fileFilter = (req, file, cb) => {
 };
 
 // Multer instances
+export const uploadCategoryImage = multer({
+    storage: categoryStorage,
+    fileFilter,
+    limits: { fileSize: 5 * 1024 * 1024 }
+}).single('image');
+
 export const uploadServiceImages = multer({
     storage: serviceStorage,
     fileFilter,
     limits: { fileSize: 5 * 1024 * 1024 }
 }).array('images', 3);
 
-export const uploadVehicleImage = multer({
-    storage: vehicleStorage,
+export const uploadVariantImage = multer({
+    storage: variantStorage,
     fileFilter,
     limits: { fileSize: 5 * 1024 * 1024 }
 }).single('image');
@@ -73,7 +93,7 @@ export const uploadAvatar = multer({
     limits: { fileSize: 2 * 1024 * 1024 }
 }).single('avatar');
 
-// ✅ FIXED: Accept publicId directly instead of URL
+// Delete helper
 export const deleteCloudinaryImage = async (publicId) => {
     try {
         if (!publicId || publicId.includes('default')) return;

@@ -1,4 +1,4 @@
-// controllers/reviewController.js - COMPLETE FIXED
+// controllers/reviewController.js - FIXED
 
 import Review from '../models/Review.js';
 import Booking from '../models/Booking.js';
@@ -16,7 +16,6 @@ export const createReview = async (req, res) => {
     try {
         const { bookingId, rating, comment } = req.body;
 
-        // Validate required
         if (!bookingId || !rating) {
             return res.status(400).json({
                 success: false,
@@ -24,7 +23,6 @@ export const createReview = async (req, res) => {
             });
         }
 
-        // Validate bookingId
         if (!isValidObjectId(bookingId)) {
             return res.status(400).json({
                 success: false,
@@ -32,7 +30,6 @@ export const createReview = async (req, res) => {
             });
         }
 
-        // Validate rating
         const ratingNum = Number(rating);
         if (isNaN(ratingNum) || ratingNum < 1 || ratingNum > 5) {
             return res.status(400).json({
@@ -41,7 +38,6 @@ export const createReview = async (req, res) => {
             });
         }
 
-        // Find booking
         const booking = await Booking.findOne({
             _id: bookingId,
             customerId: req.user._id
@@ -54,7 +50,6 @@ export const createReview = async (req, res) => {
             });
         }
 
-        // Only completed bookings can be reviewed
         if (booking.status !== 'completed') {
             return res.status(400).json({
                 success: false,
@@ -62,7 +57,6 @@ export const createReview = async (req, res) => {
             });
         }
 
-        // Check if already reviewed
         if (booking.isReviewed) {
             return res.status(400).json({
                 success: false,
@@ -70,26 +64,20 @@ export const createReview = async (req, res) => {
             });
         }
 
-        // Create review with new booking fields
         const review = await Review.create({
             bookingId: booking._id,
             customerId: req.user._id,
             serviceId: booking.serviceId,
             rating: ratingNum,
             comment: comment || '',
-
-            // Extra info from new booking model
-            vehicleType: booking.vehicleType,
-            vehicleTypeName: booking.vehicleTypeName,
             serviceName: booking.serviceName,
-            serviceCategory: booking.serviceCategory
+            categoryName: booking.categoryName,
+            variantName: booking.variantName
         });
 
-        // Mark booking as reviewed
         booking.isReviewed = true;
         await booking.save();
 
-        // Populate review
         const populatedReview = await Review.findById(review._id)
             .populate('customerId', 'firstName lastName avatar')
             .populate('serviceId', 'name category');
@@ -145,15 +133,13 @@ export const canReview = async (req, res) => {
             });
         }
 
-        const canReview =
-            booking.status === 'completed' &&
-            !booking.isReviewed;
+        const canReviewBooking = booking.status === 'completed' && !booking.isReviewed;
 
         res.status(200).json({
             success: true,
             data: {
-                canReview,
-                reason: !canReview
+                canReview: canReviewBooking,
+                reason: !canReviewBooking
                     ? booking.isReviewed
                         ? 'Already reviewed'
                         : `Booking is ${booking.status}`
@@ -161,7 +147,7 @@ export const canReview = async (req, res) => {
                 booking: {
                     bookingCode: booking.bookingCode,
                     serviceName: booking.serviceName,
-                    vehicleTypeName: booking.vehicleTypeName,
+                    variantName: booking.variantName,
                     status: booking.status,
                     isReviewed: booking.isReviewed
                 }
@@ -247,7 +233,6 @@ export const updateReview = async (req, res) => {
             });
         }
 
-        // Update rating
         if (rating !== undefined) {
             const ratingNum = Number(rating);
             if (isNaN(ratingNum) || ratingNum < 1 || ratingNum > 5) {
@@ -259,7 +244,6 @@ export const updateReview = async (req, res) => {
             review.rating = ratingNum;
         }
 
-        // Update comment
         if (comment !== undefined) {
             review.comment = comment;
         }
@@ -313,7 +297,6 @@ export const deleteReview = async (req, res) => {
             });
         }
 
-        // Reset booking isReviewed flag
         await Booking.findByIdAndUpdate(review.bookingId, {
             isReviewed: false
         });

@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Loader2, Search } from 'lucide-react';
+import { X, Loader2, Search, ChevronLeft, Check } from 'lucide-react';
 import adminService from '@/services/adminService';
+import serviceService from '@/services/serviceService';
 import axiosInstance from '@/lib/axios';
 import toast from 'react-hot-toast';
 
@@ -13,122 +14,96 @@ const TIME_SLOTS = [
     '17:00-18:00'
 ];
 
-const VEHICLE_TYPES = [
-    'sedan', 'suv', 'hatchback', 'truck', 'van', 'bike', 'other'
+const STEPS = [
+    { label: 'Customer', desc: 'Who is booking?' },
+    { label: 'Service',  desc: 'What service?'   },
+    { label: 'Schedule', desc: 'When?'            },
+    { label: 'Details',  desc: 'Final details'    }
 ];
 
+/* ── Shared styles ── */
+const inputCls = `
+    w-full bg-white/[0.03] border border-white/[0.08]
+    text-white/80 text-sm placeholder-white/20
+    px-3 py-2.5 rounded-lg
+    focus:outline-none focus:border-white/20 focus:bg-white/[0.05]
+    transition-all duration-150
+`;
+
+const sectionLabel = `text-[10px] text-white/25 uppercase tracking-widest font-medium mb-3 block`;
+
 export default function CreateBookingModal({ onClose, onSuccess }) {
-    const [step, setStep] = useState(1);
+    const [step, setStep]       = useState(1);
     const [loading, setLoading] = useState(false);
 
-    // Step 1 - Booking type
-    const [bookingType, setBookingType] = useState('walkin');
-
-    // Step 1 - Customer
-    const [walkInCustomer, setWalkInCustomer] = useState({
-        name: '', phone: '', email: ''
-    });
-    const [customerSearch, setCustomerSearch] = useState('');
-    const [customers, setCustomers] = useState([]);
+    /* Step 1 */
+    const [bookingType,      setBookingType]      = useState('walkin');
+    const [walkInCustomer,   setWalkInCustomer]   = useState({ name: '', phone: '' });
+    const [customerSearch,   setCustomerSearch]   = useState('');
+    const [customers,        setCustomers]        = useState([]);
     const [selectedCustomer, setSelectedCustomer] = useState(null);
-    const [searchLoading, setSearchLoading] = useState(false);
+    const [searchLoading,    setSearchLoading]    = useState(false);
 
-    // Step 2 - Service
-    const [services, setServices] = useState([]);
+    /* Step 2 */
+    const [services,        setServices]        = useState([]);
     const [selectedService, setSelectedService] = useState(null);
-    const [selectedVehicleType, setSelectedVehicleType] = useState(null);
+    const [selectedVariant, setSelectedVariant] = useState(null);
     const [servicesLoading, setServicesLoading] = useState(false);
 
-    // Step 3 - Date & Time
-    const [bookingDate, setBookingDate] = useState('');
-    const [timeSlot, setTimeSlot] = useState('');
-    const [availability, setAvailability] = useState([]);
-    const [availabilityLoading, setAvailabilityLoading] = useState(false);
+    /* Step 3 */
+    const [bookingDate,          setBookingDate]          = useState('');
+    const [timeSlot,             setTimeSlot]             = useState('');
+    const [availability,         setAvailability]         = useState([]);
+    const [availabilityLoading,  setAvailabilityLoading]  = useState(false);
 
-    // Step 4 - Details
+    /* Step 4 */
     const [location, setLocation] = useState({
-        address: 'Walk-in / At Shop',
-        city: 'Walk-in',
-        state: '', zipCode: '', landmark: ''
+        address: 'Walk-in / At Shop', city: 'Walk-in', landmark: ''
     });
-    const [vehicleDetails, setVehicleDetails] = useState({
-        type: '', brand: '', model: '', color: '', plateNumber: ''
-    });
-    const [specialNotes, setSpecialNotes] = useState('');
-    const [paymentMethod, setPaymentMethod] = useState('cash');
+    const [specialNotes,   setSpecialNotes]   = useState('');
+    const [paymentMethod,  setPaymentMethod]  = useState('cash');
 
-    // Load services
+    /* Load services */
     useEffect(() => {
-        const loadServices = async () => {
+        (async () => {
             try {
                 setServicesLoading(true);
-                const response = await adminService.getAllServices({
-                    isActive: true,
-                    limit: 100
-                });
-                if (response.success) {
-                    setServices(response.data);
-                }
-            } catch (error) {
-                toast.error('Failed to load services');
-            } finally {
-                setServicesLoading(false);
-            }
-        };
-        loadServices();
+                const res = await serviceService.getAll({ isActive: true, limit: 100 });
+                if (res.success) setServices(res.data);
+            } catch { toast.error('Failed to load services'); }
+            finally { setServicesLoading(false); }
+        })();
     }, []);
 
-    // Search customers
+    /* Search customers */
     useEffect(() => {
         if (bookingType !== 'online' || customerSearch.length < 2) {
-            setCustomers([]);
-            return;
+            setCustomers([]); return;
         }
-        const timer = setTimeout(async () => {
+        const t = setTimeout(async () => {
             try {
                 setSearchLoading(true);
-                const response = await adminService.getAllUsers({
-                    search: customerSearch,
-                    limit: 5
-                });
-                if (response.success) {
-                    setCustomers(response.data.users);
-                }
-            } catch (error) {
-                // silent
-            } finally {
-                setSearchLoading(false);
-            }
+                const res = await adminService.getAllUsers({ search: customerSearch, limit: 5 });
+                if (res.success) setCustomers(res.data.users);
+            } catch { }
+            finally { setSearchLoading(false); }
         }, 400);
-        return () => clearTimeout(timer);
+        return () => clearTimeout(t);
     }, [customerSearch, bookingType]);
 
-    // Check availability
+    /* Check availability */
     useEffect(() => {
         if (!selectedService || !bookingDate) return;
-
-        const checkAvailability = async () => {
+        (async () => {
             try {
                 setAvailabilityLoading(true);
-                const response = await axiosInstance.get(
-                    '/bookings/availability',
-                    {
-                        params: {
-                            serviceId: selectedService._id,
-                            date: bookingDate
-                        }
-                    }
-                );
-                if (response.data.success) {
-                    setAvailability(response.data.data.slots || []);
-                }
-            } catch (error) {
-                // silent
-            } finally {
-                setAvailabilityLoading(false);
-            }
-        };
-        checkAvailability();
+                const res = await axiosInstance.get('/bookings/availability', {
+                    params: { serviceId: selectedService._id, date: bookingDate }
+                });
+                if (res.data.success) setAvailability(res.data.data.slots || []);
+            } catch { }
+            finally { setAvailabilityLoading(false); }
+        })();
     }, [selectedService, bookingDate]);
 
     const isSlotAvailable = (slot) => {
@@ -139,597 +114,572 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
     const handleSubmit = async () => {
         try {
             setLoading(true);
-
             const payload = {
-                bookingType,
-                serviceId: selectedService._id,
-                vehicleTypeId: selectedVehicleType._id,
-                bookingDate,
-                timeSlot,
-                location,
-                vehicleDetails,
-                specialNotes,
-                paymentMethod
+                bookingType, serviceId: selectedService._id,
+                variantId: selectedVariant._id, bookingDate,
+                timeSlot, location, specialNotes, paymentMethod
             };
-
-            if (bookingType === 'walkin') {
-                payload.walkInCustomer = walkInCustomer;
-            } else {
-                payload.customerId = selectedCustomer._id;
-            }
-
+            if (bookingType === 'walkin') payload.walkInCustomer = walkInCustomer;
+            else payload.customerId = selectedCustomer._id;
             await adminService.createAdminBooking(payload);
             onSuccess();
-        } catch (error) {
-            toast.error(
-                error.response?.data?.message || 'Failed to create booking'
-            );
-        } finally {
-            setLoading(false);
-        }
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to create booking');
+        } finally { setLoading(false); }
     };
 
-    const canProceedStep1 = bookingType === 'walkin'
-        ? walkInCustomer.name.trim()
-        : selectedCustomer !== null;
+    const canProceed = {
+        1: bookingType === 'walkin' ? walkInCustomer.name.trim() : selectedCustomer !== null,
+        2: selectedService && selectedVariant,
+        3: bookingDate && timeSlot,
+        4: true
+    };
 
-    const canProceedStep2 = selectedService && selectedVehicleType;
-    const canProceedStep3 = bookingDate && timeSlot;
-    const canProceedStep4 = vehicleDetails.type;
+    const activeVariants = selectedService?.variants?.filter(v => v.isActive) || [];
 
     return (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-            <div className="bg-neutral-950 border border-neutral-800 w-full max-w-2xl max-h-[90vh] flex flex-col">
+        <>
+            {/* Backdrop */}
+            <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden sm:block" onClick={onClose} />
 
-                {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-800 shrink-0">
-                    <div>
-                        <p className="text-xs text-neutral-500 tracking-widest uppercase mb-1">
-                            Admin
-                        </p>
-                        <h2 className="text-white text-lg font-light">
-                            Create Booking
-                        </h2>
-                    </div>
-                    <button
-                        onClick={onClose}
-                        className="w-8 h-8 flex items-center justify-center text-neutral-500 hover:text-white transition-colors"
-                    >
-                        <X className="w-4 h-4" />
-                    </button>
-                </div>
+            <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center pointer-events-none">
+                <div className="
+                    pointer-events-auto
+                    w-full sm:max-w-lg sm:max-h-[92vh]
+                    h-full sm:h-auto
+                    flex flex-col
+                    bg-[#0a0a0a]
+                    sm:rounded-xl
+                    border-0 sm:border sm:border-white/[0.08]
+                    shadow-2xl shadow-black/80
+                    overflow-hidden
+                ">
+                    {/* Top gradient line */}
+                    <div className="h-px w-full bg-gradient-to-r from-transparent via-white/15 to-transparent shrink-0" />
 
-                {/* Step Indicators */}
-                <div className="flex items-center px-6 py-3 border-b border-neutral-800 gap-2 shrink-0">
-                    {['Customer', 'Service', 'Schedule', 'Details'].map((s, i) => (
-                        <div key={s} className="flex items-center gap-2">
-                            <div className={`flex items-center gap-2 ${
-                                step === i + 1
-                                    ? 'text-white'
-                                    : step > i + 1
-                                    ? 'text-neutral-500'
-                                    : 'text-neutral-700'
-                            }`}>
-                                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs border ${
-                                    step === i + 1
-                                        ? 'border-white bg-white text-black'
-                                        : step > i + 1
-                                        ? 'border-neutral-600 text-neutral-500'
-                                        : 'border-neutral-800 text-neutral-700'
-                                }`}>
-                                    {i + 1}
-                                </div>
-                                <span className="text-xs hidden sm:block">{s}</span>
-                            </div>
-                            {i < 3 && (
-                                <div className={`h-px flex-1 w-4 ${
-                                    step > i + 1
-                                        ? 'bg-neutral-600'
-                                        : 'bg-neutral-800'
-                                }`} />
-                            )}
+                    {/* ── Header ── */}
+                    <div className="shrink-0 flex items-center gap-3 px-4 py-4">
+                        <button
+                            onClick={() => step > 1 ? setStep(step - 1) : onClose()}
+                            className="
+                                w-8 h-8 rounded-lg flex items-center justify-center
+                                border border-white/[0.06] bg-white/[0.03]
+                                text-white/35 hover:text-white/70
+                                transition-all duration-150
+                            "
+                        >
+                            <ChevronLeft className="w-4 h-4" />
+                        </button>
+
+                        <div className="flex-1 min-w-0">
+                            <p className="text-[10px] text-white/25 uppercase tracking-widest">
+                                Step {step} of 4
+                            </p>
+                            <p className="text-sm font-medium text-white/80 mt-0.5">
+                                {STEPS[step - 1].label}
+                                <span className="text-white/30 font-normal ml-2 text-xs">
+                                    {STEPS[step - 1].desc}
+                                </span>
+                            </p>
                         </div>
-                    ))}
-                </div>
 
-                {/* Content */}
-                <div className="flex-1 overflow-y-auto p-6">
+                        <button
+                            onClick={onClose}
+                            className="
+                                w-8 h-8 rounded-lg flex items-center justify-center
+                                border border-white/[0.06] bg-white/[0.03]
+                                text-white/30 hover:text-white/70
+                                transition-all duration-150
+                            "
+                        >
+                            <X className="w-3.5 h-3.5" />
+                        </button>
+                    </div>
 
-                    {/* ── STEP 1: Customer ── */}
-                    {step === 1 && (
-                        <div className="space-y-6">
-                            {/* Booking Type */}
-                            <div>
-                                <p className="text-xs text-neutral-500 tracking-widest uppercase mb-3">
-                                    Booking Type
-                                </p>
-                                <div className="grid grid-cols-2 gap-3">
-                                    {['walkin', 'online'].map((type) => (
-                                        <button
-                                            key={type}
-                                            onClick={() => {
-                                                setBookingType(type);
-                                                setSelectedCustomer(null);
-                                                setCustomerSearch('');
-                                            }}
-                                            className={`p-4 border text-left transition-colors ${
-                                                bookingType === type
-                                                    ? 'border-white bg-white/5'
-                                                    : 'border-neutral-800 hover:border-neutral-600'
-                                            }`}
-                                        >
-                                            <p className="text-sm text-white capitalize mb-1">
-                                                {type === 'walkin' ? 'Walk-in' : 'Online'}
-                                            </p>
-                                            <p className="text-xs text-neutral-500">
-                                                {type === 'walkin'
-                                                    ? 'Customer at shop'
-                                                    : 'Registered customer'
-                                                }
-                                            </p>
-                                        </button>
-                                    ))}
+                    {/* ── Step Indicators ── */}
+                    <div className="shrink-0 px-4 pb-4">
+                        {/* Progress track */}
+                        <div className="relative flex items-center gap-1 mb-3">
+                            {STEPS.map((s, i) => (
+                                <div
+                                    key={s.label}
+                                    className={`h-0.5 flex-1 rounded-full transition-all duration-300 ${
+                                        i + 1 <= step ? 'bg-white/60' : 'bg-white/[0.08]'
+                                    }`}
+                                />
+                            ))}
+                        </div>
+
+                        {/* Step dots */}
+                        <div className="flex items-center justify-between">
+                            {STEPS.map((s, i) => (
+                                <div key={s.label} className="flex items-center gap-1.5">
+                                    <div className={`
+                                        w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-semibold
+                                        transition-all duration-200
+                                        ${step === i + 1
+                                            ? 'bg-white text-black shadow-lg shadow-white/20'
+                                            : step > i + 1
+                                            ? 'bg-white/20 text-white/60'
+                                            : 'bg-white/[0.06] text-white/20'
+                                        }
+                                    `}>
+                                        {step > i + 1
+                                            ? <Check className="w-2.5 h-2.5" />
+                                            : i + 1
+                                        }
+                                    </div>
+                                    <span className={`text-[10px] transition-colors duration-200 ${
+                                        step === i + 1 ? 'text-white/60' : 'text-white/20'
+                                    }`}>
+                                        {s.label}
+                                    </span>
                                 </div>
-                            </div>
+                            ))}
+                        </div>
+                    </div>
 
-                            {/* Walk-in Customer */}
-                            {bookingType === 'walkin' && (
-                                <div className="space-y-4">
-                                    <p className="text-xs text-neutral-500 tracking-widest uppercase">
-                                        Customer Info
-                                    </p>
-                                    <Input
-                                        label="Name *"
-                                        value={walkInCustomer.name}
-                                        onChange={(v) => setWalkInCustomer(p => ({ ...p, name: v }))}
-                                        placeholder="Full name"
-                                    />
-                                    <Input
-                                        label="Phone"
-                                        value={walkInCustomer.phone}
-                                        onChange={(v) => setWalkInCustomer(p => ({ ...p, phone: v }))}
-                                        placeholder="+91 XXXXX XXXXX"
-                                    />
-                                    <Input
-                                        label="Email"
-                                        value={walkInCustomer.email}
-                                        onChange={(v) => setWalkInCustomer(p => ({ ...p, email: v }))}
-                                        placeholder="customer@email.com"
-                                    />
+                    {/* ── Divider ── */}
+                    <div className="h-px bg-white/[0.05] shrink-0" />
+
+                    {/* ── Scrollable Content ── */}
+                    <div className="flex-1 overflow-y-auto px-4 py-5 space-y-6">
+
+                        {/* STEP 1 — Customer */}
+                        {step === 1 && (
+                            <div className="space-y-5">
+                                <div>
+                                    <span className={sectionLabel}>Booking Type</span>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {[
+                                            { value: 'walkin', label: 'Walk-in',    sub: 'At shop, no account' },
+                                            { value: 'online', label: 'Online',     sub: 'Registered customer' }
+                                        ].map(({ value, label, sub }) => (
+                                            <button
+                                                key={value}
+                                                onClick={() => {
+                                                    setBookingType(value);
+                                                    setSelectedCustomer(null);
+                                                    setCustomerSearch('');
+                                                }}
+                                                className={`
+                                                    p-3.5 rounded-lg border text-left transition-all duration-150
+                                                    ${bookingType === value
+                                                        ? 'border-white/25 bg-white/[0.06]'
+                                                        : 'border-white/[0.07] bg-white/[0.02] hover:border-white/[0.12]'
+                                                    }
+                                                `}
+                                            >
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <p className="text-sm text-white/80 font-medium">{label}</p>
+                                                    {bookingType === value && (
+                                                        <div className="w-4 h-4 rounded-full bg-white flex items-center justify-center">
+                                                            <Check className="w-2.5 h-2.5 text-black" />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <p className="text-[11px] text-white/30">{sub}</p>
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
-                            )}
 
-                            {/* Online Customer Search */}
-                            {bookingType === 'online' && (
-                                <div className="space-y-3">
-                                    <p className="text-xs text-neutral-500 tracking-widest uppercase">
-                                        Search Customer
-                                    </p>
-                                    <div className="relative">
-                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-600" />
-                                        <input
-                                            type="text"
-                                            value={customerSearch}
-                                            onChange={(e) => {
-                                                setCustomerSearch(e.target.value);
-                                                setSelectedCustomer(null);
-                                            }}
-                                            placeholder="Search by name or email..."
-                                            className="w-full bg-black border border-neutral-800 text-white placeholder-neutral-600 text-sm pl-10 pr-4 py-2.5 focus:outline-none focus:border-neutral-600"
+                                {bookingType === 'walkin' && (
+                                    <div className="space-y-3">
+                                        <FieldInput
+                                            label="Customer Name *"
+                                            value={walkInCustomer.name}
+                                            onChange={(v) => setWalkInCustomer(p => ({ ...p, name: v }))}
+                                            placeholder="Full name"
+                                        />
+                                        <FieldInput
+                                            label="Phone"
+                                            value={walkInCustomer.phone}
+                                            onChange={(v) => setWalkInCustomer(p => ({ ...p, phone: v }))}
+                                            placeholder="+91 XXXXX XXXXX"
                                         />
                                     </div>
+                                )}
 
-                                    {searchLoading && (
-                                        <p className="text-xs text-neutral-500">Searching...</p>
-                                    )}
+                                {bookingType === 'online' && (
+                                    <div className="space-y-2">
+                                        <span className={sectionLabel}>Search Customer</span>
+                                        <div className="relative">
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/25 pointer-events-none" />
+                                            <input
+                                                type="text"
+                                                value={customerSearch}
+                                                onChange={(e) => {
+                                                    setCustomerSearch(e.target.value);
+                                                    setSelectedCustomer(null);
+                                                }}
+                                                placeholder="Search by name or email…"
+                                                className={`${inputCls} pl-9`}
+                                            />
+                                            {searchLoading && (
+                                                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/25 animate-spin" />
+                                            )}
+                                        </div>
 
-                                    {customers.length > 0 && !selectedCustomer && (
-                                        <div className="border border-neutral-800 divide-y divide-neutral-800">
-                                            {customers.map((customer) => (
+                                        {/* Results */}
+                                        {customers.length > 0 && !selectedCustomer && (
+                                            <div className="rounded-lg border border-white/[0.07] bg-white/[0.02] overflow-hidden divide-y divide-white/[0.04]">
+                                                {customers.map((c) => (
+                                                    <button
+                                                        key={c._id}
+                                                        onClick={() => {
+                                                            setSelectedCustomer(c);
+                                                            setCustomerSearch(`${c.firstName} ${c.lastName}`);
+                                                            setCustomers([]);
+                                                        }}
+                                                        className="w-full px-4 py-3 text-left hover:bg-white/[0.04] transition-colors"
+                                                    >
+                                                        <p className="text-sm text-white/70">{c.firstName} {c.lastName}</p>
+                                                        <p className="text-[11px] text-white/30 font-mono mt-0.5">{c.email}</p>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {/* Selected */}
+                                        {selectedCustomer && (
+                                            <div className="flex items-center justify-between px-3.5 py-3 rounded-lg border border-white/[0.12] bg-white/[0.05]">
+                                                <div>
+                                                    <p className="text-sm text-white/80 font-medium">
+                                                        {selectedCustomer.firstName} {selectedCustomer.lastName}
+                                                    </p>
+                                                    <p className="text-[11px] text-white/30 font-mono mt-0.5">
+                                                        {selectedCustomer.email}
+                                                    </p>
+                                                </div>
                                                 <button
-                                                    key={customer._id}
-                                                    onClick={() => {
-                                                        setSelectedCustomer(customer);
-                                                        setCustomerSearch(
-                                                            `${customer.firstName} ${customer.lastName}`
-                                                        );
-                                                        setCustomers([]);
-                                                    }}
-                                                    className="w-full flex items-center justify-between px-4 py-3 hover:bg-neutral-900 transition-colors text-left"
+                                                    onClick={() => { setSelectedCustomer(null); setCustomerSearch(''); }}
+                                                    className="w-6 h-6 rounded-md flex items-center justify-center text-white/30 hover:text-white/70 hover:bg-white/[0.08] transition-all"
+                                                >
+                                                    <X className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* STEP 2 — Service */}
+                        {step === 2 && (
+                            <div className="space-y-5">
+                                <div>
+                                    <span className={sectionLabel}>Select Service</span>
+                                    {servicesLoading ? (
+                                        <div className="space-y-2">
+                                            {[...Array(4)].map((_, i) => (
+                                                <div key={i} className="h-16 rounded-lg bg-white/[0.03] animate-pulse" />
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-1.5">
+                                            {services.map((s) => (
+                                                <button
+                                                    key={s._id}
+                                                    onClick={() => { setSelectedService(s); setSelectedVariant(null); }}
+                                                    className={`
+                                                        w-full flex items-center justify-between p-3.5 rounded-lg
+                                                        border text-left transition-all duration-150
+                                                        ${selectedService?._id === s._id
+                                                            ? 'border-white/25 bg-white/[0.06]'
+                                                            : 'border-white/[0.07] bg-white/[0.02] hover:border-white/[0.12]'
+                                                        }
+                                                    `}
                                                 >
                                                     <div>
-                                                        <p className="text-sm text-white">
-                                                            {customer.firstName} {customer.lastName}
-                                                        </p>
-                                                        <p className="text-xs text-neutral-500">
-                                                            {customer.email}
+                                                        <p className="text-sm text-white/80">{s.name}</p>
+                                                        <p className="text-[11px] text-white/30 mt-0.5">
+                                                            {s.category?.name || s.tier}
+                                                            <span className="mx-1.5 text-white/15">·</span>
+                                                            from ₹{s.startingPrice?.toLocaleString('en-IN')}
                                                         </p>
                                                     </div>
+                                                    {selectedService?._id === s._id && (
+                                                        <div className="w-5 h-5 rounded-full bg-white flex items-center justify-center shrink-0">
+                                                            <Check className="w-3 h-3 text-black" />
+                                                        </div>
+                                                    )}
                                                 </button>
                                             ))}
                                         </div>
                                     )}
-
-                                    {selectedCustomer && (
-                                        <div className="border border-white/20 bg-white/5 px-4 py-3 flex items-center justify-between">
-                                            <div>
-                                                <p className="text-sm text-white">
-                                                    {selectedCustomer.firstName} {selectedCustomer.lastName}
-                                                </p>
-                                                <p className="text-xs text-neutral-400">
-                                                    {selectedCustomer.email}
-                                                </p>
-                                            </div>
-                                            <button
-                                                onClick={() => {
-                                                    setSelectedCustomer(null);
-                                                    setCustomerSearch('');
-                                                }}
-                                                className="text-neutral-500 hover:text-white"
-                                            >
-                                                <X className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    )}
                                 </div>
-                            )}
-                        </div>
-                    )}
 
-                    {/* ── STEP 2: Service ── */}
-                    {step === 2 && (
-                        <div className="space-y-6">
-                            <div>
-                                <p className="text-xs text-neutral-500 tracking-widest uppercase mb-3">
-                                    Select Service
-                                </p>
-                                {servicesLoading ? (
-                                    <div className="space-y-2">
-                                        {[...Array(3)].map((_, i) => (
-                                            <div key={i} className="h-16 bg-neutral-800 animate-pulse" />
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="space-y-2">
-                                        {services.map((service) => (
-                                            <button
-                                                key={service._id}
-                                                onClick={() => {
-                                                    setSelectedService(service);
-                                                    setSelectedVehicleType(null);
-                                                }}
-                                                className={`w-full flex items-center justify-between p-4 border text-left transition-colors ${
-                                                    selectedService?._id === service._id
-                                                        ? 'border-white bg-white/5'
-                                                        : 'border-neutral-800 hover:border-neutral-600'
-                                                }`}
-                                            >
-                                                <div>
-                                                    <p className="text-sm text-white">
-                                                        {service.name}
-                                                    </p>
-                                                    <p className="text-xs text-neutral-500 capitalize mt-0.5">
-                                                        {service.category} · from ₹{service.startingPrice}
-                                                    </p>
-                                                </div>
-                                            </button>
-                                        ))}
+                                {selectedService && activeVariants.length > 0 && (
+                                    <div>
+                                        <div className="h-px bg-white/[0.05] mb-4" />
+                                        <span className={sectionLabel}>Select Variant</span>
+                                        <div className="space-y-1.5">
+                                            {activeVariants.map((v) => (
+                                                <button
+                                                    key={v._id}
+                                                    onClick={() => setSelectedVariant(v)}
+                                                    className={`
+                                                        w-full flex items-center justify-between p-3.5 rounded-lg
+                                                        border text-left transition-all duration-150
+                                                        ${selectedVariant?._id === v._id
+                                                            ? 'border-white/25 bg-white/[0.06]'
+                                                            : 'border-white/[0.07] bg-white/[0.02] hover:border-white/[0.12]'
+                                                        }
+                                                    `}
+                                                >
+                                                    <div>
+                                                        <p className="text-sm text-white/80">{v.name}</p>
+                                                        <p className="text-[11px] text-white/30 mt-0.5">
+                                                            {v.duration} min
+                                                        </p>
+                                                    </div>
+                                                    <div className="text-right flex items-center gap-3">
+                                                        <div>
+                                                            <p className="text-sm font-semibold text-white tabular-nums">
+                                                                ₹{(v.discountPrice ?? v.price)?.toLocaleString('en-IN')}
+                                                            </p>
+                                                            {v.discountPrice && v.discountPrice < v.price && (
+                                                                <p className="text-[11px] text-white/25 line-through tabular-nums">
+                                                                    ₹{v.price?.toLocaleString('en-IN')}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                        {selectedVariant?._id === v._id && (
+                                                            <div className="w-5 h-5 rounded-full bg-white flex items-center justify-center shrink-0">
+                                                                <Check className="w-3 h-3 text-black" />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
                                 )}
                             </div>
+                        )}
 
-                            {/* Vehicle Type */}
-                            {selectedService && (
+                        {/* STEP 3 — Schedule */}
+                        {step === 3 && (
+                            <div className="space-y-5">
                                 <div>
-                                    <p className="text-xs text-neutral-500 tracking-widest uppercase mb-3">
-                                        Vehicle Type
-                                    </p>
-                                    <div className="space-y-2">
-                                        {selectedService.vehicleTypes
-                                            ?.filter(v => v.isActive)
-                                            .map((vt) => (
-                                                <button
-                                                    key={vt._id}
-                                                    onClick={() => setSelectedVehicleType(vt)}
-                                                    className={`w-full flex items-center justify-between p-4 border text-left transition-colors ${
-                                                        selectedVehicleType?._id === vt._id
-                                                            ? 'border-white bg-white/5'
-                                                            : 'border-neutral-800 hover:border-neutral-600'
-                                                    }`}
-                                                >
-                                                    <div>
-                                                        <p className="text-sm text-white">
-                                                            {vt.label}
-                                                        </p>
-                                                        <p className="text-xs text-neutral-500 mt-0.5">
-                                                            {vt.duration} min
-                                                        </p>
-                                                    </div>
-                                                    <p className="text-sm text-white font-medium">
-                                                        ₹{vt.price?.toLocaleString('en-IN')}
-                                                    </p>
-                                                </button>
-                                            ))
-                                        }
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* ── STEP 3: Schedule ── */}
-                    {step === 3 && (
-                        <div className="space-y-6">
-                            <div>
-                                <label className="block text-xs text-neutral-500 tracking-widest uppercase mb-2">
-                                    Booking Date
-                                </label>
-                                <input
-                                    type="date"
-                                    value={bookingDate}
-                                    min={new Date().toISOString().split('T')[0]}
-                                    onChange={(e) => {
-                                        setBookingDate(e.target.value);
-                                        setTimeSlot('');
-                                    }}
-                                    className="w-full bg-black border border-neutral-800 text-white text-sm px-4 py-3 focus:outline-none focus:border-neutral-600"
-                                />
-                            </div>
-
-                            {bookingDate && (
-                                <div>
-                                    <p className="text-xs text-neutral-500 tracking-widest uppercase mb-3">
-                                        Time Slot
-                                        {availabilityLoading && (
-                                            <span className="ml-2 normal-case text-neutral-600">
-                                                checking...
-                                            </span>
-                                        )}
-                                    </p>
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                                        {TIME_SLOTS.map((slot) => {
-                                            const available = isSlotAvailable(slot);
-                                            return (
-                                                <button
-                                                    key={slot}
-                                                    onClick={() => available && setTimeSlot(slot)}
-                                                    disabled={!available}
-                                                    className={`p-3 border text-xs font-mono transition-colors ${
-                                                        timeSlot === slot
-                                                            ? 'border-white bg-white text-black'
-                                                            : !available
-                                                            ? 'border-neutral-900 text-neutral-700 cursor-not-allowed'
-                                                            : 'border-neutral-800 text-neutral-400 hover:border-neutral-600 hover:text-white'
-                                                    }`}
-                                                >
-                                                    {slot}
-                                                    {!available && (
-                                                        <span className="block text-neutral-700 text-xs font-sans mt-0.5">
-                                                            Booked
-                                                        </span>
-                                                    )}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* ── STEP 4: Details ── */}
-                    {step === 4 && (
-                        <div className="space-y-6">
-
-                            {/* Location */}
-                            <div>
-                                <p className="text-xs text-neutral-500 tracking-widest uppercase mb-3">
-                                    Location
-                                </p>
-                                <div className="space-y-3">
-                                    <Input
-                                        label="Address"
-                                        value={location.address}
-                                        onChange={(v) => setLocation(p => ({ ...p, address: v }))}
-                                        placeholder="Street address"
+                                    <span className={sectionLabel}>Booking Date</span>
+                                    <input
+                                        type="date"
+                                        value={bookingDate}
+                                        min={new Date().toISOString().split('T')[0]}
+                                        onChange={(e) => { setBookingDate(e.target.value); setTimeSlot(''); }}
+                                        className={`${inputCls} [color-scheme:dark]`}
                                     />
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <Input
-                                            label="City"
+                                </div>
+
+                                {bookingDate && (
+                                    <div>
+                                        <div className="flex items-center justify-between mb-3">
+                                            <span className={`${sectionLabel} mb-0`}>Time Slot</span>
+                                            {availabilityLoading && (
+                                                <div className="flex items-center gap-1.5">
+                                                    <Loader2 className="w-3 h-3 text-white/25 animate-spin" />
+                                                    <span className="text-[10px] text-white/25">Checking…</span>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {TIME_SLOTS.map((slot) => {
+                                                const available = isSlotAvailable(slot);
+                                                const selected  = timeSlot === slot;
+
+                                                return (
+                                                    <button
+                                                        key={slot}
+                                                        onClick={() => available && setTimeSlot(slot)}
+                                                        disabled={!available}
+                                                        className={`
+                                                            relative p-3 rounded-lg border text-xs font-mono
+                                                            transition-all duration-150
+                                                            ${selected
+                                                                ? 'border-white/30 bg-white/[0.08] text-white'
+                                                                : !available
+                                                                ? 'border-white/[0.04] bg-white/[0.01] text-white/15 cursor-not-allowed'
+                                                                : 'border-white/[0.07] bg-white/[0.02] text-white/50 hover:border-white/[0.14] hover:text-white/70'
+                                                            }
+                                                        `}
+                                                    >
+                                                        {slot}
+                                                        {!available && (
+                                                            <span className="block text-[10px] text-white/15 mt-0.5 font-sans">
+                                                                Booked
+                                                            </span>
+                                                        )}
+                                                        {selected && (
+                                                            <span className="absolute top-1.5 right-1.5 w-3 h-3 rounded-full bg-white flex items-center justify-center">
+                                                                <Check className="w-2 h-2 text-black" />
+                                                            </span>
+                                                        )}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* STEP 4 — Details */}
+                        {step === 4 && (
+                            <div className="space-y-5">
+
+                                {/* Location */}
+                                <div>
+                                    <span className={sectionLabel}>Location</span>
+                                    <div className="space-y-2.5">
+                                        <FieldInput
+                                            label="Address *"
+                                            value={location.address}
+                                            onChange={(v) => setLocation(p => ({ ...p, address: v }))}
+                                            placeholder="Street address"
+                                        />
+                                        <FieldInput
+                                            label="City *"
                                             value={location.city}
                                             onChange={(v) => setLocation(p => ({ ...p, city: v }))}
                                             placeholder="City"
                                         />
-                                        <Input
-                                            label="State"
-                                            value={location.state}
-                                            onChange={(v) => setLocation(p => ({ ...p, state: v }))}
-                                            placeholder="State"
+                                        <FieldInput
+                                            label="Landmark"
+                                            value={location.landmark}
+                                            onChange={(v) => setLocation(p => ({ ...p, landmark: v }))}
+                                            placeholder="Optional"
                                         />
                                     </div>
-                                    <Input
-                                        label="Landmark"
-                                        value={location.landmark}
-                                        onChange={(v) => setLocation(p => ({ ...p, landmark: v }))}
-                                        placeholder="Near landmark (optional)"
+                                </div>
+
+                                <div className="h-px bg-white/[0.05]" />
+
+                                {/* Payment */}
+                                <div>
+                                    <span className={sectionLabel}>Payment Method</span>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {['cash', 'card', 'online'].map((m) => (
+                                            <button
+                                                key={m}
+                                                onClick={() => setPaymentMethod(m)}
+                                                className={`
+                                                    p-3 rounded-lg border text-xs font-medium capitalize
+                                                    transition-all duration-150
+                                                    ${paymentMethod === m
+                                                        ? 'border-white/25 bg-white/[0.07] text-white/80'
+                                                        : 'border-white/[0.07] bg-white/[0.02] text-white/35 hover:border-white/[0.12]'
+                                                    }
+                                                `}
+                                            >
+                                                {m}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="h-px bg-white/[0.05]" />
+
+                                {/* Notes */}
+                                <div>
+                                    <label className="block text-[10px] text-white/25 uppercase tracking-widest font-medium mb-2">
+                                        Special Notes
+                                    </label>
+                                    <textarea
+                                        value={specialNotes}
+                                        onChange={(e) => setSpecialNotes(e.target.value)}
+                                        placeholder="Vehicle details, special requests…"
+                                        rows={3}
+                                        className={`${inputCls} resize-none`}
                                     />
                                 </div>
-                            </div>
 
-                            {/* Vehicle Details */}
-                            <div>
-                                <p className="text-xs text-neutral-500 tracking-widest uppercase mb-3">
-                                    Vehicle Details
-                                </p>
-                                <div className="space-y-3">
-                                    <div>
-                                        <label className="block text-xs text-neutral-500 mb-2">
-                                            Vehicle Type *
-                                        </label>
-                                        <select
-                                            value={vehicleDetails.type}
-                                            onChange={(e) => setVehicleDetails(p => ({ ...p, type: e.target.value }))}
-                                            className="w-full bg-black border border-neutral-800 text-white text-sm px-3 py-2.5 focus:outline-none focus:border-neutral-600 capitalize"
-                                        >
-                                            <option value="">Select type</option>
-                                            {VEHICLE_TYPES.map(t => (
-                                                <option key={t} value={t} className="capitalize">
-                                                    {t}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <Input
-                                            label="Brand"
-                                            value={vehicleDetails.brand}
-                                            onChange={(v) => setVehicleDetails(p => ({ ...p, brand: v }))}
-                                            placeholder="e.g. Maruti"
+                                <div className="h-px bg-white/[0.05]" />
+
+                                {/* Summary */}
+                                <div>
+                                    <span className={sectionLabel}>Summary</span>
+                                    <div className="rounded-lg border border-white/[0.07] bg-white/[0.02] p-4 space-y-2.5">
+                                        <SummaryRow
+                                            label="Customer"
+                                            value={bookingType === 'walkin'
+                                                ? walkInCustomer.name
+                                                : `${selectedCustomer?.firstName} ${selectedCustomer?.lastName}`
+                                            }
                                         />
-                                        <Input
-                                            label="Model"
-                                            value={vehicleDetails.model}
-                                            onChange={(v) => setVehicleDetails(p => ({ ...p, model: v }))}
-                                            placeholder="e.g. Swift"
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <Input
-                                            label="Color"
-                                            value={vehicleDetails.color}
-                                            onChange={(v) => setVehicleDetails(p => ({ ...p, color: v }))}
-                                            placeholder="e.g. White"
-                                        />
-                                        <Input
-                                            label="Plate Number"
-                                            value={vehicleDetails.plateNumber}
-                                            onChange={(v) => setVehicleDetails(p => ({ ...p, plateNumber: v }))}
-                                            placeholder="KA 01 AB 1234"
+                                        <SummaryRow label="Service" value={selectedService?.name} />
+                                        <SummaryRow label="Variant" value={selectedVariant?.name} />
+                                        <SummaryRow label="Date"    value={bookingDate} mono />
+                                        <SummaryRow label="Time"    value={timeSlot}    mono />
+                                        <div className="h-px bg-white/[0.05]" />
+                                        <SummaryRow
+                                            label="Total"
+                                            value={`₹${(selectedVariant?.discountPrice ?? selectedVariant?.price)?.toLocaleString('en-IN')}`}
+                                            highlight
                                         />
                                     </div>
                                 </div>
                             </div>
-
-                            {/* Payment */}
-                            <div>
-                                <p className="text-xs text-neutral-500 tracking-widest uppercase mb-3">
-                                    Payment Method
-                                </p>
-                                <div className="grid grid-cols-3 gap-2">
-                                    {['cash', 'card', 'online'].map((method) => (
-                                        <button
-                                            key={method}
-                                            onClick={() => setPaymentMethod(method)}
-                                            className={`p-3 border text-xs capitalize transition-colors ${
-                                                paymentMethod === method
-                                                    ? 'border-white bg-white/5 text-white'
-                                                    : 'border-neutral-800 text-neutral-500 hover:border-neutral-600'
-                                            }`}
-                                        >
-                                            {method}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Special Notes */}
-                            <div>
-                                <label className="block text-xs text-neutral-500 tracking-widest uppercase mb-2">
-                                    Special Notes
-                                </label>
-                                <textarea
-                                    value={specialNotes}
-                                    onChange={(e) => setSpecialNotes(e.target.value)}
-                                    placeholder="Any special instructions..."
-                                    rows={3}
-                                    className="w-full bg-black border border-neutral-800 text-white placeholder-neutral-600 text-sm px-3 py-2 focus:outline-none focus:border-neutral-600 resize-none"
-                                />
-                            </div>
-
-                            {/* Summary */}
-                            <div className="border border-neutral-800 p-4 space-y-2">
-                                <p className="text-xs text-neutral-500 tracking-widest uppercase mb-3">
-                                    Summary
-                                </p>
-                                <SummaryRow
-                                    label="Customer"
-                                    value={
-                                        bookingType === 'walkin'
-                                            ? walkInCustomer.name
-                                            : `${selectedCustomer?.firstName} ${selectedCustomer?.lastName}`
-                                    }
-                                />
-                                <SummaryRow label="Service" value={selectedService?.name} />
-                                <SummaryRow label="Vehicle" value={selectedVehicleType?.label} />
-                                <SummaryRow label="Date" value={bookingDate} />
-                                <SummaryRow label="Slot" value={timeSlot} mono />
-                                <SummaryRow
-                                    label="Amount"
-                                    value={`₹${selectedVehicleType?.price?.toLocaleString('en-IN')}`}
-                                    highlight
-                                />
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* Footer */}
-                <div className="px-6 py-4 border-t border-neutral-800 flex items-center gap-3 shrink-0">
-                    {step > 1 && (
-                        <button
-                            onClick={() => setStep(step - 1)}
-                            className="border border-neutral-800 text-neutral-400 hover:text-white text-xs tracking-widest uppercase px-4 py-3 transition-colors"
-                        >
-                            Back
-                        </button>
-                    )}
-
-                    <button
-                        onClick={onClose}
-                        className="border border-neutral-800 text-neutral-400 hover:text-white text-xs tracking-widest uppercase px-4 py-3 transition-colors"
-                    >
-                        Cancel
-                    </button>
-
-                    <button
-                        onClick={() => {
-                            if (step < 4) {
-                                setStep(step + 1);
-                            } else {
-                                handleSubmit();
-                            }
-                        }}
-                        disabled={
-                            loading ||
-                            (step === 1 && !canProceedStep1) ||
-                            (step === 2 && !canProceedStep2) ||
-                            (step === 3 && !canProceedStep3) ||
-                            (step === 4 && !canProceedStep4)
-                        }
-                        className="flex-1 bg-white hover:bg-neutral-200 disabled:bg-neutral-800 disabled:text-neutral-600 disabled:cursor-not-allowed text-black text-xs tracking-widest uppercase py-3 transition-colors flex items-center justify-center gap-2"
-                    >
-                        {loading ? (
-                            <>
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                Creating...
-                            </>
-                        ) : step < 4 ? (
-                            'Next'
-                        ) : (
-                            'Create Booking'
                         )}
-                    </button>
+                    </div>
+
+                    {/* ── Footer ── */}
+                    <div className="shrink-0 h-px bg-white/[0.05]" />
+                    <div className="shrink-0 px-4 py-4 flex gap-2">
+                        {step > 1 && (
+                            <button
+                                onClick={() => setStep(step - 1)}
+                                className="
+                                    hidden sm:flex items-center px-4 py-2.5 rounded-lg
+                                    border border-white/[0.08] bg-white/[0.03]
+                                    text-xs text-white/40 hover:text-white/70
+                                    hover:border-white/[0.14] hover:bg-white/[0.05]
+                                    transition-all duration-150
+                                "
+                            >
+                                Back
+                            </button>
+                        )}
+
+                        <button
+                            onClick={() => step < 4 ? setStep(step + 1) : handleSubmit()}
+                            disabled={loading || !canProceed[step]}
+                            className="
+                                flex-1 flex items-center justify-center gap-2
+                                py-2.5 rounded-lg
+                                bg-white text-black text-sm font-medium
+                                hover:bg-white/90 active:bg-white/80
+                                disabled:bg-white/10 disabled:text-white/20 disabled:cursor-not-allowed
+                                shadow-lg shadow-white/10
+                                transition-all duration-150
+                            "
+                        >
+                            {loading ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    <span>Creating…</span>
+                                </>
+                            ) : step < 4 ? (
+                                'Continue'
+                            ) : (
+                                'Create Booking'
+                            )}
+                        </button>
+                    </div>
                 </div>
             </div>
-        </div>
+        </>
     );
 }
 
-// ── Reusable Input ──
-function Input({ label, value, onChange, placeholder, type = 'text' }) {
+/* ── Sub-components ── */
+
+function FieldInput({ label, value, onChange, placeholder, type = 'text' }) {
     return (
-        <div>
-            <label className="block text-xs text-neutral-500 mb-1.5">
+        <div className="space-y-1.5">
+            <label className="block text-[10px] text-white/25 uppercase tracking-widest font-medium">
                 {label}
             </label>
             <input
@@ -737,23 +687,20 @@ function Input({ label, value, onChange, placeholder, type = 'text' }) {
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
                 placeholder={placeholder}
-                className="w-full bg-black border border-neutral-800 text-white placeholder-neutral-600 text-sm px-3 py-2.5 focus:outline-none focus:border-neutral-600 transition-colors"
+                className={inputCls}
             />
         </div>
     );
 }
 
-// ── Summary Row ──
 function SummaryRow({ label, value, highlight, mono }) {
     return (
-        <div className="flex items-center justify-between">
-            <p className="text-xs text-neutral-600">{label}</p>
-            <p className={`text-sm ${
-                highlight
-                    ? 'text-white font-medium'
-                    : mono
-                    ? 'font-mono text-neutral-400'
-                    : 'text-neutral-400'
+        <div className="flex items-center justify-between gap-4">
+            <p className="text-[11px] text-white/25 shrink-0">{label}</p>
+            <p className={`text-xs text-right ${
+                highlight ? 'text-white font-semibold text-sm tabular-nums'
+                : mono     ? 'font-mono text-white/50'
+                :            'text-white/50'
             }`}>
                 {value || '—'}
             </p>

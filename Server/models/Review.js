@@ -1,4 +1,4 @@
-// models/Review.js - UPDATED with new fields
+// models/Review.js - UPDATED
 
 import mongoose from 'mongoose';
 
@@ -20,21 +20,16 @@ const reviewSchema = new mongoose.Schema({
         required: true
     },
 
-    // ✅ NEW: Extra info from booking
+    // Extra info from booking
     serviceName: {
         type: String,
         default: ''
     },
-    serviceCategory: {
-        type: String,
-        enum: ['basic', 'standard', 'premium', ''],
-        default: ''
-    },
-    vehicleType: {
+    categoryName: {
         type: String,
         default: ''
     },
-    vehicleTypeName: {
+    variantName: {
         type: String,
         default: ''
     },
@@ -88,9 +83,7 @@ reviewSchema.post('save', async function() {
 
         if (stats.length > 0) {
             await Service.findByIdAndUpdate(this.serviceId, {
-                averageRating: Math.round(
-                    stats[0].averageRating * 10
-                ) / 10,
+                averageRating: Math.round(stats[0].averageRating * 10) / 10,
                 totalReviews: stats[0].totalReviews
             });
         }

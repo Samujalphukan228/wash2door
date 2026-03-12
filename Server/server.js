@@ -14,6 +14,7 @@ import adminRoutes from './routes/adminRoutes.js';
 import publicRoutes from './routes/publicRoutes.js';
 import bookingRoutes from './routes/bookingRoutes.js';
 import reviewRoutes from './routes/reviewRoutes.js';
+import categoryRoutes from './routes/categoryRoutes.js';
 import serviceRoutes from './routes/serviceRoutes.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { generalLimiter } from './middleware/rateLimiter.js';
@@ -32,28 +33,26 @@ connectDB().then(() => {
     process.exit(1);
 });
 
-// ── allowed origins ──
 const ALLOWED_ORIGINS = [
-    'http://localhost:3000',  // public frontend dev
-    'http://localhost:3001',  // admin frontend dev (if different port)
+    'http://localhost:3000',
+    'http://localhost:3001',
     'http://localhost:3002',
     process.env.FRONTEND_URL,
     process.env.ADMIN_URL,
-].filter(Boolean) // remove undefined
+].filter(Boolean);
 
-app.use(helmet())
+app.use(helmet());
 app.use(cors({
     origin: (origin, callback) => {
-        // allow requests with no origin (mobile apps, curl, Postman)
-        if (!origin) return callback(null, true)
-        if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true)
-        console.warn(`⚠️  CORS blocked: ${origin}`)
-        callback(new Error(`CORS: origin ${origin} not allowed`))
+        if (!origin) return callback(null, true);
+        if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+        console.warn(`⚠️ CORS blocked: ${origin}`);
+        callback(new Error(`CORS: origin ${origin} not allowed`));
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
-}))
+}));
 
 app.use(generalLimiter);
 app.use(express.json({ limit: '10kb' }));
@@ -62,7 +61,6 @@ app.use(cookieParser());
 app.use(mongoSanitize());
 app.use(hpp());
 
-// ROUTES
 app.get('/api/health', (req, res) => {
     res.status(200).json({
         success: true,
@@ -76,6 +74,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/reviews', reviewRoutes);
+app.use('/api/categories', categoryRoutes);
 app.use('/api/services', serviceRoutes);
 
 app.use(notFound);
@@ -86,16 +85,15 @@ const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
     console.log(`
     ╔═══════════════════════════════════════════════════════════╗
-    ║        🚀 SERVER RUNNING - Port ${PORT}                     ║
+    ║        🚀 SERVER RUNNING - Port ${PORT}                      ║
     ╠═══════════════════════════════════════════════════════════╣
-    ║   Auth:     /api/auth/*                                   ║
-    ║   Admin:    /api/admin/*                                  ║
-    ║   Public:   /api/public/*                                 ║
-    ║   Bookings: /api/bookings/*                               ║
-    ║   Reviews:  /api/reviews/*                                ║
-    ║   Services: /api/services/*                               ║
-    ║   Socket:   ws://localhost:${PORT}                          ║
-    ║   CORS:     ${ALLOWED_ORIGINS.join(', ')}
+    ║   Auth:       /api/auth/*                                 ║
+    ║   Admin:      /api/admin/*                                ║
+    ║   Public:     /api/public/*                               ║
+    ║   Bookings:   /api/bookings/*                             ║
+    ║   Reviews:    /api/reviews/*                              ║
+    ║   Categories: /api/categories/*                           ║
+    ║   Services:   /api/services/*                             ║
     ╚═══════════════════════════════════════════════════════════╝
     `);
 });

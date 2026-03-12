@@ -1,4 +1,4 @@
-// controllers/authController.js - COMPLETE FILE
+// controllers/authController.js - FIXED getUserStats
 
 import crypto from 'crypto';
 import { validationResult } from 'express-validator';
@@ -6,7 +6,7 @@ import mongoose from 'mongoose';
 import User from '../models/User.js';
 import Booking from '../models/Booking.js';
 import Review from '../models/Review.js';
-import { deleteCloudinaryImage } from '../config/cloudinary.js'; // ✅ ADDED
+import { deleteCloudinaryImage } from '../config/cloudinary.js';
 import {
     generateTokens,
     setTokenCookies,
@@ -110,9 +110,7 @@ export const verifyOTP = async (req, res) => {
             });
         }
 
-        const user = await User.findOne({
-            email: email.toLowerCase()
-        });
+        const user = await User.findOne({ email: email.toLowerCase() });
 
         if (!user) {
             return res.status(404).json({
@@ -195,9 +193,7 @@ export const resendOTP = async (req, res) => {
             });
         }
 
-        const user = await User.findOne({
-            email: email.toLowerCase()
-        });
+        const user = await User.findOne({ email: email.toLowerCase() });
 
         if (!user) {
             return res.status(404).json({
@@ -260,9 +256,7 @@ export const login = async (req, res) => {
 
         const { email, password } = req.body;
 
-        const user = await User.findOne({
-            email: email.toLowerCase()
-        }).select('+password');
+        const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
 
         if (!user) {
             return res.status(401).json({
@@ -281,9 +275,7 @@ export const login = async (req, res) => {
         }
 
         if (user.isLocked()) {
-            const lockTimeRemaining = Math.ceil(
-                (user.lockUntil - Date.now()) / 1000 / 60
-            );
+            const lockTimeRemaining = Math.ceil((user.lockUntil - Date.now()) / 1000 / 60);
             return res.status(423).json({
                 success: false,
                 message: `Account locked. Try again in ${lockTimeRemaining} minutes.`
@@ -309,17 +301,13 @@ export const login = async (req, res) => {
 
         if (!isPasswordValid) {
             await user.incrementLoginAttempts();
-
-            // ✅ FIXED: Correct remaining attempts calculation
             const updatedAttempts = user.loginAttempts + 1;
             const remainingAttempts = Math.max(0, 5 - updatedAttempts);
 
             return res.status(401).json({
                 success: false,
                 message: 'Invalid email or password',
-                remainingAttempts: remainingAttempts > 0
-                    ? remainingAttempts
-                    : undefined
+                remainingAttempts: remainingAttempts > 0 ? remainingAttempts : undefined
             });
         }
 
@@ -422,10 +410,7 @@ export const refreshToken = async (req, res) => {
             });
         }
 
-        const {
-            accessToken,
-            refreshToken: newRefreshToken
-        } = generateTokens(user._id);
+        const { accessToken, refreshToken: newRefreshToken } = generateTokens(user._id);
 
         user.refreshToken = newRefreshToken;
         await user.save({ validateBeforeSave: false });
@@ -456,10 +441,7 @@ export const verifyEmail = async (req, res) => {
     try {
         const { token } = req.params;
 
-        const hashedToken = crypto
-            .createHash('sha256')
-            .update(token)
-            .digest('hex');
+        const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
 
         const user = await User.findOne({
             emailVerificationToken: hashedToken,
@@ -626,10 +608,7 @@ export const resetPassword = async (req, res) => {
         const { token } = req.params;
         const { password } = req.body;
 
-        const hashedToken = crypto
-            .createHash('sha256')
-            .update(token)
-            .digest('hex');
+        const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
 
         const user = await User.findOne({
             passwordResetToken: hashedToken,
@@ -841,7 +820,7 @@ export const updateProfile = async (req, res) => {
 };
 
 // ============================================
-// UPDATE AVATAR - ✅ ADDED
+// UPDATE AVATAR
 // ============================================
 
 export const updateAvatar = async (req, res) => {
@@ -862,7 +841,6 @@ export const updateAvatar = async (req, res) => {
             });
         }
 
-        // Delete old avatar from cloudinary if not default
         if (user.avatar && !user.avatar.includes('default')) {
             await deleteCloudinaryImage(user.avatar);
         }
@@ -876,9 +854,7 @@ export const updateAvatar = async (req, res) => {
         res.status(200).json({
             success: true,
             message: 'Avatar updated successfully',
-            data: {
-                avatar: updatedUser.avatar
-            }
+            data: { avatar: updatedUser.avatar }
         });
 
     } catch (error) {
@@ -943,7 +919,7 @@ export const deactivateAccount = async (req, res) => {
 };
 
 // ============================================
-// GET USER STATS
+// GET USER STATS - FIXED
 // ============================================
 
 export const getUserStats = async (req, res) => {
@@ -975,12 +951,7 @@ export const getUserStats = async (req, res) => {
                     status: 'completed'
                 }
             },
-            {
-                $group: {
-                    _id: null,
-                    total: { $sum: '$price' }
-                }
-            }
+            { $group: { _id: null, total: { $sum: '$price' } } }
         ]);
 
         const mostUsedService = await Booking.aggregate([
@@ -1001,7 +972,7 @@ export const getUserStats = async (req, res) => {
             { $limit: 1 }
         ]);
 
-        const mostUsedVehicle = await Booking.aggregate([
+        const mostUsedVariant = await Booking.aggregate([
             {
                 $match: {
                     customerId: new mongoose.Types.ObjectId(userId),
@@ -1010,8 +981,7 @@ export const getUserStats = async (req, res) => {
             },
             {
                 $group: {
-                    _id: '$vehicleType',
-                    vehicleTypeName: { $first: '$vehicleTypeName' },
+                    _id: '$variantName',
                     count: { $sum: 1 }
                 }
             },
@@ -1022,20 +992,14 @@ export const getUserStats = async (req, res) => {
         const recentBookings = await Booking.find({ customerId: userId })
             .sort({ createdAt: -1 })
             .limit(5)
-            .select(
-                'bookingCode serviceName vehicleTypeName ' +
-                'bookingDate timeSlot status price'
-            );
+            .select('bookingCode serviceName variantName bookingDate timeSlot status price');
 
         const activeBookings = await Booking.find({
             customerId: userId,
             status: { $in: ['pending', 'confirmed', 'in-progress'] }
         })
             .sort({ bookingDate: 1 })
-            .select(
-                'bookingCode serviceName vehicleTypeName ' +
-                'bookingDate timeSlot status price location'
-            );
+            .select('bookingCode serviceName variantName bookingDate timeSlot status price location');
 
         res.status(200).json({
             success: true,
@@ -1051,7 +1015,7 @@ export const getUserStats = async (req, res) => {
                 totalSpent: totalSpentData[0]?.total || 0,
                 totalReviews,
                 mostUsedService: mostUsedService[0] || null,
-                mostUsedVehicle: mostUsedVehicle[0] || null,
+                mostUsedVariant: mostUsedVariant[0] || null,
                 recentBookings,
                 activeBookings
             }
@@ -1082,9 +1046,7 @@ export const checkRegistrationStatus = async (req, res) => {
             });
         }
 
-        const user = await User.findOne({
-            email: email.toLowerCase()
-        });
+        const user = await User.findOne({ email: email.toLowerCase() });
 
         if (!user) {
             return res.status(200).json({
@@ -1119,9 +1081,7 @@ export const debugUserStatus = async (req, res) => {
     try {
         const { email } = req.params;
 
-        const user = await User.findOne({
-            email: email.toLowerCase()
-        });
+        const user = await User.findOne({ email: email.toLowerCase() });
 
         if (!user) {
             return res.status(404).json({
@@ -1169,9 +1129,7 @@ export const deleteUserCompletely = async (req, res) => {
             });
         }
 
-        const user = await User.findOne({
-            email: email.toLowerCase()
-        });
+        const user = await User.findOne({ email: email.toLowerCase() });
 
         if (!user) {
             return res.status(404).json({

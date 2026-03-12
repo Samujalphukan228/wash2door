@@ -1,6 +1,7 @@
-// controllers/publicController.js - COMPLETE FIXED
+// controllers/publicController.js
 
 import Service from '../models/Service.js';
+import Category from '../models/Category.js';
 import Review from '../models/Review.js';
 import mongoose from 'mongoose';
 
@@ -11,17 +12,20 @@ const isValidObjectId = (id) =>
 // ============================================
 // GET ALL ACTIVE SERVICES
 // ============================================
-
 export const getActiveServices = async (req, res) => {
     try {
-        const { category, sort, search } = req.query;
+        const { category, tier, sort, search } = req.query;
 
         const query = { isActive: true };
 
-        if (category) {
-            const validCategories = ['basic', 'standard', 'premium'];
-            if (validCategories.includes(category)) {
-                query.category = category;
+        if (category && isValidObjectId(category)) {
+            query.category = category;
+        }
+
+        if (tier) {
+            const validTiers = ['basic', 'standard', 'premium', 'custom'];
+            if (validTiers.includes(tier)) {
+                query.tier = tier;
             }
         }
 
@@ -34,22 +38,22 @@ export const getActiveServices = async (req, res) => {
         }
 
         let sortOption = { displayOrder: 1 };
-
         if (sort === 'price-low') sortOption = { startingPrice: 1 };
         if (sort === 'price-high') sortOption = { startingPrice: -1 };
         if (sort === 'rating') sortOption = { averageRating: -1 };
         if (sort === 'popular') sortOption = { totalBookings: -1 };
 
         const services = await Service.find(query)
-            .select('name shortDescription category images vehicleTypes highlights startingPrice averageRating totalReviews totalBookings displayOrder isActive')
+            .populate('category', 'name slug icon image')
+            .select('name shortDescription category tier images variants highlights startingPrice averageRating totalReviews totalBookings displayOrder isFeatured')
             .sort(sortOption);
 
-        // Format response
         const formattedServices = services.map(service => ({
             _id: service._id,
             name: service.name,
             shortDescription: service.shortDescription,
             category: service.category,
+            tier: service.tier,
             primaryImage: service.primaryImage,
             images: service.images,
             highlights: service.highlights,
@@ -58,7 +62,19 @@ export const getActiveServices = async (req, res) => {
             averageRating: service.averageRating,
             totalReviews: service.totalReviews,
             totalBookings: service.totalBookings,
-            vehicleCount: service.vehicleTypes.filter(v => v.isActive).length
+            isFeatured: service.isFeatured,
+            variantCount: service.variants ? service.variants.filter(v => v.isActive).length : 0,
+            variants: service.variants
+                ? service.variants
+                    .filter(v => v.isActive)
+                    .map(v => ({
+                        _id: v._id,
+                        name: v.name,
+                        price: v.price,
+                        discountPrice: v.discountPrice,
+                        duration: v.duration
+                    }))
+                : []
         }));
 
         res.status(200).json({
@@ -80,7 +96,6 @@ export const getActiveServices = async (req, res) => {
 // ============================================
 // GET SINGLE SERVICE DETAILS
 // ============================================
-
 export const getServiceDetails = async (req, res) => {
     try {
         const { serviceId } = req.params;
@@ -95,7 +110,9 @@ export const getServiceDetails = async (req, res) => {
         const service = await Service.findOne({
             _id: serviceId,
             isActive: true
-        }).select('-createdBy');
+        })
+            .populate('category', 'name slug icon image')
+            .select('-createdBy');
 
         if (!service) {
             return res.status(404).json({
@@ -104,12 +121,10 @@ export const getServiceDetails = async (req, res) => {
             });
         }
 
-        // Get active vehicle types only
-        const activeVehicleTypes = service.vehicleTypes
+        const activeVariants = service.variants
             .filter(v => v.isActive)
             .sort((a, b) => a.displayOrder - b.displayOrder);
 
-        // Get reviews
         const reviews = await Review.find({
             serviceId,
             isVisible: true
@@ -118,7 +133,6 @@ export const getServiceDetails = async (req, res) => {
             .sort({ createdAt: -1 })
             .limit(10);
 
-        // Rating breakdown
         const ratingBreakdown = await Review.aggregate([
             {
                 $match: {
@@ -144,17 +158,19 @@ export const getServiceDetails = async (req, res) => {
                     description: service.description,
                     shortDescription: service.shortDescription,
                     category: service.category,
+                    tier: service.tier,
                     images: service.images,
                     primaryImage: service.primaryImage,
                     highlights: service.highlights,
                     includes: service.includes,
                     excludes: service.excludes,
-                    vehicleTypes: activeVehicleTypes,
+                    variants: activeVariants,
                     startingPrice: service.startingPrice,
                     priceRange: service.priceRange,
                     averageRating: service.averageRating,
                     totalReviews: service.totalReviews,
-                    totalBookings: service.totalBookings
+                    totalBookings: service.totalBookings,
+                    isFeatured: service.isFeatured
                 },
                 reviews,
                 ratingBreakdown
@@ -174,40 +190,46 @@ export const getServiceDetails = async (req, res) => {
 // ============================================
 // GET CATEGORIES
 // ============================================
-
+// ✅ CORRECT BACKEND FUNCTION
 export const getCategories = async (req, res) => {
     try {
-        const categories = await Service.aggregate([
-            { $match: { isActive: true } },
-            {
-                $group: {
-                    _id: '$category',
-                    count: { $sum: 1 },
-                    minPrice: { $min: '$startingPrice' },
-                    maxPrice: { $max: '$startingPrice' },
-                    avgRating: { $avg: '$averageRating' }
-                }
-            },
-            { $sort: { _id: 1 } }
-        ]);
+        console.log('🔥 getCategories CALLED');
 
-        // Order: basic → standard → premium
-        const order = ['basic', 'standard', 'premium'];
-        const sorted = categories.sort(
-            (a, b) => order.indexOf(a._id) - order.indexOf(b._id)
+        const categories = await Category.find({ isActive: true })
+            .select('name slug icon image description displayOrder')
+            .sort({ displayOrder: 1, createdAt: -1 })
+            .lean();
+
+        const result = await Promise.all(
+            categories.map(async (cat) => {
+                const count = await Service.countDocuments({
+                    category: cat._id,
+                    isActive: true
+                });
+                return {
+                    _id: cat._id,
+                    name: cat.name,
+                    slug: cat.slug,
+                    icon: cat.icon,
+                    image: cat.image,
+                    description: cat.description,
+                    displayOrder: cat.displayOrder,
+                    totalServices: count
+                };
+            })
         );
 
         res.status(200).json({
             success: true,
-            data: sorted
+            total: result.length,
+            data: result
         });
 
     } catch (error) {
-        console.error('Get categories error:', error);
+        console.error('getCategories error:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to fetch categories',
-            error: error.message
+            message: 'Failed to fetch categories'
         });
     }
 };
@@ -215,7 +237,6 @@ export const getCategories = async (req, res) => {
 // ============================================
 // GET SERVICE REVIEWS
 // ============================================
-
 export const getServiceReviews = async (req, res) => {
     try {
         const { serviceId } = req.params;
@@ -236,7 +257,6 @@ export const getServiceReviews = async (req, res) => {
             isVisible: true
         };
 
-        // Filter by rating
         if (rating) {
             query.rating = Number(rating);
         }
@@ -268,9 +288,8 @@ export const getServiceReviews = async (req, res) => {
 };
 
 // ============================================
-// CHECK AVAILABILITY (KEPT FOR PUBLIC)
+// CHECK AVAILABILITY
 // ============================================
-
 export const checkAvailability = async (req, res) => {
     try {
         const { serviceId, date } = req.query;
@@ -297,7 +316,6 @@ export const checkAvailability = async (req, res) => {
             });
         }
 
-        // Check Sunday
         if (bookingDate.getDay() === 0) {
             return res.status(200).json({
                 success: true,
@@ -351,7 +369,7 @@ export const checkAvailability = async (req, res) => {
         console.error('Check availability error:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to check availability',
+            message: 'Failed to fetch availability',
             error: error.message
         });
     }

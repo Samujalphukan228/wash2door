@@ -1,7 +1,9 @@
+// controllers/serviceController.js
+
 import Service from '../models/Service.js';
+import Category from '../models/Category.js';
 import mongoose from 'mongoose';
 
-// Check if Booking model exists, if not create a dummy
 let Booking;
 try {
     Booking = (await import('../models/Booking.js')).default;
@@ -10,7 +12,6 @@ try {
     Booking = null;
 }
 
-// Import cloudinary delete function safely
 let deleteCloudinaryImage;
 try {
     const cloudinaryModule = await import('../config/cloudinary.js');
@@ -38,12 +39,14 @@ const parseArray = (value) => {
 // ============================================
 export const getAllServicesAdmin = async (req, res) => {
     console.log('🔥 getAllServicesAdmin CALLED');
-    console.log('📦 Query params:', req.query);
 
     try {
         const {
             category,
+            tier,
             isActive,
+            isFeatured,
+            search,
             page = 1,
             limit = 12
         } = req.query;
@@ -51,25 +54,37 @@ export const getAllServicesAdmin = async (req, res) => {
         const pageNum = parseInt(page) || 1;
         const limitNum = parseInt(limit) || 12;
 
-        // Build query
         const query = {};
 
-        if (category && category !== '') {
+        if (category && category !== '' && isValidObjectId(category)) {
             query.category = category;
+        }
+
+        if (tier && tier !== '') {
+            query.tier = tier;
         }
 
         if (isActive !== undefined && isActive !== '') {
             query.isActive = isActive === 'true';
         }
 
+        if (isFeatured !== undefined && isFeatured !== '') {
+            query.isFeatured = isFeatured === 'true';
+        }
+
+        if (search && search.trim() !== '') {
+            query.$or = [
+                { name: { $regex: search.trim(), $options: 'i' } },
+                { description: { $regex: search.trim(), $options: 'i' } }
+            ];
+        }
+
         console.log('📦 MongoDB query:', query);
 
-        // Get total count
         const total = await Service.countDocuments(query);
-        console.log('📦 Total services:', total);
 
-        // Get services
         const services = await Service.find(query)
+            .populate('category', 'name slug icon image')
             .sort({ displayOrder: 1, createdAt: -1 })
             .limit(limitNum)
             .skip((pageNum - 1) * limitNum)
@@ -87,8 +102,6 @@ export const getAllServicesAdmin = async (req, res) => {
 
     } catch (error) {
         console.error('❌ getAllServicesAdmin ERROR:', error.message);
-        console.error('Stack:', error.stack);
-
         res.status(500).json({
             success: false,
             message: 'Error fetching services',
@@ -113,7 +126,8 @@ export const getServiceById = async (req, res) => {
             });
         }
 
-        const service = await Service.findById(serviceId);
+        const service = await Service.findById(serviceId)
+            .populate('category', 'name slug icon image');
 
         if (!service) {
             return res.status(404).json({
@@ -150,11 +164,13 @@ export const createService = async (req, res) => {
             description,
             shortDescription,
             category,
+            tier,
             highlights,
             includes,
             excludes,
             displayOrder,
-            vehicleTypes
+            isFeatured,
+            variants
         } = req.body;
 
         // Validate required fields
@@ -170,64 +186,114 @@ export const createService = async (req, res) => {
             });
         }
 
-        // Validate category
-        const validCategories = ['basic', 'standard', 'premium'];
-        if (!validCategories.includes(category)) {
+        // Validate category exists
+        if (!isValidObjectId(category)) {
+            if (req.files) {
+                for (const file of req.files) {
+                    await deleteCloudinaryImage(file.filename);
+                }
+            }
             return res.status(400).json({
                 success: false,
-                message: `Invalid category. Must be: ${validCategories.join(', ')}`
+                message: 'Invalid category ID'
             });
         }
 
-        // Parse vehicleTypes
-        let parsedVehicleTypes = [];
-        if (vehicleTypes) {
+        const categoryExists = await Category.findById(category);
+        if (!categoryExists) {
+            if (req.files) {
+                for (const file of req.files) {
+                    await deleteCloudinaryImage(file.filename);
+                }
+            }
+            return res.status(400).json({
+                success: false,
+                message: 'Category not found'
+            });
+        }
+
+        // Parse variants
+        let parsedVariants = [];
+        if (variants) {
             try {
-                parsedVehicleTypes = typeof vehicleTypes === 'string'
-                    ? JSON.parse(vehicleTypes)
-                    : vehicleTypes;
+                parsedVariants = typeof variants === 'string'
+                    ? JSON.parse(variants)
+                    : variants;
             } catch (e) {
+                if (req.files) {
+                    for (const file of req.files) {
+                        await deleteCloudinaryImage(file.filename);
+                    }
+                }
                 return res.status(400).json({
                     success: false,
-                    message: 'Invalid vehicle types format'
+                    message: 'Invalid variants format. Must be valid JSON array.'
                 });
             }
         }
 
-        if (!parsedVehicleTypes || parsedVehicleTypes.length === 0) {
+        if (!parsedVariants || parsedVariants.length === 0) {
+            if (req.files) {
+                for (const file of req.files) {
+                    await deleteCloudinaryImage(file.filename);
+                }
+            }
             return res.status(400).json({
                 success: false,
-                message: 'At least one vehicle type is required'
+                message: 'At least one variant is required'
             });
         }
 
-        // Validate vehicle types
-        const validVehicleTypes = ['sedan', 'suv', 'hatchback', 'truck', 'van', 'bike', 'other'];
+        // Validate and clean each variant
+        for (let i = 0; i < parsedVariants.length; i++) {
+            const variant = parsedVariants[i];
 
-        for (const vehicle of parsedVehicleTypes) {
-            if (!vehicle.type || !validVehicleTypes.includes(vehicle.type)) {
+            if (!variant.name || variant.name.trim() === '') {
+                if (req.files) {
+                    for (const file of req.files) {
+                        await deleteCloudinaryImage(file.filename);
+                    }
+                }
                 return res.status(400).json({
                     success: false,
-                    message: `Invalid vehicle type: ${vehicle.type}`
+                    message: `Variant ${i + 1}: name is required`
                 });
             }
-            if (!vehicle.price || vehicle.price < 0) {
+
+            if (!variant.price || Number(variant.price) < 0) {
+                if (req.files) {
+                    for (const file of req.files) {
+                        await deleteCloudinaryImage(file.filename);
+                    }
+                }
                 return res.status(400).json({
                     success: false,
-                    message: `Price is required for vehicle type: ${vehicle.type}`
+                    message: `Variant "${variant.name}": valid price is required`
                 });
             }
-            if (!vehicle.duration || vehicle.duration < 1) {
+
+            if (!variant.duration || Number(variant.duration) < 1) {
+                if (req.files) {
+                    for (const file of req.files) {
+                        await deleteCloudinaryImage(file.filename);
+                    }
+                }
                 return res.status(400).json({
                     success: false,
-                    message: `Duration is required for vehicle type: ${vehicle.type}`
+                    message: `Variant "${variant.name}": duration must be at least 1 minute`
                 });
             }
-            // Set defaults
-            vehicle.label = vehicle.label || vehicle.type;
-            vehicle.price = Number(vehicle.price);
-            vehicle.duration = Number(vehicle.duration);
-            vehicle.features = parseArray(vehicle.features);
+
+            // Clean variant data
+            variant.name = variant.name.trim();
+            variant.price = Number(variant.price);
+            variant.duration = Number(variant.duration);
+            variant.discountPrice = variant.discountPrice
+                ? Number(variant.discountPrice)
+                : null;
+            variant.features = parseArray(variant.features);
+            variant.description = variant.description || '';
+            variant.displayOrder = Number(variant.displayOrder) || i;
         }
 
         // Process images
@@ -242,20 +308,29 @@ export const createService = async (req, res) => {
             });
         }
 
+        // Validate tier
+        const validTiers = ['basic', 'standard', 'premium', 'custom'];
+        const serviceTier = validTiers.includes(tier) ? tier : 'basic';
+
         // Create service
         const service = await Service.create({
-            name,
+            name: name.trim(),
             description,
             shortDescription: shortDescription || '',
             category,
+            tier: serviceTier,
             images: serviceImages,
-            vehicleTypes: parsedVehicleTypes,
+            variants: parsedVariants,
             highlights: parseArray(highlights),
             includes: parseArray(includes),
             excludes: parseArray(excludes),
             displayOrder: Number(displayOrder) || 0,
+            isFeatured: isFeatured === 'true' || isFeatured === true,
             createdBy: req.user._id
         });
+
+        // Populate category before sending response
+        await service.populate('category', 'name slug icon');
 
         console.log('✅ Service created:', service._id);
 
@@ -277,7 +352,7 @@ export const createService = async (req, res) => {
         if (error.code === 11000) {
             return res.status(400).json({
                 success: false,
-                message: 'A service with this name already exists'
+                message: 'A service with this name already exists in this category'
             });
         }
 
@@ -317,6 +392,11 @@ export const updateService = async (req, res) => {
         const service = await Service.findById(serviceId);
 
         if (!service) {
+            if (req.files) {
+                for (const file of req.files) {
+                    await deleteCloudinaryImage(file.filename);
+                }
+            }
             return res.status(404).json({
                 success: false,
                 message: 'Service not found'
@@ -328,14 +408,46 @@ export const updateService = async (req, res) => {
             description,
             shortDescription,
             category,
+            tier,
             highlights,
             includes,
             excludes,
             displayOrder,
             isActive,
-            vehicleTypes,
+            isFeatured,
+            variants,
             removeImages
         } = req.body;
+
+        // Validate category if being changed
+        if (category && category !== service.category.toString()) {
+            if (!isValidObjectId(category)) {
+                if (req.files) {
+                    for (const file of req.files) {
+                        await deleteCloudinaryImage(file.filename);
+                    }
+                }
+                return res.status(400).json({
+                    success: false,
+                    message: 'Invalid category ID'
+                });
+            }
+
+            const categoryExists = await Category.findById(category);
+            if (!categoryExists) {
+                if (req.files) {
+                    for (const file of req.files) {
+                        await deleteCloudinaryImage(file.filename);
+                    }
+                }
+                return res.status(400).json({
+                    success: false,
+                    message: 'Category not found'
+                });
+            }
+
+            service.category = category;
+        }
 
         // Handle image removal
         if (removeImages) {
@@ -359,11 +471,18 @@ export const updateService = async (req, res) => {
                 }
                 return res.status(400).json({
                     success: false,
-                    message: 'Maximum 3 images allowed'
+                    message: 'Maximum 3 images allowed. Remove existing images first.'
                 });
             }
 
             const filesToAdd = req.files.slice(0, availableSlots);
+
+            // Delete extra uploaded files
+            const extraFiles = req.files.slice(availableSlots);
+            for (const file of extraFiles) {
+                await deleteCloudinaryImage(file.filename);
+            }
+
             filesToAdd.forEach((file, index) => {
                 service.images.push({
                     url: file.path,
@@ -373,32 +492,59 @@ export const updateService = async (req, res) => {
             });
         }
 
-        // Update fields
-        if (name) service.name = name;
+        // Update basic fields
+        if (name) service.name = name.trim();
         if (description) service.description = description;
         if (shortDescription !== undefined) service.shortDescription = shortDescription;
-        if (category) service.category = category;
         if (displayOrder !== undefined) service.displayOrder = Number(displayOrder);
         if (isActive !== undefined) service.isActive = isActive === 'true' || isActive === true;
+        if (isFeatured !== undefined) service.isFeatured = isFeatured === 'true' || isFeatured === true;
 
+        // Update tier
+        const validTiers = ['basic', 'standard', 'premium', 'custom'];
+        if (tier && validTiers.includes(tier)) {
+            service.tier = tier;
+        }
+
+        // Update arrays
         if (highlights !== undefined) service.highlights = parseArray(highlights);
         if (includes !== undefined) service.includes = parseArray(includes);
         if (excludes !== undefined) service.excludes = parseArray(excludes);
 
-        if (vehicleTypes) {
-            const parsedVehicleTypes = parseArray(vehicleTypes);
-            if (parsedVehicleTypes && parsedVehicleTypes.length > 0) {
-                service.vehicleTypes = parsedVehicleTypes.map(v => ({
+        // Update variants
+        if (variants) {
+            let parsedVariants;
+            try {
+                parsedVariants = typeof variants === 'string'
+                    ? JSON.parse(variants)
+                    : variants;
+            } catch (e) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Invalid variants format'
+                });
+            }
+
+            if (parsedVariants && parsedVariants.length > 0) {
+                service.variants = parsedVariants.map((v, i) => ({
                     ...v,
-                    label: v.label || v.type,
-                    price: Number(v.price),
-                    duration: Number(v.duration),
-                    features: parseArray(v.features)
+                    _id: v._id || undefined, // preserve existing IDs
+                    name: v.name?.trim() || 'Unnamed',
+                    price: Number(v.price) || 0,
+                    duration: Number(v.duration) || 30,
+                    discountPrice: v.discountPrice ? Number(v.discountPrice) : null,
+                    features: parseArray(v.features),
+                    description: v.description || '',
+                    isActive: v.isActive !== undefined
+                        ? (v.isActive === 'true' || v.isActive === true)
+                        : true,
+                    displayOrder: Number(v.displayOrder) || i
                 }));
             }
         }
 
         await service.save();
+        await service.populate('category', 'name slug icon');
 
         console.log('✅ Service updated:', service._id);
 
@@ -410,9 +556,18 @@ export const updateService = async (req, res) => {
 
     } catch (error) {
         console.error('❌ updateService ERROR:', error.message);
+
+        if (error.code === 11000) {
+            return res.status(400).json({
+                success: false,
+                message: 'A service with this name already exists in this category'
+            });
+        }
+
         res.status(500).json({
             success: false,
-            message: 'Error updating service'
+            message: 'Error updating service',
+            error: error.message
         });
     }
 };
@@ -442,35 +597,48 @@ export const deleteService = async (req, res) => {
             });
         }
 
-        // Check for active bookings (if Booking model exists)
+        // Check for active bookings
         if (Booking) {
             const activeBookings = await Booking.countDocuments({
-                service: serviceId,
+                serviceId: serviceId,
                 status: { $in: ['pending', 'confirmed', 'in-progress'] }
             });
 
             if (activeBookings > 0) {
                 return res.status(400).json({
                     success: false,
-                    message: `Cannot delete service with ${activeBookings} active booking(s)`
+                    message: `Cannot delete service with ${activeBookings} active booking(s). Cancel or complete them first.`
                 });
             }
         }
 
-        // Delete images
+        // Delete service images
         for (const image of service.images) {
             if (image.publicId) {
                 await deleteCloudinaryImage(image.publicId);
             }
         }
 
-        for (const vehicle of service.vehicleTypes) {
-            if (vehicle.imagePublicId) {
-                await deleteCloudinaryImage(vehicle.imagePublicId);
+        // Delete variant images
+        for (const variant of service.variants) {
+            if (variant.image && variant.image.publicId) {
+                await deleteCloudinaryImage(variant.image.publicId);
             }
         }
 
+        const categoryId = service.category;
         await service.deleteOne();
+
+        // Update category count
+        try {
+            const count = await Service.countDocuments({
+                category: categoryId,
+                isActive: true
+            });
+            await Category.findByIdAndUpdate(categoryId, { totalServices: count });
+        } catch (err) {
+            console.error('Error updating category count:', err);
+        }
 
         console.log('✅ Service deleted:', serviceId);
 
@@ -483,16 +651,17 @@ export const deleteService = async (req, res) => {
         console.error('❌ deleteService ERROR:', error.message);
         res.status(500).json({
             success: false,
-            message: 'Error deleting service'
+            message: 'Error deleting service',
+            error: error.message
         });
     }
 };
 
 // ============================================
-// ADD VEHICLE TYPE (ADMIN)
+// ADD VARIANT (ADMIN)
 // ============================================
-export const addVehicleType = async (req, res) => {
-    console.log('🔥 addVehicleType CALLED');
+export const addVariant = async (req, res) => {
+    console.log('🔥 addVariant CALLED');
 
     try {
         const { serviceId } = req.params;
@@ -507,79 +676,88 @@ export const addVehicleType = async (req, res) => {
         const service = await Service.findById(serviceId);
 
         if (!service) {
+            if (req.file) await deleteCloudinaryImage(req.file.filename);
             return res.status(404).json({
                 success: false,
                 message: 'Service not found'
             });
         }
 
-        const { type, label, description, price, duration, features, displayOrder } = req.body;
+        const { name, description, price, duration, discountPrice, features, displayOrder } = req.body;
 
-        if (!type || !price || !duration) {
+        if (!name || !price || !duration) {
             if (req.file) await deleteCloudinaryImage(req.file.filename);
             return res.status(400).json({
                 success: false,
-                message: 'Type, price and duration are required'
+                message: 'Name, price and duration are required'
             });
         }
 
-        const exists = service.vehicleTypes.find(v => v.type === type);
+        // Check duplicate variant name in this service
+        const exists = service.variants.find(
+            v => v.name.toLowerCase() === name.trim().toLowerCase()
+        );
+
         if (exists) {
             if (req.file) await deleteCloudinaryImage(req.file.filename);
             return res.status(400).json({
                 success: false,
-                message: `Vehicle type "${type}" already exists`
+                message: `Variant "${name}" already exists in this service`
             });
         }
 
-        let vehicleImage = 'default-vehicle.jpg';
-        let vehicleImagePublicId = '';
+        // Process image
+        const variantImage = {
+            url: 'default-variant.jpg',
+            publicId: ''
+        };
+
         if (req.file) {
-            vehicleImage = req.file.path;
-            vehicleImagePublicId = req.file.filename;
+            variantImage.url = req.file.path;
+            variantImage.publicId = req.file.filename;
         }
 
-        service.vehicleTypes.push({
-            type,
-            label: label || type,
+        service.variants.push({
+            name: name.trim(),
             description: description || '',
-            image: vehicleImage,
-            imagePublicId: vehicleImagePublicId,
+            image: variantImage,
             price: Number(price),
+            discountPrice: discountPrice ? Number(discountPrice) : null,
             duration: Number(duration),
             features: parseArray(features),
-            displayOrder: Number(displayOrder) || 0,
+            displayOrder: Number(displayOrder) || service.variants.length,
             isActive: true
         });
 
         await service.save();
+        await service.populate('category', 'name slug icon');
 
-        console.log('✅ Vehicle type added:', type);
+        console.log('✅ Variant added:', name);
 
         res.status(200).json({
             success: true,
-            message: `Vehicle type "${type}" added`,
+            message: `Variant "${name}" added successfully`,
             data: service
         });
 
     } catch (error) {
-        console.error('❌ addVehicleType ERROR:', error.message);
+        console.error('❌ addVariant ERROR:', error.message);
         if (req.file) await deleteCloudinaryImage(req.file.filename);
         res.status(500).json({
             success: false,
-            message: 'Error adding vehicle type'
+            message: 'Error adding variant'
         });
     }
 };
 
 // ============================================
-// UPDATE VEHICLE TYPE (ADMIN)
+// UPDATE VARIANT (ADMIN)
 // ============================================
-export const updateVehicleType = async (req, res) => {
-    console.log('🔥 updateVehicleType CALLED');
+export const updateVariant = async (req, res) => {
+    console.log('🔥 updateVariant CALLED');
 
     try {
-        const { serviceId, vehicleTypeId } = req.params;
+        const { serviceId, variantId } = req.params;
 
         if (!isValidObjectId(serviceId)) {
             return res.status(400).json({
@@ -591,67 +769,93 @@ export const updateVehicleType = async (req, res) => {
         const service = await Service.findById(serviceId);
 
         if (!service) {
+            if (req.file) await deleteCloudinaryImage(req.file.filename);
             return res.status(404).json({
                 success: false,
                 message: 'Service not found'
             });
         }
 
-        const vehicleType = service.vehicleTypes.id(vehicleTypeId);
+        const variant = service.variants.id(variantId);
 
-        if (!vehicleType) {
+        if (!variant) {
+            if (req.file) await deleteCloudinaryImage(req.file.filename);
             return res.status(404).json({
                 success: false,
-                message: 'Vehicle type not found'
+                message: 'Variant not found'
             });
         }
 
-        const { label, description, price, duration, features, isActive, displayOrder } = req.body;
+        const { name, description, price, duration, discountPrice, features, isActive, displayOrder } = req.body;
 
+        // Handle image update
         if (req.file) {
-            if (vehicleType.imagePublicId) {
-                await deleteCloudinaryImage(vehicleType.imagePublicId);
+            if (variant.image && variant.image.publicId) {
+                await deleteCloudinaryImage(variant.image.publicId);
             }
-            vehicleType.image = req.file.path;
-            vehicleType.imagePublicId = req.file.filename;
+            variant.image = {
+                url: req.file.path,
+                publicId: req.file.filename
+            };
         }
 
-        if (label) vehicleType.label = label;
-        if (description !== undefined) vehicleType.description = description;
-        if (price) vehicleType.price = Number(price);
-        if (duration) vehicleType.duration = Number(duration);
-        if (isActive !== undefined) vehicleType.isActive = isActive === 'true' || isActive === true;
-        if (displayOrder !== undefined) vehicleType.displayOrder = Number(displayOrder);
-        if (features !== undefined) vehicleType.features = parseArray(features);
+        // Check duplicate name (excluding current variant)
+        if (name && name.trim().toLowerCase() !== variant.name.toLowerCase()) {
+            const exists = service.variants.find(
+                v => v._id.toString() !== variantId &&
+                    v.name.toLowerCase() === name.trim().toLowerCase()
+            );
+
+            if (exists) {
+                if (req.file) await deleteCloudinaryImage(req.file.filename);
+                return res.status(400).json({
+                    success: false,
+                    message: `Variant "${name}" already exists in this service`
+                });
+            }
+        }
+
+        // Update fields
+        if (name) variant.name = name.trim();
+        if (description !== undefined) variant.description = description;
+        if (price) variant.price = Number(price);
+        if (duration) variant.duration = Number(duration);
+        if (discountPrice !== undefined) {
+            variant.discountPrice = discountPrice ? Number(discountPrice) : null;
+        }
+        if (isActive !== undefined) variant.isActive = isActive === 'true' || isActive === true;
+        if (displayOrder !== undefined) variant.displayOrder = Number(displayOrder);
+        if (features !== undefined) variant.features = parseArray(features);
 
         await service.save();
+        await service.populate('category', 'name slug icon');
 
-        console.log('✅ Vehicle type updated');
+        console.log('✅ Variant updated');
 
         res.status(200).json({
             success: true,
-            message: 'Vehicle type updated',
+            message: 'Variant updated successfully',
             data: service
         });
 
     } catch (error) {
-        console.error('❌ updateVehicleType ERROR:', error.message);
+        console.error('❌ updateVariant ERROR:', error.message);
         if (req.file) await deleteCloudinaryImage(req.file.filename);
         res.status(500).json({
             success: false,
-            message: 'Error updating vehicle type'
+            message: 'Error updating variant'
         });
     }
 };
 
 // ============================================
-// DELETE VEHICLE TYPE (ADMIN)
+// DELETE VARIANT (ADMIN)
 // ============================================
-export const deleteVehicleType = async (req, res) => {
-    console.log('🔥 deleteVehicleType CALLED');
+export const deleteVariant = async (req, res) => {
+    console.log('🔥 deleteVariant CALLED');
 
     try {
-        const { serviceId, vehicleTypeId } = req.params;
+        const { serviceId, variantId } = req.params;
 
         if (!isValidObjectId(serviceId)) {
             return res.status(400).json({
@@ -669,42 +873,60 @@ export const deleteVehicleType = async (req, res) => {
             });
         }
 
-        if (service.vehicleTypes.length <= 1) {
+        if (service.variants.length <= 1) {
             return res.status(400).json({
                 success: false,
-                message: 'Cannot delete the only vehicle type'
+                message: 'Cannot delete the only variant. Service must have at least one variant.'
             });
         }
 
-        const vehicleType = service.vehicleTypes.id(vehicleTypeId);
+        const variant = service.variants.id(variantId);
 
-        if (!vehicleType) {
+        if (!variant) {
             return res.status(404).json({
                 success: false,
-                message: 'Vehicle type not found'
+                message: 'Variant not found'
             });
         }
 
-        if (vehicleType.imagePublicId) {
-            await deleteCloudinaryImage(vehicleType.imagePublicId);
+        // Check for active bookings with this variant
+        if (Booking) {
+            const activeBookings = await Booking.countDocuments({
+                serviceId: serviceId,
+                variantId: variantId,
+                status: { $in: ['pending', 'confirmed', 'in-progress'] }
+            });
+
+            if (activeBookings > 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Cannot delete variant with ${activeBookings} active booking(s)`
+                });
+            }
         }
 
-        service.vehicleTypes.pull(vehicleTypeId);
-        await service.save();
+        // Delete variant image
+        if (variant.image && variant.image.publicId) {
+            await deleteCloudinaryImage(variant.image.publicId);
+        }
 
-        console.log('✅ Vehicle type deleted');
+        service.variants.pull(variantId);
+        await service.save();
+        await service.populate('category', 'name slug icon');
+
+        console.log('✅ Variant deleted');
 
         res.status(200).json({
             success: true,
-            message: 'Vehicle type deleted',
+            message: 'Variant deleted successfully',
             data: service
         });
 
     } catch (error) {
-        console.error('❌ deleteVehicleType ERROR:', error.message);
+        console.error('❌ deleteVariant ERROR:', error.message);
         res.status(500).json({
             success: false,
-            message: 'Error deleting vehicle type'
+            message: 'Error deleting variant'
         });
     }
 };
@@ -734,6 +956,7 @@ export const setPrimaryImage = async (req, res) => {
             });
         }
 
+        // Reset all
         service.images.forEach(img => {
             img.isPrimary = false;
         });
@@ -762,6 +985,51 @@ export const setPrimaryImage = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Error setting primary image'
+        });
+    }
+};
+
+// ============================================
+// TOGGLE SERVICE FEATURED (ADMIN)
+// ============================================
+export const toggleFeatured = async (req, res) => {
+    console.log('🔥 toggleFeatured CALLED:', req.params.serviceId);
+
+    try {
+        const { serviceId } = req.params;
+
+        if (!isValidObjectId(serviceId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid service ID'
+            });
+        }
+
+        const service = await Service.findById(serviceId);
+
+        if (!service) {
+            return res.status(404).json({
+                success: false,
+                message: 'Service not found'
+            });
+        }
+
+        service.isFeatured = !service.isFeatured;
+        await service.save();
+
+        console.log('✅ Featured toggled:', service.isFeatured);
+
+        res.status(200).json({
+            success: true,
+            message: `Service ${service.isFeatured ? 'featured' : 'unfeatured'}`,
+            data: service
+        });
+
+    } catch (error) {
+        console.error('❌ toggleFeatured ERROR:', error.message);
+        res.status(500).json({
+            success: false,
+            message: 'Error toggling featured status'
         });
     }
 };

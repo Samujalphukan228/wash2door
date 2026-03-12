@@ -1,171 +1,245 @@
 'use client';
 
 import { format } from 'date-fns';
-import { X, MapPin, Car, Clock, CreditCard, User } from 'lucide-react';
+import { X, MapPin, Clock, CreditCard, User, Package, Tag, ArrowUpRight, RefreshCw } from 'lucide-react';
 
-const statusStyles = {
-    pending:      'text-neutral-400 border-neutral-700',
-    confirmed:    'text-white border-neutral-400',
-    'in-progress':'text-white border-neutral-400',
-    completed:    'text-white border-neutral-400',
-    cancelled:    'text-neutral-600 border-neutral-800'
+const statusConfig = {
+    pending:       { bg: 'bg-yellow-500/10', text: 'text-yellow-400', ring: 'ring-yellow-500/20', dot: 'bg-yellow-400' },
+    confirmed:     { bg: 'bg-blue-500/10',   text: 'text-blue-400',   ring: 'ring-blue-500/20',   dot: 'bg-blue-400'   },
+    'in-progress': { bg: 'bg-purple-500/10', text: 'text-purple-400', ring: 'ring-purple-500/20', dot: 'bg-purple-400' },
+    completed:     { bg: 'bg-green-500/10',  text: 'text-green-400',  ring: 'ring-green-500/20',  dot: 'bg-green-400'  },
+    cancelled:     { bg: 'bg-red-500/10',    text: 'text-red-400',    ring: 'ring-red-500/20',    dot: 'bg-red-400'    }
 };
 
 export default function BookingDetailModal({ booking, onClose, onUpdateStatus }) {
+    const status = statusConfig[booking.status] || statusConfig.pending;
+    const canUpdate = !['completed', 'cancelled'].includes(booking.status);
+
     return (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-            <div className="bg-neutral-950 border border-neutral-800 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <>
+            {/* Backdrop */}
+            <div
+                className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50"
+                onClick={onClose}
+            />
 
-                {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-800 sticky top-0 bg-neutral-950">
-                    <div>
-                        <p className="text-xs text-neutral-500 tracking-widest uppercase mb-1">
-                            Booking Details
-                        </p>
-                        <h2 className="text-white font-mono text-lg">
-                            {booking.bookingCode}
-                        </h2>
-                    </div>
-                    <button
-                        onClick={onClose}
-                        className="w-8 h-8 flex items-center justify-center text-neutral-500 hover:text-white transition-colors"
-                    >
-                        <X className="w-4 h-4" />
-                    </button>
-                </div>
+            {/* Panel */}
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+                <div className="
+                    pointer-events-auto
+                    w-full max-w-lg max-h-[90vh]
+                    flex flex-col
+                    rounded-xl
+                    border border-white/[0.08]
+                    bg-[#0a0a0a]
+                    shadow-2xl shadow-black/80
+                    overflow-hidden
+                ">
+                    {/* Top gradient line */}
+                    <div className="h-px w-full bg-gradient-to-r from-transparent via-white/20 to-transparent shrink-0" />
 
-                <div className="p-6 space-y-6">
+                    {/* Header */}
+                    <div className="flex items-start justify-between px-5 py-4 shrink-0">
+                        <div className="space-y-2">
+                            {/* Code pill */}
+                            <div className="flex items-center gap-2">
+                                <span className="font-mono text-xs text-white/40 bg-white/[0.04] border border-white/[0.07] px-2.5 py-1 rounded-md">
+                                    {booking.bookingCode}
+                                </span>
+                                <span className={`
+                                    inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full
+                                    text-[11px] font-medium ring-1
+                                    ${status.bg} ${status.text} ${status.ring}
+                                `}>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
+                                    <span className="capitalize">{booking.status}</span>
+                                </span>
+                            </div>
 
-                    {/* Status + Type */}
-                    <div className="flex items-center gap-3 flex-wrap">
-                        <span className={`text-xs border px-3 py-1 capitalize ${statusStyles[booking.status]}`}>
-                            {booking.status}
-                        </span>
-                        <span className="text-xs border border-neutral-800 text-neutral-500 px-3 py-1 capitalize">
-                            {booking.bookingType === 'walkin' ? 'Walk-in' : 'Online'}
-                        </span>
-                        <span className="text-xs border border-neutral-800 text-neutral-500 px-3 py-1 capitalize">
-                            {booking.serviceCategory}
-                        </span>
-                    </div>
-
-                    {/* Customer */}
-                    <Section icon={User} title="Customer">
-                        {booking.customerId ? (
-                            <>
-                                <Row label="Name" value={`${booking.customerId.firstName} ${booking.customerId.lastName}`} />
-                                <Row label="Email" value={booking.customerId.email} />
-                            </>
-                        ) : (
-                            <>
-                                <Row label="Name" value={booking.walkInCustomer?.name || '—'} />
-                                <Row label="Phone" value={booking.walkInCustomer?.phone || '—'} />
-                                <Row label="Email" value={booking.walkInCustomer?.email || '—'} />
-                            </>
-                        )}
-                    </Section>
-
-                    {/* Service */}
-                    <Section icon={Car} title="Service">
-                        <Row label="Service" value={booking.serviceName} />
-                        <Row label="Vehicle Type" value={booking.vehicleTypeName} />
-                        <Row label="Duration" value={`${booking.duration} minutes`} />
-                        <Row
-                            label="Amount"
-                            value={`₹${booking.price?.toLocaleString('en-IN')}`}
-                            highlight
-                        />
-                    </Section>
-
-                    {/* Schedule */}
-                    <Section icon={Clock} title="Schedule">
-                        <Row
-                            label="Date"
-                            value={format(new Date(booking.bookingDate), 'EEEE, dd MMMM yyyy')}
-                        />
-                        <Row label="Time Slot" value={booking.timeSlot} mono />
-                    </Section>
-
-                    {/* Location */}
-                    <Section icon={MapPin} title="Location">
-                        <Row label="Address" value={booking.location?.address || '—'} />
-                        <Row label="City" value={booking.location?.city || '—'} />
-                        {booking.location?.state && (
-                            <Row label="State" value={booking.location.state} />
-                        )}
-                        {booking.location?.landmark && (
-                            <Row label="Landmark" value={booking.location.landmark} />
-                        )}
-                    </Section>
-
-                    {/* Vehicle */}
-                    <Section icon={Car} title="Vehicle Details">
-                        <Row label="Brand" value={booking.vehicleDetails?.brand || '—'} />
-                        <Row label="Model" value={booking.vehicleDetails?.model || '—'} />
-                        <Row label="Color" value={booking.vehicleDetails?.color || '—'} />
-                        <Row label="Plate" value={booking.vehicleDetails?.plateNumber || '—'} mono />
-                    </Section>
-
-                    {/* Payment */}
-                    <Section icon={CreditCard} title="Payment">
-                        <Row label="Method" value={booking.paymentMethod} />
-                        <Row label="Status" value={booking.paymentStatus} />
-                    </Section>
-
-                    {/* Special Notes */}
-                    {booking.specialNotes && (
-                        <div>
-                            <p className="text-xs text-neutral-500 tracking-widest uppercase mb-2">
-                                Special Notes
-                            </p>
-                            <p className="text-sm text-neutral-400 bg-neutral-900 border border-neutral-800 p-3">
-                                {booking.specialNotes}
-                            </p>
+                            {/* Sub badges */}
+                            <div className="flex items-center gap-1.5">
+                                <Badge>
+                                    {booking.bookingType === 'walkin' ? 'Walk-in' : 'Online'}
+                                </Badge>
+                                {booking.serviceTier && (
+                                    <Badge>
+                                        <Tag className="w-2.5 h-2.5 opacity-50" />
+                                        {booking.serviceTier}
+                                    </Badge>
+                                )}
+                            </div>
                         </div>
-                    )}
 
-                    {/* Cancellation */}
-                    {booking.status === 'cancelled' && (
-                        <div className="border border-neutral-800 p-4">
-                            <p className="text-xs text-neutral-500 tracking-widest uppercase mb-2">
-                                Cancellation
-                            </p>
-                            <Row label="By" value={booking.cancelledBy || '—'} />
-                            <Row label="Reason" value={booking.cancellationReason || '—'} />
-                        </div>
-                    )}
-                </div>
-
-                {/* Footer */}
-                <div className="px-6 py-4 border-t border-neutral-800 flex items-center justify-between">
-                    <p className="text-xs text-neutral-600">
-                        Created {format(new Date(booking.createdAt), 'dd MMM yyyy, hh:mm a')}
-                    </p>
-                    {booking.status !== 'completed' &&
-                     booking.status !== 'cancelled' && (
                         <button
-                            onClick={onUpdateStatus}
-                            className="bg-white hover:bg-neutral-200 text-black text-xs tracking-[0.15em] uppercase px-4 py-2 transition-colors"
+                            onClick={onClose}
+                            className="
+                                w-8 h-8 rounded-lg flex items-center justify-center
+                                text-white/30 hover:text-white/70
+                                border border-white/[0.06] hover:border-white/[0.12]
+                                bg-white/[0.02] hover:bg-white/[0.06]
+                                transition-all duration-150
+                            "
                         >
-                            Update Status
+                            <X className="w-3.5 h-3.5" />
                         </button>
-                    )}
+                    </div>
+
+                    {/* Divider */}
+                    <div className="h-px bg-white/[0.05] mx-5" />
+
+                    {/* Scrollable Body */}
+                    <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5 scrollbar-thin scrollbar-thumb-white/10">
+
+                        {/* Customer */}
+                        <Section icon={User} title="Customer">
+                            {booking.customerId ? (
+                                <>
+                                    <Row label="Name"  value={`${booking.customerId.firstName} ${booking.customerId.lastName}`} />
+                                    <Row label="Email" value={booking.customerId.email} mono />
+                                </>
+                            ) : (
+                                <>
+                                    <Row label="Name"  value={booking.walkInCustomer?.name  || '—'} />
+                                    <Row label="Phone" value={booking.walkInCustomer?.phone || '—'} mono />
+                                </>
+                            )}
+                        </Section>
+
+                        <Divider />
+
+                        {/* Service */}
+                        <Section icon={Package} title="Service">
+                            <Row label="Category" value={booking.categoryName} />
+                            <Row label="Service"  value={booking.serviceName} />
+                            {booking.variantName && (
+                                <Row label="Variant" value={booking.variantName} />
+                            )}
+                            <Row label="Duration" value={`${booking.duration} min`} />
+                            <Row
+                                label="Amount"
+                                value={`₹${booking.price?.toLocaleString('en-IN')}`}
+                                highlight
+                            />
+                        </Section>
+
+                        <Divider />
+
+                        {/* Schedule */}
+                        <Section icon={Clock} title="Schedule">
+                            <Row
+                                label="Date"
+                                value={format(new Date(booking.bookingDate), 'EEE, dd MMM yyyy')}
+                            />
+                            <Row label="Time" value={booking.timeSlot} mono />
+                        </Section>
+
+                        <Divider />
+
+                        {/* Location */}
+                        <Section icon={MapPin} title="Location">
+                            <Row label="City"    value={booking.location?.city    || '—'} />
+                            <Row label="Address" value={booking.location?.address || '—'} />
+                            {booking.location?.landmark && (
+                                <Row label="Landmark" value={booking.location.landmark} />
+                            )}
+                        </Section>
+
+                        <Divider />
+
+                        {/* Payment */}
+                        <Section icon={CreditCard} title="Payment">
+                            <Row label="Method" value={booking.paymentMethod} />
+                            <Row label="Status" value={booking.paymentStatus} />
+                        </Section>
+
+                        {/* Special Notes */}
+                        {booking.specialNotes && (
+                            <>
+                                <Divider />
+                                <div className="space-y-2">
+                                    <p className="text-[10px] text-white/25 uppercase tracking-widest font-medium">
+                                        Special Notes
+                                    </p>
+                                    <p className="text-xs text-white/50 bg-white/[0.03] border border-white/[0.06] rounded-lg p-3 leading-relaxed">
+                                        {booking.specialNotes}
+                                    </p>
+                                </div>
+                            </>
+                        )}
+
+                        {/* Cancellation */}
+                        {booking.status === 'cancelled' && (
+                            <>
+                                <Divider />
+                                <div className="space-y-2">
+                                    <p className="text-[10px] text-red-400/60 uppercase tracking-widest font-medium">
+                                        Cancellation
+                                    </p>
+                                    <div className="bg-red-500/[0.05] border border-red-500/[0.12] rounded-lg p-3 space-y-2">
+                                        <Row label="Cancelled By" value={booking.cancelledBy || '—'} />
+                                        <Row label="Reason"       value={booking.cancellationReason || '—'} />
+                                    </div>
+                                </div>
+                            </>
+                        )}
+
+                        {/* Bottom spacer */}
+                        <div className="h-1" />
+                    </div>
+
+                    {/* Footer */}
+                    <div className="shrink-0">
+                        <div className="h-px bg-white/[0.05]" />
+                        <div className="flex items-center justify-between px-5 py-3.5">
+                            <p className="text-[11px] text-white/20 font-mono">
+                                {format(new Date(booking.createdAt), 'dd MMM yyyy · hh:mm a')}
+                            </p>
+
+                            {canUpdate ? (
+                                <button
+                                    onClick={onUpdateStatus}
+                                    className="
+                                        group relative flex items-center gap-2
+                                        px-4 py-2 rounded-lg
+                                        bg-white text-black text-xs font-medium
+                                        hover:bg-white/90 active:bg-white/80
+                                        shadow-lg shadow-white/10
+                                        transition-all duration-150
+                                        overflow-hidden
+                                    "
+                                >
+                                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-black/5 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
+                                    <RefreshCw className="w-3 h-3 relative" />
+                                    <span className="relative">Update Status</span>
+                                </button>
+                            ) : (
+                                <span className={`
+                                    text-[11px] font-medium px-3 py-1.5 rounded-full ring-1
+                                    ${status.bg} ${status.text} ${status.ring}
+                                `}>
+                                    {booking.status === 'completed' ? 'Booking completed' : 'Booking cancelled'}
+                                </span>
+                            )}
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
+        </>
     );
 }
 
+/* ── Sub-components ── */
+
 function Section({ icon: Icon, title, children }) {
     return (
-        <div>
-            <div className="flex items-center gap-2 mb-3">
-                <Icon className="w-3.5 h-3.5 text-neutral-600" />
-                <p className="text-xs text-neutral-500 tracking-widest uppercase">
+        <div className="space-y-2.5">
+            <div className="flex items-center gap-1.5">
+                <Icon className="w-3 h-3 text-white/20" />
+                <p className="text-[10px] text-white/25 uppercase tracking-widest font-medium">
                     {title}
                 </p>
             </div>
-            <div className="space-y-2 pl-5">
+            <div className="space-y-2">
                 {children}
             </div>
         </div>
@@ -174,17 +248,29 @@ function Section({ icon: Icon, title, children }) {
 
 function Row({ label, value, highlight, mono }) {
     return (
-        <div className="flex items-start justify-between gap-4">
-            <p className="text-xs text-neutral-600 shrink-0">{label}</p>
-            <p className={`text-sm text-right ${
+        <div className="flex items-start justify-between gap-6">
+            <p className="text-xs text-white/25 shrink-0 pt-px">{label}</p>
+            <p className={`text-xs text-right leading-relaxed ${
                 highlight
-                    ? 'text-white font-medium'
+                    ? 'text-white font-semibold text-sm'
                     : mono
-                    ? 'font-mono text-neutral-300'
-                    : 'text-neutral-300'
+                    ? 'font-mono text-white/55'
+                    : 'text-white/55'
             }`}>
-                {value}
+                {value ?? '—'}
             </p>
         </div>
     );
+}
+
+function Badge({ children }) {
+    return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-white/[0.07] bg-white/[0.03] text-[10px] text-white/35 font-medium">
+            {children}
+        </span>
+    );
+}
+
+function Divider() {
+    return <div className="h-px bg-white/[0.04]" />;
 }

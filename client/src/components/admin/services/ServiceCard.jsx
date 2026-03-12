@@ -1,12 +1,15 @@
+// src/components/admin/services/ServiceCard.jsx
+
 'use client';
 
 import { Eye, Pencil, Trash2, ToggleLeft, ToggleRight, Star, Tag } from 'lucide-react';
 import Image from 'next/image';
 
-const categoryColors = {
+const tierColors = {
     basic: 'border-neutral-700 text-neutral-400',
     standard: 'border-neutral-600 text-neutral-300',
-    premium: 'border-neutral-400 text-white'
+    premium: 'border-neutral-400 text-white',
+    custom: 'border-neutral-500 text-neutral-200'
 };
 
 export default function ServiceCard({
@@ -16,14 +19,13 @@ export default function ServiceCard({
     onDelete,
     onToggleActive
 }) {
-    const primaryImage = service.images?.find(img => img.isPrimary)
-        || service.images?.[0];
+    const primaryImage = service.images?.find(img => img.isPrimary) || service.images?.[0];
+    const categoryName = service.category?.name || 'Uncategorized';
+    const categoryIcon = service.category?.icon || '';
 
     return (
         <div className={`bg-neutral-950 border flex flex-col transition-colors ${
-            service.isActive
-                ? 'border-neutral-800'
-                : 'border-neutral-900 opacity-60'
+            service.isActive ? 'border-neutral-800' : 'border-neutral-900 opacity-60'
         }`}>
             {/* Image */}
             <div className="relative h-44 bg-neutral-900 overflow-hidden">
@@ -42,23 +44,28 @@ export default function ServiceCard({
 
                 {/* Category Badge */}
                 <div className="absolute top-3 left-3">
-                    <span className={`text-xs border px-2 py-0.5 bg-black/80 capitalize ${
-                        categoryColors[service.category]
-                    }`}>
-                        {service.category}
+                    <span className="text-xs border border-neutral-700 bg-black/80 text-neutral-300 px-2 py-0.5">
+                        {categoryIcon} {categoryName}
                     </span>
                 </div>
 
-                {/* Active Badge */}
+                {/* Tier Badge */}
                 <div className="absolute top-3 right-3">
-                    <span className={`text-xs px-2 py-0.5 ${
-                        service.isActive
-                            ? 'bg-white text-black'
-                            : 'bg-neutral-800 text-neutral-500'
+                    <span className={`text-xs border px-2 py-0.5 bg-black/80 capitalize ${
+                        tierColors[service.tier] || tierColors.basic
                     }`}>
-                        {service.isActive ? 'Active' : 'Inactive'}
+                        {service.tier || 'basic'}
                     </span>
                 </div>
+
+                {/* Featured Badge */}
+                {service.isFeatured && (
+                    <div className="absolute bottom-3 left-3">
+                        <span className="text-xs bg-white text-black px-2 py-0.5">
+                            ★ Featured
+                        </span>
+                    </div>
+                )}
 
                 {/* Image Count */}
                 {service.images?.length > 1 && (
@@ -91,37 +98,48 @@ export default function ServiceCard({
                     <div className="flex items-center gap-1">
                         <Tag className="w-3 h-3 text-neutral-600" />
                         <span className="text-xs text-neutral-500">
-                            {service.vehicleTypes?.length || 0} types
+                            {service.variants?.length || 0} variants
                         </span>
                     </div>
                     <div className="ml-auto">
                         <span className="text-sm text-white font-medium">
-                            ₹{service.startingPrice?.toLocaleString('en-IN')}+
+                            ₹{service.startingPrice?.toLocaleString('en-IN') || 0}+
                         </span>
                     </div>
                 </div>
 
-                {/* Vehicle Types Preview */}
-                {service.vehicleTypes?.length > 0 && (
+                {/* Variants Preview */}
+                {service.variants?.length > 0 && (
                     <div className="flex flex-wrap gap-1 mb-4">
-                        {service.vehicleTypes
+                        {service.variants
                             .filter(v => v.isActive)
                             .slice(0, 3)
-                            .map((vt) => (
+                            .map((variant, index) => (
                                 <span
-                                    key={vt._id}
-                                    className="text-xs border border-neutral-800 text-neutral-600 px-2 py-0.5 capitalize"
+                                    key={variant._id || index}
+                                    className="text-xs border border-neutral-800 text-neutral-600 px-2 py-0.5"
                                 >
-                                    {vt.type}
+                                    {variant.name}
                                 </span>
                             ))}
-                        {service.vehicleTypes.filter(v => v.isActive).length > 3 && (
+                        {service.variants.filter(v => v.isActive).length > 3 && (
                             <span className="text-xs text-neutral-700">
-                                +{service.vehicleTypes.filter(v => v.isActive).length - 3}
+                                +{service.variants.filter(v => v.isActive).length - 3}
                             </span>
                         )}
                     </div>
                 )}
+
+                {/* Status */}
+                <div className="mb-4">
+                    <span className={`text-xs px-2 py-0.5 ${
+                        service.isActive
+                            ? 'bg-white text-black'
+                            : 'bg-neutral-800 text-neutral-500'
+                    }`}>
+                        {service.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                </div>
 
                 {/* Actions */}
                 <div className="flex items-center gap-1 mt-auto pt-3 border-t border-neutral-800">

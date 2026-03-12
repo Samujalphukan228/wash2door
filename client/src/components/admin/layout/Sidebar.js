@@ -17,16 +17,18 @@ import {
     ChevronRight,
     Car,
     Settings,
+    Layers,
     X
 } from 'lucide-react';
 
 const navItems = [
-    { label: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
-    { label: 'Bookings',  href: '/admin/bookings',  icon: CalendarDays    },
-    { label: 'Services',  href: '/admin/services',  icon: Wrench          },
-    { label: 'Users',     href: '/admin/users',     icon: Users           },
-    { label: 'Reviews',   href: '/admin/reviews',   icon: Star            },
-    { label: 'Reports',   href: '/admin/reports',   icon: BarChart3       },
+    { label: 'Dashboard',  href: '/admin/dashboard',  icon: LayoutDashboard },
+    { label: 'Bookings',   href: '/admin/bookings',   icon: CalendarDays    },
+    { label: 'Categories', href: '/admin/categories', icon: Layers          },
+    { label: 'Services',   href: '/admin/services',   icon: Wrench          },
+    { label: 'Users',      href: '/admin/users',      icon: Users           },
+    { label: 'Reviews',    href: '/admin/reviews',    icon: Star            },
+    { label: 'Reports',    href: '/admin/reports',    icon: BarChart3       },
 ];
 
 // Helper to get avatar URL

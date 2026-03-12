@@ -1,9 +1,11 @@
+// models/Booking.js - SIMPLIFIED
+
 import mongoose from 'mongoose';
 import crypto from 'crypto';
 
 const bookingSchema = new mongoose.Schema({
     // ============================================
-    // BOOKING CODE
+    // BOOKING CODE (auto generated)
     // ============================================
     bookingCode: {
         type: String,
@@ -12,7 +14,6 @@ const bookingSchema = new mongoose.Schema({
 
     // ============================================
     // BOOKING TYPE
-    // ✅ NEW: online = customer booked, walkin = admin created
     // ============================================
     bookingType: {
         type: String,
@@ -21,35 +22,33 @@ const bookingSchema = new mongoose.Schema({
     },
 
     // ============================================
-    // CUSTOMER (registered user - optional for walkin)
+    // CUSTOMER
     // ============================================
     customerId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         default: null
     },
-
-    // ============================================
-    // WALK-IN CUSTOMER INFO
-    // ✅ NEW: For offline/walk-in customers
-    // ============================================
     walkInCustomer: {
-        name: {
-            type: String,
-            default: ''
-        },
-        phone: {
-            type: String,
-            default: ''
-        },
-        email: {
-            type: String,
-            default: ''
-        }
+        name: { type: String, default: '' },
+        phone: { type: String, default: '' }
     },
 
     // ============================================
-    // SERVICE INFO (Step 1)
+    // CATEGORY (stored for history)
+    // ============================================
+    categoryId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Category',
+        required: [true, 'Category is required']
+    },
+    categoryName: {
+        type: String,
+        required: true
+    },
+
+    // ============================================
+    // SERVICE
     // ============================================
     serviceId: {
         type: mongoose.Schema.Types.ObjectId,
@@ -60,26 +59,21 @@ const bookingSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    serviceCategory: {
+    serviceTier: {
         type: String,
-        enum: ['basic', 'standard', 'premium'],
+        enum: ['basic', 'standard', 'premium', 'custom'],
         required: true
     },
 
     // ============================================
-    // VEHICLE TYPE INFO (Step 2)
+    // VARIANT (pricing option selected)
     // ============================================
-    vehicleTypeId: {
+    variantId: {
         type: mongoose.Schema.Types.ObjectId,
-        required: [true, 'Vehicle type is required']
+        required: [true, 'Variant is required']
     },
-    vehicleTypeName: {
+    variantName: {
         type: String,
-        required: true
-    },
-    vehicleType: {
-        type: String,
-        enum: ['sedan', 'suv', 'hatchback', 'truck', 'van', 'bike', 'other'],
         required: true
     },
     price: {
@@ -92,7 +86,7 @@ const bookingSchema = new mongoose.Schema({
     },
 
     // ============================================
-    // DATE & TIME (Step 3)
+    // DATE & TIME
     // ============================================
     bookingDate: {
         type: Date,
@@ -110,61 +104,25 @@ const bookingSchema = new mongoose.Schema({
     },
 
     // ============================================
-    // LOCATION & VEHICLE DETAILS (Step 4)
+    // LOCATION (simplified)
     // ============================================
     location: {
-        address: {
-            type: String,
-            default: 'Walk-in / At Shop'
-        },
-        city: {
-            type: String,
-            default: 'Walk-in'
-        },
-        state: {
-            type: String,
-            default: ''
-        },
-        zipCode: {
-            type: String,
-            default: ''
-        },
-        landmark: {
-            type: String,
-            default: ''
-        }
-    },
-    vehicleDetails: {
-        type: {
-            type: String,
-            enum: ['sedan', 'suv', 'hatchback', 'truck', 'van', 'bike', 'other'],
-            required: [true, 'Vehicle type is required']
-        },
-        brand: {
-            type: String,
-            default: ''
-        },
-        model: {
-            type: String,
-            default: ''
-        },
-        color: {
-            type: String,
-            default: ''
-        },
-        plateNumber: {
-            type: String,
-            default: ''
-        }
-    },
-    specialNotes: {
-        type: String,
-        default: '',
-        maxlength: [500, 'Special notes cannot exceed 500 characters']
+        address: { type: String, required: [true, 'Address is required'] },
+        city: { type: String, required: [true, 'City is required'] },
+        landmark: { type: String, default: '' }
     },
 
     // ============================================
-    // BOOKING STATUS
+    // NOTES (customer can mention anything here)
+    // ============================================
+    specialNotes: {
+        type: String,
+        default: '',
+        maxlength: [500, 'Notes cannot exceed 500 characters']
+    },
+
+    // ============================================
+    // STATUS
     // ============================================
     status: {
         type: String,
@@ -184,17 +142,12 @@ const bookingSchema = new mongoose.Schema({
     },
 
     // ============================================
-    // REVIEW
+    // REVIEW & PAYMENT
     // ============================================
     isReviewed: {
         type: Boolean,
         default: false
     },
-
-    // ============================================
-    // PAYMENT
-    // ✅ UPDATED: Added card and online options
-    // ============================================
     paymentMethod: {
         type: String,
         enum: ['cash', 'card', 'online'],
@@ -206,10 +159,6 @@ const bookingSchema = new mongoose.Schema({
         default: 'pending'
     },
 
-    // ============================================
-    // CREATED BY (for walkin - which admin created)
-    // ✅ NEW
-    // ============================================
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
@@ -220,31 +169,25 @@ const bookingSchema = new mongoose.Schema({
     timestamps: true
 });
 
-// ============================================
-// AUTO GENERATE BOOKING CODE
-// ============================================
+// Auto generate booking code
 bookingSchema.pre('save', function(next) {
     if (!this.bookingCode) {
         const random = crypto.randomBytes(3).toString('hex').toUpperCase();
         const timestamp = Date.now().toString(36).toUpperCase().slice(-3);
-        // ✅ WI prefix for walk-in, CW for online
-        const prefix = this.bookingType === 'walkin' ? 'WI' : 'CW';
+        const prefix = this.bookingType === 'walkin' ? 'WI' : 'BK';
         this.bookingCode = `${prefix}-${timestamp}${random}`;
     }
     next();
 });
 
-// ============================================
-// INDEXES
-// ============================================
+// Indexes
 bookingSchema.index({ customerId: 1 });
 bookingSchema.index({ status: 1 });
 bookingSchema.index({ bookingDate: 1 });
 bookingSchema.index({ bookingCode: 1 });
 bookingSchema.index({ serviceId: 1 });
+bookingSchema.index({ categoryId: 1 });
 bookingSchema.index({ bookingType: 1 });
-
-// ✅ Unique index to prevent race condition double booking
 bookingSchema.index(
     { serviceId: 1, bookingDate: 1, timeSlot: 1 },
     { unique: true }

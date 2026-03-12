@@ -1,92 +1,101 @@
+// src/components/admin/services/ServiceDetailModal.jsx
+
 'use client';
 
 import { useState } from 'react';
 import {
     X, Pencil, Star, Tag, Clock,
-    Check, Minus, Plus, Trash2,
-    Loader2
+    Check, Minus, Plus, Trash2, Loader2
 } from 'lucide-react';
-import axiosInstance from '@/lib/axios';
+import serviceService from '@/services/serviceService';
 import toast from 'react-hot-toast';
 import Image from 'next/image';
 
-const categoryColors = {
+const tierColors = {
     basic: 'border-neutral-700 text-neutral-400',
     standard: 'border-neutral-600 text-neutral-300',
-    premium: 'border-neutral-400 text-white'
+    premium: 'border-neutral-400 text-white',
+    custom: 'border-neutral-500 text-neutral-200'
 };
 
 export default function ServiceDetailModal({
     service,
     onClose,
     onEdit,
-    onRefresh
+    onRefresh,
+    onManageVariants
 }) {
     const [activeTab, setActiveTab] = useState('overview');
     const [selectedImage, setSelectedImage] = useState(
         service.images?.find(img => img.isPrimary) || service.images?.[0]
     );
     const [loading, setLoading] = useState(false);
-    const [showAddVehicle, setShowAddVehicle] = useState(false);
+    const [showAddVariant, setShowAddVariant] = useState(false);
 
-    const [newVehicle, setNewVehicle] = useState({
-        type: '', label: '', description: '',
-        price: '', duration: '', features: []
+    const [newVariant, setNewVariant] = useState({
+        name: '',
+        description: '',
+        price: '',
+        discountPrice: '',
+        duration: '',
+        features: []
     });
 
-    const handleDeleteVehicle = async (vehicleTypeId) => {
-        if (!confirm('Delete this vehicle type?')) return;
+    const categoryName = service.category?.name || 'Uncategorized';
+    const categoryIcon = service.category?.icon || '';
+
+    const handleDeleteVariant = async (variantId) => {
+        if (!confirm('Delete this variant?')) return;
         try {
             setLoading(true);
-            await axiosInstance.delete(
-                `/services/${service._id}/vehicles/${vehicleTypeId}`
-            );
-            toast.success('Vehicle type deleted');
+            await serviceService.deleteVariant(service._id, variantId);
+            toast.success('Variant deleted');
             onRefresh();
             onClose();
         } catch (error) {
-            toast.error(
-                error.response?.data?.message || 'Failed to delete'
-            );
+            toast.error(error.response?.data?.message || 'Failed to delete');
         } finally {
             setLoading(false);
         }
     };
 
-    const handleAddVehicle = async () => {
-        if (!newVehicle.type || !newVehicle.price || !newVehicle.duration) {
-            toast.error('Type, price and duration are required');
+    const handleAddVariant = async () => {
+        if (!newVariant.name || !newVariant.price || !newVariant.duration) {
+            toast.error('Name, price and duration are required');
             return;
         }
         try {
             setLoading(true);
-            await axiosInstance.post(
-                `/services/${service._id}/vehicles`,
-                {
-                    ...newVehicle,
-                    label: newVehicle.label || newVehicle.type,
-                    price: Number(newVehicle.price),
-                    duration: Number(newVehicle.duration)
-                }
-            );
-            toast.success('Vehicle type added');
-            setShowAddVehicle(false);
-            setNewVehicle({
-                type: '', label: '', description: '',
-                price: '', duration: '', features: []
+
+            const formData = new FormData();
+            formData.append('name', newVariant.name.trim());
+            formData.append('description', newVariant.description || '');
+            formData.append('price', Number(newVariant.price));
+            formData.append('duration', Number(newVariant.duration));
+            if (newVariant.discountPrice) {
+                formData.append('discountPrice', Number(newVariant.discountPrice));
+            }
+            formData.append('features', JSON.stringify(
+                (newVariant.features || []).filter(f => f.trim())
+            ));
+
+            await serviceService.addVariant(service._id, formData);
+            toast.success('Variant added');
+            setShowAddVariant(false);
+            setNewVariant({
+                name: '', description: '', price: '',
+                discountPrice: '', duration: '', features: []
             });
             onRefresh();
             onClose();
         } catch (error) {
-            toast.error(
-                error.response?.data?.message || 'Failed to add vehicle type'
-            );
+            toast.error(error.response?.data?.message || 'Failed to add variant');
         } finally {
             setLoading(false);
         }
     };
 
-    const tabs = ['overview', 'vehicles', 'reviews'];
+    const tabs = ['overview', 'variants', 'reviews'];
 
     return (
         <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
@@ -96,14 +105,17 @@ export default function ServiceDetailModal({
                 <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-800 shrink-0">
                     <div className="flex items-center gap-3">
                         <div>
-                            <div className="flex items-center gap-2 mb-1">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
                                 <h2 className="text-white font-medium">
                                     {service.name}
                                 </h2>
+                                <span className="text-xs border border-neutral-700 bg-black/80 text-neutral-300 px-2 py-0.5">
+                                    {categoryIcon} {categoryName}
+                                </span>
                                 <span className={`text-xs border px-2 py-0.5 capitalize ${
-                                    categoryColors[service.category]
+                                    tierColors[service.tier] || tierColors.basic
                                 }`}>
-                                    {service.category}
+                                    {service.tier || 'basic'}
                                 </span>
                                 <span className={`text-xs px-2 py-0.5 ${
                                     service.isActive
@@ -112,6 +124,11 @@ export default function ServiceDetailModal({
                                 }`}>
                                     {service.isActive ? 'Active' : 'Inactive'}
                                 </span>
+                                {service.isFeatured && (
+                                    <span className="text-xs bg-white text-black px-2 py-0.5">
+                                        ★ Featured
+                                    </span>
+                                )}
                             </div>
                             <p className="text-xs text-neutral-500">
                                 {service.totalBookings || 0} bookings ·{' '}
@@ -160,6 +177,8 @@ export default function ServiceDetailModal({
                     {/* Overview Tab */}
                     {activeTab === 'overview' && (
                         <div className="space-y-6">
+                            
+                            {/* Images */}
                             {service.images?.length > 0 && (
                                 <div className="space-y-3">
                                     <div className="relative h-56 bg-neutral-900 overflow-hidden">
@@ -197,6 +216,7 @@ export default function ServiceDetailModal({
                                 </div>
                             )}
 
+                            {/* Description */}
                             <div>
                                 <p className="text-xs text-neutral-500 tracking-widest uppercase mb-2">
                                     Description
@@ -206,6 +226,7 @@ export default function ServiceDetailModal({
                                 </p>
                             </div>
 
+                            {/* Highlights */}
                             {service.highlights?.length > 0 && (
                                 <div>
                                     <p className="text-xs text-neutral-500 tracking-widest uppercase mb-3">
@@ -222,6 +243,7 @@ export default function ServiceDetailModal({
                                 </div>
                             )}
 
+                            {/* Includes / Excludes */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                 {service.includes?.length > 0 && (
                                     <div>
@@ -257,14 +279,14 @@ export default function ServiceDetailModal({
                         </div>
                     )}
 
-                    {/* Vehicles Tab */}
-                    {activeTab === 'vehicles' && (
+                    {/* Variants Tab */}
+                    {activeTab === 'variants' && (
                         <div className="space-y-4">
-                            {service.vehicleTypes?.map((vt) => (
+                            {service.variants?.map((variant) => (
                                 <div
-                                    key={vt._id}
+                                    key={variant._id}
                                     className={`border p-4 ${
-                                        vt.isActive
+                                        variant.isActive
                                             ? 'border-neutral-800'
                                             : 'border-neutral-900 opacity-50'
                                     }`}
@@ -273,22 +295,25 @@ export default function ServiceDetailModal({
                                         <div>
                                             <div className="flex items-center gap-2">
                                                 <p className="text-white font-medium text-sm">
-                                                    {vt.label}
+                                                    {variant.name}
                                                 </p>
-                                                <span className="text-xs border border-neutral-800 text-neutral-500 px-2 py-0.5 capitalize">
-                                                    {vt.type}
-                                                </span>
+                                                {!variant.isActive && (
+                                                    <span className="text-xs border border-neutral-800 text-neutral-600 px-1.5 py-0.5">
+                                                        Inactive
+                                                    </span>
+                                                )}
                                             </div>
-                                            {vt.description && (
+                                            {variant.description && (
                                                 <p className="text-xs text-neutral-500 mt-1">
-                                                    {vt.description}
+                                                    {variant.description}
                                                 </p>
                                             )}
                                         </div>
                                         <button
-                                            onClick={() => handleDeleteVehicle(vt._id)}
-                                            disabled={loading}
-                                            className="text-neutral-700 hover:text-white transition-colors"
+                                            onClick={() => handleDeleteVariant(variant._id)}
+                                            disabled={loading || service.variants.length <= 1}
+                                            className="text-neutral-700 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                            title={service.variants.length <= 1 ? 'Cannot delete last variant' : 'Delete'}
                                         >
                                             <Trash2 className="w-4 h-4" />
                                         </button>
@@ -298,20 +323,25 @@ export default function ServiceDetailModal({
                                         <div className="flex items-center gap-1.5">
                                             <Tag className="w-3.5 h-3.5 text-neutral-600" />
                                             <span className="text-sm text-white font-medium">
-                                                ₹{vt.price?.toLocaleString('en-IN')}
+                                                ₹{variant.price?.toLocaleString('en-IN')}
                                             </span>
+                                            {variant.discountPrice && (
+                                                <span className="text-xs text-neutral-500 line-through ml-1">
+                                                    ₹{variant.discountPrice?.toLocaleString('en-IN')}
+                                                </span>
+                                            )}
                                         </div>
                                         <div className="flex items-center gap-1.5">
                                             <Clock className="w-3.5 h-3.5 text-neutral-600" />
                                             <span className="text-sm text-neutral-400">
-                                                {vt.duration} min
+                                                {variant.duration} min
                                             </span>
                                         </div>
                                     </div>
 
-                                    {vt.features?.length > 0 && (
+                                    {variant.features?.length > 0 && (
                                         <div className="flex flex-wrap gap-1.5">
-                                            {vt.features.map((f, i) => (
+                                            {variant.features.map((f, i) => (
                                                 <span
                                                     key={i}
                                                     className="text-xs border border-neutral-800 text-neutral-500 px-2 py-0.5"
@@ -324,81 +354,148 @@ export default function ServiceDetailModal({
                                 </div>
                             ))}
 
-                            {!showAddVehicle ? (
+                            {/* Add Variant */}
+                            {!showAddVariant ? (
                                 <button
-                                    onClick={() => setShowAddVehicle(true)}
+                                    onClick={() => setShowAddVariant(true)}
                                     className="w-full border border-dashed border-neutral-800 text-neutral-500 hover:text-white hover:border-neutral-600 py-3 text-xs tracking-widest uppercase transition-colors flex items-center justify-center gap-2"
                                 >
                                     <Plus className="w-4 h-4" />
-                                    Add Vehicle Type
+                                    Add Variant
                                 </button>
                             ) : (
                                 <div className="border border-neutral-800 p-4 space-y-4">
                                     <div className="flex items-center justify-between">
                                         <p className="text-xs text-neutral-500 tracking-widest uppercase">
-                                            New Vehicle Type
+                                            New Variant
                                         </p>
                                         <button
-                                            onClick={() => setShowAddVehicle(false)}
+                                            onClick={() => setShowAddVariant(false)}
                                             className="text-neutral-500 hover:text-white transition-colors"
                                         >
                                             <X className="w-4 h-4" />
                                         </button>
                                     </div>
+
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
                                             <label className="block text-xs text-neutral-500 mb-1.5">
-                                                Type *
+                                                Name *
                                             </label>
-                                            <select
-                                                value={newVehicle.type}
-                                                onChange={(e) => setNewVehicle(p => ({ ...p, type: e.target.value }))}
+                                            <input
+                                                type="text"
+                                                value={newVariant.name}
+                                                onChange={(e) => setNewVariant(p => ({ ...p, name: e.target.value }))}
+                                                placeholder="e.g. Sedan, 2 Seater"
                                                 className="w-full bg-black border border-neutral-800 text-white text-sm px-3 py-2 focus:outline-none focus:border-neutral-600"
-                                            >
-                                                <option value="">Select</option>
-                                                {['sedan', 'suv', 'hatchback', 'truck', 'van', 'bike', 'other'].map(t => (
-                                                    <option key={t} value={t}>{t}</option>
-                                                ))}
-                                            </select>
+                                            />
                                         </div>
-                                        <VInput
-                                            label="Label"
-                                            value={newVehicle.label}
-                                            onChange={(v) => setNewVehicle(p => ({ ...p, label: v }))}
-                                            placeholder="e.g. SUV / MUV"
-                                        />
+                                        <div>
+                                            <label className="block text-xs text-neutral-500 mb-1.5">
+                                                Description
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={newVariant.description}
+                                                onChange={(e) => setNewVariant(p => ({ ...p, description: e.target.value }))}
+                                                placeholder="Brief description"
+                                                className="w-full bg-black border border-neutral-800 text-white text-sm px-3 py-2 focus:outline-none focus:border-neutral-600"
+                                            />
+                                        </div>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <VInput
-                                            label="Price (₹) *"
-                                            value={newVehicle.price}
-                                            onChange={(v) => setNewVehicle(p => ({ ...p, price: v }))}
-                                            type="number"
-                                            placeholder="500"
-                                        />
-                                        <VInput
-                                            label="Duration (min) *"
-                                            value={newVehicle.duration}
-                                            onChange={(v) => setNewVehicle(p => ({ ...p, duration: v }))}
-                                            type="number"
-                                            placeholder="60"
-                                        />
+
+                                    <div className="grid grid-cols-3 gap-3">
+                                        <div>
+                                            <label className="block text-xs text-neutral-500 mb-1.5">
+                                                Price (₹) *
+                                            </label>
+                                            <input
+                                                type="number"
+                                                value={newVariant.price}
+                                                onChange={(e) => setNewVariant(p => ({ ...p, price: e.target.value }))}
+                                                placeholder="500"
+                                                className="w-full bg-black border border-neutral-800 text-white text-sm px-3 py-2 focus:outline-none focus:border-neutral-600"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs text-neutral-500 mb-1.5">
+                                                Discount Price
+                                            </label>
+                                            <input
+                                                type="number"
+                                                value={newVariant.discountPrice}
+                                                onChange={(e) => setNewVariant(p => ({ ...p, discountPrice: e.target.value }))}
+                                                placeholder="450"
+                                                className="w-full bg-black border border-neutral-800 text-white text-sm px-3 py-2 focus:outline-none focus:border-neutral-600"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs text-neutral-500 mb-1.5">
+                                                Duration (min) *
+                                            </label>
+                                            <input
+                                                type="number"
+                                                value={newVariant.duration}
+                                                onChange={(e) => setNewVariant(p => ({ ...p, duration: e.target.value }))}
+                                                placeholder="60"
+                                                className="w-full bg-black border border-neutral-800 text-white text-sm px-3 py-2 focus:outline-none focus:border-neutral-600"
+                                            />
+                                        </div>
                                     </div>
-                                    <VInput
-                                        label="Description"
-                                        value={newVehicle.description}
-                                        onChange={(v) => setNewVehicle(p => ({ ...p, description: v }))}
-                                        placeholder="Brief description..."
-                                    />
+
+                                    {/* Quick Features */}
+                                    <div>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <label className="text-xs text-neutral-500">Features</label>
+                                            <button
+                                                type="button"
+                                                onClick={() => setNewVariant(p => ({
+                                                    ...p,
+                                                    features: [...(p.features || []), '']
+                                                }))}
+                                                className="text-xs text-neutral-500 hover:text-white"
+                                            >
+                                                + Add
+                                            </button>
+                                        </div>
+                                        <div className="space-y-2">
+                                            {(newVariant.features || []).map((f, fi) => (
+                                                <div key={fi} className="flex gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={f}
+                                                        onChange={(e) => {
+                                                            const features = [...newVariant.features];
+                                                            features[fi] = e.target.value;
+                                                            setNewVariant(p => ({ ...p, features }));
+                                                        }}
+                                                        placeholder="e.g. Exterior Wash"
+                                                        className="flex-1 bg-black border border-neutral-800 text-white placeholder-neutral-600 text-sm px-3 py-1.5 focus:outline-none focus:border-neutral-600"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setNewVariant(p => ({
+                                                            ...p,
+                                                            features: p.features.filter((_, i) => i !== fi)
+                                                        }))}
+                                                        className="text-neutral-700 hover:text-white px-2"
+                                                    >
+                                                        <X className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
                                     <button
-                                        onClick={handleAddVehicle}
+                                        onClick={handleAddVariant}
                                         disabled={loading}
                                         className="w-full bg-white hover:bg-neutral-200 disabled:bg-neutral-800 text-black text-xs tracking-widest uppercase py-2.5 transition-colors flex items-center justify-center gap-2"
                                     >
                                         {loading ? (
                                             <Loader2 className="w-3.5 h-3.5 animate-spin" />
                                         ) : (
-                                            'Add Vehicle Type'
+                                            'Add Variant'
                                         )}
                                     </button>
                                 </div>
@@ -451,23 +548,6 @@ export default function ServiceDetailModal({
                     )}
                 </div>
             </div>
-        </div>
-    );
-}
-
-function VInput({ label, value, onChange, placeholder, type = 'text' }) {
-    return (
-        <div>
-            <label className="block text-xs text-neutral-500 mb-1.5">
-                {label}
-            </label>
-            <input
-                type={type}
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                placeholder={placeholder}
-                className="w-full bg-black border border-neutral-800 text-white placeholder-neutral-600 text-sm px-3 py-2 focus:outline-none focus:border-neutral-600"
-            />
         </div>
     );
 }

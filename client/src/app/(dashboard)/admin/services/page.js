@@ -1,3 +1,5 @@
+// src/app/(dashboard)/admin/services/page.js
+
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -7,7 +9,8 @@ import ServicesFilter from '@/components/admin/services/ServicesFilter';
 import CreateServiceModal from '@/components/admin/services/CreateServiceModal';
 import EditServiceModal from '@/components/admin/services/EditServiceModal';
 import ServiceDetailModal from '@/components/admin/services/ServiceDetailModal';
-import adminService from '@/services/adminService';
+import VariantModal from '@/components/admin/services/VariantModal';
+import serviceService from '@/services/serviceService';
 import { Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -21,6 +24,7 @@ export default function ServicesPage() {
         page: 1,
         limit: 12,
         category: '',
+        tier: '',
         isActive: ''
     });
 
@@ -28,6 +32,7 @@ export default function ServicesPage() {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [showDetailModal, setShowDetailModal] = useState(false);
+    const [showVariantModal, setShowVariantModal] = useState(false);
 
     const fetchServices = useCallback(async () => {
         try {
@@ -35,7 +40,7 @@ export default function ServicesPage() {
             const params = Object.fromEntries(
                 Object.entries(filters).filter(([_, v]) => v !== '')
             );
-            const response = await adminService.getAllServices(params);
+            const response = await serviceService.getAll(params);
             if (response.success) {
                 setServices(response.data);
                 setTotal(response.total);
@@ -73,31 +78,32 @@ export default function ServicesPage() {
     const handleDelete = async (serviceId) => {
         if (!confirm('Delete this service? This cannot be undone.')) return;
         try {
-            const axiosInstance = (await import('@/lib/axios')).default;
-            await axiosInstance.delete(`/services/${serviceId}`);
+            await serviceService.delete(serviceId);
             toast.success('Service deleted');
             fetchServices();
         } catch (error) {
-            toast.error(
-                error.response?.data?.message || 'Failed to delete service'
-            );
+            toast.error(error.response?.data?.message || 'Failed to delete service');
         }
     };
 
     const handleToggleActive = async (service) => {
         try {
-            const axiosInstance = (await import('@/lib/axios')).default;
-            await axiosInstance.put(`/services/${service._id}`, {
-                isActive: !service.isActive
-            });
-            toast.success(
-                `Service ${!service.isActive ? 'activated' : 'deactivated'}`
-            );
+            const formData = new FormData();
+            formData.append('isActive', !service.isActive);
+
+            await serviceService.update(service._id, formData);
+            toast.success(`Service ${!service.isActive ? 'activated' : 'deactivated'}`);
             fetchServices();
         } catch (error) {
             toast.error('Failed to update service');
         }
     };
+
+    const uniqueCategories = [...new Set(
+        services
+            .map(s => s.category?.name)
+            .filter(Boolean)
+    )];
 
     return (
         <DashboardLayout>
@@ -136,7 +142,7 @@ export default function ServicesPage() {
                         },
                         {
                             label: 'Categories',
-                            value: [...new Set(services.map(s => s.category))].length
+                            value: uniqueCategories.length
                         }
                     ].map((stat) => (
                         <div
@@ -217,7 +223,26 @@ export default function ServicesPage() {
                         setShowDetailModal(false);
                         setShowEditModal(true);
                     }}
+                    onManageVariants={() => {
+                        setShowDetailModal(false);
+                        setShowVariantModal(true);
+                    }}
                     onRefresh={fetchServices}
+                />
+            )}
+
+            {showVariantModal && selectedService && (
+                <VariantModal
+                    service={selectedService}
+                    onClose={() => {
+                        setShowVariantModal(false);
+                        setSelectedService(null);
+                    }}
+                    onSuccess={() => {
+                        setShowVariantModal(false);
+                        setSelectedService(null);
+                        fetchServices();
+                    }}
                 />
             )}
         </DashboardLayout>
