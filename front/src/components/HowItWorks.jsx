@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef } from 'react'
+import { motion } from 'framer-motion'
 import { ArrowUpRight, CalendarCheck, Car, MapPin, Sparkles } from 'lucide-react'
 
 const STEPS = [
@@ -31,41 +31,19 @@ const STEPS = [
 ]
 
 function StepCard({ step, index }) {
-  const cardRef = useRef(null)
-
-  useEffect(() => {
-    let ctx
-    const init = async () => {
-      const { default: gsap } = await import('gsap')
-      const { ScrollTrigger } = await import('gsap/ScrollTrigger')
-      gsap.registerPlugin(ScrollTrigger)
-      const el = cardRef.current
-      if (!el) return
-      ctx = gsap.context(() => {
-        gsap.fromTo(
-          el,
-          { opacity: 0, y: 40 },
-          {
-            opacity: 1,
-            y: 0,
-            duration: 0.7,
-            ease: 'power3.out',
-            delay: index * 0.12,
-            scrollTrigger: { trigger: el, start: 'top 88%' },
-          }
-        )
-      })
-    }
-    init()
-    return () => ctx?.revert()
-  }, [index])
-
   const Icon = step.icon
 
   return (
-    <div
-      ref={cardRef}
-      className="opacity-0 group flex flex-col border border-gray-200 p-6 md:p-7 bg-white
+    <motion.div
+      initial={{ opacity: 0, y: 40 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-50px" }}
+      transition={{ 
+        duration: 0.6, 
+        delay: index * 0.1,
+        ease: [0.25, 0.46, 0.45, 0.94]
+      }}
+      className="group flex flex-col border border-gray-200 p-6 md:p-7 bg-white
                  hover:border-black transition-all duration-500 rounded-[5px]
                  hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)]"
     >
@@ -73,7 +51,11 @@ function StepCard({ step, index }) {
       <div className="flex items-start justify-between mb-6">
         <div className="w-14 h-14 border border-gray-200 rounded-full flex items-center justify-center
                         group-hover:border-black transition-colors duration-500 shrink-0">
-          <Icon size={20} strokeWidth={1.2} className="text-gray-400 group-hover:text-black transition-colors duration-500" />
+          <Icon 
+            size={20} 
+            strokeWidth={1.2} 
+            className="text-gray-400 group-hover:text-black transition-colors duration-500" 
+          />
         </div>
         <span
           className="text-gray-300 group-hover:text-black transition-colors duration-500"
@@ -107,41 +89,12 @@ function StepCard({ step, index }) {
       >
         {step.description}
       </p>
-    </div>
+    </motion.div>
   )
 }
 
 export default function HowItWorks() {
-  const eyebrowRef = useRef(null)
-  const headingRef = useRef(null)
-  const descRef = useRef(null)
-  const ruleRef = useRef(null)
-
-  useEffect(() => {
-    let ctx
-    const init = async () => {
-      const { default: gsap } = await import('gsap')
-      const { ScrollTrigger } = await import('gsap/ScrollTrigger')
-      gsap.registerPlugin(ScrollTrigger)
-      const trigger = headingRef.current
-      if (!trigger) return
-      ctx = gsap.context(() => {
-        const tl = gsap.timeline({
-          scrollTrigger: { trigger, start: 'top 85%' },
-          defaults: { ease: 'power3.out' },
-        })
-        tl.fromTo(eyebrowRef.current, { opacity: 0, x: -16 }, { opacity: 1, x: 0, duration: 0.5 })
-          .fromTo(headingRef.current, { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.7 }, 0.1)
-          .fromTo(descRef.current, { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.6 }, 0.3)
-          .fromTo(ruleRef.current, { scaleX: 0, transformOrigin: 'left' }, { scaleX: 1, duration: 0.6 }, 0.4)
-      })
-    }
-    init()
-    return () => ctx?.revert()
-  }, [])
-
   return (
-    // ✅ bg-white — matches Services and every other section
     <section
       className="w-full bg-white py-24 md:py-32"
       style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
@@ -150,7 +103,14 @@ export default function HowItWorks() {
 
         {/* ── Heading ── */}
         <div className="mb-16 md:mb-20">
-          <div ref={eyebrowRef} className="flex items-center gap-3 mb-6 opacity-0">
+          {/* Eyebrow */}
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+            className="flex items-center gap-3 mb-6"
+          >
             <span className="block w-6 h-px bg-black shrink-0" />
             <span
               className="tracking-[0.4em] uppercase text-gray-400"
@@ -161,13 +121,17 @@ export default function HowItWorks() {
             >
               Simple Process
             </span>
-          </div>
+          </motion.div>
 
           <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
             <div className="flex-1">
-              <h2
-                ref={headingRef}
-                className="opacity-0 text-black mb-5"
+              {/* Heading */}
+              <motion.h2
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.1 }}
+                className="text-black mb-5"
                 style={{
                   fontFamily: 'Georgia, "Times New Roman", serif',
                   fontWeight: 300,
@@ -177,14 +141,19 @@ export default function HowItWorks() {
                 }}
               >
                 How It Works
-              </h2>
-              <p
-                ref={descRef}
-                className="opacity-0 tracking-[0.18em] leading-[1.9] uppercase text-gray-400 max-w-md"
+              </motion.h2>
+
+              {/* Description */}
+              <motion.p
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: 0.2 }}
+                className="tracking-[0.18em] leading-[1.9] uppercase text-gray-400 max-w-md"
                 style={{ fontSize: 'clamp(8px, 0.9vw, 11px)' }}
               >
                 Book a professional car wash in under 2 minutes — we handle everything else.
-              </p>
+              </motion.p>
             </div>
 
             <a
@@ -198,7 +167,14 @@ export default function HowItWorks() {
             </a>
           </div>
 
-          <div ref={ruleRef} className="w-full h-px bg-gray-200 mt-8" />
+          {/* Divider line */}
+          <motion.div 
+            initial={{ scaleX: 0 }}
+            whileInView={{ scaleX: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.3 }}
+            className="w-full h-px bg-gray-200 mt-8 origin-left" 
+          />
         </div>
 
         {/* ── Steps Grid ── */}
@@ -209,7 +185,13 @@ export default function HowItWorks() {
         </div>
 
         {/* ── Mobile CTA ── */}
-        <div className="mt-12 flex md:hidden justify-center">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5, delay: 0.4 }}
+          className="mt-12 flex md:hidden justify-center"
+        >
           <a
             href="/Bookings"
             className="relative flex items-center gap-3 tracking-[0.22em] uppercase
@@ -221,9 +203,13 @@ export default function HowItWorks() {
             <span className="relative z-10 group-hover:text-white transition-colors duration-500">
               Book Now
             </span>
-            <ArrowUpRight size={13} strokeWidth={1.5} className="relative z-10 group-hover:text-white transition-colors duration-500" />
+            <ArrowUpRight 
+              size={13} 
+              strokeWidth={1.5} 
+              className="relative z-10 group-hover:text-white transition-colors duration-500" 
+            />
           </a>
-        </div>
+        </motion.div>
 
       </div>
     </section>

@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Star, ChevronLeft, ChevronRight, Quote } from 'lucide-react'
 
 const TESTIMONIALS = [
@@ -50,7 +51,12 @@ function StarRating({ rating }) {
   return (
     <div className="flex gap-1">
       {[...Array(5)].map((_, i) => (
-        <Star key={i} size={12} strokeWidth={0} fill={i < rating ? '#000' : '#E5E5E5'} />
+        <Star 
+          key={i} 
+          size={12} 
+          strokeWidth={0} 
+          fill={i < rating ? '#000' : '#E5E5E5'} 
+        />
       ))}
     </div>
   )
@@ -59,7 +65,6 @@ function StarRating({ rating }) {
 function TestimonialCard({ testimonial }) {
   return (
     <div className="flex flex-col p-8 md:p-10 border border-black bg-white rounded-[5px]">
-
       {/* Quote Icon */}
       <Quote size={28} strokeWidth={1} className="text-gray-200 mb-6 rotate-180" />
 
@@ -123,16 +128,13 @@ function TestimonialCard({ testimonial }) {
 export default function Testimonials() {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isAutoPlaying, setIsAutoPlaying] = useState(true)
-
-  const eyebrowRef = useRef(null)
-  const headingRef = useRef(null)
-  const ruleRef = useRef(null)
-  const sliderRef = useRef(null)
+  const [direction, setDirection] = useState(1)
 
   // Auto-play
   useEffect(() => {
     if (!isAutoPlaying) return
     const interval = setInterval(() => {
+      setDirection(1)
       setCurrentIndex((prev) => (prev + 1) % TESTIMONIALS.length)
     }, 5000)
     return () => clearInterval(interval)
@@ -140,65 +142,39 @@ export default function Testimonials() {
 
   const goToPrev = () => {
     setIsAutoPlaying(false)
+    setDirection(-1)
     setCurrentIndex((prev) => (prev === 0 ? TESTIMONIALS.length - 1 : prev - 1))
   }
 
   const goToNext = () => {
     setIsAutoPlaying(false)
+    setDirection(1)
     setCurrentIndex((prev) => (prev + 1) % TESTIMONIALS.length)
   }
 
   const goToSlide = (index) => {
     setIsAutoPlaying(false)
+    setDirection(index > currentIndex ? 1 : -1)
     setCurrentIndex(index)
   }
 
-  // Heading animation
-  useEffect(() => {
-    let ctx
-    const init = async () => {
-      const { default: gsap } = await import('gsap')
-      const { ScrollTrigger } = await import('gsap/ScrollTrigger')
-      gsap.registerPlugin(ScrollTrigger)
-      const trigger = headingRef.current
-      if (!trigger) return
-      ctx = gsap.context(() => {
-        const tl = gsap.timeline({
-          scrollTrigger: { trigger, start: 'top 85%' },
-          defaults: { ease: 'power3.out' },
-        })
-        tl.fromTo(eyebrowRef.current, { opacity: 0, x: -16 }, { opacity: 1, x: 0, duration: 0.5 })
-          .fromTo(headingRef.current, { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.7 }, 0.1)
-          .fromTo(ruleRef.current, { scaleX: 0, transformOrigin: 'left' }, { scaleX: 1, duration: 0.6 }, 0.3)
-      })
-    }
-    init()
-    return () => ctx?.revert()
-  }, [])
-
-  // Slider animation
-  useEffect(() => {
-    let ctx
-    const init = async () => {
-      const { default: gsap } = await import('gsap')
-      const { ScrollTrigger } = await import('gsap/ScrollTrigger')
-      gsap.registerPlugin(ScrollTrigger)
-      const el = sliderRef.current
-      if (!el) return
-      ctx = gsap.context(() => {
-        gsap.fromTo(
-          el,
-          { opacity: 0, y: 40 },
-          { opacity: 1, y: 0, duration: 0.8, ease: 'power3.out', scrollTrigger: { trigger: el, start: 'top 85%' } }
-        )
-      })
-    }
-    init()
-    return () => ctx?.revert()
-  }, [])
+  // Slide animation variants
+  const slideVariants = {
+    enter: (direction) => ({
+      x: direction > 0 ? 300 : -300,
+      opacity: 0,
+    }),
+    center: {
+      x: 0,
+      opacity: 1,
+    },
+    exit: (direction) => ({
+      x: direction > 0 ? -300 : 300,
+      opacity: 0,
+    }),
+  }
 
   return (
-    // ✅ bg-white — consistent with all other sections
     <section
       className="w-full bg-white py-24 md:py-32"
       style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
@@ -207,7 +183,14 @@ export default function Testimonials() {
 
         {/* ── Heading ── */}
         <div className="mb-16 md:mb-20">
-          <div ref={eyebrowRef} className="flex items-center gap-3 mb-6 opacity-0">
+          {/* Eyebrow */}
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+            className="flex items-center gap-3 mb-6"
+          >
             <span className="block w-6 h-px bg-black shrink-0" />
             <span
               className="tracking-[0.4em] uppercase text-gray-400"
@@ -218,12 +201,16 @@ export default function Testimonials() {
             >
               Testimonials
             </span>
-          </div>
+          </motion.div>
 
           <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
-            <h2
-              ref={headingRef}
-              className="opacity-0 text-black"
+            {/* Heading */}
+            <motion.h2
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.1 }}
+              className="text-black"
               style={{
                 fontFamily: 'Georgia, "Times New Roman", serif',
                 fontWeight: 300,
@@ -233,10 +220,16 @@ export default function Testimonials() {
               }}
             >
               What Our Customers Say
-            </h2>
+            </motion.h2>
 
             {/* Navigation — Desktop */}
-            <div className="hidden md:flex items-center gap-3 mb-2">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+              className="hidden md:flex items-center gap-3 mb-2"
+            >
               <button
                 onClick={goToPrev}
                 className="w-10 h-10 border border-gray-300 flex items-center justify-center rounded-[3px]
@@ -253,26 +246,45 @@ export default function Testimonials() {
               >
                 <ChevronRight size={18} strokeWidth={1.5} />
               </button>
-            </div>
+            </motion.div>
           </div>
 
-          <div ref={ruleRef} className="w-full h-px bg-gray-200 mt-8" />
+          {/* Divider */}
+          <motion.div 
+            initial={{ scaleX: 0 }}
+            whileInView={{ scaleX: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            className="w-full h-px bg-gray-200 mt-8 origin-left" 
+          />
         </div>
 
         {/* ── Slider ── */}
-        <div ref={sliderRef} className="opacity-0">
+        <motion.div
+          initial={{ opacity: 0, y: 40 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.7, delay: 0.2 }}
+        >
+          {/* Slider Container */}
           <div className="relative overflow-hidden">
-            <div
-              className="flex transition-transform duration-500 ease-out"
-              style={{ transform: `translateX(-${currentIndex * 100}%)` }}
-            >
-              {TESTIMONIALS.map((testimonial) => (
-                <div key={testimonial.id} className="w-full flex-shrink-0">
-                  <div className="max-w-2xl mx-auto">
-                    <TestimonialCard testimonial={testimonial} />
-                  </div>
-                </div>
-              ))}
+            <div className="max-w-2xl mx-auto">
+              <AnimatePresence mode="wait" custom={direction}>
+                <motion.div
+                  key={currentIndex}
+                  custom={direction}
+                  variants={slideVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={{
+                    x: { type: "spring", stiffness: 300, damping: 30 },
+                    opacity: { duration: 0.3 },
+                  }}
+                >
+                  <TestimonialCard testimonial={TESTIMONIALS[currentIndex]} />
+                </motion.div>
+              </AnimatePresence>
             </div>
           </div>
 
@@ -283,7 +295,9 @@ export default function Testimonials() {
                 key={index}
                 onClick={() => goToSlide(index)}
                 className={`h-2 rounded-full transition-all duration-300 ${
-                  index === currentIndex ? 'w-8 bg-black' : 'w-2 bg-gray-300 hover:bg-gray-400'
+                  index === currentIndex 
+                    ? 'w-8 bg-black' 
+                    : 'w-2 bg-gray-300 hover:bg-gray-400'
                 }`}
                 aria-label={`Go to testimonial ${index + 1}`}
               />
@@ -309,7 +323,7 @@ export default function Testimonials() {
               <ChevronRight size={20} strokeWidth={1.5} />
             </button>
           </div>
-        </div>
+        </motion.div>
 
       </div>
     </section>
