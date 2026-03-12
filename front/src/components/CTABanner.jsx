@@ -102,7 +102,7 @@ export default function CTABanner() {
             {/* CTA Buttons */}
             <div className="flex flex-wrap gap-4">
               <a
-                href="/services"
+                href="/Bookings"
                 className="relative flex items-center gap-2 tracking-[0.22em] uppercase
                            text-black bg-white border border-white px-7 py-4 no-underline
                            overflow-hidden group rounded-[5px]"

@@ -188,7 +188,7 @@ export default function HowItWorks() {
             </div>
 
             <a
-              href="https://wash2door.in/bookin/"
+              href="/Bookings"
               className="hidden md:flex items-center gap-3 tracking-[0.28em] uppercase
                          text-gray-400 no-underline hover:text-black transition-colors duration-300 group mb-2"
               style={{ fontSize: 'clamp(7px, 0.8vw, 9px)' }}
@@ -211,7 +211,7 @@ export default function HowItWorks() {
         {/* ── Mobile CTA ── */}
         <div className="mt-12 flex md:hidden justify-center">
           <a
-            href="https://wash2door.in/bookin/"
+            href="/Bookings"
             className="relative flex items-center gap-3 tracking-[0.22em] uppercase
                        text-black border border-black px-7 py-3.5 no-underline
                        overflow-hidden group rounded-[5px]"

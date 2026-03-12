@@ -281,7 +281,7 @@ export default function Hero() {
                 {/* Primary CTA */}
                 <a
                   ref={ctaRef}
-                  href="https://wash2door.in/bookin/"
+                  href="/Bookings"
                   className="group opacity-0 relative inline-flex items-center justify-center gap-2 sm:gap-2.5 
                            border border-white/25 overflow-hidden transition-all duration-300
                            hover:border-white/40 active:scale-[0.98]"
@@ -369,7 +369,7 @@ export default function Hero() {
 
               {/* Services link - desktop */}
               <a
-                href="https://wash2door.in/services/"
+                href="/Services"
                 className="hidden md:flex items-center gap-2.5 lg:gap-3 text-white/30 hover:text-white/80 transition-colors duration-300 ml-auto group uppercase"
                 style={{
                   fontSize: 'clamp(7.5px, 0.65vw + 6px, 9.5px)',

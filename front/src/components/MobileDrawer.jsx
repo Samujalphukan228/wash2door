@@ -1,21 +1,39 @@
 "use client"
 
 import { useEffect } from 'react'
-import { X, Phone, MapPin } from 'lucide-react'
+import { X, Phone, MapPin, User, LogOut, Calendar } from 'lucide-react'
+import { useAuth } from '@/context/AuthContext'
 
 const navLinks = [
-  { label: 'Home',     href: '/' },
-  { label: 'About Us', href: '/About' },
-  { label: 'Services', href: 'https://wash2door.in/services/' },
-  { label: 'Contact',  href: '/Contact' },
+  { label: 'Home',        href: '/' },
+  { label: 'About Us',    href: '/About' },
+  { label: 'Services',    href: '/Services' },
+  { label: 'My Bookings', href: '/my-bookings' },  // ✅ Fixed
+  { label: 'Contact',     href: '/Contact' },
 ]
 
 export default function MobileDrawer({ isOpen, onClose }) {
+  const { user, openModal, logout } = useAuth()
 
   useEffect(() => {
     document.body.style.overflow = isOpen ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
   }, [isOpen])
+
+  const handleLogout = () => {
+    logout()
+    onClose()
+  }
+
+  const handleNavClick = (href) => {
+    // If trying to access my-bookings without login, open login modal
+    if (href === '/my-bookings' && !user) {
+      openModal('login')
+      onClose()
+      return
+    }
+    // Otherwise, navigate normally (handled by href)
+  }
 
   return (
     <div className={`fixed inset-0 z-[9999] ${isOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}>
@@ -73,25 +91,103 @@ export default function MobileDrawer({ isOpen, onClose }) {
         {/* Divider */}
         <div className={`mx-5 md:mx-8 h-px bg-gray-200 transition-all duration-500 delay-75 ${isOpen ? 'opacity-100' : 'opacity-0'}`} />
 
+        {/* User Section (if logged in) */}
+        {user && (
+          <div
+            className={`mx-5 md:mx-8 mt-4 mb-2 p-4 bg-gray-50 rounded-lg transition-all duration-300 ${
+              isOpen ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2'
+            }`}
+            style={{ transitionDelay: isOpen ? '150ms' : '0ms' }}
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 bg-black rounded-full flex items-center justify-center text-white">
+                <User size={18} strokeWidth={1.5} />
+              </div>
+              <div>
+                <p
+                  className="tracking-[0.15em] uppercase text-black font-medium"
+                  style={{ fontSize: 'clamp(9px, 2.4vw, 11px)' }}
+                >
+                  {user.firstName} {user.lastName}
+                </p>
+                <p
+                  className="text-gray-500"
+                  style={{ fontSize: 'clamp(8px, 2vw, 9px)' }}
+                >
+                  {user.email}
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex gap-2">
+              <a
+                href="/profile"
+                onClick={onClose}
+                className="flex-1 text-center py-2 text-[9px] tracking-[0.2em] uppercase bg-white border border-gray-200 text-black rounded hover:bg-gray-100 transition-colors"
+              >
+                Profile
+              </a>
+              <button
+                onClick={handleLogout}
+                className="flex items-center justify-center gap-1 px-4 py-2 text-[9px] tracking-[0.2em] uppercase bg-white border border-gray-200 text-red-600 rounded hover:bg-red-50 transition-colors"
+              >
+                <LogOut size={12} strokeWidth={1.5} />
+                Sign Out
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Nav links */}
         <nav className="flex flex-col mt-3 md:mt-4">
-          {navLinks.map((link, i) => (
-            <a
-              key={link.label}
-              href={link.href}
-              onClick={onClose}
-              className={`relative mx-5 md:mx-8 py-4 tracking-[0.26em] uppercase text-black
-                          no-underline border-b border-gray-100 last:border-0
-                          hover:pl-2 hover:tracking-[0.32em] transition-all duration-300
-                          ${isOpen ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-6'}`}
-              style={{
-                fontSize: 'clamp(10px, 2.6vw, 11px)',
-                transitionDelay: isOpen ? `${i * 50 + 100}ms` : '0ms',
-              }}
-            >
-              {link.label}
-            </a>
-          ))}
+          {navLinks.map((link, i) => {
+            // Check if this link requires auth
+            const requiresAuth = link.href === '/my-bookings'
+            
+            // If requires auth and user not logged in, show login modal instead
+            if (requiresAuth && !user) {
+              return (
+                <button
+                  key={link.label}
+                  onClick={() => {
+                    openModal('login')
+                    onClose()
+                  }}
+                  className={`relative mx-5 md:mx-8 py-4 tracking-[0.26em] uppercase text-black text-left
+                              border-b border-gray-100 last:border-0
+                              hover:pl-2 hover:tracking-[0.32em] transition-all duration-300
+                              ${isOpen ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-6'}`}
+                  style={{
+                    fontSize: 'clamp(10px, 2.6vw, 11px)',
+                    transitionDelay: isOpen ? `${i * 50 + (user ? 200 : 100)}ms` : '0ms',
+                  }}
+                >
+                  <span className="flex items-center gap-2">
+                    {link.label}
+                    <span className="text-[8px] text-gray-400">(Login required)</span>
+                  </span>
+                </button>
+              )
+            }
+            
+            return (
+              <a
+                key={link.label}
+                href={link.href}
+                onClick={onClose}
+                className={`relative mx-5 md:mx-8 py-4 tracking-[0.26em] uppercase text-black
+                            no-underline border-b border-gray-100 last:border-0
+                            hover:pl-2 hover:tracking-[0.32em] transition-all duration-300
+                            ${isOpen ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-6'}`}
+                style={{
+                  fontSize: 'clamp(10px, 2.6vw, 11px)',
+                  transitionDelay: isOpen ? `${i * 50 + (user ? 200 : 100)}ms` : '0ms',
+                }}
+              >
+                {link.label}
+              </a>
+            )
+          })}
         </nav>
 
         <div className="flex-1" />
@@ -139,19 +235,37 @@ export default function MobileDrawer({ isOpen, onClose }) {
           }`}
           style={{ transitionDelay: isOpen ? '400ms' : '0ms' }}
         >
-          <a
-            href="https://wash2door.in/bookin/"
-            className="block w-full text-center tracking-[0.36em] uppercase py-4
-                       bg-black text-white no-underline rounded-sm
-                       hover:bg-white hover:text-black border border-black
-                       transition-all duration-300 font-medium"
-            style={{ fontSize: 'clamp(9px, 2.4vw, 11px)' }}
-          >
-            Book Now
-          </a>
+          {user ? (
+            <a
+              href="/my-bookings"  // ✅ Fixed
+              onClick={onClose}
+              className="flex items-center justify-center gap-2 w-full text-center tracking-[0.36em] uppercase py-4
+                         bg-black text-white no-underline rounded-sm
+                         hover:bg-white hover:text-black border border-black
+                         transition-all duration-300 font-medium"
+              style={{ fontSize: 'clamp(9px, 2.4vw, 11px)' }}
+            >
+              <Calendar size={14} strokeWidth={1.5} />
+              My Bookings
+            </a>
+          ) : (
+            <button
+              onClick={() => {
+                openModal('login')
+                onClose()
+              }}
+              className="block w-full text-center tracking-[0.36em] uppercase py-4
+                         bg-black text-white rounded-sm
+                         hover:bg-white hover:text-black border border-black
+                         transition-all duration-300 font-medium"
+              style={{ fontSize: 'clamp(9px, 2.4vw, 11px)' }}
+            >
+              Sign In
+            </button>
+          )}
         </div>
 
       </div>
     </div>
   )
-}
+}2

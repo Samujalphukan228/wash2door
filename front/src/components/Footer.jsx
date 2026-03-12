@@ -12,17 +12,17 @@ import {
 } from 'lucide-react'
 
 const QUICK_LINKS = [
-  { label: 'Home',       href: 'https://wash2door.in/' },
-  { label: 'About Us',   href: 'https://wash2door.in/about-us/' },
-  { label: 'Services',   href: 'https://wash2door.in/services/' },
-  { label: 'Contact Us', href: 'https://wash2door.in/contact-us/' },
-  { label: 'Book Now',   href: 'https://wash2door.in/bookin/' },
+  { label: 'Home',       href: '/' },
+  { label: 'About Us',   href: '/About' },
+  { label: 'Services',   href: '/Services' },
+  { label: 'Contact Us', href: '/Contact-us/' },
+  { label: 'Book Now',   href: '/Bookings' },
 ]
 
 const SERVICES = [
-  { label: 'Car Wash',            href: 'https://wash2door.in/services/' },
-  { label: 'Sofa Cleaning',       href: 'https://wash2door.in/services/' },
-  { label: 'Water Tank Cleaning', href: 'https://wash2door.in/services/' },
+  { label: 'Car Wash',            href: '/Services' },
+  { label: 'Sofa Cleaning',       href: '/Services' },
+  { label: 'Water Tank Cleaning', href: '/Services' },
 ]
 
 const CONTACT_INFO = [
@@ -107,7 +107,7 @@ export default function Footer() {
           <div className="lg:col-span-5 footer-col opacity-0">
 
             {/* Wordmark */}
-            <a href="https://wash2door.in/" className="inline-block mb-6 no-underline group">
+            <a href="/" className="inline-block mb-6 no-underline group">
               <div
                 className="tracking-[0.42em] uppercase text-white transition-opacity duration-300 group-hover:opacity-60"
                 style={{

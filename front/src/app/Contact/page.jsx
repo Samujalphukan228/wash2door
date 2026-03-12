@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useRef, useState } from 'react'
-import { ArrowUpRight, Phone, Mail, MapPin, Clock, Instagram, Facebook, Send } from 'lucide-react'
+import { useEffect, useRef } from 'react'
+import { ArrowUpRight, Phone, Mail, MapPin, Clock, Instagram, Facebook } from 'lucide-react'
 
 const CONTACT_DETAILS = [
   {
@@ -43,180 +43,11 @@ const SOCIALS = [
   },
 ]
 
-// ── Contact Form ──
-function ContactForm() {
-  const [form, setForm] = useState({ name: '', phone: '', service: '', message: '' })
-  const [submitted, setSubmitted] = useState(false)
-  const [loading, setLoading] = useState(false)
-
-  const handleChange = (e) => setForm((p) => ({ ...p, [e.target.name]: e.target.value }))
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    // Simulate submission — wire up to your backend/API here
-    await new Promise((r) => setTimeout(r, 1200))
-    setLoading(false)
-    setSubmitted(true)
-  }
-
-  const inputClass = `
-    w-full bg-transparent border-b border-gray-200 py-3 outline-none
-    tracking-[0.15em] uppercase text-black placeholder-gray-300
-    focus:border-black transition-colors duration-300
-  `
-
-  if (submitted) {
-    return (
-      <div className="flex flex-col items-start justify-center h-full py-16">
-        <div className="w-12 h-px bg-black mb-8" />
-        <h3
-          className="text-black mb-4"
-          style={{
-            fontFamily: 'Georgia, "Times New Roman", serif',
-            fontWeight: 300,
-            fontSize: 'clamp(20px, 4vw, 32px)',
-            letterSpacing: '-0.01em',
-          }}
-        >
-          Message Sent
-        </h3>
-        <p
-          className="tracking-[0.18em] uppercase text-gray-400 leading-[1.9] mb-8"
-          style={{ fontSize: 'clamp(10px, 2.4vw, 11px)' }}
-        >
-          Thank you for reaching out. We will get back to you shortly.
-        </p>
-        <button
-          onClick={() => { setSubmitted(false); setForm({ name: '', phone: '', service: '', message: '' }) }}
-          className="tracking-[0.22em] uppercase text-gray-400 hover:text-black transition-colors duration-300 border-b border-gray-200 hover:border-black pb-0.5"
-          style={{ fontSize: 'clamp(9px, 2.2vw, 11px)' }}
-        >
-          Send another message
-        </button>
-      </div>
-    )
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-8">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div>
-          <label
-            className="block tracking-[0.3em] uppercase text-gray-400 mb-3"
-            style={{ fontSize: 'clamp(9px, 2.2vw, 10px)' }}
-          >
-            Your Name
-          </label>
-          <input
-            type="text"
-            name="name"
-            required
-            placeholder="Rahul Sharma"
-            value={form.name}
-            onChange={handleChange}
-            className={inputClass}
-            style={{ fontSize: 'clamp(10px, 2.4vw, 11px)' }}
-          />
-        </div>
-        <div>
-          <label
-            className="block tracking-[0.3em] uppercase text-gray-400 mb-3"
-            style={{ fontSize: 'clamp(9px, 2.2vw, 10px)' }}
-          >
-            Phone Number
-          </label>
-          <input
-            type="tel"
-            name="phone"
-            required
-            placeholder="+91 XXXXX XXXXX"
-            value={form.phone}
-            onChange={handleChange}
-            className={inputClass}
-            style={{ fontSize: 'clamp(10px, 2.4vw, 11px)' }}
-          />
-        </div>
-      </div>
-
-      <div>
-        <label
-          className="block tracking-[0.3em] uppercase text-gray-400 mb-3"
-          style={{ fontSize: 'clamp(9px, 2.2vw, 10px)' }}
-        >
-          Service Interested In
-        </label>
-        <select
-          name="service"
-          value={form.service}
-          onChange={handleChange}
-          className={`${inputClass} cursor-pointer`}
-          style={{ fontSize: 'clamp(10px, 2.4vw, 11px)' }}
-        >
-          <option value="">Select a service</option>
-          <option value="car-wash">Car Wash</option>
-          <option value="sofa-cleaning">Sofa Cleaning</option>
-          <option value="water-tank-cleaning">Water Tank Cleaning</option>
-          <option value="other">Other</option>
-        </select>
-      </div>
-
-      <div>
-        <label
-          className="block tracking-[0.3em] uppercase text-gray-400 mb-3"
-          style={{ fontSize: 'clamp(9px, 2.2vw, 10px)' }}
-        >
-          Message
-        </label>
-        <textarea
-          name="message"
-          rows={4}
-          placeholder="Tell us how we can help..."
-          value={form.message}
-          onChange={handleChange}
-          className={`${inputClass} resize-none`}
-          style={{ fontSize: 'clamp(10px, 2.4vw, 11px)' }}
-        />
-      </div>
-
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
-        <button
-          type="submit"
-          disabled={loading}
-          className="relative flex items-center gap-2 tracking-[0.22em] uppercase
-                     text-white bg-black border border-black px-7 py-4
-                     overflow-hidden group rounded-[5px] disabled:opacity-50 disabled:cursor-not-allowed"
-          style={{ fontSize: 'clamp(9px, 2.2vw, 11px)' }}
-        >
-          <span className="absolute inset-0 bg-white origin-bottom scale-y-0 group-hover:scale-y-100 transition-transform duration-500 ease-out" />
-          <span className="relative z-10 group-hover:text-black transition-colors duration-500">
-            {loading ? 'Sending…' : 'Send Message'}
-          </span>
-          <Send size={13} strokeWidth={1.5} className="relative z-10 group-hover:text-black transition-colors duration-500" />
-        </button>
-
-        <p
-          className="tracking-[0.15em] uppercase text-gray-300"
-          style={{ fontSize: 'clamp(9px, 2.2vw, 10px)' }}
-        >
-          Or call us directly at{' '}
-          <a
-            href="tel:6900706456"
-            className="text-black border-b border-gray-200 hover:border-black transition-colors duration-300 no-underline"
-          >
-            6900706456
-          </a>
-        </p>
-      </div>
-    </form>
-  )
-}
 
 // ── Page ──
 export default function ContactPage() {
   const heroRef = useRef(null)
   const leftRef = useRef(null)
-  const rightRef = useRef(null)
 
   // Hero animation
   useEffect(() => {
@@ -243,7 +74,7 @@ export default function ContactPage() {
       const { default: gsap } = await import('gsap')
       const { ScrollTrigger } = await import('gsap/ScrollTrigger')
       gsap.registerPlugin(ScrollTrigger)
-      for (const ref of [leftRef, rightRef]) {
+      for (const ref of [leftRef]) {
         if (!ref.current) continue
         ctx = gsap.context(() => {
           gsap.fromTo(
@@ -316,23 +147,10 @@ export default function ContactPage() {
             </span>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-24">
+          <div className="max-w-2xl">
 
-            {/* ── Left — Contact info ── */}
+            {/* ── Contact info ── */}
             <div ref={leftRef} className="opacity-0">
-              <h2
-                className="text-black mb-10"
-                style={{
-                  fontFamily: 'Georgia, "Times New Roman", serif',
-                  fontWeight: 300,
-                  fontSize: 'clamp(1.6rem, 3.5vw, 2.8rem)',
-                  lineHeight: 1.1,
-                  letterSpacing: '-0.01em',
-                }}
-              >
-                Contact Information
-              </h2>
-
               {/* Details */}
               <div className="flex flex-col gap-8 mb-12">
                 {CONTACT_DETAILS.map((item, i) => {
@@ -416,23 +234,6 @@ export default function ContactPage() {
                   </span>
                 </a>
               </div>
-            </div>
-
-            {/* ── Right — Form ── */}
-            <div ref={rightRef} className="opacity-0">
-              <h2
-                className="text-black mb-10"
-                style={{
-                  fontFamily: 'Georgia, "Times New Roman", serif',
-                  fontWeight: 300,
-                  fontSize: 'clamp(1.6rem, 3.5vw, 2.8rem)',
-                  lineHeight: 1.1,
-                  letterSpacing: '-0.01em',
-                }}
-              >
-                Send a Message
-              </h2>
-              <ContactForm />
             </div>
 
           </div>
