@@ -10,7 +10,7 @@ const navLinks = [
   { label: 'Home',     href: '/' },
   { label: 'About Us', href: '/About' },
   { label: 'Services', href: 'https://wash2door.in/services/' },
-  { label: 'Contact',  href: 'https://wash2door.in/contact-us/' },
+  { label: 'Contact',  href: '/Contact' },
 ]
 
 export default function Navbar() {
