@@ -486,6 +486,7 @@ export const getPasswordChangeConfirmationTemplate = (userName) => {
     `;
 };
 
+
 export const getBookingCancellationTemplate = (userName, booking) => {
     return `
     <!DOCTYPE html>
@@ -503,7 +504,13 @@ export const getBookingCancellationTemplate = (userName, booking) => {
             .content h2 { color: #333333; margin-top: 0; }
             .content p { color: #666666; line-height: 1.6; font-size: 16px; }
             .cancel-box { background-color: #f8d7da; border-left: 4px solid #dc3545; padding: 15px; margin: 20px 0; border-radius: 4px; }
+            .info-box { background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0; }
+            .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }
+            .info-row:last-child { border-bottom: none; }
+            .info-label { color: #666; }
+            .info-value { color: #333; font-weight: 600; }
             .footer { background-color: #f8f9fa; padding: 20px; text-align: center; color: #999999; font-size: 12px; }
+            .button { display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; margin-top: 20px; }
         </style>
     </head>
     <body>
@@ -514,21 +521,54 @@ export const getBookingCancellationTemplate = (userName, booking) => {
             <div class="content">
                 <h2>Hello, ${userName}!</h2>
                 <div class="cancel-box">
-                    <strong>Booking ${booking.bookingCode} has been cancelled.</strong><br>
-                    Reason: ${booking.cancellationReason || 'N/A'}
+                    <strong>Your booking has been cancelled.</strong><br>
+                    ${booking.cancellationReason ? `<br>Reason: ${booking.cancellationReason}` : ''}
                 </div>
-                <p>Service: ${booking.serviceId?.name || 'N/A'}</p>
-                <p>Date: ${new Date(booking.bookingDate).toLocaleDateString()}</p>
-                <p>If you'd like to rebook, visit our website.</p>
+                
+                <div class="info-box">
+                    <div class="info-row">
+                        <span class="info-label">Booking Code</span>
+                        <span class="info-value">${booking.bookingCode}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Service</span>
+                        <span class="info-value">${booking.serviceName || 'N/A'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Date</span>
+                        <span class="info-value">${new Date(booking.bookingDate).toLocaleDateString('en-IN', { 
+                            weekday: 'long', 
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric' 
+                        })}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Time Slot</span>
+                        <span class="info-value">${booking.timeSlot}</span>
+                    </div>
+                </div>
+                
+                <p>If you'd like to book again, visit our website and schedule a new appointment.</p>
+                
+                <p style="text-align: center;">
+                    <a href="${process.env.FRONTEND_URL}/services" class="button">Book Again</a>
+                </p>
+                
+                <p style="font-size: 14px; color: #999; margin-top: 30px;">
+                    If you have any questions, please contact our support team.
+                </p>
             </div>
             <div class="footer">
-                <p>© ${new Date().getFullYear()} Car Washing Service. All rights reserved.</p>
+                <p>© ${new Date().getFullYear()} Wash2Door. All rights reserved.</p>
+                <p>This is an automated message, please do not reply.</p>
             </div>
         </div>
     </body>
     </html>
     `;
 };
+
 
 export const getBookingStatusTemplate = (userName, booking) => {
     const statusColors = {

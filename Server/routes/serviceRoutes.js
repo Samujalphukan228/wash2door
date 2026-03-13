@@ -1,4 +1,4 @@
-// routes/serviceRoutes.js
+// routes/serviceRoutes.js - UPDATED
 
 import express from 'express';
 import { protect, isAdmin } from '../middleware/auth.js';
@@ -17,16 +17,13 @@ import {
     updateVariant,
     deleteVariant,
     setPrimaryImage,
-    toggleFeatured
+    deleteImage,
+    toggleFeatured,
+    toggleActive,
+    reorderServices
 } from '../controllers/serviceController.js';
 
 const router = express.Router();
-
-// Debug middleware
-router.use((req, res, next) => {
-    console.log(`📍 Service Route: ${req.method} ${req.path}`);
-    next();
-});
 
 // Health check
 router.get('/health', (req, res) => {
@@ -45,13 +42,18 @@ router.post('/', handleServiceImageUpload, createService);
 router.put('/:serviceId', handleServiceImageUpload, updateService);
 router.delete('/:serviceId', deleteService);
 
+// Service status toggles
+router.patch('/:serviceId/featured', toggleFeatured);
+router.patch('/:serviceId/active', toggleActive);
+
+// Reorder services
+router.put('/reorder/bulk', reorderServices);
+
 // Image management
 router.put('/:serviceId/images/:imageId/primary', setPrimaryImage);
+router.delete('/:serviceId/images/:imageId', deleteImage);
 
-// Featured toggle
-router.patch('/:serviceId/featured', toggleFeatured);
-
-// Variant routes (replaces vehicle type routes)
+// Variant routes
 router.post('/:serviceId/variants', handleVariantImageUpload, addVariant);
 router.put('/:serviceId/variants/:variantId', handleVariantImageUpload, updateVariant);
 router.delete('/:serviceId/variants/:variantId', deleteVariant);

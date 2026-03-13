@@ -1,55 +1,64 @@
-// config/socket.js - FIXED
+// config/socket.js
 
 import { Server } from 'socket.io';
 
-let io;
+let io = null;
 
 export const initSocket = (server) => {
     io = new Server(server, {
         cors: {
-            origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+            origin: [
+                'http://localhost:3000',
+                'http://localhost:3001',
+                process.env.FRONTEND_URL,
+                process.env.ADMIN_URL
+            ].filter(Boolean),
             methods: ['GET', 'POST'],
             credentials: true
-        }
+        },
+        transports: ['websocket', 'polling']
     });
 
     io.on('connection', (socket) => {
-        console.log(`✅ Socket connected: ${socket.id}`);
+        console.log(`🔌 Socket connected: ${socket.id}`);
 
-        // ============================================
-        // JOIN ROOMS
-        // ============================================
-
-        // Customer joins their own room
+        // Join rooms based on user role
         socket.on('join', ({ userId, role }) => {
-            if (userId) {
-                socket.join(`user_${userId}`);
-                console.log(`👤 User ${userId} joined their room`);
-            }
+            // Join user-specific room
+            socket.join(`user:${userId}`);
+            console.log(`👤 User ${userId} joined their room`);
 
-            // Admin joins admin room
+            // Join admin room if admin
             if (role === 'admin') {
-                socket.join('admin_room');
-                console.log(`👑 Admin joined admin room`);
+                socket.join('admins');
+                console.log(`👑 Admin ${userId} joined admin room`);
             }
         });
 
-        // ============================================
-        // DISCONNECT
-        // ============================================
-        socket.on('disconnect', () => {
-            console.log(`❌ Socket disconnected: ${socket.id}`);
+        // Leave rooms
+        socket.on('leave', ({ userId }) => {
+            socket.leave(`user:${userId}`);
+            socket.leave('admins');
+            console.log(`👋 User ${userId} left rooms`);
+        });
+
+        socket.on('disconnect', (reason) => {
+            console.log(`❌ Socket disconnected: ${socket.id} - ${reason}`);
+        });
+
+        socket.on('error', (error) => {
+            console.error(`⚠️ Socket error: ${error.message}`);
         });
     });
 
-    console.log('🔌 Socket.io initialized');
+    console.log('✅ Socket.IO initialized');
     return io;
 };
 
-// Get io instance anywhere in the app
 export const getIO = () => {
     if (!io) {
-        throw new Error('Socket.io not initialized');
+        console.warn('⚠️ Socket.IO not initialized');
+        return null;
     }
     return io;
 };

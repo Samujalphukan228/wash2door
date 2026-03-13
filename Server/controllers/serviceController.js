@@ -1,25 +1,11 @@
-// controllers/serviceController.js
+// controllers/serviceController.js - COMPLETE with socket emissions
 
 import Service from '../models/Service.js';
 import Category from '../models/Category.js';
+import Booking from '../models/Booking.js';
 import mongoose from 'mongoose';
-
-let Booking;
-try {
-    Booking = (await import('../models/Booking.js')).default;
-} catch (e) {
-    console.log('⚠️ Booking model not found, skipping booking checks');
-    Booking = null;
-}
-
-let deleteCloudinaryImage;
-try {
-    const cloudinaryModule = await import('../config/cloudinary.js');
-    deleteCloudinaryImage = cloudinaryModule.deleteCloudinaryImage;
-} catch (e) {
-    console.log('⚠️ Cloudinary config not found');
-    deleteCloudinaryImage = async () => {};
-}
+import { deleteCloudinaryImage } from '../config/cloudinary.js';
+import { emitServiceUpdate, emitVariantUpdate } from '../utils/socketEmitter.js';
 
 const isValidObjectId = (id) =>
     mongoose.Types.ObjectId.isValid(id) && /^[0-9a-fA-F]{24}$/.test(id);
@@ -37,9 +23,8 @@ const parseArray = (value) => {
 // ============================================
 // GET ALL SERVICES (ADMIN)
 // ============================================
-export const getAllServicesAdmin = async (req, res) => {
-    console.log('🔥 getAllServicesAdmin CALLED');
 
+export const getAllServicesAdmin = async (req, res) => {
     try {
         const {
             category,
@@ -48,7 +33,9 @@ export const getAllServicesAdmin = async (req, res) => {
             isFeatured,
             search,
             page = 1,
-            limit = 12
+            limit = 12,
+            sortBy = 'displayOrder',
+            sortOrder = 'asc'
         } = req.query;
 
         const pageNum = parseInt(page) || 1;
@@ -79,18 +66,17 @@ export const getAllServicesAdmin = async (req, res) => {
             ];
         }
 
-        console.log('📦 MongoDB query:', query);
+        const sortOptions = {};
+        sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
 
         const total = await Service.countDocuments(query);
 
         const services = await Service.find(query)
             .populate('category', 'name slug icon image')
-            .sort({ displayOrder: 1, createdAt: -1 })
+            .sort(sortOptions)
             .limit(limitNum)
             .skip((pageNum - 1) * limitNum)
             .lean();
-
-        console.log('📦 Services found:', services.length);
 
         res.status(200).json({
             success: true,
@@ -101,7 +87,7 @@ export const getAllServicesAdmin = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('❌ getAllServicesAdmin ERROR:', error.message);
+        console.error('getAllServicesAdmin ERROR:', error.message);
         res.status(500).json({
             success: false,
             message: 'Error fetching services',
@@ -113,9 +99,8 @@ export const getAllServicesAdmin = async (req, res) => {
 // ============================================
 // GET SINGLE SERVICE (ADMIN)
 // ============================================
-export const getServiceById = async (req, res) => {
-    console.log('🔥 getServiceById CALLED:', req.params.serviceId);
 
+export const getServiceById = async (req, res) => {
     try {
         const { serviceId } = req.params;
 
@@ -127,7 +112,8 @@ export const getServiceById = async (req, res) => {
         }
 
         const service = await Service.findById(serviceId)
-            .populate('category', 'name slug icon image');
+            .populate('category', 'name slug icon image')
+            .populate('createdBy', 'firstName lastName');
 
         if (!service) {
             return res.status(404).json({
@@ -136,13 +122,27 @@ export const getServiceById = async (req, res) => {
             });
         }
 
+        // Get booking stats
+        const bookingStats = await Booking.aggregate([
+            { $match: { serviceId: new mongoose.Types.ObjectId(serviceId) } },
+            {
+                $group: {
+                    _id: '$status',
+                    count: { $sum: 1 }
+                }
+            }
+        ]);
+
         res.status(200).json({
             success: true,
-            data: service
+            data: {
+                service,
+                bookingStats
+            }
         });
 
     } catch (error) {
-        console.error('❌ getServiceById ERROR:', error.message);
+        console.error('getServiceById ERROR:', error.message);
         res.status(500).json({
             success: false,
             message: 'Error fetching service'
@@ -153,11 +153,8 @@ export const getServiceById = async (req, res) => {
 // ============================================
 // CREATE SERVICE (ADMIN)
 // ============================================
-export const createService = async (req, res) => {
-    console.log('🔥 createService CALLED');
-    console.log('📦 Body:', req.body);
-    console.log('📦 Files:', req.files?.length || 0);
 
+export const createService = async (req, res) => {
     try {
         const {
             name,
@@ -260,7 +257,7 @@ export const createService = async (req, res) => {
                 });
             }
 
-            if (!variant.price || Number(variant.price) < 0) {
+            if (variant.price === undefined || variant.price === null || Number(variant.price) < 0) {
                 if (req.files) {
                     for (const file of req.files) {
                         await deleteCloudinaryImage(file.filename);
@@ -285,15 +282,16 @@ export const createService = async (req, res) => {
             }
 
             // Clean variant data
-            variant.name = variant.name.trim();
-            variant.price = Number(variant.price);
-            variant.duration = Number(variant.duration);
-            variant.discountPrice = variant.discountPrice
-                ? Number(variant.discountPrice)
-                : null;
-            variant.features = parseArray(variant.features);
-            variant.description = variant.description || '';
-            variant.displayOrder = Number(variant.displayOrder) || i;
+            parsedVariants[i] = {
+                name: variant.name.trim(),
+                description: variant.description || '',
+                price: Number(variant.price),
+                discountPrice: variant.discountPrice ? Number(variant.discountPrice) : null,
+                duration: Number(variant.duration),
+                features: parseArray(variant.features),
+                isActive: variant.isActive !== false,
+                displayOrder: Number(variant.displayOrder) || i
+            };
         }
 
         // Process images
@@ -332,7 +330,8 @@ export const createService = async (req, res) => {
         // Populate category before sending response
         await service.populate('category', 'name slug icon');
 
-        console.log('✅ Service created:', service._id);
+        // ---- Socket event ----
+        emitServiceUpdate(service, 'created');
 
         res.status(201).json({
             success: true,
@@ -341,7 +340,7 @@ export const createService = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('❌ createService ERROR:', error.message);
+        console.error('createService ERROR:', error.message);
 
         if (req.files) {
             for (const file of req.files) {
@@ -376,13 +375,17 @@ export const createService = async (req, res) => {
 // ============================================
 // UPDATE SERVICE (ADMIN)
 // ============================================
-export const updateService = async (req, res) => {
-    console.log('🔥 updateService CALLED:', req.params.serviceId);
 
+export const updateService = async (req, res) => {
     try {
         const { serviceId } = req.params;
 
         if (!isValidObjectId(serviceId)) {
+            if (req.files) {
+                for (const file of req.files) {
+                    await deleteCloudinaryImage(file.filename);
+                }
+            }
             return res.status(400).json({
                 success: false,
                 message: 'Invalid service ID'
@@ -527,14 +530,14 @@ export const updateService = async (req, res) => {
 
             if (parsedVariants && parsedVariants.length > 0) {
                 service.variants = parsedVariants.map((v, i) => ({
-                    ...v,
                     _id: v._id || undefined, // preserve existing IDs
                     name: v.name?.trim() || 'Unnamed',
-                    price: Number(v.price) || 0,
-                    duration: Number(v.duration) || 30,
-                    discountPrice: v.discountPrice ? Number(v.discountPrice) : null,
-                    features: parseArray(v.features),
                     description: v.description || '',
+                    price: Number(v.price) || 0,
+                    discountPrice: v.discountPrice ? Number(v.discountPrice) : null,
+                    duration: Number(v.duration) || 30,
+                    features: parseArray(v.features),
+                    image: v.image || { url: 'default-variant.jpg', publicId: '' },
                     isActive: v.isActive !== undefined
                         ? (v.isActive === 'true' || v.isActive === true)
                         : true,
@@ -546,7 +549,8 @@ export const updateService = async (req, res) => {
         await service.save();
         await service.populate('category', 'name slug icon');
 
-        console.log('✅ Service updated:', service._id);
+        // ---- Socket event ----
+        emitServiceUpdate(service, 'updated');
 
         res.status(200).json({
             success: true,
@@ -555,7 +559,13 @@ export const updateService = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('❌ updateService ERROR:', error.message);
+        console.error('updateService ERROR:', error.message);
+
+        if (req.files) {
+            for (const file of req.files) {
+                await deleteCloudinaryImage(file.filename);
+            }
+        }
 
         if (error.code === 11000) {
             return res.status(400).json({
@@ -575,9 +585,8 @@ export const updateService = async (req, res) => {
 // ============================================
 // DELETE SERVICE (ADMIN)
 // ============================================
-export const deleteService = async (req, res) => {
-    console.log('🔥 deleteService CALLED:', req.params.serviceId);
 
+export const deleteService = async (req, res) => {
     try {
         const { serviceId } = req.params;
 
@@ -598,19 +607,24 @@ export const deleteService = async (req, res) => {
         }
 
         // Check for active bookings
-        if (Booking) {
-            const activeBookings = await Booking.countDocuments({
-                serviceId: serviceId,
-                status: { $in: ['pending', 'confirmed', 'in-progress'] }
-            });
+        const activeBookings = await Booking.countDocuments({
+            serviceId: serviceId,
+            status: { $in: ['pending', 'confirmed', 'in-progress'] }
+        });
 
-            if (activeBookings > 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: `Cannot delete service with ${activeBookings} active booking(s). Cancel or complete them first.`
-                });
-            }
+        if (activeBookings > 0) {
+            return res.status(400).json({
+                success: false,
+                message: `Cannot delete service with ${activeBookings} active booking(s). Cancel or complete them first.`
+            });
         }
+
+        // Store data for socket emission
+        const deletedServiceData = {
+            _id: service._id,
+            name: service.name,
+            category: service.category
+        };
 
         // Delete service images
         for (const image of service.images) {
@@ -640,7 +654,8 @@ export const deleteService = async (req, res) => {
             console.error('Error updating category count:', err);
         }
 
-        console.log('✅ Service deleted:', serviceId);
+        // ---- Socket event ----
+        emitServiceUpdate(deletedServiceData, 'deleted');
 
         res.status(200).json({
             success: true,
@@ -648,7 +663,7 @@ export const deleteService = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('❌ deleteService ERROR:', error.message);
+        console.error('deleteService ERROR:', error.message);
         res.status(500).json({
             success: false,
             message: 'Error deleting service',
@@ -660,13 +675,13 @@ export const deleteService = async (req, res) => {
 // ============================================
 // ADD VARIANT (ADMIN)
 // ============================================
-export const addVariant = async (req, res) => {
-    console.log('🔥 addVariant CALLED');
 
+export const addVariant = async (req, res) => {
     try {
         const { serviceId } = req.params;
 
         if (!isValidObjectId(serviceId)) {
+            if (req.file) await deleteCloudinaryImage(req.file.filename);
             return res.status(400).json({
                 success: false,
                 message: 'Invalid service ID'
@@ -685,7 +700,7 @@ export const addVariant = async (req, res) => {
 
         const { name, description, price, duration, discountPrice, features, displayOrder } = req.body;
 
-        if (!name || !price || !duration) {
+        if (!name || price === undefined || !duration) {
             if (req.file) await deleteCloudinaryImage(req.file.filename);
             return res.status(400).json({
                 success: false,
@@ -717,7 +732,7 @@ export const addVariant = async (req, res) => {
             variantImage.publicId = req.file.filename;
         }
 
-        service.variants.push({
+        const newVariant = {
             name: name.trim(),
             description: description || '',
             image: variantImage,
@@ -727,12 +742,17 @@ export const addVariant = async (req, res) => {
             features: parseArray(features),
             displayOrder: Number(displayOrder) || service.variants.length,
             isActive: true
-        });
+        };
 
+        service.variants.push(newVariant);
         await service.save();
         await service.populate('category', 'name slug icon');
 
-        console.log('✅ Variant added:', name);
+        // Get the added variant
+        const addedVariant = service.variants[service.variants.length - 1];
+
+        // ---- Socket event ----
+        emitVariantUpdate(serviceId, addedVariant, 'added');
 
         res.status(200).json({
             success: true,
@@ -741,7 +761,7 @@ export const addVariant = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('❌ addVariant ERROR:', error.message);
+        console.error('addVariant ERROR:', error.message);
         if (req.file) await deleteCloudinaryImage(req.file.filename);
         res.status(500).json({
             success: false,
@@ -753,13 +773,13 @@ export const addVariant = async (req, res) => {
 // ============================================
 // UPDATE VARIANT (ADMIN)
 // ============================================
-export const updateVariant = async (req, res) => {
-    console.log('🔥 updateVariant CALLED');
 
+export const updateVariant = async (req, res) => {
     try {
         const { serviceId, variantId } = req.params;
 
         if (!isValidObjectId(serviceId)) {
+            if (req.file) await deleteCloudinaryImage(req.file.filename);
             return res.status(400).json({
                 success: false,
                 message: 'Invalid service ID'
@@ -818,8 +838,8 @@ export const updateVariant = async (req, res) => {
         // Update fields
         if (name) variant.name = name.trim();
         if (description !== undefined) variant.description = description;
-        if (price) variant.price = Number(price);
-        if (duration) variant.duration = Number(duration);
+        if (price !== undefined) variant.price = Number(price);
+        if (duration !== undefined) variant.duration = Number(duration);
         if (discountPrice !== undefined) {
             variant.discountPrice = discountPrice ? Number(discountPrice) : null;
         }
@@ -830,7 +850,8 @@ export const updateVariant = async (req, res) => {
         await service.save();
         await service.populate('category', 'name slug icon');
 
-        console.log('✅ Variant updated');
+        // ---- Socket event ----
+        emitVariantUpdate(serviceId, variant, 'updated');
 
         res.status(200).json({
             success: true,
@@ -839,7 +860,7 @@ export const updateVariant = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('❌ updateVariant ERROR:', error.message);
+        console.error('updateVariant ERROR:', error.message);
         if (req.file) await deleteCloudinaryImage(req.file.filename);
         res.status(500).json({
             success: false,
@@ -851,9 +872,8 @@ export const updateVariant = async (req, res) => {
 // ============================================
 // DELETE VARIANT (ADMIN)
 // ============================================
-export const deleteVariant = async (req, res) => {
-    console.log('🔥 deleteVariant CALLED');
 
+export const deleteVariant = async (req, res) => {
     try {
         const { serviceId, variantId } = req.params;
 
@@ -890,20 +910,25 @@ export const deleteVariant = async (req, res) => {
         }
 
         // Check for active bookings with this variant
-        if (Booking) {
-            const activeBookings = await Booking.countDocuments({
-                serviceId: serviceId,
-                variantId: variantId,
-                status: { $in: ['pending', 'confirmed', 'in-progress'] }
-            });
+        const activeBookings = await Booking.countDocuments({
+            serviceId: serviceId,
+            variantId: variantId,
+            status: { $in: ['pending', 'confirmed', 'in-progress'] }
+        });
 
-            if (activeBookings > 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: `Cannot delete variant with ${activeBookings} active booking(s)`
-                });
-            }
+        if (activeBookings > 0) {
+            return res.status(400).json({
+                success: false,
+                message: `Cannot delete variant with ${activeBookings} active booking(s)`
+            });
         }
+
+        // Store variant data for socket emission
+        const deletedVariantData = {
+            _id: variant._id,
+            name: variant.name,
+            isActive: false
+        };
 
         // Delete variant image
         if (variant.image && variant.image.publicId) {
@@ -914,7 +939,8 @@ export const deleteVariant = async (req, res) => {
         await service.save();
         await service.populate('category', 'name slug icon');
 
-        console.log('✅ Variant deleted');
+        // ---- Socket event ----
+        emitVariantUpdate(serviceId, deletedVariantData, 'deleted');
 
         res.status(200).json({
             success: true,
@@ -923,7 +949,7 @@ export const deleteVariant = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('❌ deleteVariant ERROR:', error.message);
+        console.error('deleteVariant ERROR:', error.message);
         res.status(500).json({
             success: false,
             message: 'Error deleting variant'
@@ -934,9 +960,8 @@ export const deleteVariant = async (req, res) => {
 // ============================================
 // SET PRIMARY IMAGE (ADMIN)
 // ============================================
-export const setPrimaryImage = async (req, res) => {
-    console.log('🔥 setPrimaryImage CALLED');
 
+export const setPrimaryImage = async (req, res) => {
     try {
         const { serviceId, imageId } = req.params;
 
@@ -956,7 +981,7 @@ export const setPrimaryImage = async (req, res) => {
             });
         }
 
-        // Reset all
+        // Reset all images to non-primary
         service.images.forEach(img => {
             img.isPrimary = false;
         });
@@ -972,8 +997,6 @@ export const setPrimaryImage = async (req, res) => {
         image.isPrimary = true;
         await service.save();
 
-        console.log('✅ Primary image set');
-
         res.status(200).json({
             success: true,
             message: 'Primary image updated',
@@ -981,7 +1004,7 @@ export const setPrimaryImage = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('❌ setPrimaryImage ERROR:', error.message);
+        console.error('setPrimaryImage ERROR:', error.message);
         res.status(500).json({
             success: false,
             message: 'Error setting primary image'
@@ -990,11 +1013,75 @@ export const setPrimaryImage = async (req, res) => {
 };
 
 // ============================================
+// DELETE IMAGE (ADMIN)
+// ============================================
+
+export const deleteImage = async (req, res) => {
+    try {
+        const { serviceId, imageId } = req.params;
+
+        if (!isValidObjectId(serviceId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid service ID'
+            });
+        }
+
+        const service = await Service.findById(serviceId);
+
+        if (!service) {
+            return res.status(404).json({
+                success: false,
+                message: 'Service not found'
+            });
+        }
+
+        const image = service.images.id(imageId);
+        if (!image) {
+            return res.status(404).json({
+                success: false,
+                message: 'Image not found'
+            });
+        }
+
+        // Delete from Cloudinary
+        if (image.publicId) {
+            await deleteCloudinaryImage(image.publicId);
+        }
+
+        // Check if this was the primary image
+        const wasPrimary = image.isPrimary;
+
+        // Remove from array
+        service.images.pull(imageId);
+
+        // If deleted image was primary and there are other images, make first one primary
+        if (wasPrimary && service.images.length > 0) {
+            service.images[0].isPrimary = true;
+        }
+
+        await service.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Image deleted successfully',
+            data: service
+        });
+
+    } catch (error) {
+        console.error('deleteImage ERROR:', error.message);
+        res.status(500).json({
+            success: false,
+            message: 'Error deleting image'
+        });
+    }
+};
+
+// ============================================
 // TOGGLE SERVICE FEATURED (ADMIN)
 // ============================================
-export const toggleFeatured = async (req, res) => {
-    console.log('🔥 toggleFeatured CALLED:', req.params.serviceId);
 
+export const toggleFeatured = async (req, res) => {
     try {
         const { serviceId } = req.params;
 
@@ -1017,7 +1104,8 @@ export const toggleFeatured = async (req, res) => {
         service.isFeatured = !service.isFeatured;
         await service.save();
 
-        console.log('✅ Featured toggled:', service.isFeatured);
+        // ---- Socket event ----
+        emitServiceUpdate(service, 'updated');
 
         res.status(200).json({
             success: true,
@@ -1026,10 +1114,135 @@ export const toggleFeatured = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('❌ toggleFeatured ERROR:', error.message);
+        console.error('toggleFeatured ERROR:', error.message);
         res.status(500).json({
             success: false,
             message: 'Error toggling featured status'
         });
     }
+};
+
+// ============================================
+// TOGGLE SERVICE ACTIVE STATUS (ADMIN)
+// ============================================
+
+export const toggleActive = async (req, res) => {
+    try {
+        const { serviceId } = req.params;
+
+        if (!isValidObjectId(serviceId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid service ID'
+            });
+        }
+
+        const service = await Service.findById(serviceId);
+
+        if (!service) {
+            return res.status(404).json({
+                success: false,
+                message: 'Service not found'
+            });
+        }
+
+        // If deactivating, check for active bookings
+        if (service.isActive) {
+            const activeBookings = await Booking.countDocuments({
+                serviceId: serviceId,
+                status: { $in: ['pending', 'confirmed', 'in-progress'] }
+            });
+
+            if (activeBookings > 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Cannot deactivate service with ${activeBookings} active booking(s)`
+                });
+            }
+        }
+
+        service.isActive = !service.isActive;
+        await service.save();
+
+        // Update category service count
+        try {
+            const count = await Service.countDocuments({
+                category: service.category,
+                isActive: true
+            });
+            await Category.findByIdAndUpdate(service.category, { totalServices: count });
+        } catch (err) {
+            console.error('Error updating category count:', err);
+        }
+
+        // ---- Socket event ----
+        emitServiceUpdate(service, 'updated');
+
+        res.status(200).json({
+            success: true,
+            message: `Service ${service.isActive ? 'activated' : 'deactivated'}`,
+            data: service
+        });
+
+    } catch (error) {
+        console.error('toggleActive ERROR:', error.message);
+        res.status(500).json({
+            success: false,
+            message: 'Error toggling active status'
+        });
+    }
+};
+
+// ============================================
+// REORDER SERVICES (ADMIN)
+// ============================================
+
+export const reorderServices = async (req, res) => {
+    try {
+        const { orderedIds } = req.body;
+
+        if (!orderedIds || !Array.isArray(orderedIds)) {
+            return res.status(400).json({
+                success: false,
+                message: 'orderedIds array is required'
+            });
+        }
+
+        const bulkOps = orderedIds.map((id, index) => ({
+            updateOne: {
+                filter: { _id: id },
+                update: { displayOrder: index }
+            }
+        }));
+
+        await Service.bulkWrite(bulkOps);
+
+        res.status(200).json({
+            success: true,
+            message: 'Services reordered successfully'
+        });
+
+    } catch (error) {
+        console.error('reorderServices ERROR:', error.message);
+        res.status(500).json({
+            success: false,
+            message: 'Error reordering services'
+        });
+    }
+};
+
+export default {
+    getAllServicesAdmin,
+    getServiceById,
+    createService,
+    updateService,
+    deleteService,
+    addVariant,
+    updateVariant,
+    deleteVariant,
+    setPrimaryImage,
+    deleteImage,
+    toggleFeatured,
+    toggleActive,
+    reorderServices
 };

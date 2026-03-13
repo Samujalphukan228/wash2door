@@ -1,17 +1,10 @@
-// controllers/categoryController.js
+// controllers/categoryController.js - COMPLETE with socket emissions
 
 import Category from '../models/Category.js';
 import Service from '../models/Service.js';
 import mongoose from 'mongoose';
-
-let deleteCloudinaryImage;
-try {
-    const cloudinaryModule = await import('../config/cloudinary.js');
-    deleteCloudinaryImage = cloudinaryModule.deleteCloudinaryImage;
-} catch (e) {
-    console.log('⚠️ Cloudinary config not found');
-    deleteCloudinaryImage = async () => {};
-}
+import { deleteCloudinaryImage } from '../config/cloudinary.js';
+import { emitCategoryUpdate } from '../utils/socketEmitter.js';
 
 const isValidObjectId = (id) =>
     mongoose.Types.ObjectId.isValid(id) && /^[0-9a-fA-F]{24}$/.test(id);
@@ -19,40 +12,66 @@ const isValidObjectId = (id) =>
 // ============================================
 // GET ALL CATEGORIES (ADMIN)
 // ============================================
-export const getAllCategories = async (req, res) => {
-    console.log('🔥 getAllCategories CALLED');
 
+export const getAllCategories = async (req, res) => {
     try {
-        const { isActive, page = 1, limit = 50 } = req.query;
+        const {
+            isActive,
+            page = 1,
+            limit = 50,
+            search,
+            sortBy = 'displayOrder',
+            sortOrder = 'asc'
+        } = req.query;
 
         const pageNum = parseInt(page) || 1;
         const limitNum = parseInt(limit) || 50;
 
         const query = {};
+
         if (isActive !== undefined && isActive !== '') {
             query.isActive = isActive === 'true';
         }
 
+        if (search) {
+            query.name = { $regex: search, $options: 'i' };
+        }
+
+        const sortOptions = {};
+        sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
+
         const total = await Category.countDocuments(query);
 
         const categories = await Category.find(query)
-            .sort({ displayOrder: 1, createdAt: -1 })
+            .sort(sortOptions)
             .limit(limitNum)
             .skip((pageNum - 1) * limitNum)
             .lean();
 
-        console.log('📦 Categories found:', categories.length);
+        // Add service count to each category
+        const categoriesWithCount = await Promise.all(
+            categories.map(async (cat) => {
+                const serviceCount = await Service.countDocuments({
+                    category: cat._id,
+                    isActive: true
+                });
+                return {
+                    ...cat,
+                    activeServices: serviceCount
+                };
+            })
+        );
 
         res.status(200).json({
             success: true,
             total,
             pages: Math.ceil(total / limitNum),
             page: pageNum,
-            data: categories
+            data: categoriesWithCount
         });
 
     } catch (error) {
-        console.error('❌ getAllCategories ERROR:', error.message);
+        console.error('getAllCategories ERROR:', error.message);
         res.status(500).json({
             success: false,
             message: 'Error fetching categories',
@@ -64,9 +83,8 @@ export const getAllCategories = async (req, res) => {
 // ============================================
 // GET SINGLE CATEGORY
 // ============================================
-export const getCategoryById = async (req, res) => {
-    console.log('🔥 getCategoryById CALLED:', req.params.categoryId);
 
+export const getCategoryById = async (req, res) => {
     try {
         const { categoryId } = req.params;
 
@@ -77,7 +95,8 @@ export const getCategoryById = async (req, res) => {
             });
         }
 
-        const category = await Category.findById(categoryId);
+        const category = await Category.findById(categoryId)
+            .populate('createdBy', 'firstName lastName');
 
         if (!category) {
             return res.status(404).json({
@@ -86,13 +105,28 @@ export const getCategoryById = async (req, res) => {
             });
         }
 
+        // Get services in this category
+        const services = await Service.find({ category: categoryId })
+            .select('name isActive tier startingPrice averageRating totalBookings')
+            .sort({ displayOrder: 1 });
+
+        const stats = {
+            totalServices: services.length,
+            activeServices: services.filter(s => s.isActive).length,
+            totalBookings: services.reduce((sum, s) => sum + (s.totalBookings || 0), 0)
+        };
+
         res.status(200).json({
             success: true,
-            data: category
+            data: {
+                category,
+                services,
+                stats
+            }
         });
 
     } catch (error) {
-        console.error('❌ getCategoryById ERROR:', error.message);
+        console.error('getCategoryById ERROR:', error.message);
         res.status(500).json({
             success: false,
             message: 'Error fetching category'
@@ -103,11 +137,8 @@ export const getCategoryById = async (req, res) => {
 // ============================================
 // CREATE CATEGORY
 // ============================================
-export const createCategory = async (req, res) => {
-    console.log('🔥 createCategory CALLED');
-    console.log('📦 Body:', req.body);
-    console.log('📦 File:', req.file ? 'Yes' : 'No');
 
+export const createCategory = async (req, res) => {
     try {
         const { name, description, icon, displayOrder } = req.body;
 
@@ -143,16 +174,24 @@ export const createCategory = async (req, res) => {
             categoryImage.publicId = req.file.filename;
         }
 
+        // Get next display order if not provided
+        let order = Number(displayOrder);
+        if (!order && order !== 0) {
+            const lastCategory = await Category.findOne().sort({ displayOrder: -1 });
+            order = lastCategory ? lastCategory.displayOrder + 1 : 0;
+        }
+
         const category = await Category.create({
             name: name.trim(),
             description: description || '',
             icon: icon || '',
             image: categoryImage,
-            displayOrder: Number(displayOrder) || 0,
+            displayOrder: order,
             createdBy: req.user._id
         });
 
-        console.log('✅ Category created:', category._id);
+        // ---- Socket event ----
+        emitCategoryUpdate(category, 'created');
 
         res.status(201).json({
             success: true,
@@ -161,7 +200,7 @@ export const createCategory = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('❌ createCategory ERROR:', error.message);
+        console.error('createCategory ERROR:', error.message);
 
         if (req.file) await deleteCloudinaryImage(req.file.filename);
 
@@ -192,13 +231,13 @@ export const createCategory = async (req, res) => {
 // ============================================
 // UPDATE CATEGORY
 // ============================================
-export const updateCategory = async (req, res) => {
-    console.log('🔥 updateCategory CALLED:', req.params.categoryId);
 
+export const updateCategory = async (req, res) => {
     try {
         const { categoryId } = req.params;
 
         if (!isValidObjectId(categoryId)) {
+            if (req.file) await deleteCloudinaryImage(req.file.filename);
             return res.status(400).json({
                 success: false,
                 message: 'Invalid category ID'
@@ -218,7 +257,7 @@ export const updateCategory = async (req, res) => {
         const { name, description, icon, displayOrder, isActive } = req.body;
 
         // Check duplicate name (excluding current)
-        if (name && name.trim() !== category.name) {
+        if (name && name.trim().toLowerCase() !== category.name.toLowerCase()) {
             const existing = await Category.findOne({
                 name: { $regex: new RegExp(`^${name.trim()}$`, 'i') },
                 _id: { $ne: categoryId }
@@ -254,7 +293,8 @@ export const updateCategory = async (req, res) => {
 
         await category.save();
 
-        console.log('✅ Category updated:', category._id);
+        // ---- Socket event ----
+        emitCategoryUpdate(category, 'updated');
 
         res.status(200).json({
             success: true,
@@ -263,7 +303,7 @@ export const updateCategory = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('❌ updateCategory ERROR:', error.message);
+        console.error('updateCategory ERROR:', error.message);
         if (req.file) await deleteCloudinaryImage(req.file.filename);
         res.status(500).json({
             success: false,
@@ -276,9 +316,8 @@ export const updateCategory = async (req, res) => {
 // ============================================
 // DELETE CATEGORY
 // ============================================
-export const deleteCategory = async (req, res) => {
-    console.log('🔥 deleteCategory CALLED:', req.params.categoryId);
 
+export const deleteCategory = async (req, res) => {
     try {
         const { categoryId } = req.params;
 
@@ -308,6 +347,13 @@ export const deleteCategory = async (req, res) => {
             });
         }
 
+        // Store data for socket emission
+        const deletedCategoryData = {
+            _id: category._id,
+            name: category.name,
+            isActive: false
+        };
+
         // Delete category image
         if (category.image.publicId) {
             await deleteCloudinaryImage(category.image.publicId);
@@ -315,7 +361,8 @@ export const deleteCategory = async (req, res) => {
 
         await category.deleteOne();
 
-        console.log('✅ Category deleted:', categoryId);
+        // ---- Socket event ----
+        emitCategoryUpdate(deletedCategoryData, 'deleted');
 
         res.status(200).json({
             success: true,
@@ -323,7 +370,7 @@ export const deleteCategory = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('❌ deleteCategory ERROR:', error.message);
+        console.error('deleteCategory ERROR:', error.message);
         res.status(500).json({
             success: false,
             message: 'Error deleting category',
@@ -335,9 +382,8 @@ export const deleteCategory = async (req, res) => {
 // ============================================
 // TOGGLE CATEGORY STATUS
 // ============================================
-export const toggleCategoryStatus = async (req, res) => {
-    console.log('🔥 toggleCategoryStatus CALLED:', req.params.categoryId);
 
+export const toggleCategoryStatus = async (req, res) => {
     try {
         const { categoryId } = req.params;
 
@@ -360,16 +406,17 @@ export const toggleCategoryStatus = async (req, res) => {
         category.isActive = !category.isActive;
         await category.save();
 
-        // If category is deactivated, optionally deactivate all its services
+        // If category is deactivated, deactivate all its services
         if (!category.isActive) {
-            await Service.updateMany(
+            const result = await Service.updateMany(
                 { category: categoryId },
                 { isActive: false }
             );
-            console.log('⚠️ All services in category deactivated');
+            console.log(`⚠️ Deactivated ${result.modifiedCount} services in category`);
         }
 
-        console.log('✅ Category status toggled:', category.isActive);
+        // ---- Socket event ----
+        emitCategoryUpdate(category, 'updated');
 
         res.status(200).json({
             success: true,
@@ -378,7 +425,7 @@ export const toggleCategoryStatus = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('❌ toggleCategoryStatus ERROR:', error.message);
+        console.error('toggleCategoryStatus ERROR:', error.message);
         res.status(500).json({
             success: false,
             message: 'Error toggling category status'
@@ -389,12 +436,10 @@ export const toggleCategoryStatus = async (req, res) => {
 // ============================================
 // REORDER CATEGORIES
 // ============================================
-export const reorderCategories = async (req, res) => {
-    console.log('🔥 reorderCategories CALLED');
 
+export const reorderCategories = async (req, res) => {
     try {
         const { orderedIds } = req.body;
-        // orderedIds = ["id1", "id2", "id3"] in desired order
 
         if (!orderedIds || !Array.isArray(orderedIds)) {
             return res.status(400).json({
@@ -412,18 +457,26 @@ export const reorderCategories = async (req, res) => {
 
         await Category.bulkWrite(bulkOps);
 
-        console.log('✅ Categories reordered');
-
         res.status(200).json({
             success: true,
             message: 'Categories reordered successfully'
         });
 
     } catch (error) {
-        console.error('❌ reorderCategories ERROR:', error.message);
+        console.error('reorderCategories ERROR:', error.message);
         res.status(500).json({
             success: false,
             message: 'Error reordering categories'
         });
     }
+};
+
+export default {
+    getAllCategories,
+    getCategoryById,
+    createCategory,
+    updateCategory,
+    deleteCategory,
+    toggleCategoryStatus,
+    reorderCategories
 };

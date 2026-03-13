@@ -1,9 +1,10 @@
-// middleware/uploadMiddleware.js
+// middleware/uploadMiddleware.js - COMPLETE FILE (Single source for all uploads)
 
 import multer from 'multer';
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import { v2 as cloudinary } from 'cloudinary';
 
+// Ensure cloudinary is configured
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
@@ -11,7 +12,19 @@ cloudinary.config({
 });
 
 // ============================================
-// STORAGES
+// FILE FILTER
+// ============================================
+const imageFileFilter = (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (allowedTypes.includes(file.mimetype)) {
+        cb(null, true);
+    } else {
+        cb(new Error('Only JPG, PNG, WEBP images are allowed!'), false);
+    }
+};
+
+// ============================================
+// CLOUDINARY STORAGES
 // ============================================
 const categoryStorage = new CloudinaryStorage({
     cloudinary,
@@ -54,22 +67,26 @@ const avatarStorage = new CloudinaryStorage({
 // ============================================
 const uploadCategoryImage = multer({
     storage: categoryStorage,
-    limits: { fileSize: 5 * 1024 * 1024 }
+    fileFilter: imageFileFilter,
+    limits: { fileSize: 5 * 1024 * 1024 } // 5MB
 }).single('image');
 
 const uploadServiceImages = multer({
     storage: serviceStorage,
+    fileFilter: imageFileFilter,
     limits: { fileSize: 5 * 1024 * 1024 }
 }).array('images', 3);
 
 const uploadVariantImage = multer({
     storage: variantStorage,
+    fileFilter: imageFileFilter,
     limits: { fileSize: 5 * 1024 * 1024 }
 }).single('image');
 
 const uploadAvatar = multer({
     storage: avatarStorage,
-    limits: { fileSize: 2 * 1024 * 1024 }
+    fileFilter: imageFileFilter,
+    limits: { fileSize: 2 * 1024 * 1024 } // 2MB
 }).single('avatar');
 
 // ============================================
@@ -77,8 +94,6 @@ const uploadAvatar = multer({
 // ============================================
 
 export const handleCategoryImageUpload = (req, res, next) => {
-    console.log('📸 handleCategoryImageUpload called');
-
     uploadCategoryImage(req, res, (err) => {
         if (err) {
             console.error('❌ Category upload error:', err.message);
@@ -86,24 +101,28 @@ export const handleCategoryImageUpload = (req, res, next) => {
             if (err.code === 'LIMIT_FILE_SIZE') {
                 return res.status(400).json({
                     success: false,
-                    message: 'File too large. Max 5MB.'
+                    message: 'File too large. Maximum size is 5MB.'
+                });
+            }
+
+            if (err.message.includes('Only')) {
+                return res.status(400).json({
+                    success: false,
+                    message: err.message
                 });
             }
 
             return res.status(400).json({
                 success: false,
-                message: err.message || 'Upload failed'
+                message: err.message || 'Image upload failed'
             });
         }
 
-        console.log('📸 Category image uploaded:', req.file ? 'Yes' : 'No');
         next();
     });
 };
 
 export const handleServiceImageUpload = (req, res, next) => {
-    console.log('📸 handleServiceImageUpload called');
-
     uploadServiceImages(req, res, (err) => {
         if (err) {
             console.error('❌ Service upload error:', err.message);
@@ -111,48 +130,57 @@ export const handleServiceImageUpload = (req, res, next) => {
             if (err.code === 'LIMIT_FILE_SIZE') {
                 return res.status(400).json({
                     success: false,
-                    message: 'File too large. Max 5MB.'
+                    message: 'File too large. Maximum size is 5MB per image.'
                 });
             }
 
-            if (err.code === 'LIMIT_FILE_COUNT') {
+            if (err.code === 'LIMIT_FILE_COUNT' || err.code === 'LIMIT_UNEXPECTED_FILE') {
                 return res.status(400).json({
                     success: false,
-                    message: 'Max 3 images allowed.'
+                    message: 'Maximum 3 images allowed.'
+                });
+            }
+
+            if (err.message.includes('Only')) {
+                return res.status(400).json({
+                    success: false,
+                    message: err.message
                 });
             }
 
             return res.status(400).json({
                 success: false,
-                message: err.message || 'Upload failed'
+                message: err.message || 'Image upload failed'
             });
         }
 
-        console.log('📸 Service files uploaded:', req.files?.length || 0);
         next();
     });
 };
 
 export const handleVariantImageUpload = (req, res, next) => {
-    console.log('📸 handleVariantImageUpload called');
-
     uploadVariantImage(req, res, (err) => {
         if (err) {
             console.error('❌ Variant upload error:', err.message);
+
+            if (err.code === 'LIMIT_FILE_SIZE') {
+                return res.status(400).json({
+                    success: false,
+                    message: 'File too large. Maximum size is 5MB.'
+                });
+            }
+
             return res.status(400).json({
                 success: false,
-                message: err.message || 'Upload failed'
+                message: err.message || 'Image upload failed'
             });
         }
 
-        console.log('📸 Variant image uploaded:', req.file ? 'Yes' : 'No');
         next();
     });
 };
 
 export const handleAvatarUpload = (req, res, next) => {
-    console.log('📸 handleAvatarUpload called');
-
     uploadAvatar(req, res, (err) => {
         if (err) {
             console.error('❌ Avatar upload error:', err.message);
@@ -160,7 +188,7 @@ export const handleAvatarUpload = (req, res, next) => {
             if (err.code === 'LIMIT_FILE_SIZE') {
                 return res.status(400).json({
                     success: false,
-                    message: 'File too large. Max 2MB.'
+                    message: 'File too large. Maximum size is 2MB.'
                 });
             }
 
@@ -170,7 +198,14 @@ export const handleAvatarUpload = (req, res, next) => {
             });
         }
 
-        console.log('📸 Avatar uploaded:', req.file ? 'Yes' : 'No');
         next();
     });
+};
+
+// Export raw multer instances if needed elsewhere
+export {
+    uploadCategoryImage,
+    uploadServiceImages,
+    uploadVariantImage,
+    uploadAvatar
 };

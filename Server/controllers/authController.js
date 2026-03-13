@@ -6,7 +6,7 @@ import mongoose from 'mongoose';
 import User from '../models/User.js';
 import Booking from '../models/Booking.js';
 import Review from '../models/Review.js';
-import { deleteCloudinaryImage } from '../config/cloudinary.js';
+import { deleteCloudinaryImage, getPublicIdFromUrl } from '../config/cloudinary.js';
 import {
     generateTokens,
     setTokenCookies,
@@ -835,16 +835,29 @@ export const updateAvatar = async (req, res) => {
         const user = await User.findById(req.user._id);
 
         if (!user) {
+            // Delete uploaded file if user not found
+            if (req.file.filename) {
+                await deleteCloudinaryImage(req.file.filename);
+            }
             return res.status(404).json({
                 success: false,
                 message: 'User not found'
             });
         }
 
+        // Delete old avatar if it exists and is not default
         if (user.avatar && !user.avatar.includes('default')) {
-            await deleteCloudinaryImage(user.avatar);
+            // Try to extract publicId from URL or use directly if it's already a publicId
+            const publicId = user.avatar.startsWith('http') 
+                ? getPublicIdFromUrl(user.avatar)
+                : user.avatar;
+            
+            if (publicId) {
+                await deleteCloudinaryImage(publicId);
+            }
         }
 
+        // Update with new avatar URL
         const updatedUser = await User.findByIdAndUpdate(
             req.user._id,
             { avatar: req.file.path },
@@ -854,17 +867,27 @@ export const updateAvatar = async (req, res) => {
         res.status(200).json({
             success: true,
             message: 'Avatar updated successfully',
-            data: { avatar: updatedUser.avatar }
+            data: { 
+                avatar: updatedUser.avatar,
+                avatarPublicId: req.file.filename // Return publicId for reference
+            }
         });
 
     } catch (error) {
         console.error('Update avatar error:', error);
+        
+        // Clean up uploaded file on error
+        if (req.file?.filename) {
+            await deleteCloudinaryImage(req.file.filename);
+        }
+        
         res.status(500).json({
             success: false,
             message: 'Failed to update avatar'
         });
     }
 };
+
 
 // ============================================
 // DEACTIVATE ACCOUNT

@@ -1,7 +1,15 @@
+// src/components/admin/bookings/BookingCards.jsx
+
 'use client';
 
+import { useState } from 'react';
 import { format } from 'date-fns';
-import { Eye, RefreshCw, ChevronLeft, ChevronRight, MapPin, Clock, ArrowUpRight } from 'lucide-react';
+import { 
+    Eye, RefreshCw, ChevronLeft, ChevronRight, MapPin, Clock, 
+    ArrowUpRight, CheckCircle, Play, Loader2 
+} from 'lucide-react';
+import adminService from '@/services/adminService';
+import toast from 'react-hot-toast';
 
 const statusConfig = {
     pending:       { bg: 'bg-yellow-500/10', text: 'text-yellow-400', dot: 'bg-yellow-400', ring: 'ring-yellow-500/20' },
@@ -9,6 +17,20 @@ const statusConfig = {
     'in-progress': { bg: 'bg-purple-500/10', text: 'text-purple-400', dot: 'bg-purple-400', ring: 'ring-purple-500/20'},
     completed:     { bg: 'bg-green-500/10',  text: 'text-green-400',  dot: 'bg-green-400',  ring: 'ring-green-500/20' },
     cancelled:     { bg: 'bg-red-500/10',    text: 'text-red-400',    dot: 'bg-red-400',    ring: 'ring-red-500/20'   }
+};
+
+// Get next action based on status
+const getNextAction = (status) => {
+    switch (status) {
+        case 'pending':
+            return { nextStatus: 'confirmed', label: 'Confirm', icon: CheckCircle, color: 'text-blue-400' };
+        case 'confirmed':
+            return { nextStatus: 'in-progress', label: 'Start', icon: Play, color: 'text-purple-400' };
+        case 'in-progress':
+            return { nextStatus: 'completed', label: 'Complete', icon: CheckCircle, color: 'text-green-400' };
+        default:
+            return null;
+    }
 };
 
 function SkeletonCard() {
@@ -39,11 +61,54 @@ function StatusBadge({ status }) {
     );
 }
 
-function BookingCard({ booking, onView, onUpdateStatus }) {
+function BookingCard({ booking, onView, onUpdateStatus, onRefresh }) {
+    const [actionLoading, setActionLoading] = useState(false);
+
+    const nextAction = getNextAction(booking.status);
     const isActionable = !['completed', 'cancelled'].includes(booking.status);
+    
     const customerName = booking.customerId
         ? `${booking.customerId.firstName} ${booking.customerId.lastName}`
         : booking.walkInCustomer?.name || 'Walk-in Customer';
+
+    const handleQuickAction = async (e) => {
+        e?.preventDefault?.();
+        e?.stopPropagation?.();
+
+        if (!nextAction) return;
+
+        try {
+            setActionLoading(true);
+            await adminService.updateBookingStatus(booking._id, nextAction.nextStatus);
+            
+            if (nextAction.nextStatus === 'completed') {
+                toast.success('Booking completed! Revenue added.');
+            } else {
+                toast.success(`Booking ${nextAction.nextStatus}`);
+            }
+            
+            if (onRefresh) {
+                onRefresh();
+            }
+        } catch (error) {
+            console.error('Quick action error:', error);
+            toast.error(error.response?.data?.message || 'Failed to update');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleView = (e) => {
+        e?.preventDefault?.();
+        e?.stopPropagation?.();
+        onView(booking);
+    };
+
+    const handleUpdateStatus = (e) => {
+        e?.preventDefault?.();
+        e?.stopPropagation?.();
+        onUpdateStatus(booking);
+    };
 
     return (
         <div className="group relative rounded-lg border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/[0.10] transition-all duration-150 overflow-hidden">
@@ -53,7 +118,8 @@ function BookingCard({ booking, onView, onUpdateStatus }) {
 
             {/* Main clickable area */}
             <button
-                onClick={() => onView(booking)}
+                type="button"
+                onClick={handleView}
                 className="w-full p-4 text-left"
             >
                 {/* Row 1: Code + Status */}
@@ -117,19 +183,44 @@ function BookingCard({ booking, onView, onUpdateStatus }) {
             {isActionable && (
                 <div className="flex border-t border-white/[0.05]">
                     <button
-                        onClick={() => onView(booking)}
+                        type="button"
+                        onClick={handleView}
                         className="flex-1 py-2.5 flex items-center justify-center gap-1.5 text-[11px] text-white/35 hover:text-white/70 hover:bg-white/[0.03] transition-all duration-150"
                     >
                         <Eye className="w-3.5 h-3.5" />
-                        View Details
+                        View
                     </button>
+
                     <div className="w-px bg-white/[0.05]" />
+
+                    {/* Quick Action Button */}
+                    {nextAction && (
+                        <>
+                            <button
+                                type="button"
+                                onClick={handleQuickAction}
+                                disabled={actionLoading}
+                                className={`flex-1 py-2.5 flex items-center justify-center gap-1.5 text-[11px] font-medium hover:bg-white/[0.03] transition-all duration-150 disabled:opacity-50 ${nextAction.color}`}
+                            >
+                                {actionLoading ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                    <nextAction.icon className="w-3.5 h-3.5" />
+                                )}
+                                {nextAction.label}
+                            </button>
+
+                            <div className="w-px bg-white/[0.05]" />
+                        </>
+                    )}
+
                     <button
-                        onClick={() => onUpdateStatus(booking)}
-                        className="flex-1 py-2.5 flex items-center justify-center gap-1.5 text-[11px] text-white/60 hover:text-white hover:bg-white/[0.03] transition-all duration-150 font-medium"
+                        type="button"
+                        onClick={handleUpdateStatus}
+                        className="flex-1 py-2.5 flex items-center justify-center gap-1.5 text-[11px] text-white/35 hover:text-white/70 hover:bg-white/[0.03] transition-all duration-150"
                     >
                         <RefreshCw className="w-3.5 h-3.5" />
-                        Update Status
+                        More
                     </button>
                 </div>
             )}
@@ -150,6 +241,7 @@ function Pagination({ currentPage, pages, onPageChange }) {
     return (
         <div className="flex items-center justify-between pt-2">
             <button
+                type="button"
                 onClick={() => onPageChange(currentPage - 1)}
                 disabled={currentPage === 1}
                 className="flex items-center gap-1 px-3 py-1.5 rounded-md text-xs text-white/40 hover:text-white/80 hover:bg-white/[0.05] disabled:opacity-25 disabled:cursor-not-allowed transition-all"
@@ -162,6 +254,7 @@ function Pagination({ currentPage, pages, onPageChange }) {
                 {getPages().map((page) => (
                     <button
                         key={page}
+                        type="button"
                         onClick={() => onPageChange(page)}
                         className={`w-7 h-7 rounded-md text-xs font-medium transition-all duration-150 ${
                             currentPage === page
@@ -175,6 +268,7 @@ function Pagination({ currentPage, pages, onPageChange }) {
             </div>
 
             <button
+                type="button"
                 onClick={() => onPageChange(currentPage + 1)}
                 disabled={currentPage === pages}
                 className="flex items-center gap-1 px-3 py-1.5 rounded-md text-xs text-white/40 hover:text-white/80 hover:bg-white/[0.05] disabled:opacity-25 disabled:cursor-not-allowed transition-all"
@@ -194,7 +288,8 @@ export default function BookingCards({
     currentPage,
     onPageChange,
     onView,
-    onUpdateStatus
+    onUpdateStatus,
+    onRefresh
 }) {
     if (loading) {
         return (
@@ -235,6 +330,7 @@ export default function BookingCards({
                     booking={booking}
                     onView={onView}
                     onUpdateStatus={onUpdateStatus}
+                    onRefresh={onRefresh}
                 />
             ))}
 

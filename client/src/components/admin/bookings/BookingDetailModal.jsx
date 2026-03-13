@@ -1,7 +1,15 @@
+// src/components/admin/bookings/BookingDetailModal.jsx
+
 'use client';
 
+import { useState } from 'react';
 import { format } from 'date-fns';
-import { X, MapPin, Clock, CreditCard, User, Package, Tag, ArrowUpRight, RefreshCw } from 'lucide-react';
+import { 
+    X, MapPin, Clock, CreditCard, User, Package, Tag, 
+    RefreshCw, History, CheckCircle, XCircle, Play, Loader2 
+} from 'lucide-react';
+import adminService from '@/services/adminService';
+import toast from 'react-hot-toast';
 
 const statusConfig = {
     pending:       { bg: 'bg-yellow-500/10', text: 'text-yellow-400', ring: 'ring-yellow-500/20', dot: 'bg-yellow-400' },
@@ -11,30 +19,156 @@ const statusConfig = {
     cancelled:     { bg: 'bg-red-500/10',    text: 'text-red-400',    ring: 'ring-red-500/20',    dot: 'bg-red-400'    }
 };
 
-export default function BookingDetailModal({ booking, onClose, onUpdateStatus }) {
+// Quick actions based on current status
+const getQuickActions = (currentStatus) => {
+    switch (currentStatus) {
+        case 'pending':
+            return [
+                { status: 'confirmed', label: 'Confirm', icon: CheckCircle, color: 'bg-blue-500 hover:bg-blue-600' },
+                { status: 'cancelled', label: 'Cancel', icon: XCircle, color: 'bg-red-500/20 hover:bg-red-500/30 text-red-400', needsReason: true }
+            ];
+        case 'confirmed':
+            return [
+                { status: 'in-progress', label: 'Start Service', icon: Play, color: 'bg-purple-500 hover:bg-purple-600' },
+                { status: 'cancelled', label: 'Cancel', icon: XCircle, color: 'bg-red-500/20 hover:bg-red-500/30 text-red-400', needsReason: true }
+            ];
+        case 'in-progress':
+            return [
+                { status: 'completed', label: 'Mark Completed', icon: CheckCircle, color: 'bg-green-500 hover:bg-green-600' },
+                { status: 'cancelled', label: 'Cancel', icon: XCircle, color: 'bg-red-500/20 hover:bg-red-500/30 text-red-400', needsReason: true }
+            ];
+        default:
+            return [];
+    }
+};
+
+export default function BookingDetailModal({ booking, customerHistory, onClose, onUpdateStatus, onStatusChange }) {
+    const [actionLoading, setActionLoading] = useState(null);
+    const [showCancelInput, setShowCancelInput] = useState(false);
+    const [cancelReason, setCancelReason] = useState('');
+
     const status = statusConfig[booking.status] || statusConfig.pending;
     const canUpdate = !['completed', 'cancelled'].includes(booking.status);
+    const quickActions = getQuickActions(booking.status);
+
+    // Handle both populated and non-populated customer data
+    const customerName = booking.customerId
+        ? typeof booking.customerId === 'object'
+            ? `${booking.customerId.firstName} ${booking.customerId.lastName}`
+            : 'Online Customer'
+        : booking.walkInCustomer?.name || 'Walk-in Customer';
+
+    const customerEmail = booking.customerId && typeof booking.customerId === 'object'
+        ? booking.customerId.email
+        : null;
+
+    const customerPhone = booking.customerId && typeof booking.customerId === 'object'
+        ? booking.customerId.phone
+        : booking.walkInCustomer?.phone;
+
+    // Quick status update - prevent page reload
+    const handleQuickAction = async (e, action) => {
+        e?.preventDefault?.();
+        e?.stopPropagation?.();
+
+        if (action.needsReason) {
+            setShowCancelInput(true);
+            return;
+        }
+
+        try {
+            setActionLoading(action.status);
+            await adminService.updateBookingStatus(booking._id, action.status);
+            
+            if (action.status === 'completed') {
+                toast.success('Booking completed! Revenue added.');
+            } else {
+                toast.success(`Booking ${action.status}`);
+            }
+            
+            // Trigger refresh without page reload
+            if (onStatusChange) {
+                onStatusChange();
+            }
+            onClose();
+        } catch (error) {
+            console.error('Quick action error:', error);
+            toast.error(error.response?.data?.message || 'Failed to update status');
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
+    // Handle cancel with reason - prevent page reload
+    const handleCancel = async (e) => {
+        e?.preventDefault?.();
+        e?.stopPropagation?.();
+
+        if (!cancelReason.trim()) {
+            toast.error('Please provide a reason for cancellation');
+            return;
+        }
+
+        try {
+            setActionLoading('cancelled');
+            await adminService.updateBookingStatus(booking._id, 'cancelled', cancelReason);
+            toast.success('Booking cancelled');
+            
+            if (onStatusChange) {
+                onStatusChange();
+            }
+            onClose();
+        } catch (error) {
+            console.error('Cancel error:', error);
+            toast.error(error.response?.data?.message || 'Failed to cancel booking');
+        } finally {
+            setActionLoading(null);
+            setShowCancelInput(false);
+        }
+    };
+
+    const handleClose = (e) => {
+        e?.preventDefault?.();
+        e?.stopPropagation?.();
+        onClose();
+    };
+
+    const handleUpdateStatusClick = (e) => {
+        e?.preventDefault?.();
+        e?.stopPropagation?.();
+        onUpdateStatus();
+    };
+
+    const handleBackFromCancel = (e) => {
+        e?.preventDefault?.();
+        e?.stopPropagation?.();
+        setShowCancelInput(false);
+        setCancelReason('');
+    };
 
     return (
         <>
             {/* Backdrop */}
             <div
                 className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50"
-                onClick={onClose}
+                onClick={handleClose}
             />
 
             {/* Panel */}
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-                <div className="
-                    pointer-events-auto
-                    w-full max-w-lg max-h-[90vh]
-                    flex flex-col
-                    rounded-xl
-                    border border-white/[0.08]
-                    bg-[#0a0a0a]
-                    shadow-2xl shadow-black/80
-                    overflow-hidden
-                ">
+                <div 
+                    className="
+                        pointer-events-auto
+                        w-full max-w-lg max-h-[90vh]
+                        flex flex-col
+                        rounded-xl
+                        border border-white/[0.08]
+                        bg-[#0a0a0a]
+                        shadow-2xl shadow-black/80
+                        overflow-hidden
+                    "
+                    onClick={(e) => e.stopPropagation()}
+                >
                     {/* Top gradient line */}
                     <div className="h-px w-full bg-gradient-to-r from-transparent via-white/20 to-transparent shrink-0" />
 
@@ -71,7 +205,8 @@ export default function BookingDetailModal({ booking, onClose, onUpdateStatus })
                         </div>
 
                         <button
-                            onClick={onClose}
+                            type="button"
+                            onClick={handleClose}
                             className="
                                 w-8 h-8 rounded-lg flex items-center justify-center
                                 text-white/30 hover:text-white/70
@@ -84,6 +219,88 @@ export default function BookingDetailModal({ booking, onClose, onUpdateStatus })
                         </button>
                     </div>
 
+                    {/* Quick Actions */}
+                    {canUpdate && quickActions.length > 0 && (
+                        <div className="px-5 pb-4 shrink-0">
+                            {!showCancelInput ? (
+                                <div className="flex gap-2">
+                                    {quickActions.map((action) => (
+                                        <button
+                                            key={action.status}
+                                            type="button"
+                                            onClick={(e) => handleQuickAction(e, action)}
+                                            disabled={actionLoading !== null}
+                                            className={`
+                                                flex-1 flex items-center justify-center gap-2
+                                                px-4 py-2.5 rounded-lg
+                                                text-xs font-medium text-white
+                                                transition-all duration-150
+                                                disabled:opacity-50 disabled:cursor-not-allowed
+                                                ${action.color}
+                                            `}
+                                        >
+                                            {actionLoading === action.status ? (
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                            ) : (
+                                                <action.icon className="w-4 h-4" />
+                                            )}
+                                            {action.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    <textarea
+                                        value={cancelReason}
+                                        onChange={(e) => setCancelReason(e.target.value)}
+                                        placeholder="Reason for cancellation..."
+                                        rows={2}
+                                        className="
+                                            w-full bg-white/[0.03] border border-white/[0.08]
+                                            text-white/80 text-sm placeholder-white/20
+                                            px-3 py-2.5 rounded-lg resize-none
+                                            focus:outline-none focus:border-white/20
+                                        "
+                                    />
+                                    <div className="flex gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={handleBackFromCancel}
+                                            className="
+                                                flex-1 px-4 py-2 rounded-lg
+                                                border border-white/[0.08] bg-white/[0.03]
+                                                text-xs text-white/50 hover:text-white/80
+                                                transition-all duration-150
+                                            "
+                                        >
+                                            Back
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleCancel}
+                                            disabled={actionLoading === 'cancelled'}
+                                            className="
+                                                flex-1 flex items-center justify-center gap-2
+                                                px-4 py-2 rounded-lg
+                                                bg-red-500 hover:bg-red-600
+                                                text-xs font-medium text-white
+                                                transition-all duration-150
+                                                disabled:opacity-50
+                                            "
+                                        >
+                                            {actionLoading === 'cancelled' ? (
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                            ) : (
+                                                <XCircle className="w-4 h-4" />
+                                            )}
+                                            Confirm Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     {/* Divider */}
                     <div className="h-px bg-white/[0.05] mx-5" />
 
@@ -92,16 +309,12 @@ export default function BookingDetailModal({ booking, onClose, onUpdateStatus })
 
                         {/* Customer */}
                         <Section icon={User} title="Customer">
-                            {booking.customerId ? (
-                                <>
-                                    <Row label="Name"  value={`${booking.customerId.firstName} ${booking.customerId.lastName}`} />
-                                    <Row label="Email" value={booking.customerId.email} mono />
-                                </>
-                            ) : (
-                                <>
-                                    <Row label="Name"  value={booking.walkInCustomer?.name  || '—'} />
-                                    <Row label="Phone" value={booking.walkInCustomer?.phone || '—'} mono />
-                                </>
+                            <Row label="Name" value={customerName} />
+                            {customerEmail && (
+                                <Row label="Email" value={customerEmail} mono />
+                            )}
+                            {customerPhone && (
+                                <Row label="Phone" value={customerPhone} mono />
                             )}
                         </Section>
 
@@ -110,7 +323,7 @@ export default function BookingDetailModal({ booking, onClose, onUpdateStatus })
                         {/* Service */}
                         <Section icon={Package} title="Service">
                             <Row label="Category" value={booking.categoryName} />
-                            <Row label="Service"  value={booking.serviceName} />
+                            <Row label="Service" value={booking.serviceName} />
                             {booking.variantName && (
                                 <Row label="Variant" value={booking.variantName} />
                             )}
@@ -137,7 +350,7 @@ export default function BookingDetailModal({ booking, onClose, onUpdateStatus })
 
                         {/* Location */}
                         <Section icon={MapPin} title="Location">
-                            <Row label="City"    value={booking.location?.city    || '—'} />
+                            <Row label="City" value={booking.location?.city || '—'} />
                             <Row label="Address" value={booking.location?.address || '—'} />
                             {booking.location?.landmark && (
                                 <Row label="Landmark" value={booking.location.landmark} />
@@ -148,8 +361,8 @@ export default function BookingDetailModal({ booking, onClose, onUpdateStatus })
 
                         {/* Payment */}
                         <Section icon={CreditCard} title="Payment">
-                            <Row label="Method" value={booking.paymentMethod} />
-                            <Row label="Status" value={booking.paymentStatus} />
+                            <Row label="Method" value={booking.paymentMethod || 'Cash'} />
+                            <Row label="Status" value={booking.paymentStatus || 'Pending'} />
                         </Section>
 
                         {/* Special Notes */}
@@ -167,6 +380,32 @@ export default function BookingDetailModal({ booking, onClose, onUpdateStatus })
                             </>
                         )}
 
+                        {/* Completed Info */}
+                        {booking.status === 'completed' && (
+                            <>
+                                <Divider />
+                                <div className="space-y-2">
+                                    <p className="text-[10px] text-green-400/60 uppercase tracking-widest font-medium">
+                                        Completion
+                                    </p>
+                                    <div className="bg-green-500/[0.05] border border-green-500/[0.12] rounded-lg p-3 space-y-2">
+                                        {booking.completedAt && (
+                                            <Row
+                                                label="Completed At"
+                                                value={format(new Date(booking.completedAt), 'dd MMM yyyy, hh:mm a')}
+                                                mono
+                                            />
+                                        )}
+                                        <Row
+                                            label="Revenue"
+                                            value={`₹${booking.price?.toLocaleString('en-IN')}`}
+                                            highlight
+                                        />
+                                    </div>
+                                </div>
+                            </>
+                        )}
+
                         {/* Cancellation */}
                         {booking.status === 'cancelled' && (
                             <>
@@ -177,9 +416,52 @@ export default function BookingDetailModal({ booking, onClose, onUpdateStatus })
                                     </p>
                                     <div className="bg-red-500/[0.05] border border-red-500/[0.12] rounded-lg p-3 space-y-2">
                                         <Row label="Cancelled By" value={booking.cancelledBy || '—'} />
-                                        <Row label="Reason"       value={booking.cancellationReason || '—'} />
+                                        <Row label="Reason" value={booking.cancellationReason || '—'} />
+                                        {booking.cancelledAt && (
+                                            <Row
+                                                label="Cancelled At"
+                                                value={format(new Date(booking.cancelledAt), 'dd MMM yyyy, hh:mm a')}
+                                                mono
+                                            />
+                                        )}
                                     </div>
                                 </div>
+                            </>
+                        )}
+
+                        {/* Customer History */}
+                        {customerHistory && customerHistory.length > 0 && (
+                            <>
+                                <Divider />
+                                <Section icon={History} title="Previous Bookings">
+                                    <div className="space-y-2">
+                                        {customerHistory.map((hist) => (
+                                            <div
+                                                key={hist._id}
+                                                className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.05]"
+                                            >
+                                                <div>
+                                                    <p className="text-xs text-white/60">{hist.serviceName}</p>
+                                                    <p className="text-[10px] text-white/30 mt-0.5">
+                                                        {format(new Date(hist.bookingDate), 'dd MMM yyyy')}
+                                                    </p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <span className={`
+                                                        text-[10px] px-2 py-0.5 rounded-full
+                                                        ${statusConfig[hist.status]?.bg || ''}
+                                                        ${statusConfig[hist.status]?.text || 'text-white/40'}
+                                                    `}>
+                                                        {hist.status}
+                                                    </span>
+                                                    <p className="text-[10px] text-white/40 mt-1 font-mono">
+                                                        ₹{hist.price?.toLocaleString('en-IN')}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </Section>
                             </>
                         )}
 
@@ -192,25 +474,24 @@ export default function BookingDetailModal({ booking, onClose, onUpdateStatus })
                         <div className="h-px bg-white/[0.05]" />
                         <div className="flex items-center justify-between px-5 py-3.5">
                             <p className="text-[11px] text-white/20 font-mono">
-                                {format(new Date(booking.createdAt), 'dd MMM yyyy · hh:mm a')}
+                                {booking.createdAt && format(new Date(booking.createdAt), 'dd MMM yyyy · hh:mm a')}
                             </p>
 
                             {canUpdate ? (
                                 <button
-                                    onClick={onUpdateStatus}
+                                    type="button"
+                                    onClick={handleUpdateStatusClick}
                                     className="
                                         group relative flex items-center gap-2
                                         px-4 py-2 rounded-lg
-                                        bg-white text-black text-xs font-medium
-                                        hover:bg-white/90 active:bg-white/80
-                                        shadow-lg shadow-white/10
+                                        border border-white/[0.08] bg-white/[0.03]
+                                        text-xs text-white/50 hover:text-white/80
+                                        hover:bg-white/[0.06] hover:border-white/[0.12]
                                         transition-all duration-150
-                                        overflow-hidden
                                     "
                                 >
-                                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-black/5 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
-                                    <RefreshCw className="w-3 h-3 relative" />
-                                    <span className="relative">Update Status</span>
+                                    <RefreshCw className="w-3 h-3" />
+                                    <span>More Options</span>
                                 </button>
                             ) : (
                                 <span className={`

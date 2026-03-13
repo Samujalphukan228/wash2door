@@ -1,4 +1,4 @@
-// routes/bookingRoutes.js - COMPLETE NEW FILE
+// routes/bookingRoutes.js - UPDATED
 
 import express from 'express';
 import {
@@ -6,6 +6,7 @@ import {
     getMyBookings,
     getBookingById,
     cancelBooking,
+    rescheduleBooking,
     getServiceWithPricing,
     checkAvailability
 } from '../controllers/bookingController.js';
@@ -18,10 +19,10 @@ const router = express.Router();
 // PUBLIC ROUTES - No auth needed
 // ============================================
 
-// Step 2: Get vehicle types with pricing for a service
+// Get service with variant pricing
 router.get('/pricing/:serviceId', getServiceWithPricing);
 
-// Step 3: Check time slot availability
+// Check time slot availability
 router.get('/availability', checkAvailability);
 
 // ============================================
@@ -29,7 +30,7 @@ router.get('/availability', checkAvailability);
 // ============================================
 router.use(protect);
 
-// Step 4 & 5: Create booking
+// Create booking
 router.post('/', createBooking);
 
 // Get my bookings
@@ -40,5 +41,8 @@ router.get('/:bookingId', getBookingById);
 
 // Cancel booking
 router.put('/:bookingId/cancel', cancelBooking);
+
+// Reschedule booking
+router.put('/:bookingId/reschedule', rescheduleBooking);
 
 export default router;

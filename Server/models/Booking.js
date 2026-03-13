@@ -1,7 +1,15 @@
-// models/Booking.js - SIMPLIFIED
+// models/Booking.js - UPDATED with constants import
 
 import mongoose from 'mongoose';
 import crypto from 'crypto';
+import {
+    TIME_SLOTS,
+    BOOKING_STATUSES,
+    BOOKING_TYPES,
+    PAYMENT_METHODS,
+    PAYMENT_STATUSES,
+    SERVICE_TIERS
+} from '../utils/constants.js';
 
 const bookingSchema = new mongoose.Schema({
     // ============================================
@@ -17,7 +25,7 @@ const bookingSchema = new mongoose.Schema({
     // ============================================
     bookingType: {
         type: String,
-        enum: ['online', 'walkin'],
+        enum: BOOKING_TYPES,
         default: 'online'
     },
 
@@ -61,7 +69,7 @@ const bookingSchema = new mongoose.Schema({
     },
     serviceTier: {
         type: String,
-        enum: ['basic', 'standard', 'premium', 'custom'],
+        enum: SERVICE_TIERS,
         required: true
     },
 
@@ -95,12 +103,7 @@ const bookingSchema = new mongoose.Schema({
     timeSlot: {
         type: String,
         required: [true, 'Time slot is required'],
-        enum: [
-            '08:00-09:00', '09:00-10:00', '10:00-11:00',
-            '11:00-12:00', '12:00-13:00', '13:00-14:00',
-            '14:00-15:00', '15:00-16:00', '16:00-17:00',
-            '17:00-18:00'
-        ]
+        enum: TIME_SLOTS
     },
 
     // ============================================
@@ -126,7 +129,7 @@ const bookingSchema = new mongoose.Schema({
     // ============================================
     status: {
         type: String,
-        enum: ['pending', 'confirmed', 'in-progress', 'completed', 'cancelled'],
+        enum: BOOKING_STATUSES,
         default: 'pending'
     },
     completedAt: Date,
@@ -150,12 +153,12 @@ const bookingSchema = new mongoose.Schema({
     },
     paymentMethod: {
         type: String,
-        enum: ['cash', 'card', 'online'],
+        enum: PAYMENT_METHODS,
         default: 'cash'
     },
     paymentStatus: {
         type: String,
-        enum: ['pending', 'completed'],
+        enum: PAYMENT_STATUSES,
         default: 'pending'
     },
 
@@ -169,7 +172,9 @@ const bookingSchema = new mongoose.Schema({
     timestamps: true
 });
 
-// Auto generate booking code
+// ============================================
+// AUTO GENERATE BOOKING CODE
+// ============================================
 bookingSchema.pre('save', function(next) {
     if (!this.bookingCode) {
         const random = crypto.randomBytes(3).toString('hex').toUpperCase();
@@ -180,7 +185,9 @@ bookingSchema.pre('save', function(next) {
     next();
 });
 
-// Indexes
+// ============================================
+// INDEXES
+// ============================================
 bookingSchema.index({ customerId: 1 });
 bookingSchema.index({ status: 1 });
 bookingSchema.index({ bookingDate: 1 });
@@ -188,10 +195,113 @@ bookingSchema.index({ bookingCode: 1 });
 bookingSchema.index({ serviceId: 1 });
 bookingSchema.index({ categoryId: 1 });
 bookingSchema.index({ bookingType: 1 });
+bookingSchema.index({ createdAt: -1 });
+
+// Unique compound index to prevent double booking
 bookingSchema.index(
     { serviceId: 1, bookingDate: 1, timeSlot: 1 },
-    { unique: true }
+    {
+        unique: true,
+        partialFilterExpression: { status: { $nin: ['cancelled'] } }
+    }
 );
+
+// ============================================
+// VIRTUALS
+// ============================================
+bookingSchema.virtual('customerName').get(function() {
+    if (this.bookingType === 'walkin') {
+        return this.walkInCustomer?.name || 'Walk-in Customer';
+    }
+    return null; // Will be populated from customerId
+});
+
+bookingSchema.virtual('isUpcoming').get(function() {
+    if (this.status === 'cancelled' || this.status === 'completed') {
+        return false;
+    }
+    const now = new Date();
+    const bookingDateTime = new Date(this.bookingDate);
+    const [startHour] = this.timeSlot.split('-')[0].split(':');
+    bookingDateTime.setHours(parseInt(startHour), 0, 0, 0);
+    return bookingDateTime > now;
+});
+
+bookingSchema.virtual('canCancel').get(function() {
+    if (!['pending', 'confirmed'].includes(this.status)) {
+        return false;
+    }
+    const now = new Date();
+    const bookingDateTime = new Date(this.bookingDate);
+    const [startHour] = this.timeSlot.split('-')[0].split(':');
+    bookingDateTime.setHours(parseInt(startHour), 0, 0, 0);
+    
+    // Can cancel up to 2 hours before
+    const cancelDeadline = new Date(bookingDateTime.getTime() - 2 * 60 * 60 * 1000);
+    return now < cancelDeadline;
+});
+
+// ============================================
+// STATIC METHODS
+// ============================================
+
+// Get available slots for a service on a date
+bookingSchema.statics.getAvailableSlots = async function(serviceId, date) {
+    const bookingDate = new Date(date);
+    const startOfDay = new Date(bookingDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(bookingDate);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    const bookedSlots = await this.find({
+        serviceId,
+        bookingDate: { $gte: startOfDay, $lte: endOfDay },
+        status: { $nin: ['cancelled'] }
+    }).select('timeSlot');
+    
+    const bookedSlotNames = bookedSlots.map(b => b.timeSlot);
+    
+    return TIME_SLOTS.filter(slot => !bookedSlotNames.includes(slot));
+};
+
+// Get booking stats for a user
+bookingSchema.statics.getUserStats = async function(userId) {
+    const stats = await this.aggregate([
+        { $match: { customerId: new mongoose.Types.ObjectId(userId) } },
+        {
+            $group: {
+                _id: '$status',
+                count: { $sum: 1 },
+                totalSpent: {
+                    $sum: {
+                        $cond: [{ $eq: ['$status', 'completed'] }, '$price', 0]
+                    }
+                }
+            }
+        }
+    ]);
+    
+    const result = {
+        total: 0,
+        pending: 0,
+        confirmed: 0,
+        inProgress: 0,
+        completed: 0,
+        cancelled: 0,
+        totalSpent: 0
+    };
+    
+    stats.forEach(s => {
+        result[s._id === 'in-progress' ? 'inProgress' : s._id] = s.count;
+        result.total += s.count;
+        if (s._id === 'completed') {
+            result.totalSpent = s.totalSpent;
+        }
+    });
+    
+    return result;
+};
 
 const Booking = mongoose.model('Booking', bookingSchema);
 

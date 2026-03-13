@@ -1,26 +1,28 @@
-// controllers/bookingController.js - SIMPLIFIED & FIXED
+// controllers/bookingController.js - GLOBAL SLOT BOOKING
 
 import Booking from '../models/Booking.js';
 import Service from '../models/Service.js';
 import mongoose from 'mongoose';
-import { getIO } from '../config/socket.js';
-import { SOCKET_EVENTS } from '../utils/socketEvents.js';
+import {
+    TIME_SLOTS,
+    BOOKING_STATUSES,
+    LIMITS,
+    isValidTimeSlot,
+    isClosedDay
+} from '../utils/constants.js';
 import {
     sendBookingConfirmationEmail,
     sendAdminNewBookingEmail,
     sendBookingCancellationEmail
 } from '../utils/sendEmail.js';
+import {
+    emitNewBooking,
+    emitBookingCancelled
+} from '../utils/socketEmitter.js';
 
 const isValidObjectId = (id) =>
     mongoose.Types.ObjectId.isValid(id) &&
     /^[0-9a-fA-F]{24}$/.test(id);
-
-const VALID_TIME_SLOTS = [
-    '08:00-09:00', '09:00-10:00', '10:00-11:00',
-    '11:00-12:00', '12:00-13:00', '13:00-14:00',
-    '14:00-15:00', '15:00-16:00', '16:00-17:00',
-    '17:00-18:00'
-];
 
 // ============================================
 // GET SERVICE WITH VARIANT PRICING
@@ -88,24 +90,18 @@ export const getServiceWithPricing = async (req, res) => {
 };
 
 // ============================================
-// CHECK TIME SLOT AVAILABILITY
+// CHECK TIME SLOT AVAILABILITY (GLOBAL)
 // ============================================
 
 export const checkAvailability = async (req, res) => {
     try {
         const { serviceId, date } = req.query;
 
-        if (!serviceId || !date) {
+        // serviceId is optional now, but we keep it for API compatibility
+        if (!date) {
             return res.status(400).json({
                 success: false,
-                message: 'Service ID and date are required'
-            });
-        }
-
-        if (!isValidObjectId(serviceId)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid service ID'
+                message: 'Date is required'
             });
         }
 
@@ -127,14 +123,22 @@ export const checkAvailability = async (req, res) => {
             });
         }
 
-        if (bookingDate.getDay() === 0) {
+        // Check if Sunday (closed)
+        if (isClosedDay(bookingDate)) {
             return res.status(200).json({
                 success: true,
                 data: {
                     date,
                     isAvailable: false,
+                    isClosed: true,
                     message: 'We are closed on Sundays',
-                    slots: []
+                    availableSlots: 0,
+                    totalSlots: TIME_SLOTS.length,
+                    slots: TIME_SLOTS.map(slot => ({
+                        slot,
+                        available: false,
+                        reason: 'Closed'
+                    }))
                 }
             });
         }
@@ -145,22 +149,79 @@ export const checkAvailability = async (req, res) => {
         const endOfDay = new Date(bookingDate);
         endOfDay.setHours(23, 59, 59, 999);
 
+        // ============================================
+        // GLOBAL CHECK - Get ALL bookings for this date
+        // ============================================
         const bookedSlots = await Booking.find({
-            serviceId,
             bookingDate: { $gte: startOfDay, $lte: endOfDay },
             status: { $nin: ['cancelled'] }
-        }).select('timeSlot');
+        }).select('timeSlot serviceId serviceName variantName');
 
-        const bookedSlotNames = bookedSlots.map(b => b.timeSlot);
+        // Create a map of booked slots with details
+        const bookedSlotMap = {};
+        bookedSlots.forEach(booking => {
+            bookedSlotMap[booking.timeSlot] = {
+                serviceName: booking.serviceName,
+                variantName: booking.variantName
+            };
+        });
 
-        const slots = VALID_TIME_SLOTS.map(slot => ({
-            slot,
-            available: !bookedSlotNames.includes(slot)
-        }));
+        // For today, filter out past time slots
+        const now = new Date();
+        const isToday = bookingDate.toDateString() === now.toDateString();
+
+        const slots = TIME_SLOTS.map(slot => {
+            const [startTime] = slot.split('-');
+            const [hours] = startTime.split(':');
+            const slotHour = parseInt(hours);
+
+            // Check if slot is booked
+            const isBooked = bookedSlotMap[slot] !== undefined;
+
+            // Check if slot is in the past (for today)
+            let isPast = false;
+            if (isToday) {
+                const currentHour = now.getHours();
+                // Add 1 hour buffer - can't book slots starting within the next hour
+                if (slotHour <= currentHour + 1) {
+                    isPast = true;
+                }
+            }
+
+            // Determine availability and reason
+            let available = true;
+            let reason = null;
+            let bookedBy = null;
+
+            if (isPast) {
+                available = false;
+                reason = 'Past';
+            } else if (isBooked) {
+                available = false;
+                reason = 'Booked';
+                bookedBy = bookedSlotMap[slot].serviceName;
+            }
+
+            return {
+                slot,
+                available,
+                reason,
+                bookedBy
+            };
+        });
+
+        const availableCount = slots.filter(s => s.available).length;
 
         res.status(200).json({
             success: true,
-            data: { date, isAvailable: true, slots }
+            data: {
+                date,
+                isAvailable: availableCount > 0,
+                isClosed: false,
+                availableSlots: availableCount,
+                totalSlots: slots.length,
+                slots
+            }
         });
 
     } catch (error) {
@@ -173,7 +234,7 @@ export const checkAvailability = async (req, res) => {
 };
 
 // ============================================
-// CREATE BOOKING
+// CREATE BOOKING (GLOBAL SLOT CHECK)
 // ============================================
 
 export const createBooking = async (req, res) => {
@@ -209,10 +270,10 @@ export const createBooking = async (req, res) => {
             });
         }
 
-        if (!VALID_TIME_SLOTS.includes(timeSlot)) {
+        if (!isValidTimeSlot(timeSlot)) {
             return res.status(400).json({
                 success: false,
-                message: 'Invalid time slot'
+                message: `Invalid time slot. Valid slots: ${TIME_SLOTS.join(', ')}`
             });
         }
 
@@ -235,7 +296,7 @@ export const createBooking = async (req, res) => {
             });
         }
 
-        if (requestedDate.getDay() === 0) {
+        if (isClosedDay(requestedDate)) {
             return res.status(400).json({
                 success: false,
                 message: 'We are closed on Sundays'
@@ -243,24 +304,40 @@ export const createBooking = async (req, res) => {
         }
 
         const maxDate = new Date();
-        maxDate.setDate(maxDate.getDate() + 30);
+        maxDate.setDate(maxDate.getDate() + LIMITS.MAX_BOOKING_ADVANCE_DAYS);
         if (requestedDate > maxDate) {
             return res.status(400).json({
                 success: false,
-                message: 'Cannot book more than 30 days in advance'
+                message: `Cannot book more than ${LIMITS.MAX_BOOKING_ADVANCE_DAYS} days in advance`
             });
         }
 
-        // ---- Max active bookings ----
+        // ---- Check if slot time has passed (for today) ----
+        const isToday = requestedDate.toDateString() === new Date().toDateString();
+        if (isToday) {
+            const [startTime] = timeSlot.split('-');
+            const [hours] = startTime.split(':');
+            const slotHour = parseInt(hours);
+            const currentHour = new Date().getHours();
+
+            if (slotHour <= currentHour + 1) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'This time slot is no longer available for today'
+                });
+            }
+        }
+
+        // ---- Max active bookings per user ----
         const activeBookings = await Booking.countDocuments({
             customerId: req.user._id,
             status: { $in: ['pending', 'confirmed'] }
         });
 
-        if (activeBookings >= 3) {
+        if (activeBookings >= LIMITS.MAX_ACTIVE_BOOKINGS_PER_USER) {
             return res.status(400).json({
                 success: false,
-                message: 'Maximum 3 active bookings allowed'
+                message: `Maximum ${LIMITS.MAX_ACTIVE_BOOKINGS_PER_USER} active bookings allowed`
             });
         }
 
@@ -293,7 +370,9 @@ export const createBooking = async (req, res) => {
             });
         }
 
-        // ---- Check slot availability ----
+        // ============================================
+        // GLOBAL SLOT CHECK - Check ALL services
+        // ============================================
         const startOfDay = new Date(requestedDate);
         startOfDay.setHours(0, 0, 0, 0);
 
@@ -301,7 +380,6 @@ export const createBooking = async (req, res) => {
         endOfDay.setHours(23, 59, 59, 999);
 
         const slotTaken = await Booking.findOne({
-            serviceId,
             bookingDate: { $gte: startOfDay, $lte: endOfDay },
             timeSlot,
             status: { $nin: ['cancelled'] }
@@ -310,7 +388,7 @@ export const createBooking = async (req, res) => {
         if (slotTaken) {
             return res.status(400).json({
                 success: false,
-                message: 'This time slot is already booked'
+                message: `Time slot ${timeSlot} is already booked${slotTaken.serviceName ? ` for "${slotTaken.serviceName}"` : ''}. Please choose another slot.`
             });
         }
 
@@ -347,33 +425,7 @@ export const createBooking = async (req, res) => {
         });
 
         // ---- Socket events ----
-        try {
-            const io = getIO();
-
-            io.to('admin_room').emit(SOCKET_EVENTS.NEW_BOOKING, {
-                bookingId: booking._id,
-                bookingCode: booking.bookingCode,
-                bookingType: 'online',
-                customerName: `${req.user.firstName} ${req.user.lastName}`,
-                serviceName: booking.serviceName,
-                variantName: booking.variantName,
-                categoryName: booking.categoryName,
-                bookingDate: booking.bookingDate,
-                timeSlot: booking.timeSlot,
-                price: booking.price,
-                status: booking.status,
-                location: booking.location,
-                createdAt: booking.createdAt
-            });
-
-            io.emit(SOCKET_EVENTS.SLOT_BOOKED, {
-                serviceId: booking.serviceId,
-                bookingDate: booking.bookingDate,
-                timeSlot: booking.timeSlot
-            });
-        } catch (socketError) {
-            console.error('Socket emit error:', socketError.message);
-        }
+        emitNewBooking(booking, `${req.user.firstName} ${req.user.lastName}`);
 
         // ---- Send emails ----
         const emailData = {
@@ -386,7 +438,12 @@ export const createBooking = async (req, res) => {
             bookingDate: booking.bookingDate,
             timeSlot: booking.timeSlot,
             location: booking.location,
-            vehicleDetails: { brand: '', model: '', color: '', plateNumber: '' },
+            vehicleDetails: {
+                brand: '',
+                model: '',
+                color: '',
+                plateNumber: ''
+            },
             specialNotes: booking.specialNotes
         };
 
@@ -429,7 +486,7 @@ export const createBooking = async (req, res) => {
         if (error.code === 11000) {
             return res.status(400).json({
                 success: false,
-                message: 'This time slot was just booked'
+                message: 'This time slot was just booked by someone else. Please choose another slot.'
             });
         }
 
@@ -462,11 +519,10 @@ export const getMyBookings = async (req, res) => {
         const query = { customerId: req.user._id };
 
         if (status) {
-            const validStatuses = ['pending', 'confirmed', 'in-progress', 'completed', 'cancelled'];
-            if (!validStatuses.includes(status)) {
+            if (!BOOKING_STATUSES.includes(status)) {
                 return res.status(400).json({
                     success: false,
-                    message: `Invalid status. Must be: ${validStatuses.join(', ')}`
+                    message: `Invalid status. Must be: ${BOOKING_STATUSES.join(', ')}`
                 });
             }
             query.status = status;
@@ -479,10 +535,32 @@ export const getMyBookings = async (req, res) => {
             .limit(limitNum)
             .skip((pageNum - 1) * limitNum);
 
+        // Add computed fields
+        const bookingsWithMeta = bookings.map(booking => {
+            const bookingObj = booking.toObject();
+
+            // Calculate if booking is upcoming
+            const bookingDateTime = new Date(booking.bookingDate);
+            const [startHour] = booking.timeSlot.split('-')[0].split(':');
+            bookingDateTime.setHours(parseInt(startHour), 0, 0, 0);
+
+            bookingObj.isUpcoming = bookingDateTime > new Date() &&
+                !['cancelled', 'completed'].includes(booking.status);
+
+            // Calculate if can cancel (2 hours before)
+            const cancelDeadline = new Date(
+                bookingDateTime.getTime() - LIMITS.MIN_CANCEL_HOURS_BEFORE * 60 * 60 * 1000
+            );
+            bookingObj.canCancel = ['pending', 'confirmed'].includes(booking.status) &&
+                new Date() < cancelDeadline;
+
+            return bookingObj;
+        });
+
         res.status(200).json({
             success: true,
             data: {
-                bookings,
+                bookings: bookingsWithMeta,
                 total,
                 pages: Math.ceil(total / limitNum),
                 currentPage: pageNum
@@ -525,9 +603,27 @@ export const getBookingById = async (req, res) => {
             });
         }
 
+        const bookingObj = booking.toObject();
+
+        // Add computed fields
+        const bookingDateTime = new Date(booking.bookingDate);
+        const [startHour] = booking.timeSlot.split('-')[0].split(':');
+        bookingDateTime.setHours(parseInt(startHour), 0, 0, 0);
+
+        bookingObj.isUpcoming = bookingDateTime > new Date() &&
+            !['cancelled', 'completed'].includes(booking.status);
+
+        const cancelDeadline = new Date(
+            bookingDateTime.getTime() - LIMITS.MIN_CANCEL_HOURS_BEFORE * 60 * 60 * 1000
+        );
+        bookingObj.canCancel = ['pending', 'confirmed'].includes(booking.status) &&
+            new Date() < cancelDeadline;
+
+        bookingObj.canReview = booking.status === 'completed' && !booking.isReviewed;
+
         res.status(200).json({
             success: true,
-            data: booking
+            data: bookingObj
         });
 
     } catch (error) {
@@ -574,56 +670,37 @@ export const cancelBooking = async (req, res) => {
             });
         }
 
-        // 2 hour cancellation limit
+        // Cancellation time limit check
         const bookingDateTime = new Date(booking.bookingDate);
         const [startHour] = booking.timeSlot.split('-')[0].split(':');
         bookingDateTime.setHours(parseInt(startHour), 0, 0, 0);
 
-        const twoHoursBefore = new Date(bookingDateTime.getTime() - 2 * 60 * 60 * 1000);
+        const cancelDeadline = new Date(
+            bookingDateTime.getTime() - LIMITS.MIN_CANCEL_HOURS_BEFORE * 60 * 60 * 1000
+        );
 
-        if (new Date() > twoHoursBefore) {
+        if (new Date() > cancelDeadline) {
             return res.status(400).json({
                 success: false,
-                message: 'Cannot cancel booking less than 2 hours before the slot'
+                message: `Cannot cancel booking less than ${LIMITS.MIN_CANCEL_HOURS_BEFORE} hours before the slot`
             });
         }
 
+        // Update booking
         booking.status = 'cancelled';
         booking.cancellationReason = reason || 'Cancelled by customer';
         booking.cancelledBy = 'user';
         booking.cancelledAt = new Date();
         await booking.save();
 
-        // Socket events
-        try {
-            const io = getIO();
+        // ---- Socket events ----
+        emitBookingCancelled(booking, 'user');
 
-            io.to('admin_room').emit(SOCKET_EVENTS.BOOKING_CANCELLED, {
-                bookingId: booking._id,
-                bookingCode: booking.bookingCode,
-                serviceName: booking.serviceName,
-                variantName: booking.variantName,
-                timeSlot: booking.timeSlot,
-                bookingDate: booking.bookingDate,
-                cancelledBy: 'user',
-                reason: booking.cancellationReason
-            });
-
-            io.emit(SOCKET_EVENTS.SLOT_AVAILABLE, {
-                serviceId: booking.serviceId,
-                bookingDate: booking.bookingDate,
-                timeSlot: booking.timeSlot
-            });
-        } catch (socketError) {
-            console.error('Socket emit error:', socketError.message);
-        }
-
-        // Send cancellation email
+        // ---- Send cancellation email ----
         try {
             await sendBookingCancellationEmail(req.user, {
                 bookingCode: booking.bookingCode,
                 serviceName: booking.serviceName,
-                serviceId: booking.serviceId,
                 bookingDate: booking.bookingDate,
                 timeSlot: booking.timeSlot,
                 cancellationReason: booking.cancellationReason
@@ -634,7 +711,7 @@ export const cancelBooking = async (req, res) => {
 
         res.status(200).json({
             success: true,
-            message: 'Booking cancelled successfully',
+            message: 'Booking cancelled successfully. The slot is now available for others.',
             data: booking
         });
 
@@ -645,4 +722,180 @@ export const cancelBooking = async (req, res) => {
             message: 'Failed to cancel booking'
         });
     }
+};
+
+// ============================================
+// RESCHEDULE BOOKING (GLOBAL SLOT CHECK)
+// ============================================
+
+export const rescheduleBooking = async (req, res) => {
+    try {
+        const { bookingId } = req.params;
+        const { newDate, newTimeSlot } = req.body;
+
+        if (!isValidObjectId(bookingId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid booking ID'
+            });
+        }
+
+        if (!newDate || !newTimeSlot) {
+            return res.status(400).json({
+                success: false,
+                message: 'New date and time slot are required'
+            });
+        }
+
+        if (!isValidTimeSlot(newTimeSlot)) {
+            return res.status(400).json({
+                success: false,
+                message: `Invalid time slot. Valid slots: ${TIME_SLOTS.join(', ')}`
+            });
+        }
+
+        const booking = await Booking.findOne({
+            _id: bookingId,
+            customerId: req.user._id
+        });
+
+        if (!booking) {
+            return res.status(404).json({
+                success: false,
+                message: 'Booking not found'
+            });
+        }
+
+        if (!['pending', 'confirmed'].includes(booking.status)) {
+            return res.status(400).json({
+                success: false,
+                message: `Cannot reschedule a ${booking.status} booking`
+            });
+        }
+
+        // Validate new date
+        const requestedDate = new Date(newDate);
+        if (isNaN(requestedDate.getTime())) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid date format'
+            });
+        }
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        if (requestedDate < today) {
+            return res.status(400).json({
+                success: false,
+                message: 'Cannot reschedule to a past date'
+            });
+        }
+
+        if (isClosedDay(requestedDate)) {
+            return res.status(400).json({
+                success: false,
+                message: 'We are closed on Sundays'
+            });
+        }
+
+        const maxDate = new Date();
+        maxDate.setDate(maxDate.getDate() + LIMITS.MAX_BOOKING_ADVANCE_DAYS);
+        if (requestedDate > maxDate) {
+            return res.status(400).json({
+                success: false,
+                message: `Cannot book more than ${LIMITS.MAX_BOOKING_ADVANCE_DAYS} days in advance`
+            });
+        }
+
+        // Check if slot time has passed (for today)
+        const isToday = requestedDate.toDateString() === new Date().toDateString();
+        if (isToday) {
+            const [startTime] = newTimeSlot.split('-');
+            const [hours] = startTime.split(':');
+            const slotHour = parseInt(hours);
+            const currentHour = new Date().getHours();
+
+            if (slotHour <= currentHour + 1) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'This time slot is no longer available for today'
+                });
+            }
+        }
+
+        // ============================================
+        // GLOBAL SLOT CHECK - Check ALL services
+        // ============================================
+        const startOfDay = new Date(requestedDate);
+        startOfDay.setHours(0, 0, 0, 0);
+
+        const endOfDay = new Date(requestedDate);
+        endOfDay.setHours(23, 59, 59, 999);
+
+        const slotTaken = await Booking.findOne({
+            _id: { $ne: bookingId }, // Exclude current booking
+            bookingDate: { $gte: startOfDay, $lte: endOfDay },
+            timeSlot: newTimeSlot,
+            status: { $nin: ['cancelled'] }
+        });
+
+        if (slotTaken) {
+            return res.status(400).json({
+                success: false,
+                message: `Time slot ${newTimeSlot} is already booked. Please choose another slot.`
+            });
+        }
+
+        // Store old values for socket emission
+        const oldDate = booking.bookingDate;
+        const oldTimeSlot = booking.timeSlot;
+
+        // Update booking
+        booking.bookingDate = requestedDate;
+        booking.timeSlot = newTimeSlot;
+        await booking.save();
+
+        // ---- Socket events ----
+        // Emit that old slot is now available
+        emitBookingCancelled({
+            ...booking.toObject(),
+            bookingDate: oldDate,
+            timeSlot: oldTimeSlot
+        }, 'reschedule');
+
+        // Emit that new slot is taken
+        emitNewBooking(booking, `${req.user.firstName} ${req.user.lastName}`);
+
+        res.status(200).json({
+            success: true,
+            message: 'Booking rescheduled successfully',
+            data: booking
+        });
+
+    } catch (error) {
+        console.error('Reschedule booking error:', error);
+
+        if (error.code === 11000) {
+            return res.status(400).json({
+                success: false,
+                message: 'This time slot was just booked by someone else'
+            });
+        }
+
+        res.status(500).json({
+            success: false,
+            message: 'Failed to reschedule booking'
+        });
+    }
+};
+
+export default {
+    getServiceWithPricing,
+    checkAvailability,
+    createBooking,
+    getMyBookings,
+    getBookingById,
+    cancelBooking,
+    rescheduleBooking
 };

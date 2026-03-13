@@ -1,40 +1,51 @@
+// src/components/admin/bookings/StatsBar.jsx
+
 'use client';
 
 import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 
 const STATS = [
-    { key: 'total',      label: 'Total',       color: 'text-white'        },
-    { key: 'pending',    label: 'Pending',      color: 'text-yellow-400'   },
-    { key: 'confirmed',  label: 'Confirmed',    color: 'text-blue-400'     },
-    { key: 'inProgress', label: 'In Progress',  color: 'text-purple-400'   },
-    { key: 'completed',  label: 'Completed',    color: 'text-green-400'    },
-    { key: 'cancelled',  label: 'Cancelled',    color: 'text-red-400'      },
-    { key: 'revenue',    label: 'Revenue',      color: 'text-white', isRevenue: true },
+    { key: 'total',         label: 'Total',        color: 'text-white'       },
+    { key: 'pending',       label: 'Pending',      color: 'text-yellow-400'  },
+    { key: 'confirmed',     label: 'Confirmed',    color: 'text-blue-400'    },
+    { key: 'inProgress',    label: 'In Progress',  color: 'text-purple-400'  },
+    { key: 'completed',     label: 'Completed',    color: 'text-green-400'   },
+    { key: 'cancelled',     label: 'Cancelled',    color: 'text-red-400'     },
+    { key: 'todayBookings', label: 'Today',        color: 'text-cyan-400'    },
+    { key: 'revenue',       label: 'Revenue',      color: 'text-white', isRevenue: true },
 ];
+
+// Mobile shows first 3, expanded shows all
+const MOBILE_DEFAULT = ['total', 'pending', 'revenue'];
+const MOBILE_EXPANDED = ['confirmed', 'inProgress', 'completed', 'cancelled', 'todayBookings'];
 
 function format(stat, stats) {
     const v = stats[stat.key];
+    if (v === undefined || v === null) return '—';
     if (stat.isRevenue) return `₹${Number(v).toLocaleString('en-IN')}`;
-    return v ?? 0;
+    return v;
 }
 
-export default function StatsBar({ stats, loading }) {
+export default function StatsBar({ stats = {}, loading }) {
     const [expanded, setExpanded] = useState(false);
+
+    const mobileDefaultStats = STATS.filter(s => MOBILE_DEFAULT.includes(s.key));
+    const mobileExpandedStats = STATS.filter(s => MOBILE_EXPANDED.includes(s.key));
 
     return (
         <>
             {/* ── Mobile ── */}
             <div className="sm:hidden">
                 <div className="grid grid-cols-3 gap-px bg-white/[0.06] border border-white/[0.06] rounded-xl overflow-hidden">
-                    {[STATS[0], STATS[1], STATS[6]].map((stat) => (
+                    {mobileDefaultStats.map((stat) => (
                         <MobileStat key={stat.key} stat={stat} stats={stats} loading={loading} />
                     ))}
                 </div>
 
                 {expanded && (
-                    <div className="mt-px grid grid-cols-2 gap-px bg-white/[0.06] border border-white/[0.06] rounded-xl overflow-hidden mt-2">
-                        {[STATS[2], STATS[3], STATS[4], STATS[5]].map((stat) => (
+                    <div className="mt-2 grid grid-cols-2 gap-px bg-white/[0.06] border border-white/[0.06] rounded-xl overflow-hidden">
+                        {mobileExpandedStats.map((stat) => (
                             <MobileStat key={stat.key} stat={stat} stats={stats} loading={loading} />
                         ))}
                     </div>
@@ -50,7 +61,7 @@ export default function StatsBar({ stats, loading }) {
             </div>
 
             {/* ── Desktop ── */}
-            <div className="hidden sm:grid grid-cols-7 gap-px bg-white/[0.06] border border-white/[0.06] rounded-xl overflow-hidden">
+            <div className="hidden sm:grid grid-cols-8 gap-px bg-white/[0.06] border border-white/[0.06] rounded-xl overflow-hidden">
                 {STATS.map((stat) => (
                     <DesktopStat key={stat.key} stat={stat} stats={stats} loading={loading} />
                 ))}

@@ -1,7 +1,15 @@
+// src/components/admin/bookings/BookingsTable.jsx
+
 'use client';
 
+import { useState } from 'react';
 import { format } from 'date-fns';
-import { Eye, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { 
+    Eye, RefreshCw, ChevronLeft, ChevronRight, 
+    CheckCircle, Play, Loader2 
+} from 'lucide-react';
+import adminService from '@/services/adminService';
+import toast from 'react-hot-toast';
 
 const statusConfig = {
     pending:       { dot: 'bg-yellow-400', text: 'text-yellow-400',  bg: 'bg-yellow-500/10',  ring: 'ring-yellow-500/20'  },
@@ -28,6 +36,20 @@ const HEADERS = [
     { key: 'amount',   label: 'Amount'   },
     { key: 'actions',  label: ''         }
 ];
+
+// Get next action based on status
+const getNextAction = (status) => {
+    switch (status) {
+        case 'pending':
+            return { nextStatus: 'confirmed', label: 'Confirm', icon: CheckCircle, color: 'text-blue-400 hover:text-blue-300' };
+        case 'confirmed':
+            return { nextStatus: 'in-progress', label: 'Start', icon: Play, color: 'text-purple-400 hover:text-purple-300' };
+        case 'in-progress':
+            return { nextStatus: 'completed', label: 'Complete', icon: CheckCircle, color: 'text-green-400 hover:text-green-300' };
+        default:
+            return null;
+    }
+};
 
 /* ── Skeleton ── */
 function TableSkeleton() {
@@ -68,8 +90,49 @@ function TableEmpty() {
 /* ── Main ── */
 export default function BookingsTable({
     bookings, loading, total, pages,
-    currentPage, onPageChange, onView, onUpdateStatus
+    currentPage, onPageChange, onView, onUpdateStatus, onRefresh
 }) {
+    const [actionLoading, setActionLoading] = useState(null);
+
+    // Quick status update - prevent page reload
+    const handleQuickAction = async (e, bookingId, newStatus) => {
+        e?.preventDefault?.();
+        e?.stopPropagation?.();
+
+        try {
+            setActionLoading(bookingId);
+            await adminService.updateBookingStatus(bookingId, newStatus);
+            
+            if (newStatus === 'completed') {
+                toast.success('Booking completed! Revenue added.');
+            } else {
+                toast.success(`Booking ${newStatus}`);
+            }
+            
+            // Refresh without page reload
+            if (onRefresh) {
+                onRefresh();
+            }
+        } catch (error) {
+            console.error('Quick action error:', error);
+            toast.error(error.response?.data?.message || 'Failed to update');
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
+    const handleView = (e, booking) => {
+        e?.preventDefault?.();
+        e?.stopPropagation?.();
+        onView(booking);
+    };
+
+    const handleUpdateStatus = (e, booking) => {
+        e?.preventDefault?.();
+        e?.stopPropagation?.();
+        onUpdateStatus(booking);
+    };
+
     if (loading) return <TableSkeleton />;
     if (!bookings || bookings.length === 0) return <TableEmpty />;
 
@@ -114,10 +177,12 @@ export default function BookingsTable({
 
                     <tbody className="divide-y divide-white/[0.03]">
                         {bookings.map((booking) => {
-                            const status  = statusConfig[booking.status]  || statusConfig.pending;
-                            const tier    = tierConfig[booking.serviceTier] || tierConfig.basic;
-                            const canEdit = !['completed', 'cancelled'].includes(booking.status);
-                            const name    = booking.customerId
+                            const status = statusConfig[booking.status] || statusConfig.pending;
+                            const tier = tierConfig[booking.serviceTier] || tierConfig.basic;
+                            const nextAction = getNextAction(booking.status);
+                            const isLoading = actionLoading === booking._id;
+
+                            const name = booking.customerId
                                 ? `${booking.customerId.firstName} ${booking.customerId.lastName}`
                                 : booking.walkInCustomer?.name || '—';
                             const sub = booking.customerId?.email
@@ -217,21 +282,61 @@ export default function BookingsTable({
                                     {/* Actions */}
                                     <td className="px-5 py-4">
                                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                                            <ActionBtn
-                                                onClick={() => onView(booking)}
+                                            {/* View */}
+                                            <button
+                                                type="button"
+                                                onClick={(e) => handleView(e, booking)}
                                                 title="View details"
+                                                className="
+                                                    w-7 h-7 rounded-lg flex items-center justify-center
+                                                    border border-white/[0.06] bg-white/[0.02]
+                                                    text-white/30 hover:text-white/70
+                                                    hover:bg-white/[0.06] hover:border-white/10
+                                                    transition-all duration-150
+                                                "
                                             >
                                                 <Eye className="w-3.5 h-3.5" />
-                                            </ActionBtn>
+                                            </button>
 
-                                            {canEdit && (
-                                                <ActionBtn
-                                                    onClick={() => onUpdateStatus(booking)}
-                                                    title="Update status"
-                                                    highlight
+                                            {/* Quick Action (next step) */}
+                                            {nextAction && (
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => handleQuickAction(e, booking._id, nextAction.nextStatus)}
+                                                    disabled={isLoading}
+                                                    title={nextAction.label}
+                                                    className={`
+                                                        w-7 h-7 rounded-lg flex items-center justify-center
+                                                        border border-white/[0.08] bg-white/[0.03]
+                                                        transition-all duration-150
+                                                        disabled:opacity-50
+                                                        ${nextAction.color}
+                                                    `}
+                                                >
+                                                    {isLoading ? (
+                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                    ) : (
+                                                        <nextAction.icon className="w-3.5 h-3.5" />
+                                                    )}
+                                                </button>
+                                            )}
+
+                                            {/* More options */}
+                                            {!['completed', 'cancelled'].includes(booking.status) && (
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => handleUpdateStatus(e, booking)}
+                                                    title="More options"
+                                                    className="
+                                                        w-7 h-7 rounded-lg flex items-center justify-center
+                                                        border border-white/[0.06] bg-white/[0.02]
+                                                        text-white/30 hover:text-white/70
+                                                        hover:bg-white/[0.06] hover:border-white/10
+                                                        transition-all duration-150
+                                                    "
                                                 >
                                                     <RefreshCw className="w-3.5 h-3.5" />
-                                                </ActionBtn>
+                                                </button>
                                             )}
                                         </div>
                                     </td>
@@ -251,17 +356,26 @@ export default function BookingsTable({
 
                     <div className="flex items-center gap-1">
                         {/* Prev */}
-                        <PaginationBtn
+                        <button
+                            type="button"
                             onClick={() => onPageChange(currentPage - 1)}
                             disabled={currentPage === 1}
+                            className="
+                                w-7 h-7 rounded-md flex items-center justify-center
+                                text-white/30 hover:text-white/70
+                                hover:bg-white/[0.06]
+                                disabled:opacity-25 disabled:cursor-not-allowed
+                                transition-all duration-150
+                            "
                         >
                             <ChevronLeft className="w-3.5 h-3.5" />
-                        </PaginationBtn>
+                        </button>
 
                         {/* Pages */}
                         {getPages().map((page) => (
                             <button
                                 key={page}
+                                type="button"
                                 onClick={() => onPageChange(page)}
                                 className={`
                                     w-7 h-7 rounded-md text-xs font-medium transition-all duration-150
@@ -276,54 +390,23 @@ export default function BookingsTable({
                         ))}
 
                         {/* Next */}
-                        <PaginationBtn
+                        <button
+                            type="button"
                             onClick={() => onPageChange(currentPage + 1)}
                             disabled={currentPage === pages}
+                            className="
+                                w-7 h-7 rounded-md flex items-center justify-center
+                                text-white/30 hover:text-white/70
+                                hover:bg-white/[0.06]
+                                disabled:opacity-25 disabled:cursor-not-allowed
+                                transition-all duration-150
+                            "
                         >
                             <ChevronRight className="w-3.5 h-3.5" />
-                        </PaginationBtn>
+                        </button>
                     </div>
                 </div>
             )}
         </div>
-    );
-}
-
-/* ── Sub-components ── */
-
-function ActionBtn({ onClick, title, highlight, children }) {
-    return (
-        <button
-            onClick={onClick}
-            title={title}
-            className={`
-                w-7 h-7 rounded-lg flex items-center justify-center
-                border transition-all duration-150
-                ${highlight
-                    ? 'border-white/10 text-white/60 hover:text-white hover:bg-white/[0.08] hover:border-white/20'
-                    : 'border-white/[0.06] text-white/30 hover:text-white/70 hover:bg-white/[0.06] hover:border-white/10'
-                }
-            `}
-        >
-            {children}
-        </button>
-    );
-}
-
-function PaginationBtn({ onClick, disabled, children }) {
-    return (
-        <button
-            onClick={onClick}
-            disabled={disabled}
-            className="
-                w-7 h-7 rounded-md flex items-center justify-center
-                text-white/30 hover:text-white/70
-                hover:bg-white/[0.06]
-                disabled:opacity-25 disabled:cursor-not-allowed
-                transition-all duration-150
-            "
-        >
-            {children}
-        </button>
     );
 }

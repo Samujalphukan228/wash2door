@@ -1,28 +1,23 @@
+// src/services/adminService.js
+
 import axiosInstance from '@/lib/axios';
 
 const adminService = {
 
     // Dashboard
     getDashboardStats: async () => {
-        const response = await axiosInstance.get(
-            '/admin/dashboard/stats'
-        );
+        const response = await axiosInstance.get('/admin/dashboard/stats');
         return response.data;
     },
 
     // Users
     getAllUsers: async (params) => {
-        const response = await axiosInstance.get(
-            '/admin/users',
-            { params }
-        );
+        const response = await axiosInstance.get('/admin/users', { params });
         return response.data;
     },
 
     getUserById: async (userId) => {
-        const response = await axiosInstance.get(
-            `/admin/users/${userId}`
-        );
+        const response = await axiosInstance.get(`/admin/users/${userId}`);
         return response.data;
     },
 
@@ -35,9 +30,7 @@ const adminService = {
     },
 
     unblockUser: async (userId) => {
-        const response = await axiosInstance.put(
-            `/admin/users/${userId}/unblock`
-        );
+        const response = await axiosInstance.put(`/admin/users/${userId}/unblock`);
         return response.data;
     },
 
@@ -51,10 +44,12 @@ const adminService = {
 
     // Bookings
     getAllBookings: async (params) => {
-        const response = await axiosInstance.get(
-            '/admin/bookings',
-            { params }
-        );
+        const response = await axiosInstance.get('/admin/bookings', { params });
+        return response.data;
+    },
+
+    getBookingById: async (bookingId) => {
+        const response = await axiosInstance.get(`/admin/bookings/${bookingId}`);
         return response.data;
     },
 
@@ -67,54 +62,33 @@ const adminService = {
     },
 
     createAdminBooking: async (data) => {
-        const response = await axiosInstance.post(
-            '/admin/bookings',
-            data
-        );
-        return response.data;
-    },
-
-    // Services
-    getAllServices: async (params) => {
-        const response = await axiosInstance.get(
-            '/admin/services',
-            { params }
-        );
+        const response = await axiosInstance.post('/admin/bookings', data);
         return response.data;
     },
 
     // Reviews
     getAllReviews: async (params) => {
-        const response = await axiosInstance.get(
-            '/admin/reviews',
-            { params }
-        );
+        const response = await axiosInstance.get('/admin/reviews', { params });
         return response.data;
     },
 
     toggleReviewVisibility: async (reviewId) => {
-        const response = await axiosInstance.put(
-            `/admin/reviews/${reviewId}/toggle`
-        );
+        const response = await axiosInstance.put(`/admin/reviews/${reviewId}/toggle`);
         return response.data;
     },
 
     // Reports
     getRevenueReport: async (params) => {
-        const response = await axiosInstance.get(
-            '/admin/reports/revenue',
-            { params }
-        );
+        const response = await axiosInstance.get('/admin/reports/revenue', { params });
         return response.data;
     },
 
     getBookingReport: async (params) => {
-        const response = await axiosInstance.get(
-            '/admin/reports/bookings',
-            { params }
-        );
+        const response = await axiosInstance.get('/admin/reports/bookings', { params });
         return response.data;
     }
+
+    // ❌ REMOVED: getAllServices - use serviceService.getAll() instead
 };
 
 export default adminService;

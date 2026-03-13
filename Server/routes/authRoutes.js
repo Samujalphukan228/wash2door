@@ -1,3 +1,5 @@
+// routes/authRoutes.js - UPDATED with protected setup-admin
+
 import express from 'express';
 import {
     register,
@@ -110,73 +112,84 @@ router.get('/me/stats', protect, getUserStats);
 router.post('/check-registration', checkRegistrationStatus);
 
 // ============================================
-// SETUP FIRST ADMIN (ONE TIME USE)
+// SETUP FIRST ADMIN (Protected - Dev/Setup Only)
 // ============================================
-router.post('/setup-admin', async (req, res) => {
-    try {
-        const adminExists = await User.findOne({ role: 'admin' });
+if (process.env.NODE_ENV === 'development' || process.env.ALLOW_ADMIN_SETUP === 'true') {
+    router.post('/setup-admin', async (req, res) => {
+        try {
+            const adminExists = await User.findOne({ role: 'admin' });
 
-        if (adminExists) {
-            return res.status(403).json({
-                success: false,
-                message: 'Admin already exists. This route is disabled.'
-            });
-        }
-
-        const { email, password } = req.body;
-
-        if (!email || !password) {
-            return res.status(400).json({
-                success: false,
-                message: 'Email and password are required'
-            });
-        }
-
-        const user = await User.findOne({
-            email: email.toLowerCase(),
-            registrationStatus: 'completed'
-        });
-
-        if (!user) {
-            return res.status(404).json({
-                success: false,
-                message: 'User not found. Register first.'
-            });
-        }
-
-        const userWithPassword = await User.findById(user._id)
-            .select('+password');
-
-        const isValid = await userWithPassword.comparePassword(password);
-
-        if (!isValid) {
-            return res.status(401).json({
-                success: false,
-                message: 'Invalid password'
-            });
-        }
-
-        user.role = 'admin';
-        await user.save({ validateBeforeSave: false });
-
-        res.status(200).json({
-            success: true,
-            message: `${user.email} is now an admin!`,
-            data: {
-                id: user._id,
-                email: user.email,
-                role: user.role
+            if (adminExists) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Admin already exists. This route is disabled.'
+                });
             }
-        });
 
-    } catch (error) {
-        console.error('Setup admin error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to setup admin'
-        });
-    }
-});
+            const { email, password, setupKey } = req.body;
+
+            // Require setup key in production
+            if (process.env.NODE_ENV !== 'development') {
+                if (!setupKey || setupKey !== process.env.ADMIN_SETUP_KEY) {
+                    return res.status(403).json({
+                        success: false,
+                        message: 'Invalid setup key'
+                    });
+                }
+            }
+
+            if (!email || !password) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Email and password are required'
+                });
+            }
+
+            const user = await User.findOne({
+                email: email.toLowerCase(),
+                registrationStatus: 'completed'
+            });
+
+            if (!user) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'User not found. Register first.'
+                });
+            }
+
+            const userWithPassword = await User.findById(user._id).select('+password');
+
+            const isValid = await userWithPassword.comparePassword(password);
+
+            if (!isValid) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Invalid password'
+                });
+            }
+
+            user.role = 'admin';
+            await user.save({ validateBeforeSave: false });
+
+            res.status(200).json({
+                success: true,
+                message: `${user.email} is now an admin!`,
+                data: {
+                    id: user._id,
+                    email: user.email,
+                    role: user.role
+                }
+            });
+
+        } catch (error) {
+            console.error('Setup admin error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to setup admin'
+            });
+        }
+    });
+}
 
 // ============================================
 // DEBUG ROUTES (Development only)

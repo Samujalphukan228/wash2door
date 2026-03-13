@@ -1,24 +1,26 @@
-// controllers/adminController.js - COMPLETE FIXED FILE
+// controllers/adminController.js - COMPLETE with GLOBAL SLOT BOOKING
 
 import User from '../models/User.js';
 import Service from '../models/Service.js';
 import Booking from '../models/Booking.js';
 import Review from '../models/Review.js';
 import { sendBookingStatusEmail } from '../utils/sendEmail.js';
-import { getIO } from '../config/socket.js';
-import { SOCKET_EVENTS } from '../utils/socketEvents.js';
+import {
+    TIME_SLOTS,
+    BOOKING_STATUSES,
+    isValidTimeSlot,
+    isClosedDay
+} from '../utils/constants.js';
+import {
+    emitNewBooking,
+    emitBookingStatusUpdate,
+    emitUserBlocked
+} from '../utils/socketEmitter.js';
 import mongoose from 'mongoose';
 
 const isValidObjectId = (id) =>
     mongoose.Types.ObjectId.isValid(id) &&
     /^[0-9a-fA-F]{24}$/.test(id);
-
-const VALID_TIME_SLOTS = [
-    '08:00-09:00', '09:00-10:00', '10:00-11:00',
-    '11:00-12:00', '12:00-13:00', '13:00-14:00',
-    '14:00-15:00', '15:00-16:00', '16:00-17:00',
-    '17:00-18:00'
-];
 
 // ============================================
 // DASHBOARD STATS
@@ -32,23 +34,34 @@ export const getDashboardStats = async (req, res) => {
         todayEnd.setHours(23, 59, 59, 999);
 
         const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+        const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59, 999);
 
         const [
             totalUsers,
             totalAdmins,
+            newUsersThisMonth,
             totalBookings,
             totalServices,
+            activeServices,
             bookingsToday,
             pendingBookings,
             confirmedBookings,
             inProgressBookings,
             completedBookings,
             cancelledBookings,
-            bookingsThisMonth
+            bookingsThisMonth,
+            bookingsLastMonth
         ] = await Promise.all([
             User.countDocuments({ role: 'user', registrationStatus: 'completed' }),
             User.countDocuments({ role: 'admin' }),
+            User.countDocuments({
+                role: 'user',
+                registrationStatus: 'completed',
+                createdAt: { $gte: thisMonthStart }
+            }),
             Booking.countDocuments(),
+            Service.countDocuments(),
             Service.countDocuments({ isActive: true }),
             Booking.countDocuments({ createdAt: { $gte: today, $lte: todayEnd } }),
             Booking.countDocuments({ status: 'pending' }),
@@ -56,7 +69,8 @@ export const getDashboardStats = async (req, res) => {
             Booking.countDocuments({ status: 'in-progress' }),
             Booking.countDocuments({ status: 'completed' }),
             Booking.countDocuments({ status: 'cancelled' }),
-            Booking.countDocuments({ createdAt: { $gte: thisMonthStart } })
+            Booking.countDocuments({ createdAt: { $gte: thisMonthStart } }),
+            Booking.countDocuments({ createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd } })
         ]);
 
         const revenueThisMonth = await Booking.aggregate([
@@ -69,6 +83,16 @@ export const getDashboardStats = async (req, res) => {
             { $group: { _id: null, total: { $sum: '$price' } } }
         ]);
 
+        const revenueLastMonth = await Booking.aggregate([
+            {
+                $match: {
+                    status: 'completed',
+                    completedAt: { $gte: lastMonthStart, $lte: lastMonthEnd }
+                }
+            },
+            { $group: { _id: null, total: { $sum: '$price' } } }
+        ]);
+
         const totalRevenue = await Booking.aggregate([
             { $match: { status: 'completed' } },
             { $group: { _id: null, total: { $sum: '$price' } } }
@@ -76,8 +100,8 @@ export const getDashboardStats = async (req, res) => {
 
         const recentBookings = await Booking.find()
             .sort({ createdAt: -1 })
-            .limit(5)
-            .populate('customerId', 'firstName lastName email');
+            .limit(10)
+            .populate('customerId', 'firstName lastName email avatar');
 
         const popularServices = await Booking.aggregate([
             { $match: { status: { $ne: 'cancelled' } } },
@@ -85,6 +109,7 @@ export const getDashboardStats = async (req, res) => {
                 $group: {
                     _id: '$serviceId',
                     serviceName: { $first: '$serviceName' },
+                    categoryName: { $first: '$categoryName' },
                     totalBookings: { $sum: 1 },
                     totalRevenue: { $sum: '$price' }
                 }
@@ -105,15 +130,46 @@ export const getDashboardStats = async (req, res) => {
             { $sort: { count: -1 } }
         ]);
 
+        const bookingsByTimeSlot = await Booking.aggregate([
+            { $match: { status: { $ne: 'cancelled' } } },
+            {
+                $group: {
+                    _id: '$timeSlot',
+                    count: { $sum: 1 }
+                }
+            },
+            { $sort: { count: -1 } }
+        ]);
+
+        // Upcoming bookings for today
+        const upcomingToday = await Booking.find({
+            bookingDate: { $gte: today, $lte: todayEnd },
+            status: { $in: ['pending', 'confirmed'] }
+        })
+            .populate('customerId', 'firstName lastName email')
+            .sort({ timeSlot: 1 })
+            .limit(10);
+
         res.status(200).json({
             success: true,
             data: {
-                users: { total: totalUsers, admins: totalAdmins },
-                services: { total: totalServices },
+                users: {
+                    total: totalUsers,
+                    admins: totalAdmins,
+                    newThisMonth: newUsersThisMonth
+                },
+                services: {
+                    total: totalServices,
+                    active: activeServices
+                },
                 bookings: {
                     total: totalBookings,
                     today: bookingsToday,
                     thisMonth: bookingsThisMonth,
+                    lastMonth: bookingsLastMonth,
+                    growth: bookingsLastMonth > 0
+                        ? Math.round(((bookingsThisMonth - bookingsLastMonth) / bookingsLastMonth) * 100)
+                        : 100,
                     byStatus: {
                         pending: pendingBookings,
                         confirmed: confirmedBookings,
@@ -124,11 +180,17 @@ export const getDashboardStats = async (req, res) => {
                 },
                 revenue: {
                     total: totalRevenue[0]?.total || 0,
-                    thisMonth: revenueThisMonth[0]?.total || 0
+                    thisMonth: revenueThisMonth[0]?.total || 0,
+                    lastMonth: revenueLastMonth[0]?.total || 0,
+                    growth: (revenueLastMonth[0]?.total || 0) > 0
+                        ? Math.round((((revenueThisMonth[0]?.total || 0) - (revenueLastMonth[0]?.total || 0)) / (revenueLastMonth[0]?.total || 1)) * 100)
+                        : 100
                 },
                 recentBookings,
+                upcomingToday,
                 popularServices,
-                bookingsByCategory
+                bookingsByCategory,
+                bookingsByTimeSlot
             }
         });
 
@@ -148,7 +210,14 @@ export const getDashboardStats = async (req, res) => {
 
 export const getAllUsers = async (req, res) => {
     try {
-        const { page = 1, limit = 10, search, isBlocked } = req.query;
+        const {
+            page = 1,
+            limit = 10,
+            search,
+            isBlocked,
+            sortBy = 'createdAt',
+            sortOrder = 'desc'
+        } = req.query;
 
         const pageNum = parseInt(page);
         const limitNum = parseInt(limit);
@@ -167,18 +236,38 @@ export const getAllUsers = async (req, res) => {
             query.isBlocked = isBlocked === 'true';
         }
 
+        const sortOptions = {};
+        sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
         const total = await User.countDocuments(query);
 
         const users = await User.find(query)
             .select('-password -otp -refreshToken -passwordResetToken -emailVerificationToken')
-            .sort({ createdAt: -1 })
+            .sort(sortOptions)
             .limit(limitNum)
             .skip((pageNum - 1) * limitNum);
+
+        // Add booking stats for each user
+        const usersWithStats = await Promise.all(
+            users.map(async (user) => {
+                const bookingCount = await Booking.countDocuments({ customerId: user._id });
+                const completedCount = await Booking.countDocuments({
+                    customerId: user._id,
+                    status: 'completed'
+                });
+
+                return {
+                    ...user.toObject(),
+                    totalBookings: bookingCount,
+                    completedBookings: completedCount
+                };
+            })
+        );
 
         res.status(200).json({
             success: true,
             data: {
-                users,
+                users: usersWithStats,
                 total,
                 pages: Math.ceil(total / limitNum),
                 currentPage: pageNum
@@ -196,7 +285,7 @@ export const getAllUsers = async (req, res) => {
 };
 
 // ============================================
-// GET SINGLE USER WITH BOOKINGS
+// GET SINGLE USER WITH DETAILS
 // ============================================
 
 export const getUserById = async (req, res) => {
@@ -220,14 +309,11 @@ export const getUserById = async (req, res) => {
             });
         }
 
-        const bookings = await Booking.find({ customerId: userId })
-            .sort({ createdAt: -1 })
-            .limit(10);
-
-        const [totalBookings, completedBookings, cancelledBookings, totalSpent] = await Promise.all([
+        const [totalBookings, completedBookings, cancelledBookings, pendingBookings, totalSpent] = await Promise.all([
             Booking.countDocuments({ customerId: userId }),
             Booking.countDocuments({ customerId: userId, status: 'completed' }),
             Booking.countDocuments({ customerId: userId, status: 'cancelled' }),
+            Booking.countDocuments({ customerId: userId, status: { $in: ['pending', 'confirmed'] } }),
             Booking.aggregate([
                 {
                     $match: {
@@ -239,10 +325,32 @@ export const getUserById = async (req, res) => {
             ])
         ]);
 
+        const recentBookings = await Booking.find({ customerId: userId })
+            .sort({ createdAt: -1 })
+            .limit(10);
+
         const reviews = await Review.find({ customerId: userId })
             .populate('serviceId', 'name')
             .sort({ createdAt: -1 })
             .limit(5);
+
+        const favoriteServices = await Booking.aggregate([
+            {
+                $match: {
+                    customerId: new mongoose.Types.ObjectId(userId),
+                    status: { $ne: 'cancelled' }
+                }
+            },
+            {
+                $group: {
+                    _id: '$serviceId',
+                    serviceName: { $first: '$serviceName' },
+                    count: { $sum: 1 }
+                }
+            },
+            { $sort: { count: -1 } },
+            { $limit: 3 }
+        ]);
 
         res.status(200).json({
             success: true,
@@ -252,10 +360,15 @@ export const getUserById = async (req, res) => {
                     totalBookings,
                     completedBookings,
                     cancelledBookings,
-                    totalSpent: totalSpent[0]?.total || 0
+                    pendingBookings,
+                    totalSpent: totalSpent[0]?.total || 0,
+                    completionRate: totalBookings > 0
+                        ? Math.round((completedBookings / totalBookings) * 100)
+                        : 0
                 },
-                recentBookings: bookings,
-                recentReviews: reviews
+                recentBookings,
+                reviews,
+                favoriteServices
             }
         });
 
@@ -311,7 +424,11 @@ export const blockUser = async (req, res) => {
         user.isBlocked = true;
         user.blockedReason = reason || 'No reason provided';
         user.blockedAt = new Date();
+        user.refreshToken = undefined;
         await user.save({ validateBeforeSave: false });
+
+        // Force logout via socket
+        emitUserBlocked(userId, user.blockedReason);
 
         const userResponse = user.toObject();
         delete userResponse.password;
@@ -414,6 +531,13 @@ export const changeUserRole = async (req, res) => {
             });
         }
 
+        if (userId === req.user._id.toString()) {
+            return res.status(400).json({
+                success: false,
+                message: 'Cannot change your own role'
+            });
+        }
+
         const user = await User.findById(userId);
 
         if (!user) {
@@ -455,192 +579,6 @@ export const changeUserRole = async (req, res) => {
 };
 
 // ============================================
-// GET ALL SERVICES (ADMIN)
-// ============================================
-
-export const getAllServices = async (req, res) => {
-    try {
-        const { page = 1, limit = 10, category, isActive } = req.query;
-
-        const pageNum = parseInt(page);
-        const limitNum = parseInt(limit);
-
-        const query = {};
-        if (category) query.category = category;
-        if (isActive !== undefined) query.isActive = isActive === 'true';
-
-        const total = await Service.countDocuments(query);
-
-        const services = await Service.find(query)
-            .populate('category', 'name slug')
-            .sort({ displayOrder: 1, createdAt: -1 })
-            .limit(limitNum)
-            .skip((pageNum - 1) * limitNum);
-
-        res.status(200).json({
-            success: true,
-            total,
-            pages: Math.ceil(total / limitNum),
-            currentPage: pageNum,
-            data: services
-        });
-
-    } catch (error) {
-        console.error('Get services error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error fetching services',
-            error: error.message
-        });
-    }
-};
-
-// ============================================
-// CREATE SERVICE
-// ============================================
-
-export const createService = async (req, res) => {
-    try {
-        const { name, description, category, tier, variants } = req.body;
-
-        if (!name || !description || !category) {
-            return res.status(400).json({
-                success: false,
-                message: 'Name, description and category are required'
-            });
-        }
-
-        if (!variants || !Array.isArray(variants) || variants.length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'At least one variant is required'
-            });
-        }
-
-        const serviceData = {
-            ...req.body,
-            createdBy: req.user._id
-        };
-
-        const service = await Service.create(serviceData);
-
-        res.status(201).json({
-            success: true,
-            message: 'Service created successfully',
-            data: service
-        });
-
-    } catch (error) {
-        console.error('Create service error:', error);
-
-        if (error.code === 11000) {
-            return res.status(400).json({
-                success: false,
-                message: 'A service with this name already exists'
-            });
-        }
-
-        if (error.name === 'ValidationError') {
-            const messages = Object.values(error.errors).map(e => e.message);
-            return res.status(400).json({
-                success: false,
-                message: 'Validation error',
-                errors: messages
-            });
-        }
-
-        res.status(500).json({
-            success: false,
-            message: 'Error creating service',
-            error: error.message
-        });
-    }
-};
-
-// ============================================
-// UPDATE SERVICE
-// ============================================
-
-export const updateService = async (req, res) => {
-    try {
-        const { serviceId } = req.params;
-
-        if (!isValidObjectId(serviceId)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid service ID'
-            });
-        }
-
-        const service = await Service.findByIdAndUpdate(
-            serviceId,
-            req.body,
-            { new: true, runValidators: true }
-        );
-
-        if (!service) {
-            return res.status(404).json({
-                success: false,
-                message: 'Service not found'
-            });
-        }
-
-        res.status(200).json({
-            success: true,
-            message: 'Service updated successfully',
-            data: service
-        });
-
-    } catch (error) {
-        console.error('Update service error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error updating service',
-            error: error.message
-        });
-    }
-};
-
-// ============================================
-// DELETE SERVICE
-// ============================================
-
-export const deleteService = async (req, res) => {
-    try {
-        const { serviceId } = req.params;
-
-        if (!isValidObjectId(serviceId)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid service ID'
-            });
-        }
-
-        const service = await Service.findByIdAndDelete(serviceId);
-
-        if (!service) {
-            return res.status(404).json({
-                success: false,
-                message: 'Service not found'
-            });
-        }
-
-        res.status(200).json({
-            success: true,
-            message: 'Service deleted successfully'
-        });
-
-    } catch (error) {
-        console.error('Delete service error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error deleting service',
-            error: error.message
-        });
-    }
-};
-
-// ============================================
 // GET ALL BOOKINGS (ADMIN)
 // ============================================
 
@@ -656,7 +594,9 @@ export const getAllBookings = async (req, res) => {
             categoryName,
             startDate,
             endDate,
-            bookingType
+            bookingType,
+            sortBy = 'createdAt',
+            sortOrder = 'desc'
         } = req.query;
 
         const pageNum = parseInt(page);
@@ -664,18 +604,15 @@ export const getAllBookings = async (req, res) => {
 
         const query = {};
 
-        if (status) {
-            const validStatuses = ['pending', 'confirmed', 'in-progress', 'completed', 'cancelled'];
-            if (validStatuses.includes(status)) {
-                query.status = status;
-            }
+        if (status && BOOKING_STATUSES.includes(status)) {
+            query.status = status;
         }
 
         if (categoryName) {
             query.categoryName = { $regex: categoryName, $options: 'i' };
         }
 
-        if (bookingType) {
+        if (bookingType && ['online', 'walkin'].includes(bookingType)) {
             query.bookingType = bookingType;
         }
 
@@ -702,17 +639,21 @@ export const getAllBookings = async (req, res) => {
             query.$or = [
                 { bookingCode: { $regex: search, $options: 'i' } },
                 { serviceName: { $regex: search, $options: 'i' } },
+                { variantName: { $regex: search, $options: 'i' } },
                 { 'walkInCustomer.name': { $regex: search, $options: 'i' } },
                 { 'walkInCustomer.phone': { $regex: search, $options: 'i' } }
             ];
         }
 
+        const sortOptions = {};
+        sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
         const total = await Booking.countDocuments(query);
 
         const bookings = await Booking.find(query)
-            .populate('customerId', 'firstName lastName email')
+            .populate('customerId', 'firstName lastName email avatar')
             .populate('createdBy', 'firstName lastName')
-            .sort({ createdAt: -1 })
+            .sort(sortOptions)
             .limit(limitNum)
             .skip((pageNum - 1) * limitNum);
 
@@ -735,6 +676,62 @@ export const getAllBookings = async (req, res) => {
 };
 
 // ============================================
+// GET SINGLE BOOKING (ADMIN)
+// ============================================
+
+export const getBookingById = async (req, res) => {
+    try {
+        const { bookingId } = req.params;
+
+        if (!isValidObjectId(bookingId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid booking ID'
+            });
+        }
+
+        const booking = await Booking.findById(bookingId)
+            .populate('customerId', 'firstName lastName email avatar phone')
+            .populate('createdBy', 'firstName lastName');
+
+        if (!booking) {
+            return res.status(404).json({
+                success: false,
+                message: 'Booking not found'
+            });
+        }
+
+        // Get customer's booking history if online booking
+        let customerHistory = null;
+        if (booking.customerId) {
+            customerHistory = await Booking.find({
+                customerId: booking.customerId._id,
+                _id: { $ne: bookingId }
+            })
+                .sort({ createdAt: -1 })
+                .limit(5)
+                .select('bookingCode serviceName status bookingDate price');
+        }
+
+        res.status(200).json({
+            success: true,
+            data: {
+                booking,
+                customerHistory
+            }
+        });
+
+    } catch (error) {
+        console.error('Get booking error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error fetching booking',
+            error: error.message
+        });
+    }
+};
+
+// ============================================
 // UPDATE BOOKING STATUS
 // ============================================
 
@@ -750,33 +747,15 @@ export const updateBookingStatus = async (req, res) => {
             });
         }
 
-        const validStatuses = ['pending', 'confirmed', 'in-progress', 'completed', 'cancelled'];
-
-        if (!validStatuses.includes(status)) {
+        if (!BOOKING_STATUSES.includes(status)) {
             return res.status(400).json({
                 success: false,
-                message: `Invalid status. Must be: ${validStatuses.join(', ')}`
+                message: `Invalid status. Must be: ${BOOKING_STATUSES.join(', ')}`
             });
         }
 
-        const updateData = { status };
-
-        if (status === 'completed') {
-            updateData.completedAt = new Date();
-            updateData.paymentStatus = 'completed';
-        }
-
-        if (status === 'cancelled') {
-            updateData.cancelledAt = new Date();
-            updateData.cancelledBy = 'admin';
-            updateData.cancellationReason = reason || 'Cancelled by admin';
-        }
-
-        const booking = await Booking.findByIdAndUpdate(
-            bookingId,
-            updateData,
-            { new: true }
-        ).populate('customerId', 'firstName lastName email');
+        const booking = await Booking.findById(bookingId)
+            .populate('customerId', 'firstName lastName email');
 
         if (!booking) {
             return res.status(404).json({
@@ -785,40 +764,40 @@ export const updateBookingStatus = async (req, res) => {
             });
         }
 
-        // Socket events
-        try {
-            const io = getIO();
+        // Validate status transition
+        const validTransitions = {
+            'pending': ['confirmed', 'cancelled'],
+            'confirmed': ['in-progress', 'cancelled'],
+            'in-progress': ['completed', 'cancelled'],
+            'completed': [],
+            'cancelled': []
+        };
 
-            const socketPayload = {
-                bookingId: booking._id,
-                bookingCode: booking.bookingCode,
-                status: booking.status,
-                serviceName: booking.serviceName,
-                variantName: booking.variantName,
-                bookingDate: booking.bookingDate,
-                timeSlot: booking.timeSlot,
-                updatedAt: new Date()
-            };
-
-            if (booking.customerId) {
-                io.to(`user_${booking.customerId._id}`).emit(
-                    SOCKET_EVENTS.BOOKING_STATUS_UPDATED,
-                    socketPayload
-                );
-            }
-
-            io.to('admin_room').emit(SOCKET_EVENTS.BOOKING_STATUS_UPDATED, socketPayload);
-
-            if (status === 'cancelled') {
-                io.emit(SOCKET_EVENTS.SLOT_AVAILABLE, {
-                    serviceId: booking.serviceId,
-                    bookingDate: booking.bookingDate,
-                    timeSlot: booking.timeSlot
-                });
-            }
-        } catch (socketError) {
-            console.error('Socket emit error:', socketError.message);
+        if (!validTransitions[booking.status]?.includes(status)) {
+            return res.status(400).json({
+                success: false,
+                message: `Cannot change status from "${booking.status}" to "${status}"`
+            });
         }
+
+        // Update booking
+        booking.status = status;
+
+        if (status === 'completed') {
+            booking.completedAt = new Date();
+            booking.paymentStatus = 'completed';
+        }
+
+        if (status === 'cancelled') {
+            booking.cancelledAt = new Date();
+            booking.cancelledBy = 'admin';
+            booking.cancellationReason = reason || 'Cancelled by admin';
+        }
+
+        await booking.save();
+
+        // Socket events
+        emitBookingStatusUpdate(booking, booking.customerId?._id);
 
         // Send email
         try {
@@ -846,7 +825,7 @@ export const updateBookingStatus = async (req, res) => {
 };
 
 // ============================================
-// CREATE ADMIN BOOKING
+// CREATE ADMIN BOOKING (GLOBAL SLOT CHECK)
 // ============================================
 
 export const createAdminBooking = async (req, res) => {
@@ -859,10 +838,10 @@ export const createAdminBooking = async (req, res) => {
             variantId,
             bookingDate,
             timeSlot,
+            location,
             specialNotes,
             paymentMethod,
-            paymentStatus,
-            location
+            paymentStatus
         } = req.body;
 
         // Validate booking type
@@ -960,21 +939,23 @@ export const createAdminBooking = async (req, res) => {
             });
         }
 
-        if (requestedDate.getDay() === 0) {
+        if (isClosedDay(requestedDate)) {
             return res.status(400).json({
                 success: false,
                 message: 'We are closed on Sundays'
             });
         }
 
-        if (!VALID_TIME_SLOTS.includes(timeSlot)) {
+        if (!isValidTimeSlot(timeSlot)) {
             return res.status(400).json({
                 success: false,
-                message: 'Invalid time slot'
+                message: `Invalid time slot. Valid slots: ${TIME_SLOTS.join(', ')}`
             });
         }
 
-        // Check slot availability
+        // ============================================
+        // GLOBAL SLOT CHECK - Check ALL services
+        // ============================================
         const startOfDay = new Date(requestedDate);
         startOfDay.setHours(0, 0, 0, 0);
 
@@ -982,7 +963,6 @@ export const createAdminBooking = async (req, res) => {
         endOfDay.setHours(23, 59, 59, 999);
 
         const slotTaken = await Booking.findOne({
-            serviceId,
             bookingDate: { $gte: startOfDay, $lte: endOfDay },
             timeSlot,
             status: { $nin: ['cancelled'] }
@@ -991,7 +971,7 @@ export const createAdminBooking = async (req, res) => {
         if (slotTaken) {
             return res.status(400).json({
                 success: false,
-                message: `Time slot ${timeSlot} is already booked`
+                message: `Time slot ${timeSlot} is already booked for "${slotTaken.serviceName}". Please choose another slot.`
             });
         }
 
@@ -1031,53 +1011,21 @@ export const createAdminBooking = async (req, res) => {
             status: 'confirmed'
         });
 
+        // Update service booking count
         await Service.findByIdAndUpdate(serviceId, {
             $inc: { totalBookings: 1 }
         });
 
         // Socket events
-        try {
-            const io = getIO();
-            const customerName = bookingType === 'walkin'
-                ? walkInCustomer.name
-                : `Customer ${customerId}`;
+        const customerName = bookingType === 'walkin'
+            ? walkInCustomer.name
+            : 'Online Customer';
 
-            io.to('admin_room').emit(SOCKET_EVENTS.NEW_BOOKING, {
-                bookingId: booking._id,
-                bookingCode: booking.bookingCode,
-                bookingType: booking.bookingType,
-                customerName,
-                serviceName: booking.serviceName,
-                variantName: booking.variantName,
-                categoryName: booking.categoryName,
-                bookingDate: booking.bookingDate,
-                timeSlot: booking.timeSlot,
-                price: booking.price,
-                status: booking.status,
-                createdAt: booking.createdAt
-            });
+        emitNewBooking(booking, customerName);
 
-            io.emit(SOCKET_EVENTS.SLOT_BOOKED, {
-                serviceId: booking.serviceId,
-                bookingDate: booking.bookingDate,
-                timeSlot: booking.timeSlot
-            });
-
-            if (bookingType === 'online' && customerId) {
-                io.to(`user_${customerId}`).emit(
-                    SOCKET_EVENTS.BOOKING_STATUS_UPDATED,
-                    {
-                        bookingId: booking._id,
-                        bookingCode: booking.bookingCode,
-                        status: booking.status,
-                        serviceName: booking.serviceName,
-                        bookingDate: booking.bookingDate,
-                        timeSlot: booking.timeSlot
-                    }
-                );
-            }
-        } catch (socketError) {
-            console.error('Socket emit error:', socketError.message);
+        // Notify customer if online booking
+        if (bookingType === 'online' && customerId) {
+            emitBookingStatusUpdate(booking, customerId);
         }
 
         res.status(201).json({
@@ -1110,7 +1058,7 @@ export const createAdminBooking = async (req, res) => {
         if (error.code === 11000) {
             return res.status(400).json({
                 success: false,
-                message: 'This time slot was just booked'
+                message: 'This time slot was just booked by someone else. Please choose another slot.'
             });
         }
 
@@ -1146,7 +1094,8 @@ export const getRevenueReport = async (req, res) => {
                 $group: {
                     _id: { $dateToString: { format: dateFormat, date: '$completedAt' } },
                     revenue: { $sum: '$price' },
-                    bookings: { $sum: 1 }
+                    bookings: { $sum: 1 },
+                    avgOrderValue: { $avg: '$price' }
                 }
             },
             { $sort: { _id: 1 } }
@@ -1162,6 +1111,20 @@ export const getRevenueReport = async (req, res) => {
                 }
             },
             { $sort: { revenue: -1 } }
+        ]);
+
+        const revenueByService = await Booking.aggregate([
+            { $match: matchCondition },
+            {
+                $group: {
+                    _id: '$serviceId',
+                    serviceName: { $first: '$serviceName' },
+                    revenue: { $sum: '$price' },
+                    bookings: { $sum: 1 }
+                }
+            },
+            { $sort: { revenue: -1 } },
+            { $limit: 10 }
         ]);
 
         const revenueByVariant = await Booking.aggregate([
@@ -1189,21 +1152,36 @@ export const getRevenueReport = async (req, res) => {
             { $limit: 10 }
         ]);
 
+        const revenueByPaymentMethod = await Booking.aggregate([
+            { $match: matchCondition },
+            {
+                $group: {
+                    _id: '$paymentMethod',
+                    revenue: { $sum: '$price' },
+                    bookings: { $sum: 1 }
+                }
+            }
+        ]);
+
         const totalRevenue = revenueData.reduce((sum, day) => sum + day.revenue, 0);
         const totalBookings = revenueData.reduce((sum, day) => sum + day.bookings, 0);
 
         res.status(200).json({
             success: true,
             data: {
-                totalRevenue,
-                totalBookings,
-                averageOrderValue: totalBookings > 0
-                    ? Math.round(totalRevenue / totalBookings)
-                    : 0,
+                summary: {
+                    totalRevenue,
+                    totalBookings,
+                    averageOrderValue: totalBookings > 0
+                        ? Math.round(totalRevenue / totalBookings)
+                        : 0
+                },
                 revenueData,
                 revenueByCategory,
+                revenueByService,
                 revenueByVariant,
-                revenueByCity
+                revenueByCity,
+                revenueByPaymentMethod
             }
         });
 
@@ -1218,12 +1196,130 @@ export const getRevenueReport = async (req, res) => {
 };
 
 // ============================================
+// BOOKING REPORT
+// ============================================
+
+export const getBookingReport = async (req, res) => {
+    try {
+        const { startDate, endDate } = req.query;
+
+        const matchCondition = {};
+
+        if (startDate || endDate) {
+            matchCondition.createdAt = {};
+            if (startDate) matchCondition.createdAt.$gte = new Date(startDate);
+            if (endDate) matchCondition.createdAt.$lte = new Date(endDate);
+        }
+
+        const byStatus = await Booking.aggregate([
+            { $match: matchCondition },
+            { $group: { _id: '$status', count: { $sum: 1 } } }
+        ]);
+
+        const byVariant = await Booking.aggregate([
+            { $match: matchCondition },
+            {
+                $group: {
+                    _id: '$variantName',
+                    count: { $sum: 1 },
+                    revenue: { $sum: '$price' }
+                }
+            },
+            { $sort: { count: -1 } }
+        ]);
+
+        const byService = await Booking.aggregate([
+            { $match: matchCondition },
+            {
+                $group: {
+                    _id: '$serviceId',
+                    serviceName: { $first: '$serviceName' },
+                    count: { $sum: 1 },
+                    revenue: { $sum: '$price' }
+                }
+            },
+            { $sort: { count: -1 } }
+        ]);
+
+        const byTimeSlot = await Booking.aggregate([
+            { $match: matchCondition },
+            { $group: { _id: '$timeSlot', count: { $sum: 1 } } },
+            { $sort: { _id: 1 } }
+        ]);
+
+        const byCity = await Booking.aggregate([
+            { $match: matchCondition },
+            { $group: { _id: '$location.city', count: { $sum: 1 } } },
+            { $sort: { count: -1 } },
+            { $limit: 10 }
+        ]);
+
+        const byBookingType = await Booking.aggregate([
+            { $match: matchCondition },
+            {
+                $group: {
+                    _id: '$bookingType',
+                    count: { $sum: 1 },
+                    revenue: { $sum: '$price' }
+                }
+            }
+        ]);
+
+        const byDayOfWeek = await Booking.aggregate([
+            { $match: matchCondition },
+            {
+                $group: {
+                    _id: { $dayOfWeek: '$bookingDate' },
+                    count: { $sum: 1 }
+                }
+            },
+            { $sort: { _id: 1 } }
+        ]);
+
+        const dayNames = ['', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const byDayOfWeekNamed = byDayOfWeek.map(d => ({
+            day: dayNames[d._id],
+            count: d.count
+        }));
+
+        res.status(200).json({
+            success: true,
+            data: {
+                byStatus,
+                byVariant,
+                byService,
+                byTimeSlot,
+                byCity,
+                byBookingType,
+                byDayOfWeek: byDayOfWeekNamed
+            }
+        });
+
+    } catch (error) {
+        console.error('Booking report error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error fetching booking report',
+            error: error.message
+        });
+    }
+};
+
+// ============================================
 // GET ALL REVIEWS (ADMIN)
 // ============================================
 
 export const getAllReviews = async (req, res) => {
     try {
-        const { page = 1, limit = 10, isVisible, serviceId } = req.query;
+        const {
+            page = 1,
+            limit = 10,
+            isVisible,
+            serviceId,
+            rating,
+            sortBy = 'createdAt',
+            sortOrder = 'desc'
+        } = req.query;
 
         const pageNum = parseInt(page);
         const limitNum = parseInt(limit);
@@ -1231,22 +1327,43 @@ export const getAllReviews = async (req, res) => {
         const query = {};
         if (isVisible !== undefined) query.isVisible = isVisible === 'true';
         if (serviceId && isValidObjectId(serviceId)) query.serviceId = serviceId;
+        if (rating) query.rating = parseInt(rating);
+
+        const sortOptions = {};
+        sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
 
         const total = await Review.countDocuments(query);
 
         const reviews = await Review.find(query)
-            .populate('customerId', 'firstName lastName email')
+            .populate('customerId', 'firstName lastName email avatar')
             .populate('serviceId', 'name category')
-            .populate('bookingId', 'bookingCode')
-            .sort({ createdAt: -1 })
+            .populate('bookingId', 'bookingCode bookingDate')
+            .sort(sortOptions)
             .limit(limitNum)
             .skip((pageNum - 1) * limitNum);
+
+        const ratingStats = await Review.aggregate([
+            { $match: query },
+            {
+                $group: {
+                    _id: null,
+                    avgRating: { $avg: '$rating' },
+                    totalReviews: { $sum: 1 },
+                    rating5: { $sum: { $cond: [{ $eq: ['$rating', 5] }, 1, 0] } },
+                    rating4: { $sum: { $cond: [{ $eq: ['$rating', 4] }, 1, 0] } },
+                    rating3: { $sum: { $cond: [{ $eq: ['$rating', 3] }, 1, 0] } },
+                    rating2: { $sum: { $cond: [{ $eq: ['$rating', 2] }, 1, 0] } },
+                    rating1: { $sum: { $cond: [{ $eq: ['$rating', 1] }, 1, 0] } }
+                }
+            }
+        ]);
 
         res.status(200).json({
             success: true,
             total,
             pages: Math.ceil(total / limitNum),
             currentPage: pageNum,
+            stats: ratingStats[0] || null,
             data: reviews
         });
 
@@ -1303,94 +1420,19 @@ export const toggleReviewVisibility = async (req, res) => {
     }
 };
 
-// ============================================
-// BOOKING REPORT
-// ============================================
-
-export const getBookingReport = async (req, res) => {
-    try {
-        const { startDate, endDate } = req.query;
-
-        const matchCondition = {};
-
-        if (startDate || endDate) {
-            matchCondition.createdAt = {};
-            if (startDate) matchCondition.createdAt.$gte = new Date(startDate);
-            if (endDate) matchCondition.createdAt.$lte = new Date(endDate);
-        }
-
-        const byStatus = await Booking.aggregate([
-            { $match: matchCondition },
-            { $group: { _id: '$status', count: { $sum: 1 } } }
-        ]);
-
-        const byVariant = await Booking.aggregate([
-            { $match: matchCondition },
-            {
-                $group: {
-                    _id: '$variantName',
-                    count: { $sum: 1 },
-                    revenue: { $sum: '$price' }
-                }
-            },
-            { $sort: { count: -1 } }
-        ]);
-
-        const byService = await Booking.aggregate([
-            { $match: matchCondition },
-            {
-                $group: {
-                    _id: '$serviceId',
-                    serviceName: { $first: '$serviceName' },
-                    count: { $sum: 1 },
-                    revenue: { $sum: '$price' }
-                }
-            },
-            { $sort: { count: -1 } }
-        ]);
-
-        const byTimeSlot = await Booking.aggregate([
-            { $match: matchCondition },
-            { $group: { _id: '$timeSlot', count: { $sum: 1 } } },
-            { $sort: { count: -1 } }
-        ]);
-
-        const byCity = await Booking.aggregate([
-            { $match: matchCondition },
-            { $group: { _id: '$location.city', count: { $sum: 1 } } },
-            { $sort: { count: -1 } },
-            { $limit: 10 }
-        ]);
-
-        const byBookingType = await Booking.aggregate([
-            { $match: matchCondition },
-            {
-                $group: {
-                    _id: '$bookingType',
-                    count: { $sum: 1 },
-                    revenue: { $sum: '$price' }
-                }
-            }
-        ]);
-
-        res.status(200).json({
-            success: true,
-            data: {
-                byStatus,
-                byVariant,
-                byService,
-                byTimeSlot,
-                byCity,
-                byBookingType
-            }
-        });
-
-    } catch (error) {
-        console.error('Booking report error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error fetching booking report',
-            error: error.message
-        });
-    }
+export default {
+    getDashboardStats,
+    getAllUsers,
+    getUserById,
+    blockUser,
+    unblockUser,
+    changeUserRole,
+    getAllBookings,
+    getBookingById,
+    updateBookingStatus,
+    createAdminBooking,
+    getRevenueReport,
+    getBookingReport,
+    getAllReviews,
+    toggleReviewVisibility
 };

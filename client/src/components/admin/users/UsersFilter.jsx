@@ -3,9 +3,10 @@
 import { useState } from 'react';
 import { Search, X } from 'lucide-react';
 
+// ✅ FIXED: Use 'user' instead of 'customer'
 const ROLE_OPTIONS = [
     { value: '', label: 'All Roles' },
-    { value: 'customer', label: 'Customer' },
+    { value: 'user', label: 'Customer' },
     { value: 'admin', label: 'Admin' }
 ];
 
@@ -47,7 +48,7 @@ export default function UsersFilter({ filters, onFilterChange }) {
                     onChange={(e) => setSearchInput(e.target.value)}
                     onKeyDown={handleSearch}
                     onBlur={() => onFilterChange({ search: searchInput })}
-                    placeholder="Search name, email, phone..."
+                    placeholder="Search name, email..."
                     className="w-full bg-neutral-950 border border-neutral-800 text-white placeholder-neutral-600 text-sm pl-10 pr-4 py-2.5 focus:outline-none focus:border-neutral-600 transition-colors"
                 />
             </div>

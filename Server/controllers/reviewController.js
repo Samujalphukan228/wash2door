@@ -1,8 +1,10 @@
-// controllers/reviewController.js - FIXED
+// controllers/reviewController.js - COMPLETE with socket emissions
 
 import Review from '../models/Review.js';
 import Booking from '../models/Booking.js';
+import Service from '../models/Service.js';
 import mongoose from 'mongoose';
+import { emitNewReview } from '../utils/socketEmitter.js';
 
 const isValidObjectId = (id) =>
     mongoose.Types.ObjectId.isValid(id) &&
@@ -69,18 +71,25 @@ export const createReview = async (req, res) => {
             customerId: req.user._id,
             serviceId: booking.serviceId,
             rating: ratingNum,
-            comment: comment || '',
+            comment: comment?.trim() || '',
             serviceName: booking.serviceName,
             categoryName: booking.categoryName,
             variantName: booking.variantName
         });
 
+        // Mark booking as reviewed
         booking.isReviewed = true;
         await booking.save();
+
+        // Update service rating
+        await updateServiceRating(booking.serviceId);
 
         const populatedReview = await Review.findById(review._id)
             .populate('customerId', 'firstName lastName avatar')
             .populate('serviceId', 'name category');
+
+        // ---- Socket event ----
+        emitNewReview(review, booking.serviceName);
 
         res.status(201).json({
             success: true,
@@ -135,21 +144,27 @@ export const canReview = async (req, res) => {
 
         const canReviewBooking = booking.status === 'completed' && !booking.isReviewed;
 
+        let reason = null;
+        if (!canReviewBooking) {
+            if (booking.isReviewed) {
+                reason = 'Already reviewed';
+            } else {
+                reason = `Booking is ${booking.status}`;
+            }
+        }
+
         res.status(200).json({
             success: true,
             data: {
                 canReview: canReviewBooking,
-                reason: !canReviewBooking
-                    ? booking.isReviewed
-                        ? 'Already reviewed'
-                        : `Booking is ${booking.status}`
-                    : null,
+                reason,
                 booking: {
                     bookingCode: booking.bookingCode,
                     serviceName: booking.serviceName,
                     variantName: booking.variantName,
                     status: booking.status,
-                    isReviewed: booking.isReviewed
+                    isReviewed: booking.isReviewed,
+                    completedAt: booking.completedAt
                 }
             }
         });
@@ -206,6 +221,50 @@ export const getMyReviews = async (req, res) => {
 };
 
 // ============================================
+// GET REVIEW BY ID
+// ============================================
+
+export const getReviewById = async (req, res) => {
+    try {
+        const { reviewId } = req.params;
+
+        if (!isValidObjectId(reviewId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid review ID'
+            });
+        }
+
+        const review = await Review.findOne({
+            _id: reviewId,
+            customerId: req.user._id
+        })
+            .populate('serviceId', 'name category images')
+            .populate('bookingId', 'bookingCode bookingDate timeSlot serviceName variantName');
+
+        if (!review) {
+            return res.status(404).json({
+                success: false,
+                message: 'Review not found'
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            data: review
+        });
+
+    } catch (error) {
+        console.error('Get review error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch review',
+            error: error.message
+        });
+    }
+};
+
+// ============================================
 // UPDATE REVIEW
 // ============================================
 
@@ -233,6 +292,15 @@ export const updateReview = async (req, res) => {
             });
         }
 
+        // Check if review is too old to edit (e.g., 30 days)
+        const daysSinceCreation = (Date.now() - review.createdAt) / (1000 * 60 * 60 * 24);
+        if (daysSinceCreation > 30) {
+            return res.status(400).json({
+                success: false,
+                message: 'Reviews can only be edited within 30 days of creation'
+            });
+        }
+
         if (rating !== undefined) {
             const ratingNum = Number(rating);
             if (isNaN(ratingNum) || ratingNum < 1 || ratingNum > 5) {
@@ -245,10 +313,13 @@ export const updateReview = async (req, res) => {
         }
 
         if (comment !== undefined) {
-            review.comment = comment;
+            review.comment = comment.trim();
         }
 
         await review.save();
+
+        // Update service rating
+        await updateServiceRating(review.serviceId);
 
         const updatedReview = await Review.findById(review._id)
             .populate('customerId', 'firstName lastName avatar')
@@ -285,7 +356,7 @@ export const deleteReview = async (req, res) => {
             });
         }
 
-        const review = await Review.findOneAndDelete({
+        const review = await Review.findOne({
             _id: reviewId,
             customerId: req.user._id
         });
@@ -297,9 +368,18 @@ export const deleteReview = async (req, res) => {
             });
         }
 
-        await Booking.findByIdAndUpdate(review.bookingId, {
+        const serviceId = review.serviceId;
+        const bookingId = review.bookingId;
+
+        await review.deleteOne();
+
+        // Update booking's isReviewed flag
+        await Booking.findByIdAndUpdate(bookingId, {
             isReviewed: false
         });
+
+        // Update service rating
+        await updateServiceRating(serviceId);
 
         res.status(200).json({
             success: true,
@@ -314,4 +394,52 @@ export const deleteReview = async (req, res) => {
             error: error.message
         });
     }
+};
+
+// ============================================
+// HELPER: UPDATE SERVICE RATING
+// ============================================
+
+async function updateServiceRating(serviceId) {
+    try {
+        const stats = await Review.aggregate([
+            {
+                $match: {
+                    serviceId: new mongoose.Types.ObjectId(serviceId),
+                    isVisible: true
+                }
+            },
+            {
+                $group: {
+                    _id: '$serviceId',
+                    averageRating: { $avg: '$rating' },
+                    totalReviews: { $sum: 1 }
+                }
+            }
+        ]);
+
+        if (stats.length > 0) {
+            await Service.findByIdAndUpdate(serviceId, {
+                averageRating: Math.round(stats[0].averageRating * 10) / 10,
+                totalReviews: stats[0].totalReviews
+            });
+        } else {
+            // No reviews, reset to defaults
+            await Service.findByIdAndUpdate(serviceId, {
+                averageRating: 0,
+                totalReviews: 0
+            });
+        }
+    } catch (error) {
+        console.error('Error updating service rating:', error);
+    }
+}
+
+export default {
+    createReview,
+    canReview,
+    getMyReviews,
+    getReviewById,
+    updateReview,
+    deleteReview
 };

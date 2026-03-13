@@ -36,13 +36,16 @@ export default function UsersPage() {
                 Object.entries(filters).filter(([_, v]) => v !== '')
             );
             const response = await adminService.getAllUsers(params);
+            
             if (response.success) {
+                // ✅ FIXED: Handle backend response structure
                 setUsers(response.data?.users || response.data || []);
-                setTotal(response.total || response.data?.total || 0);
-                setPages(response.pages || response.data?.pages || 1);
+                setTotal(response.data?.total || response.total || 0);
+                setPages(response.data?.pages || response.pages || 1);
             }
         } catch (error) {
             toast.error('Failed to fetch users');
+            console.error('Fetch users error:', error);
         } finally {
             setLoading(false);
         }
@@ -65,12 +68,14 @@ export default function UsersPage() {
         try {
             const response = await adminService.getUserById(user._id);
             if (response.success) {
+                // Backend returns { user, stats, recentBookings, reviews, favoriteServices }
                 setSelectedUser(response.data);
             } else {
-                setSelectedUser(user);
+                setSelectedUser({ user });
             }
-        } catch {
-            setSelectedUser(user);
+        } catch (error) {
+            console.error('Get user details error:', error);
+            setSelectedUser({ user });
         }
         setShowDetailModal(true);
     };
@@ -83,19 +88,27 @@ export default function UsersPage() {
     const handleBlock = async (userId, reason) => {
         try {
             await adminService.blockUser(userId, reason);
-            toast.success('User blocked');
+            toast.success('User blocked successfully');
             setShowBlockModal(false);
             setSelectedUser(null);
             fetchUsers();
         } catch (error) {
             toast.error(error.response?.data?.message || 'Failed to block user');
+            throw error;
         }
     };
 
     const handleUnblock = async (userId) => {
         try {
             await adminService.unblockUser(userId);
-            toast.success('User unblocked');
+            toast.success('User unblocked successfully');
+            
+            // Close modal if open
+            if (showDetailModal) {
+                setShowDetailModal(false);
+                setSelectedUser(null);
+            }
+            
             fetchUsers();
         } catch (error) {
             toast.error(error.response?.data?.message || 'Failed to unblock user');
@@ -103,20 +116,30 @@ export default function UsersPage() {
     };
 
     const handleRoleChange = async (userId, role) => {
-        if (!confirm(`Change this user's role to ${role}?`)) return;
+        const roleLabel = role === 'user' ? 'Customer' : 'Admin';
+        
+        if (!confirm(`Change this user's role to ${roleLabel}?`)) return;
+        
         try {
             await adminService.changeUserRole(userId, role);
-            toast.success(`Role changed to ${role}`);
+            toast.success(`Role changed to ${roleLabel}`);
+            
+            // Close modal if open
+            if (showDetailModal) {
+                setShowDetailModal(false);
+                setSelectedUser(null);
+            }
+            
             fetchUsers();
         } catch (error) {
             toast.error(error.response?.data?.message || 'Failed to change role');
         }
     };
 
-    // ── Stats ──
+    // ✅ FIXED: Stats calculation using 'user' role
     const stats = {
         total,
-        customers: users.filter(u => u.role === 'customer').length,
+        customers: users.filter(u => u.role === 'user').length,
         admins: users.filter(u => u.role === 'admin').length,
         blocked: users.filter(u => u.isBlocked).length
     };
@@ -203,14 +226,13 @@ export default function UsersPage() {
                         setShowBlockModal(true);
                     }}
                     onUnblock={async () => {
-                        await handleUnblock(selectedUser._id);
-                        setShowDetailModal(false);
-                        setSelectedUser(null);
+                        // Extract userId - handle both user object and nested structure
+                        const userId = selectedUser.user?._id || selectedUser._id;
+                        await handleUnblock(userId);
                     }}
                     onRoleChange={async (role) => {
-                        await handleRoleChange(selectedUser._id, role);
-                        setShowDetailModal(false);
-                        setSelectedUser(null);
+                        const userId = selectedUser.user?._id || selectedUser._id;
+                        await handleRoleChange(userId, role);
                     }}
                 />
             )}

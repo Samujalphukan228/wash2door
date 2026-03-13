@@ -1,3 +1,5 @@
+// src/app/admin/bookings/page.jsx
+
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -10,16 +12,33 @@ import CreateBookingModal from '@/components/admin/bookings/CreateBookingModal';
 import UpdateStatusModal from '@/components/admin/bookings/UpdateStatusModal';
 import StatsBar from '@/components/admin/bookings/StatsBar';
 import adminService from '@/services/adminService';
-import { Plus, RefreshCw, Calendar } from 'lucide-react';
+import { useBookingSocket } from '@/hooks/useSocketEvents';
+import { Plus, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function BookingsPage() {
+    // ============================================
+    // STATE
+    // ============================================
     const [bookings, setBookings] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [total, setTotal] = useState(0);
     const [pages, setPages] = useState(1);
 
+    // Stats from API (accurate counts)
+    const [stats, setStats] = useState({
+        total: 0,
+        pending: 0,
+        confirmed: 0,
+        inProgress: 0,
+        completed: 0,
+        cancelled: 0,
+        revenue: 0,
+        todayBookings: 0
+    });
+
+    // Filters
     const [filters, setFilters] = useState({
         page: 1,
         limit: 10,
@@ -28,27 +47,42 @@ export default function BookingsPage() {
         categoryName: '',
         date: '',
         city: '',
-        search: ''
+        search: '',
+        sortBy: 'createdAt',
+        sortOrder: 'desc'
     });
 
+    // Modals
     const [selectedBooking, setSelectedBooking] = useState(null);
+    const [customerHistory, setCustomerHistory] = useState([]);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showDetailModal, setShowDetailModal] = useState(false);
     const [showStatusModal, setShowStatusModal] = useState(false);
 
+    // ============================================
+    // FETCH BOOKINGS
+    // ============================================
     const fetchBookings = useCallback(async (isRefresh = false) => {
         try {
             isRefresh ? setRefreshing(true) : setLoading(true);
-            const params = Object.fromEntries(
-                Object.entries(filters).filter(([_, v]) => v !== '')
-            );
+
+            // Clean up filters - remove empty values
+            const params = {};
+            Object.entries(filters).forEach(([key, value]) => {
+                if (value !== '' && value !== null && value !== undefined) {
+                    params[key] = value;
+                }
+            });
+
             const response = await adminService.getAllBookings(params);
+
             if (response.success) {
-                setBookings(response.data);
-                setTotal(response.total);
+                setBookings(response.data || []);
+                setTotal(response.total || 0);
                 setPages(response.pages || 1);
             }
-        } catch {
+        } catch (error) {
+            console.error('Fetch bookings error:', error);
             toast.error('Failed to fetch bookings');
         } finally {
             setLoading(false);
@@ -56,32 +90,206 @@ export default function BookingsPage() {
         }
     }, [filters]);
 
-    useEffect(() => { fetchBookings(); }, [fetchBookings]);
+    // ============================================
+    // FETCH STATS
+    // ============================================
+    const fetchStats = useCallback(async () => {
+        try {
+            const response = await adminService.getDashboardStats();
 
-    const handleFilterChange = (newFilters) =>
-        setFilters(prev => ({ ...prev, ...newFilters, page: 1 }));
+            if (response.success) {
+                const { bookings: bookingStats, revenue } = response.data;
+
+                setStats({
+                    total: bookingStats?.total || 0,
+                    pending: bookingStats?.byStatus?.pending || 0,
+                    confirmed: bookingStats?.byStatus?.confirmed || 0,
+                    inProgress: bookingStats?.byStatus?.inProgress || 0,
+                    completed: bookingStats?.byStatus?.completed || 0,
+                    cancelled: bookingStats?.byStatus?.cancelled || 0,
+                    revenue: revenue?.total || 0,
+                    todayBookings: bookingStats?.today || 0
+                });
+            }
+        } catch (error) {
+            console.error('Fetch stats error:', error);
+        }
+    }, []);
+
+    // ============================================
+    // REFRESH ALL DATA
+    // ============================================
+    const refreshAll = useCallback(() => {
+        fetchBookings();
+        fetchStats();
+    }, [fetchBookings, fetchStats]);
+
+    // ============================================
+    // INITIAL FETCH
+    // ============================================
+    useEffect(() => {
+        fetchBookings();
+        fetchStats();
+    }, [fetchBookings, fetchStats]);
+
+    // ============================================
+    // REAL-TIME SOCKET UPDATES
+    // ============================================
+    const handleNewBooking = useCallback((data) => {
+        // Add new booking to the top of list if on first page
+        if (filters.page === 1) {
+            setBookings(prev => {
+                // Check if booking already exists
+                const exists = prev.find(b => b._id === data.bookingId);
+                if (exists) return prev;
+
+                // Add to top, remove last if at limit
+                const updated = [data, ...prev];
+                if (updated.length > filters.limit) {
+                    updated.pop();
+                }
+                return updated;
+            });
+
+            setTotal(prev => prev + 1);
+        }
+
+        // Update stats
+        setStats(prev => ({
+            ...prev,
+            total: prev.total + 1,
+            pending: prev.pending + 1,
+            todayBookings: prev.todayBookings + 1
+        }));
+    }, [filters.page, filters.limit]);
+
+    const handleStatusUpdate = useCallback((data) => {
+        // Update booking in list
+        setBookings(prev =>
+            prev.map(booking =>
+                booking._id === data.bookingId
+                    ? { ...booking, status: data.status }
+                    : booking
+            )
+        );
+
+        // Refresh stats to get accurate counts
+        fetchStats();
+    }, [fetchStats]);
+
+    const handleBookingCancelled = useCallback((data) => {
+        // Update booking in list
+        setBookings(prev =>
+            prev.map(booking =>
+                booking._id === data.bookingId
+                    ? { ...booking, status: 'cancelled' }
+                    : booking
+            )
+        );
+
+        // Update stats
+        setStats(prev => ({
+            ...prev,
+            cancelled: prev.cancelled + 1,
+            pending: Math.max(0, prev.pending - 1)
+        }));
+    }, []);
+
+    // Subscribe to socket events
+    useBookingSocket({
+        onNewBooking: handleNewBooking,
+        onStatusUpdate: handleStatusUpdate,
+        onCancelled: handleBookingCancelled
+    });
+
+    // ============================================
+    // HANDLERS
+    // ============================================
+    const handleFilterChange = (newFilters) => {
+        setFilters(prev => ({
+            ...prev,
+            ...newFilters,
+            page: newFilters.page !== undefined ? newFilters.page : 1
+        }));
+    };
 
     const handlePageChange = (page) => {
         setFilters(prev => ({ ...prev, page }));
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
-    const handleView = (booking) => { setSelectedBooking(booking); setShowDetailModal(true); };
-    const handleUpdateStatus = (booking) => { setSelectedBooking(booking); setShowStatusModal(true); };
-    const handleRefresh = () => { fetchBookings(true); toast.success('Refreshed', { duration: 1200 }); };
+    // View booking with full details and customer history
+    const handleView = async (booking) => {
+        try {
+            // Fetch full booking details with customer history
+            const response = await adminService.getBookingById(booking._id);
 
-    const stats = {
-        total,
-        pending:    bookings.filter(b => b.status === 'pending').length,
-        confirmed:  bookings.filter(b => b.status === 'confirmed').length,
-        inProgress: bookings.filter(b => b.status === 'in-progress').length,
-        completed:  bookings.filter(b => b.status === 'completed').length,
-        cancelled:  bookings.filter(b => b.status === 'cancelled').length,
-        revenue:    bookings
-            .filter(b => b.status !== 'cancelled')
-            .reduce((sum, b) => sum + (b.price || 0), 0)
+            if (response.success) {
+                setSelectedBooking(response.data.booking);
+                setCustomerHistory(response.data.customerHistory || []);
+                setShowDetailModal(true);
+            } else {
+                // Fallback to existing data
+                setSelectedBooking(booking);
+                setCustomerHistory([]);
+                setShowDetailModal(true);
+            }
+        } catch (error) {
+            console.error('Error fetching booking details:', error);
+            // Fallback to existing data
+            setSelectedBooking(booking);
+            setCustomerHistory([]);
+            setShowDetailModal(true);
+        }
     };
 
+    const handleUpdateStatus = (booking) => {
+        setSelectedBooking(booking);
+        setShowStatusModal(true);
+    };
+
+    const handleRefresh = () => {
+        fetchBookings(true);
+        fetchStats();
+        toast.success('Refreshed', { duration: 1200 });
+    };
+
+    const handleCreateSuccess = () => {
+        setShowCreateModal(false);
+        refreshAll();
+        toast.success('Booking created successfully');
+    };
+
+    const handleStatusSuccess = () => {
+        setShowStatusModal(false);
+        setSelectedBooking(null);
+        refreshAll();
+        toast.success('Status updated successfully');
+    };
+
+    const handleCloseDetailModal = () => {
+        setShowDetailModal(false);
+        setSelectedBooking(null);
+        setCustomerHistory([]);
+    };
+
+    const handleCloseStatusModal = () => {
+        setShowStatusModal(false);
+        setSelectedBooking(null);
+    };
+
+    const handleDetailToStatus = () => {
+        setShowDetailModal(false);
+        setShowStatusModal(true);
+    };
+
+    const handleStatusChangeFromDetail = () => {
+        refreshAll();
+    };
+
+    // ============================================
+    // RENDER
+    // ============================================
     return (
         <DashboardLayout>
             <div className="min-h-screen bg-black">
@@ -90,7 +298,7 @@ export default function BookingsPage() {
                     {/* ── Header ── */}
                     <div className="flex items-start justify-between gap-4">
                         <div className="space-y-1">
-                            {/* Eyebrow */}
+                            {/* Live indicator */}
                             <div className="flex items-center gap-2 mb-2">
                                 <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-white/[0.08] bg-white/[0.03]">
                                     <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
@@ -153,7 +361,6 @@ export default function BookingsPage() {
                                     overflow-hidden
                                 "
                             >
-                                {/* Shine sweep */}
                                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-black/5 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
                                 <Plus className="w-3.5 h-3.5 relative" />
                                 <span className="relative tracking-wide">New Booking</span>
@@ -188,7 +395,7 @@ export default function BookingsPage() {
                         onFilterChange={handleFilterChange}
                     />
 
-                    {/* ── Content ── */}
+                    {/* ── Content - Mobile Cards ── */}
                     <div className="sm:hidden">
                         <BookingCards
                             bookings={bookings}
@@ -199,9 +406,11 @@ export default function BookingsPage() {
                             onPageChange={handlePageChange}
                             onView={handleView}
                             onUpdateStatus={handleUpdateStatus}
+                            onRefresh={refreshAll}
                         />
                     </div>
 
+                    {/* ── Content - Desktop Table ── */}
                     <div className="hidden sm:block">
                         <BookingsTable
                             bookings={bookings}
@@ -212,6 +421,7 @@ export default function BookingsPage() {
                             onPageChange={handlePageChange}
                             onView={handleView}
                             onUpdateStatus={handleUpdateStatus}
+                            onRefresh={refreshAll}
                         />
                     </div>
 
@@ -224,7 +434,7 @@ export default function BookingsPage() {
                     onClick={() => setShowCreateModal(true)}
                     className="
                         relative group
-                        w-13 h-13 w-[52px] h-[52px]
+                        w-[52px] h-[52px]
                         bg-white text-black rounded-xl
                         shadow-2xl shadow-black/60
                         flex items-center justify-center
@@ -235,52 +445,33 @@ export default function BookingsPage() {
                     <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-white via-white to-neutral-200" />
                     <Plus className="w-5 h-5 relative z-10" strokeWidth={2.5} />
                 </button>
-
-                {/* FAB label */}
-                <div className="
-                    absolute right-full mr-3 top-1/2 -translate-y-1/2
-                    px-2.5 py-1 rounded-lg
-                    bg-white/[0.08] border border-white/[0.10]
-                    backdrop-blur-sm
-                    opacity-0 group-hover:opacity-100
-                    pointer-events-none
-                    whitespace-nowrap
-                    transition-opacity duration-200
-                ">
-                    <span className="text-xs text-white/70">New Booking</span>
-                </div>
             </div>
 
-            {/* ── Modals ── */}
+            {/* ── Create Booking Modal ── */}
             {showCreateModal && (
                 <CreateBookingModal
                     onClose={() => setShowCreateModal(false)}
-                    onSuccess={() => {
-                        setShowCreateModal(false);
-                        fetchBookings();
-                        toast.success('Booking created');
-                    }}
+                    onSuccess={handleCreateSuccess}
                 />
             )}
 
+            {/* ── Booking Detail Modal ── */}
             {showDetailModal && selectedBooking && (
                 <BookingDetailModal
                     booking={selectedBooking}
-                    onClose={() => { setShowDetailModal(false); setSelectedBooking(null); }}
-                    onUpdateStatus={() => { setShowDetailModal(false); setShowStatusModal(true); }}
+                    customerHistory={customerHistory}
+                    onClose={handleCloseDetailModal}
+                    onUpdateStatus={handleDetailToStatus}
+                    onStatusChange={handleStatusChangeFromDetail}
                 />
             )}
 
+            {/* ── Update Status Modal ── */}
             {showStatusModal && selectedBooking && (
                 <UpdateStatusModal
                     booking={selectedBooking}
-                    onClose={() => { setShowStatusModal(false); setSelectedBooking(null); }}
-                    onSuccess={() => {
-                        setShowStatusModal(false);
-                        setSelectedBooking(null);
-                        fetchBookings();
-                        toast.success('Status updated');
-                    }}
+                    onClose={handleCloseStatusModal}
+                    onSuccess={handleStatusSuccess}
                 />
             )}
         </DashboardLayout>

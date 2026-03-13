@@ -5,7 +5,6 @@ import {
     Eye, ShieldCheck, ShieldOff, ShieldAlert,
     ChevronLeft, ChevronRight
 } from 'lucide-react';
-import Image from 'next/image';
 
 export default function UsersTable({
     users,
@@ -67,7 +66,7 @@ export default function UsersTable({
                 <table className="w-full">
                     <thead>
                         <tr className="border-b border-neutral-800">
-                            {['User', 'Email', 'Phone', 'Role', 'Status', 'Joined', 'Actions'].map((h) => (
+                            {['User', 'Email', 'Role', 'Status', 'Bookings', 'Joined', 'Actions'].map((h) => (
                                 <th
                                     key={h}
                                     className="px-4 py-3 text-left text-xs text-neutral-500 tracking-[0.15em] uppercase font-normal whitespace-nowrap"
@@ -89,12 +88,11 @@ export default function UsersTable({
                                 <td className="px-4 py-4">
                                     <div className="flex items-center gap-3">
                                         <div className="relative w-8 h-8 rounded-full bg-neutral-800 overflow-hidden shrink-0">
-                                            {user.avatar?.url ? (
-                                                <Image
-                                                    src={user.avatar.url}
+                                            {user.avatar && user.avatar !== 'default-avatar.jpg' ? (
+                                                <img
+                                                    src={user.avatar}
                                                     alt={user.firstName}
-                                                    fill
-                                                    className="object-cover"
+                                                    className="w-full h-full object-cover"
                                                 />
                                             ) : (
                                                 <div className="w-full h-full flex items-center justify-center text-xs text-neutral-500 uppercase">
@@ -117,13 +115,6 @@ export default function UsersTable({
                                     </p>
                                 </td>
 
-                                {/* Phone */}
-                                <td className="px-4 py-4">
-                                    <p className="text-sm text-neutral-400 whitespace-nowrap">
-                                        {user.phone || '—'}
-                                    </p>
-                                </td>
-
                                 {/* Role */}
                                 <td className="px-4 py-4">
                                     <span className={`text-xs border px-2 py-0.5 capitalize ${
@@ -131,7 +122,7 @@ export default function UsersTable({
                                             ? 'border-neutral-400 text-white'
                                             : 'border-neutral-700 text-neutral-400'
                                     }`}>
-                                        {user.role}
+                                        {user.role === 'user' ? 'Customer' : user.role}
                                     </span>
                                 </td>
 
@@ -151,6 +142,13 @@ export default function UsersTable({
                                             {user.isBlocked ? 'Blocked' : 'Active'}
                                         </span>
                                     </div>
+                                </td>
+
+                                {/* Bookings */}
+                                <td className="px-4 py-4">
+                                    <p className="text-sm text-neutral-400">
+                                        {user.totalBookings || 0}
+                                    </p>
                                 </td>
 
                                 {/* Joined */}
@@ -189,7 +187,7 @@ export default function UsersTable({
                                             </button>
                                         )}
 
-                                        {user.role === 'customer' ? (
+                                        {user.role === 'user' ? (
                                             <button
                                                 onClick={() => onRoleChange(user._id, 'admin')}
                                                 className="w-7 h-7 flex items-center justify-center text-neutral-500 hover:text-white hover:bg-neutral-800 transition-colors"
@@ -199,7 +197,7 @@ export default function UsersTable({
                                             </button>
                                         ) : (
                                             <button
-                                                onClick={() => onRoleChange(user._id, 'customer')}
+                                                onClick={() => onRoleChange(user._id, 'user')}
                                                 className="w-7 h-7 flex items-center justify-center text-neutral-700 hover:text-white hover:bg-neutral-800 transition-colors"
                                                 title="Remove admin"
                                             >

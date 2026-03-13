@@ -1,3 +1,5 @@
+// src/components/admin/bookings/UpdateStatusModal.jsx
+
 'use client';
 
 import { useState } from 'react';
@@ -27,7 +29,11 @@ export default function UpdateStatusModal({ booking, onClose, onSuccess }) {
 
     const availableStatuses = STATUS_FLOW[booking.status] || [];
 
-    const handleSubmit = async () => {
+    const handleSubmit = async (e) => {
+        // Prevent form submission / page reload
+        e?.preventDefault?.();
+        e?.stopPropagation?.();
+
         if (!selectedStatus) {
             toast.error('Please select a status');
             return;
@@ -41,23 +47,50 @@ export default function UpdateStatusModal({ booking, onClose, onSuccess }) {
         try {
             setLoading(true);
             await adminService.updateBookingStatus(booking._id, selectedStatus, reason);
-            toast.success(`Booking ${selectedStatus}`);
-            onSuccess();
+            
+            if (selectedStatus === 'completed') {
+                toast.success('Booking completed! Revenue added.');
+            } else {
+                toast.success(`Booking ${selectedStatus}`);
+            }
+            
+            // Call onSuccess without page reload
+            if (onSuccess) {
+                onSuccess();
+            }
         } catch (error) {
+            console.error('Update status error:', error);
             toast.error(error.response?.data?.message || 'Failed to update');
         } finally {
             setLoading(false);
         }
     };
 
+    const handleClose = (e) => {
+        e?.preventDefault?.();
+        e?.stopPropagation?.();
+        onClose();
+    };
+
+    const handleStatusSelect = (status) => {
+        setSelectedStatus(status);
+    };
+
     return (
-        <div className="fixed inset-0 z-50 bg-black sm:bg-black/80 flex items-end sm:items-center justify-center">
-            <div className="bg-neutral-950 w-full sm:max-w-md sm:border sm:border-neutral-800 flex flex-col max-h-full sm:max-h-[90vh]">
+        <div 
+            className="fixed inset-0 z-50 bg-black sm:bg-black/80 flex items-end sm:items-center justify-center"
+            onClick={handleClose}
+        >
+            <div 
+                className="bg-neutral-950 w-full sm:max-w-md sm:border sm:border-neutral-800 flex flex-col max-h-full sm:max-h-[90vh]"
+                onClick={(e) => e.stopPropagation()}
+            >
 
                 {/* Header */}
                 <div className="shrink-0 flex items-center gap-3 px-4 py-4 border-b border-neutral-800">
                     <button
-                        onClick={onClose}
+                        type="button"
+                        onClick={handleClose}
                         className="sm:hidden w-10 h-10 -ml-2 flex items-center justify-center text-neutral-400"
                     >
                         <ChevronLeft className="w-6 h-6" />
@@ -67,7 +100,8 @@ export default function UpdateStatusModal({ booking, onClose, onSuccess }) {
                         <p className="text-white font-mono">{booking.bookingCode}</p>
                     </div>
                     <button
-                        onClick={onClose}
+                        type="button"
+                        onClick={handleClose}
                         className="hidden sm:flex w-8 h-8 items-center justify-center text-neutral-500 hover:text-white"
                     >
                         <X className="w-4 h-4" />
@@ -92,7 +126,8 @@ export default function UpdateStatusModal({ booking, onClose, onSuccess }) {
                                 {availableStatuses.map((status) => (
                                     <button
                                         key={status}
-                                        onClick={() => setSelectedStatus(status)}
+                                        type="button"
+                                        onClick={() => handleStatusSelect(status)}
                                         className={`w-full flex items-center gap-3 p-4 border text-left transition-colors ${
                                             selectedStatus === status
                                                 ? status === 'cancelled'
@@ -136,12 +171,14 @@ export default function UpdateStatusModal({ booking, onClose, onSuccess }) {
                 <div className="shrink-0 p-4 border-t border-neutral-800 bg-neutral-950">
                     <div className="flex gap-3">
                         <button
-                            onClick={onClose}
+                            type="button"
+                            onClick={handleClose}
                             className="flex-1 sm:flex-none border border-neutral-800 text-neutral-400 text-sm sm:text-xs uppercase tracking-wider py-3.5 sm:px-4 transition-colors"
                         >
                             Cancel
                         </button>
                         <button
+                            type="button"
                             onClick={handleSubmit}
                             disabled={loading || !selectedStatus || availableStatuses.length === 0}
                             className="flex-1 bg-white active:bg-neutral-200 disabled:bg-neutral-800 disabled:text-neutral-600 text-black text-sm sm:text-xs uppercase tracking-wider py-3.5 transition-colors flex items-center justify-center gap-2"
