@@ -28,10 +28,10 @@ export default function SecuritySection() {
 
         const levels = [
             { label: '', color: '' },
-            { label: 'Weak', color: 'bg-neutral-600' },
-            { label: 'Fair', color: 'bg-neutral-500' },
-            { label: 'Good', color: 'bg-neutral-400' },
-            { label: 'Strong', color: 'bg-neutral-300' },
+            { label: 'Weak', color: 'bg-white/20' },
+            { label: 'Fair', color: 'bg-white/40' },
+            { label: 'Good', color: 'bg-white/60' },
+            { label: 'Strong', color: 'bg-white/80' },
             { label: 'Very Strong', color: 'bg-white' }
         ];
 
@@ -102,13 +102,13 @@ export default function SecuritySection() {
         && currentPassword !== newPassword;
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-6">
 
             {/* ── Change Password ── */}
-            <form onSubmit={handleSubmit} className="bg-neutral-950 border border-neutral-800 p-6">
+            <form onSubmit={handleSubmit} className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-6">
                 <div className="flex items-center gap-2 mb-6">
-                    <Shield className="w-4 h-4 text-neutral-600" />
-                    <p className="text-xs text-neutral-500 tracking-widest uppercase">
+                    <Shield className="w-4 h-4 text-white/20" />
+                    <p className="text-[10px] text-white/25 tracking-widest uppercase font-medium">
                         Change Password
                     </p>
                 </div>
@@ -134,22 +134,24 @@ export default function SecuritySection() {
                         />
 
                         {newPassword && (
-                            <div className="mt-2 space-y-1.5">
+                            <div className="mt-2.5 space-y-2">
                                 <div className="flex gap-1">
                                     {[1, 2, 3, 4, 5].map((level) => (
                                         <div
                                             key={level}
-                                            className={`h-1 flex-1 transition-colors ${
+                                            className={`h-1 flex-1 rounded-full transition-all duration-300 ${
                                                 level <= strength.score
                                                     ? strength.color
-                                                    : 'bg-neutral-800'
+                                                    : 'bg-white/[0.06]'
                                             }`}
                                         />
                                     ))}
                                 </div>
-                                <p className="text-xs text-neutral-500">
-                                    {strength.label}
-                                </p>
+                                {strength.label && (
+                                    <p className="text-[11px] text-white/40">
+                                        {strength.label}
+                                    </p>
+                                )}
                             </div>
                         )}
                     </div>
@@ -165,10 +167,10 @@ export default function SecuritySection() {
                         />
 
                         {confirmPassword && (
-                            <p className={`text-xs mt-1.5 ${
+                            <p className={`text-[11px] mt-2 ${
                                 newPassword === confirmPassword
-                                    ? 'text-neutral-400'
-                                    : 'text-neutral-600'
+                                    ? 'text-white/50'
+                                    : 'text-white/25'
                             }`}>
                                 {newPassword === confirmPassword
                                     ? '✓ Passwords match'
@@ -180,8 +182,8 @@ export default function SecuritySection() {
                 </div>
 
                 {/* Requirements */}
-                <div className="mt-6 p-4 border border-neutral-800 space-y-2">
-                    <p className="text-xs text-neutral-500 tracking-widest uppercase mb-2">
+                <div className="mt-6 p-4 rounded-lg border border-white/[0.07] bg-white/[0.02] space-y-2.5">
+                    <p className="text-[10px] text-white/25 tracking-widest uppercase mb-2 font-medium">
                         Requirements
                     </p>
                     {[
@@ -191,20 +193,20 @@ export default function SecuritySection() {
                         { check: /\d/.test(newPassword), text: 'One number (0-9)' },
                         { check: /[@$!%*?&]/.test(newPassword), text: 'One special character (@$!%*?&)' }
                     ].map((req, i) => (
-                        <div key={i} className="flex items-center gap-2">
-                            <div className={`w-1.5 h-1.5 rounded-full transition-colors ${
+                        <div key={i} className="flex items-center gap-2.5">
+                            <div className={`w-1.5 h-1.5 rounded-full transition-all duration-200 ${
                                 !newPassword
-                                    ? 'bg-neutral-800'
+                                    ? 'bg-white/[0.06]'
                                     : req.check
                                     ? 'bg-white'
-                                    : 'bg-neutral-700'
+                                    : 'bg-white/20'
                             }`} />
-                            <p className={`text-xs transition-colors ${
+                            <p className={`text-xs transition-colors duration-200 ${
                                 !newPassword
-                                    ? 'text-neutral-700'
+                                    ? 'text-white/20'
                                     : req.check
-                                    ? 'text-neutral-300'
-                                    : 'text-neutral-600'
+                                    ? 'text-white/50'
+                                    : 'text-white/25'
                             }`}>
                                 {req.text}
                             </p>
@@ -212,7 +214,7 @@ export default function SecuritySection() {
                     ))}
                 </div>
 
-                <div className="flex items-center gap-3 mt-6 pt-6 border-t border-neutral-800">
+                <div className="flex items-center gap-3 mt-6 pt-6 border-t border-white/[0.05]">
                     <button
                         type="button"
                         onClick={() => {
@@ -220,14 +222,30 @@ export default function SecuritySection() {
                             setNewPassword('');
                             setConfirmPassword('');
                         }}
-                        className="border border-neutral-800 text-neutral-400 hover:text-white text-xs tracking-widest uppercase px-4 py-3 transition-colors"
+                        className="
+                            border border-white/[0.08] bg-white/[0.03]
+                            text-white/40 hover:text-white/70
+                            text-xs tracking-widest uppercase
+                            px-4 py-2.5 rounded-lg
+                            hover:border-white/[0.14] hover:bg-white/[0.05]
+                            transition-all duration-150
+                        "
                     >
                         Clear
                     </button>
                     <button
                         type="submit"
                         disabled={loading || !canSubmit}
-                        className="flex-1 bg-white hover:bg-neutral-200 disabled:bg-neutral-800 disabled:text-neutral-600 disabled:cursor-not-allowed text-black text-xs tracking-widest uppercase py-3 transition-colors flex items-center justify-center gap-2"
+                        className="
+                            flex-1 bg-white hover:bg-white/90
+                            disabled:bg-white/10 disabled:text-white/20
+                            disabled:cursor-not-allowed
+                            text-black text-xs tracking-widest uppercase
+                            py-2.5 rounded-lg
+                            shadow-lg shadow-white/10
+                            transition-all duration-150
+                            flex items-center justify-center gap-2
+                        "
                     >
                         {loading ? (
                             <>
@@ -242,10 +260,10 @@ export default function SecuritySection() {
             </form>
 
             {/* ── Security Tips ── */}
-            <div className="bg-neutral-950 border border-neutral-800 p-6">
+            <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-6">
                 <div className="flex items-center gap-2 mb-4">
-                    <AlertTriangle className="w-4 h-4 text-neutral-600" />
-                    <p className="text-xs text-neutral-500 tracking-widest uppercase">
+                    <AlertTriangle className="w-4 h-4 text-white/20" />
+                    <p className="text-[10px] text-white/25 tracking-widest uppercase font-medium">
                         Security Tips
                     </p>
                 </div>
@@ -257,9 +275,9 @@ export default function SecuritySection() {
                         'Use special characters: @ $ ! % * ? &',
                         'Log out from shared or public computers'
                     ].map((tip, i) => (
-                        <div key={i} className="flex items-start gap-2">
-                            <div className="w-1 h-1 bg-neutral-600 rounded-full mt-1.5 shrink-0" />
-                            <p className="text-xs text-neutral-500 leading-relaxed">
+                        <div key={i} className="flex items-start gap-2.5">
+                            <div className="w-1 h-1 bg-white/20 rounded-full mt-1.5 shrink-0" />
+                            <p className="text-xs text-white/30 leading-relaxed">
                                 {tip}
                             </p>
                         </div>
@@ -273,22 +291,28 @@ export default function SecuritySection() {
 function PasswordInput({ label, value, onChange, placeholder, show, onToggle }) {
     return (
         <div>
-            <label className="block text-xs text-neutral-500 mb-1.5 uppercase tracking-widest">
+            <label className="block text-[10px] text-white/25 mb-2 uppercase tracking-widest font-medium">
                 {label}
             </label>
             <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-600" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/15" />
                 <input
                     type={show ? 'text' : 'password'}
                     value={value}
                     onChange={(e) => onChange(e.target.value)}
                     placeholder={placeholder}
-                    className="w-full bg-black border border-neutral-800 text-white placeholder-neutral-600 text-sm pl-10 pr-10 py-2.5 focus:outline-none focus:border-neutral-600 transition-colors"
+                    className="
+                        w-full bg-white/[0.03] border border-white/[0.08]
+                        text-white/80 placeholder-white/20
+                        text-sm pl-10 pr-10 py-2.5 rounded-lg
+                        focus:outline-none focus:border-white/20 focus:bg-white/[0.05]
+                        transition-all duration-150
+                    "
                 />
                 <button
                     type="button"
                     onClick={onToggle}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600 hover:text-white transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20 hover:text-white/50 transition-colors"
                 >
                     {show ? (
                         <EyeOff className="w-4 h-4" />

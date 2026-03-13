@@ -23,32 +23,35 @@ export default function SettingsPage() {
                 {/* Page Header */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                        <p className="text-xs text-neutral-500 tracking-[0.2em] uppercase mb-1">
+                        <p className="text-[10px] text-white/25 uppercase tracking-widest mb-1">
                             Account
                         </p>
-                        <h1 className="text-xl sm:text-2xl font-light text-white">
+                        <h1 className="text-xl sm:text-2xl font-light text-white/90">
                             Settings
                         </h1>
                     </div>
-                    <div className="flex items-center gap-2 text-neutral-500">
+                    <div className="flex items-center gap-2 text-white/25">
                         <Settings className="w-4 h-4" />
-                        <span className="text-xs tracking-widest uppercase">
+                        <span className="text-[11px] tracking-widest uppercase">
                             Admin Settings
                         </span>
                     </div>
                 </div>
 
                 {/* Tabs */}
-                <div className="flex border-b border-neutral-800">
+                <div className="flex border-b border-white/[0.06]">
                     {tabs.map(tab => (
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
-                            className={`px-6 py-3 text-xs tracking-widest uppercase transition-colors ${
-                                activeTab === tab.id
-                                    ? 'text-white border-b border-white'
-                                    : 'text-neutral-500 hover:text-white'
-                            }`}
+                            className={`
+                                px-6 py-3 text-[11px] tracking-widest uppercase
+                                transition-all duration-150 font-medium
+                                ${activeTab === tab.id
+                                    ? 'text-white/80 border-b-2 border-white'
+                                    : 'text-white/30 hover:text-white/60'
+                                }
+                            `}
                         >
                             {tab.label}
                         </button>

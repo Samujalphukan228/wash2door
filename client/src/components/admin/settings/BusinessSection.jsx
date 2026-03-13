@@ -74,13 +74,13 @@ export default function BusinessSection() {
     };
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-6">
 
             {/* ── Business Info ── */}
-            <div className="bg-neutral-950 border border-neutral-800 p-6">
+            <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-6">
                 <div className="flex items-center gap-2 mb-6">
-                    <Store className="w-4 h-4 text-neutral-600" />
-                    <p className="text-xs text-neutral-500 tracking-widest uppercase">
+                    <Store className="w-4 h-4 text-white/20" />
+                    <p className="text-[10px] text-white/25 tracking-widest uppercase font-medium">
                         Business Information
                     </p>
                 </div>
@@ -126,10 +126,10 @@ export default function BusinessSection() {
             </div>
 
             {/* ── Location ── */}
-            <div className="bg-neutral-950 border border-neutral-800 p-6">
+            <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-6">
                 <div className="flex items-center gap-2 mb-6">
-                    <MapPin className="w-4 h-4 text-neutral-600" />
-                    <p className="text-xs text-neutral-500 tracking-widest uppercase">
+                    <MapPin className="w-4 h-4 text-white/20" />
+                    <p className="text-[10px] text-white/25 tracking-widest uppercase font-medium">
                         Location
                     </p>
                 </div>
@@ -165,10 +165,10 @@ export default function BusinessSection() {
             </div>
 
             {/* ── Working Hours ── */}
-            <div className="bg-neutral-950 border border-neutral-800 p-6">
+            <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-6">
                 <div className="flex items-center gap-2 mb-6">
-                    <Clock className="w-4 h-4 text-neutral-600" />
-                    <p className="text-xs text-neutral-500 tracking-widest uppercase">
+                    <Clock className="w-4 h-4 text-white/20" />
+                    <p className="text-[10px] text-white/25 tracking-widest uppercase font-medium">
                         Working Hours
                     </p>
                 </div>
@@ -176,31 +176,41 @@ export default function BusinessSection() {
                 <div className="space-y-5">
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-xs text-neutral-500 mb-1.5 uppercase tracking-widest">
+                            <label className="block text-[10px] text-white/25 mb-2 uppercase tracking-widest font-medium">
                                 Opening Time
                             </label>
                             <input
                                 type="time"
                                 value={settings.openTime}
                                 onChange={(e) => update('openTime', e.target.value)}
-                                className="w-full bg-black border border-neutral-800 text-white text-sm px-3 py-2.5 focus:outline-none focus:border-neutral-600"
+                                className="
+                                    w-full bg-white/[0.03] border border-white/[0.08]
+                                    text-white/80 text-sm px-3 py-2.5 rounded-lg
+                                    focus:outline-none focus:border-white/20 focus:bg-white/[0.05]
+                                    transition-all duration-150
+                                "
                             />
                         </div>
                         <div>
-                            <label className="block text-xs text-neutral-500 mb-1.5 uppercase tracking-widest">
+                            <label className="block text-[10px] text-white/25 mb-2 uppercase tracking-widest font-medium">
                                 Closing Time
                             </label>
                             <input
                                 type="time"
                                 value={settings.closeTime}
                                 onChange={(e) => update('closeTime', e.target.value)}
-                                className="w-full bg-black border border-neutral-800 text-white text-sm px-3 py-2.5 focus:outline-none focus:border-neutral-600"
+                                className="
+                                    w-full bg-white/[0.03] border border-white/[0.08]
+                                    text-white/80 text-sm px-3 py-2.5 rounded-lg
+                                    focus:outline-none focus:border-white/20 focus:bg-white/[0.05]
+                                    transition-all duration-150
+                                "
                             />
                         </div>
                     </div>
 
                     <div>
-                        <label className="block text-xs text-neutral-500 mb-3 uppercase tracking-widest">
+                        <label className="block text-[10px] text-white/25 mb-3 uppercase tracking-widest font-medium">
                             Working Days
                         </label>
                         <div className="flex flex-wrap gap-2">
@@ -208,11 +218,14 @@ export default function BusinessSection() {
                                 <button
                                     key={day}
                                     onClick={() => toggleDay(day)}
-                                    className={`px-3 py-2 text-xs capitalize border transition-colors ${
-                                        settings.workingDays.includes(day)
-                                            ? 'border-white bg-white text-black'
-                                            : 'border-neutral-800 text-neutral-500 hover:border-neutral-600'
-                                    }`}
+                                    className={`
+                                        px-3 py-2 text-xs capitalize border rounded-lg
+                                        transition-all duration-150
+                                        ${settings.workingDays.includes(day)
+                                            ? 'border-white bg-white text-black shadow-lg shadow-white/10'
+                                            : 'border-white/[0.08] bg-white/[0.03] text-white/40 hover:text-white/70 hover:border-white/[0.14] hover:bg-white/[0.05]'
+                                        }
+                                    `}
                                 >
                                     {day.slice(0, 3)}
                                 </button>
@@ -223,8 +236,8 @@ export default function BusinessSection() {
             </div>
 
             {/* ── Booking Settings ── */}
-            <div className="bg-neutral-950 border border-neutral-800 p-6">
-                <p className="text-xs text-neutral-500 tracking-widest uppercase mb-6">
+            <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-6">
+                <p className="text-[10px] text-white/25 tracking-widest uppercase mb-6 font-medium">
                     Booking Settings
                 </p>
 
@@ -257,14 +270,30 @@ export default function BusinessSection() {
             <div className="flex items-center gap-3">
                 <button
                     onClick={handleReset}
-                    className="border border-neutral-800 text-neutral-400 hover:text-white text-xs tracking-widest uppercase px-4 py-3 transition-colors"
+                    className="
+                        border border-white/[0.08] bg-white/[0.03]
+                        text-white/40 hover:text-white/70
+                        text-xs tracking-widest uppercase
+                        px-4 py-2.5 rounded-lg
+                        hover:border-white/[0.14] hover:bg-white/[0.05]
+                        transition-all duration-150
+                    "
                 >
                     Reset to Default
                 </button>
                 <button
                     onClick={handleSave}
                     disabled={loading}
-                    className="flex-1 bg-white hover:bg-neutral-200 disabled:bg-neutral-800 disabled:text-neutral-600 disabled:cursor-not-allowed text-black text-xs tracking-widest uppercase py-3 transition-colors flex items-center justify-center gap-2"
+                    className="
+                        flex-1 bg-white hover:bg-white/90
+                        disabled:bg-white/10 disabled:text-white/20
+                        disabled:cursor-not-allowed
+                        text-black text-xs tracking-widest uppercase
+                        py-2.5 rounded-lg
+                        shadow-lg shadow-white/10
+                        transition-all duration-150
+                        flex items-center justify-center gap-2
+                    "
                 >
                     {loading ? (
                         <>
@@ -281,8 +310,8 @@ export default function BusinessSection() {
             </div>
 
             {/* ── Note ── */}
-            <div className="border border-neutral-800 p-4">
-                <p className="text-xs text-neutral-600 leading-relaxed">
+            <div className="border border-white/[0.07] bg-white/[0.02] p-4 rounded-lg">
+                <p className="text-xs text-white/25 leading-relaxed">
                     Note: Business settings are saved locally. When a backend settings API is added, these will sync automatically.
                 </p>
             </div>
@@ -293,21 +322,25 @@ export default function BusinessSection() {
 function BizInput({ icon: Icon, label, value, onChange, placeholder, type = 'text' }) {
     return (
         <div>
-            <label className="block text-xs text-neutral-500 mb-1.5 uppercase tracking-widest">
+            <label className="block text-[10px] text-white/25 mb-2 uppercase tracking-widest font-medium">
                 {label}
             </label>
             <div className="relative">
                 {Icon && (
-                    <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-600" />
+                    <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/15" />
                 )}
                 <input
                     type={type}
                     value={value}
                     onChange={(e) => onChange(e.target.value)}
                     placeholder={placeholder}
-                    className={`w-full bg-black border border-neutral-800 text-white placeholder-neutral-600 text-sm ${
-                        Icon ? 'pl-10' : 'pl-3'
-                    } pr-3 py-2.5 focus:outline-none focus:border-neutral-600 transition-colors`}
+                    className={`
+                        w-full bg-white/[0.03] border border-white/[0.08]
+                        text-white/80 placeholder-white/20
+                        text-sm ${Icon ? 'pl-10' : 'pl-3'} pr-3 py-2.5 rounded-lg
+                        focus:outline-none focus:border-white/20 focus:bg-white/[0.05]
+                        transition-all duration-150
+                    `}
                 />
             </div>
         </div>

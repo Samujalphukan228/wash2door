@@ -46,15 +46,12 @@ export default function ProfileSection() {
             });
 
             if (response.data.success) {
-                // Instant UI update
                 updateUser({
                     firstName: firstName.trim(),
                     lastName: lastName.trim()
                 });
 
                 toast.success('Profile updated');
-
-                // Also refresh from backend to be sure
                 await refreshUser();
             }
         } catch (error) {
@@ -96,15 +93,12 @@ export default function ProfileSection() {
             });
 
             if (response.data.success) {
-                // Update avatar in context
                 const newAvatar = response.data.data?.avatar;
                 if (newAvatar) {
                     updateUser({ avatar: newAvatar });
                 }
 
                 toast.success('Avatar updated');
-
-                // Refresh to get latest data
                 await refreshUser();
             }
         } catch (error) {
@@ -117,17 +111,15 @@ export default function ProfileSection() {
         }
     };
 
-    // Resolve avatar URL - handles string or object
+    // Resolve avatar URL
     const getAvatarUrl = () => {
         if (avatarPreview) return avatarPreview;
         if (!user?.avatar) return null;
 
-        // If avatar is an object with url
         if (typeof user.avatar === 'object' && user.avatar?.url) {
             return user.avatar.url;
         }
 
-        // If avatar is a string (cloudinary URL)
         if (typeof user.avatar === 'string') {
             if (user.avatar === 'default-avatar.png') return null;
             if (user.avatar.startsWith('http')) return user.avatar;
@@ -139,15 +131,15 @@ export default function ProfileSection() {
     const avatarUrl = getAvatarUrl();
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-6">
 
             {/* ── Avatar ── */}
-            <div className="bg-neutral-950 border border-neutral-800 p-6">
-                <p className="text-xs text-neutral-500 tracking-widest uppercase mb-4">
+            <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-6">
+                <p className="text-[10px] text-white/25 tracking-widest uppercase mb-4 font-medium">
                     Profile Photo
                 </p>
                 <div className="flex items-center gap-6">
-                    <div className="relative w-20 h-20 rounded-full bg-neutral-800 overflow-hidden shrink-0">
+                    <div className="relative w-20 h-20 rounded-full bg-white/[0.06] overflow-hidden shrink-0 border border-white/[0.08]">
                         {avatarUrl ? (
                             <Image
                                 src={avatarUrl}
@@ -156,13 +148,13 @@ export default function ProfileSection() {
                                 className="object-cover"
                             />
                         ) : (
-                            <div className="w-full h-full flex items-center justify-center text-2xl text-neutral-500 uppercase">
+                            <div className="w-full h-full flex items-center justify-center text-2xl text-white/25 uppercase font-medium">
                                 {user?.firstName?.[0]}{user?.lastName?.[0]}
                             </div>
                         )}
 
                         {avatarLoading && (
-                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center">
                                 <Loader2 className="w-5 h-5 text-white animate-spin" />
                             </div>
                         )}
@@ -172,12 +164,21 @@ export default function ProfileSection() {
                         <button
                             onClick={() => fileInputRef.current?.click()}
                             disabled={avatarLoading}
-                            className="flex items-center gap-2 border border-neutral-800 text-neutral-400 hover:text-white text-xs tracking-widest uppercase px-4 py-2.5 transition-colors disabled:opacity-50"
+                            className="
+                                flex items-center gap-2
+                                border border-white/[0.08] bg-white/[0.03]
+                                text-white/40 hover:text-white/70
+                                text-xs tracking-widest uppercase
+                                px-4 py-2.5 rounded-lg
+                                hover:border-white/[0.14] hover:bg-white/[0.05]
+                                disabled:opacity-50 disabled:cursor-not-allowed
+                                transition-all duration-150
+                            "
                         >
                             <Upload className="w-3.5 h-3.5" />
                             Change Photo
                         </button>
-                        <p className="text-xs text-neutral-600 mt-2">
+                        <p className="text-[11px] text-white/20 mt-2">
                             JPG, PNG, WEBP · Max 2MB
                         </p>
                         <input
@@ -192,8 +193,8 @@ export default function ProfileSection() {
             </div>
 
             {/* ── Profile Form ── */}
-            <form onSubmit={handleSubmit} className="bg-neutral-950 border border-neutral-800 p-6">
-                <p className="text-xs text-neutral-500 tracking-widest uppercase mb-6">
+            <form onSubmit={handleSubmit} className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-6">
+                <p className="text-[10px] text-white/25 tracking-widest uppercase mb-6 font-medium">
                     Personal Information
                 </p>
 
@@ -226,21 +227,37 @@ export default function ProfileSection() {
                     />
                 </div>
 
-                <div className="flex items-center gap-3 mt-6 pt-6 border-t border-neutral-800">
+                <div className="flex items-center gap-3 mt-6 pt-6 border-t border-white/[0.05]">
                     <button
                         type="button"
                         onClick={() => {
                             setFirstName(user?.firstName || '');
                             setLastName(user?.lastName || '');
                         }}
-                        className="border border-neutral-800 text-neutral-400 hover:text-white text-xs tracking-widest uppercase px-4 py-3 transition-colors"
+                        className="
+                            border border-white/[0.08] bg-white/[0.03]
+                            text-white/40 hover:text-white/70
+                            text-xs tracking-widest uppercase
+                            px-4 py-2.5 rounded-lg
+                            hover:border-white/[0.14] hover:bg-white/[0.05]
+                            transition-all duration-150
+                        "
                     >
                         Reset
                     </button>
                     <button
                         type="submit"
                         disabled={loading || !firstName.trim() || !lastName.trim()}
-                        className="flex-1 bg-white hover:bg-neutral-200 disabled:bg-neutral-800 disabled:text-neutral-600 disabled:cursor-not-allowed text-black text-xs tracking-widest uppercase py-3 transition-colors flex items-center justify-center gap-2"
+                        className="
+                            flex-1 bg-white hover:bg-white/90
+                            disabled:bg-white/10 disabled:text-white/20
+                            disabled:cursor-not-allowed
+                            text-black text-xs tracking-widest uppercase
+                            py-2.5 rounded-lg
+                            shadow-lg shadow-white/10
+                            transition-all duration-150
+                            flex items-center justify-center gap-2
+                        "
                     >
                         {loading ? (
                             <>
@@ -255,8 +272,8 @@ export default function ProfileSection() {
             </form>
 
             {/* ── Account Info ── */}
-            <div className="bg-neutral-950 border border-neutral-800 p-6">
-                <p className="text-xs text-neutral-500 tracking-widest uppercase mb-4">
+            <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-6">
+                <p className="text-[10px] text-white/25 tracking-widest uppercase mb-4 font-medium">
                     Account Information
                 </p>
                 <div className="space-y-3">
@@ -315,12 +332,12 @@ function formatDate(date, withTime = false) {
 function SettingsInput({ icon: Icon, label, value, onChange, placeholder, type = 'text', disabled, note }) {
     return (
         <div>
-            <label className="block text-xs text-neutral-500 mb-1.5 uppercase tracking-widest">
+            <label className="block text-[10px] text-white/25 mb-2 uppercase tracking-widest font-medium">
                 {label}
             </label>
             <div className="relative">
                 {Icon && (
-                    <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-600" />
+                    <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/15" />
                 )}
                 <input
                     type={type}
@@ -328,15 +345,18 @@ function SettingsInput({ icon: Icon, label, value, onChange, placeholder, type =
                     onChange={(e) => onChange(e.target.value)}
                     placeholder={placeholder}
                     disabled={disabled}
-                    className={`w-full bg-black border border-neutral-800 text-white placeholder-neutral-600 text-sm ${
-                        Icon ? 'pl-10' : 'pl-3'
-                    } pr-3 py-2.5 focus:outline-none focus:border-neutral-600 transition-colors ${
-                        disabled ? 'opacity-50 cursor-not-allowed' : ''
-                    }`}
+                    className={`
+                        w-full bg-white/[0.03] border border-white/[0.08]
+                        text-white/80 placeholder-white/20
+                        text-sm ${Icon ? 'pl-10' : 'pl-3'} pr-3 py-2.5 rounded-lg
+                        focus:outline-none focus:border-white/20 focus:bg-white/[0.05]
+                        transition-all duration-150
+                        ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
+                    `}
                 />
             </div>
             {note && (
-                <p className="text-xs text-neutral-700 mt-1">{note}</p>
+                <p className="text-[11px] text-white/20 mt-1.5">{note}</p>
             )}
         </div>
     );
@@ -345,8 +365,8 @@ function SettingsInput({ icon: Icon, label, value, onChange, placeholder, type =
 function InfoRow({ label, value }) {
     return (
         <div className="flex items-center justify-between">
-            <p className="text-xs text-neutral-600">{label}</p>
-            <p className="text-sm text-neutral-300 capitalize">{value}</p>
+            <p className="text-[11px] text-white/25">{label}</p>
+            <p className="text-sm text-white/50 capitalize">{value}</p>
         </div>
     );
 }
