@@ -293,7 +293,7 @@ export default function BookingsPage() {
     return (
         <DashboardLayout>
             <div className="min-h-screen bg-black">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 pb-28 sm:pb-10">
+                <div className="max-w-7xl mx-auto px-1 sm:px-1 py-1 sm:py-1 space-y-6 pb-1 sm:pb-1">
 
                     {/* ── Header ── */}
                     <div className="flex items-start justify-between gap-4">
