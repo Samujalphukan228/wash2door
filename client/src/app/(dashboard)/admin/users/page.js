@@ -17,18 +17,13 @@ export default function UsersPage() {
     const [pages, setPages] = useState(1);
 
     const [filters, setFilters] = useState({
-        page: 1,
-        limit: 10,
-        search: '',
-        role: '',
-        isBlocked: ''
+        page: 1, limit: 10, search: '', role: '', isBlocked: ''
     });
 
     const [selectedUser, setSelectedUser] = useState(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
     const [showBlockModal, setShowBlockModal] = useState(false);
 
-    // ── Fetch Users ──
     const fetchUsers = useCallback(async () => {
         try {
             setLoading(true);
@@ -36,9 +31,7 @@ export default function UsersPage() {
                 Object.entries(filters).filter(([_, v]) => v !== '')
             );
             const response = await adminService.getAllUsers(params);
-            
             if (response.success) {
-                // ✅ FIXED: Handle backend response structure
                 setUsers(response.data?.users || response.data || []);
                 setTotal(response.data?.total || response.total || 0);
                 setPages(response.data?.pages || response.pages || 1);
@@ -51,15 +44,11 @@ export default function UsersPage() {
         }
     }, [filters]);
 
-    useEffect(() => {
-        fetchUsers();
-    }, [fetchUsers]);
+    useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
-    // ── Handlers ──
     const handleFilterChange = (newFilters) => {
         setFilters(prev => ({ ...prev, ...newFilters, page: 1 }));
     };
-
     const handlePageChange = (page) => {
         setFilters(prev => ({ ...prev, page }));
     };
@@ -68,7 +57,6 @@ export default function UsersPage() {
         try {
             const response = await adminService.getUserById(user._id);
             if (response.success) {
-                // Backend returns { user, stats, recentBookings, reviews, favoriteServices }
                 setSelectedUser(response.data);
             } else {
                 setSelectedUser({ user });
@@ -102,13 +90,10 @@ export default function UsersPage() {
         try {
             await adminService.unblockUser(userId);
             toast.success('User unblocked successfully');
-            
-            // Close modal if open
             if (showDetailModal) {
                 setShowDetailModal(false);
                 setSelectedUser(null);
             }
-            
             fetchUsers();
         } catch (error) {
             toast.error(error.response?.data?.message || 'Failed to unblock user');
@@ -117,26 +102,20 @@ export default function UsersPage() {
 
     const handleRoleChange = async (userId, role) => {
         const roleLabel = role === 'user' ? 'Customer' : 'Admin';
-        
         if (!confirm(`Change this user's role to ${roleLabel}?`)) return;
-        
         try {
             await adminService.changeUserRole(userId, role);
             toast.success(`Role changed to ${roleLabel}`);
-            
-            // Close modal if open
             if (showDetailModal) {
                 setShowDetailModal(false);
                 setSelectedUser(null);
             }
-            
             fetchUsers();
         } catch (error) {
             toast.error(error.response?.data?.message || 'Failed to change role');
         }
     };
 
-    // ✅ FIXED: Stats calculation using 'user' role
     const stats = {
         total,
         customers: users.filter(u => u.role === 'user').length,
@@ -148,25 +127,25 @@ export default function UsersPage() {
         <DashboardLayout>
             <div className="space-y-6">
 
-                {/* ── Page Header ── */}
+                {/* Page Header */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                        <p className="text-xs text-neutral-500 tracking-[0.2em] uppercase mb-1">
+                        <p className="text-[10px] text-white/25 uppercase tracking-widest mb-1">
                             Management
                         </p>
-                        <h1 className="text-xl sm:text-2xl font-light text-white">
+                        <h1 className="text-xl sm:text-2xl font-light text-white/90">
                             Users
                         </h1>
                     </div>
-                    <div className="flex items-center gap-2 text-neutral-500">
+                    <div className="flex items-center gap-2 text-white/25">
                         <Users className="w-4 h-4" />
-                        <span className="text-xs tracking-widest uppercase">
+                        <span className="text-[11px] tracking-widest uppercase">
                             {total} total users
                         </span>
                     </div>
                 </div>
 
-                {/* ── Stats Bar ── */}
+                {/* Stats Bar */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {[
                         { label: 'Total Users', value: stats.total },
@@ -176,14 +155,14 @@ export default function UsersPage() {
                     ].map((stat) => (
                         <div
                             key={stat.label}
-                            className="bg-neutral-950 border border-neutral-800 p-4"
+                            className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-4"
                         >
-                            <p className="text-xs text-neutral-500 uppercase tracking-widest mb-1">
+                            <p className="text-[10px] text-white/25 uppercase tracking-widest mb-1.5">
                                 {stat.label}
                             </p>
-                            <p className="text-2xl font-light text-white">
+                            <p className="text-2xl font-light text-white/80">
                                 {loading ? (
-                                    <span className="inline-block h-7 w-8 bg-neutral-800 animate-pulse rounded" />
+                                    <span className="inline-block h-7 w-8 bg-white/[0.06] animate-pulse rounded-md" />
                                 ) : (
                                     stat.value
                                 )}
@@ -192,13 +171,13 @@ export default function UsersPage() {
                     ))}
                 </div>
 
-                {/* ── Filters ── */}
+                {/* Filters */}
                 <UsersFilter
                     filters={filters}
                     onFilterChange={handleFilterChange}
                 />
 
-                {/* ── Table ── */}
+                {/* Table */}
                 <UsersTable
                     users={users}
                     loading={loading}
@@ -213,7 +192,7 @@ export default function UsersPage() {
                 />
             </div>
 
-            {/* ── Modals ── */}
+            {/* Modals */}
             {showDetailModal && selectedUser && (
                 <UserDetailModal
                     user={selectedUser}
@@ -226,7 +205,6 @@ export default function UsersPage() {
                         setShowBlockModal(true);
                     }}
                     onUnblock={async () => {
-                        // Extract userId - handle both user object and nested structure
                         const userId = selectedUser.user?._id || selectedUser._id;
                         await handleUnblock(userId);
                     }}

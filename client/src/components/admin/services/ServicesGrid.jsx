@@ -21,11 +21,14 @@ export default function ServicesGrid({
                 {[...Array(6)].map((_, i) => (
                     <div
                         key={i}
-                        className="bg-neutral-950 border border-neutral-800 p-6 space-y-4"
+                        className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-0 overflow-hidden"
                     >
-                        <div className="h-40 bg-neutral-800 animate-pulse" />
-                        <div className="h-4 w-3/4 bg-neutral-800 animate-pulse rounded" />
-                        <div className="h-3 w-1/2 bg-neutral-900 animate-pulse rounded" />
+                        <div className="h-44 bg-white/[0.04] animate-pulse" />
+                        <div className="p-4 space-y-3">
+                            <div className="h-4 w-3/4 bg-white/[0.06] animate-pulse rounded-md" />
+                            <div className="h-3 w-1/2 bg-white/[0.04] animate-pulse rounded-md" />
+                            <div className="h-3 w-2/3 bg-white/[0.03] animate-pulse rounded-md" />
+                        </div>
                     </div>
                 ))}
             </div>
@@ -34,9 +37,12 @@ export default function ServicesGrid({
 
     if (!services || services.length === 0) {
         return (
-            <div className="bg-neutral-950 border border-neutral-800 px-6 py-16 text-center">
-                <p className="text-neutral-500 text-sm">No services found</p>
-                <p className="text-neutral-700 text-xs mt-1">
+            <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl px-6 py-16 text-center">
+                <div className="w-12 h-12 rounded-full bg-white/[0.04] flex items-center justify-center mx-auto mb-4">
+                    <span className="text-xl">🔧</span>
+                </div>
+                <p className="text-white/40 text-sm">No services found</p>
+                <p className="text-white/20 text-xs mt-1">
                     Create your first service to get started
                 </p>
             </div>
@@ -60,15 +66,21 @@ export default function ServicesGrid({
 
             {/* Pagination */}
             {pages > 1 && (
-                <div className="flex items-center justify-between border-t border-neutral-800 pt-4">
-                    <p className="text-xs text-neutral-500">
+                <div className="flex items-center justify-between pt-4 border-t border-white/[0.05]">
+                    <p className="text-[11px] text-white/25">
                         Page {currentPage} of {pages} · {total} services
                     </p>
                     <div className="flex items-center gap-1">
                         <button
                             onClick={() => onPageChange(currentPage - 1)}
                             disabled={currentPage === 1}
-                            className="w-8 h-8 flex items-center justify-center border border-neutral-800 text-neutral-500 hover:text-white hover:border-neutral-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            className="
+                                w-8 h-8 rounded-lg flex items-center justify-center
+                                border border-white/[0.08] bg-white/[0.03]
+                                text-white/30 hover:text-white/70 hover:border-white/[0.14]
+                                disabled:opacity-20 disabled:cursor-not-allowed
+                                transition-all duration-150
+                            "
                         >
                             <ChevronLeft className="w-4 h-4" />
                         </button>
@@ -76,11 +88,13 @@ export default function ServicesGrid({
                             <button
                                 key={i + 1}
                                 onClick={() => onPageChange(i + 1)}
-                                className={`w-8 h-8 text-xs border transition-colors ${
-                                    currentPage === i + 1
-                                        ? 'border-white bg-white text-black'
-                                        : 'border-neutral-800 text-neutral-500 hover:text-white hover:border-neutral-600'
-                                }`}
+                                className={`
+                                    w-8 h-8 rounded-lg text-xs font-medium transition-all duration-150
+                                    ${currentPage === i + 1
+                                        ? 'bg-white text-black shadow-lg shadow-white/10'
+                                        : 'border border-white/[0.08] bg-white/[0.03] text-white/30 hover:text-white/70 hover:border-white/[0.14]'
+                                    }
+                                `}
                             >
                                 {i + 1}
                             </button>
@@ -88,7 +102,13 @@ export default function ServicesGrid({
                         <button
                             onClick={() => onPageChange(currentPage + 1)}
                             disabled={currentPage === pages}
-                            className="w-8 h-8 flex items-center justify-center border border-neutral-800 text-neutral-500 hover:text-white hover:border-neutral-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            className="
+                                w-8 h-8 rounded-lg flex items-center justify-center
+                                border border-white/[0.08] bg-white/[0.03]
+                                text-white/30 hover:text-white/70 hover:border-white/[0.14]
+                                disabled:opacity-20 disabled:cursor-not-allowed
+                                transition-all duration-150
+                            "
                         >
                             <ChevronRight className="w-4 h-4" />
                         </button>

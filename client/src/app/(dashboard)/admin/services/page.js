@@ -1,5 +1,3 @@
-// src/app/(dashboard)/admin/services/page.js
-
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -21,11 +19,7 @@ export default function ServicesPage() {
     const [pages, setPages] = useState(1);
 
     const [filters, setFilters] = useState({
-        page: 1,
-        limit: 12,
-        category: '',
-        tier: '',
-        isActive: ''
+        page: 1, limit: 12, category: '', tier: '', isActive: ''
     });
 
     const [selectedService, setSelectedService] = useState(null);
@@ -53,28 +47,22 @@ export default function ServicesPage() {
         }
     }, [filters]);
 
-    useEffect(() => {
-        fetchServices();
-    }, [fetchServices]);
+    useEffect(() => { fetchServices(); }, [fetchServices]);
 
     const handleFilterChange = (newFilters) => {
         setFilters(prev => ({ ...prev, ...newFilters, page: 1 }));
     };
-
     const handlePageChange = (page) => {
         setFilters(prev => ({ ...prev, page }));
     };
-
     const handleView = (service) => {
         setSelectedService(service);
         setShowDetailModal(true);
     };
-
     const handleEdit = (service) => {
         setSelectedService(service);
         setShowEditModal(true);
     };
-
     const handleDelete = async (serviceId) => {
         if (!confirm('Delete this service? This cannot be undone.')) return;
         try {
@@ -85,12 +73,10 @@ export default function ServicesPage() {
             toast.error(error.response?.data?.message || 'Failed to delete service');
         }
     };
-
     const handleToggleActive = async (service) => {
         try {
             const formData = new FormData();
             formData.append('isActive', !service.isActive);
-
             await serviceService.update(service._id, formData);
             toast.success(`Service ${!service.isActive ? 'activated' : 'deactivated'}`);
             fetchServices();
@@ -100,9 +86,7 @@ export default function ServicesPage() {
     };
 
     const uniqueCategories = [...new Set(
-        services
-            .map(s => s.category?.name)
-            .filter(Boolean)
+        services.map(s => s.category?.name).filter(Boolean)
     )];
 
     return (
@@ -112,16 +96,23 @@ export default function ServicesPage() {
                 {/* Page Header */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                        <p className="text-xs text-neutral-500 tracking-[0.2em] uppercase mb-1">
+                        <p className="text-[10px] text-white/25 uppercase tracking-widest mb-1">
                             Management
                         </p>
-                        <h1 className="text-xl sm:text-2xl font-light text-white">
+                        <h1 className="text-xl sm:text-2xl font-light text-white/90">
                             Services
                         </h1>
                     </div>
                     <button
                         onClick={() => setShowCreateModal(true)}
-                        className="flex items-center gap-2 bg-white hover:bg-neutral-200 text-black text-xs tracking-[0.15em] uppercase px-4 py-2.5 transition-colors self-start sm:self-auto"
+                        className="
+                            flex items-center gap-2 px-4 py-2.5 rounded-lg
+                            bg-white text-black text-sm font-medium
+                            hover:bg-white/90 active:bg-white/80
+                            shadow-lg shadow-white/10
+                            transition-all duration-150
+                            self-start sm:self-auto
+                        "
                     >
                         <Plus className="w-4 h-4" />
                         New Service
@@ -132,29 +123,20 @@ export default function ServicesPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {[
                         { label: 'Total', value: total },
-                        {
-                            label: 'Active',
-                            value: services.filter(s => s.isActive).length
-                        },
-                        {
-                            label: 'Inactive',
-                            value: services.filter(s => !s.isActive).length
-                        },
-                        {
-                            label: 'Categories',
-                            value: uniqueCategories.length
-                        }
+                        { label: 'Active', value: services.filter(s => s.isActive).length },
+                        { label: 'Inactive', value: services.filter(s => !s.isActive).length },
+                        { label: 'Categories', value: uniqueCategories.length }
                     ].map((stat) => (
                         <div
                             key={stat.label}
-                            className="bg-neutral-950 border border-neutral-800 p-4"
+                            className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-4"
                         >
-                            <p className="text-xs text-neutral-500 uppercase tracking-widest mb-1">
+                            <p className="text-[10px] text-white/25 uppercase tracking-widest mb-1.5">
                                 {stat.label}
                             </p>
-                            <p className="text-2xl font-light text-white">
+                            <p className="text-2xl font-light text-white/80">
                                 {loading ? (
-                                    <span className="inline-block h-7 w-8 bg-neutral-800 animate-pulse rounded" />
+                                    <span className="inline-block h-7 w-8 bg-white/[0.06] animate-pulse rounded-md" />
                                 ) : (
                                     stat.value
                                 )}
@@ -199,10 +181,7 @@ export default function ServicesPage() {
             {showEditModal && selectedService && (
                 <EditServiceModal
                     service={selectedService}
-                    onClose={() => {
-                        setShowEditModal(false);
-                        setSelectedService(null);
-                    }}
+                    onClose={() => { setShowEditModal(false); setSelectedService(null); }}
                     onSuccess={() => {
                         setShowEditModal(false);
                         setSelectedService(null);
@@ -215,18 +194,9 @@ export default function ServicesPage() {
             {showDetailModal && selectedService && (
                 <ServiceDetailModal
                     service={selectedService}
-                    onClose={() => {
-                        setShowDetailModal(false);
-                        setSelectedService(null);
-                    }}
-                    onEdit={() => {
-                        setShowDetailModal(false);
-                        setShowEditModal(true);
-                    }}
-                    onManageVariants={() => {
-                        setShowDetailModal(false);
-                        setShowVariantModal(true);
-                    }}
+                    onClose={() => { setShowDetailModal(false); setSelectedService(null); }}
+                    onEdit={() => { setShowDetailModal(false); setShowEditModal(true); }}
+                    onManageVariants={() => { setShowDetailModal(false); setShowVariantModal(true); }}
                     onRefresh={fetchServices}
                 />
             )}
@@ -234,10 +204,7 @@ export default function ServicesPage() {
             {showVariantModal && selectedService && (
                 <VariantModal
                     service={selectedService}
-                    onClose={() => {
-                        setShowVariantModal(false);
-                        setSelectedService(null);
-                    }}
+                    onClose={() => { setShowVariantModal(false); setSelectedService(null); }}
                     onSuccess={() => {
                         setShowVariantModal(false);
                         setSelectedService(null);

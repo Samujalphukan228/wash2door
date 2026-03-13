@@ -1,5 +1,3 @@
-// src/components/admin/services/ServicesFilter.jsx
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -19,6 +17,16 @@ const STATUS_OPTIONS = [
     { value: 'true', label: 'Active' },
     { value: 'false', label: 'Inactive' }
 ];
+
+const selectCls = `
+    bg-white/[0.03] border border-white/[0.08]
+    text-white/70 text-sm
+    px-3 py-2.5 rounded-lg
+    focus:outline-none focus:border-white/20 focus:bg-white/[0.05]
+    transition-all duration-150
+    disabled:opacity-40
+    appearance-none cursor-pointer
+`;
 
 export default function ServicesFilter({ filters, onFilterChange }) {
     const [categories, setCategories] = useState([]);
@@ -43,14 +51,13 @@ export default function ServicesFilter({ filters, onFilterChange }) {
     const hasActiveFilters = filters.category || filters.tier || filters.isActive !== '';
 
     return (
-        <div className="flex flex-col sm:flex-row gap-3">
-            
-            {/* Category Filter */}
+        <div className="flex flex-col sm:flex-row gap-2.5">
+
             <select
                 value={filters.category || ''}
                 onChange={(e) => onFilterChange({ category: e.target.value })}
                 disabled={loadingCategories}
-                className="bg-neutral-950 border border-neutral-800 text-white text-sm px-3 py-2.5 focus:outline-none focus:border-neutral-600 transition-colors disabled:opacity-50"
+                className={selectCls}
             >
                 <option value="">All Categories</option>
                 {categories.map(cat => (
@@ -60,11 +67,10 @@ export default function ServicesFilter({ filters, onFilterChange }) {
                 ))}
             </select>
 
-            {/* Tier Filter */}
             <select
                 value={filters.tier || ''}
                 onChange={(e) => onFilterChange({ tier: e.target.value })}
-                className="bg-neutral-950 border border-neutral-800 text-white text-sm px-3 py-2.5 focus:outline-none focus:border-neutral-600 transition-colors"
+                className={selectCls}
             >
                 {TIERS.map(opt => (
                     <option key={opt.value} value={opt.value}>
@@ -73,11 +79,10 @@ export default function ServicesFilter({ filters, onFilterChange }) {
                 ))}
             </select>
 
-            {/* Status Filter */}
             <select
                 value={filters.isActive}
                 onChange={(e) => onFilterChange({ isActive: e.target.value })}
-                className="bg-neutral-950 border border-neutral-800 text-white text-sm px-3 py-2.5 focus:outline-none focus:border-neutral-600 transition-colors"
+                className={selectCls}
             >
                 {STATUS_OPTIONS.map(opt => (
                     <option key={opt.value} value={opt.value}>
@@ -86,22 +91,26 @@ export default function ServicesFilter({ filters, onFilterChange }) {
                 ))}
             </select>
 
-            {/* Per Page */}
             <select
                 value={filters.limit}
                 onChange={(e) => onFilterChange({ limit: Number(e.target.value) })}
-                className="bg-neutral-950 border border-neutral-800 text-white text-sm px-3 py-2.5 focus:outline-none focus:border-neutral-600 transition-colors"
+                className={selectCls}
             >
                 {[12, 24, 48].map(n => (
                     <option key={n} value={n}>{n} per page</option>
                 ))}
             </select>
 
-            {/* Clear Filters */}
             {hasActiveFilters && (
                 <button
                     onClick={() => onFilterChange({ category: '', tier: '', isActive: '' })}
-                    className="flex items-center gap-2 border border-neutral-800 text-neutral-500 hover:text-white text-xs tracking-widest uppercase px-4 py-2.5 transition-colors"
+                    className="
+                        flex items-center gap-2 px-4 py-2.5 rounded-lg
+                        border border-white/[0.08] bg-white/[0.03]
+                        text-xs text-white/40 hover:text-white/70
+                        hover:border-white/[0.14] hover:bg-white/[0.05]
+                        transition-all duration-150
+                    "
                 >
                     <X className="w-3.5 h-3.5" />
                     Clear
