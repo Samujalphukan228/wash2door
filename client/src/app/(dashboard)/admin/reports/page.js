@@ -9,7 +9,7 @@ import StatCard from '@/components/admin/reports/StatCard';
 import adminService from '@/services/adminService';
 import {
     DollarSign, CalendarCheck, TrendingUp,
-    TrendingDown, Users, BarChart3
+    TrendingDown, BarChart3
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -124,16 +124,16 @@ export default function ReportsPage() {
                 {/* ── Page Header ── */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                        <p className="text-xs text-neutral-500 tracking-[0.2em] uppercase mb-1">
+                        <p className="text-[10px] text-white/25 uppercase tracking-widest mb-1">
                             Analytics
                         </p>
-                        <h1 className="text-xl sm:text-2xl font-light text-white">
+                        <h1 className="text-xl sm:text-2xl font-light text-white/90">
                             Reports
                         </h1>
                     </div>
-                    <div className="flex items-center gap-2 text-neutral-500">
+                    <div className="flex items-center gap-2 text-white/25">
                         <BarChart3 className="w-4 h-4" />
-                        <span className="text-xs tracking-widest uppercase">
+                        <span className="text-[11px] tracking-widest uppercase">
                             {filters.period} report
                         </span>
                     </div>
@@ -146,16 +146,18 @@ export default function ReportsPage() {
                 />
 
                 {/* ── Tabs ── */}
-                <div className="flex border-b border-neutral-800">
+                <div className="flex border-b border-white/[0.06]">
                     {tabs.map(tab => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
-                            className={`px-6 py-3 text-xs tracking-widest uppercase transition-colors capitalize ${
-                                activeTab === tab
-                                    ? 'text-white border-b border-white'
-                                    : 'text-neutral-500 hover:text-white'
-                            }`}
+                            className={`
+                                px-6 py-3 text-[11px] tracking-widest uppercase transition-all duration-150 capitalize font-medium
+                                ${activeTab === tab
+                                    ? 'text-white/80 border-b-2 border-white'
+                                    : 'text-white/30 hover:text-white/60'
+                                }
+                            `}
                         >
                             {tab}
                         </button>
@@ -223,32 +225,32 @@ export default function ReportsPage() {
 
                         {/* Top Services */}
                         {topServices.length > 0 && (
-                            <div className="bg-neutral-950 border border-neutral-800">
-                                <div className="px-6 py-4 border-b border-neutral-800">
-                                    <p className="text-xs font-medium text-white tracking-[0.15em] uppercase">
+                            <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden">
+                                <div className="px-5 py-4 border-b border-white/[0.05]">
+                                    <p className="text-[10px] font-medium text-white/70 tracking-[0.15em] uppercase">
                                         Top Services
                                     </p>
                                 </div>
-                                <div className="divide-y divide-neutral-800/50">
+                                <div className="divide-y divide-white/[0.03]">
                                     {topServices.slice(0, 5).map((service, i) => (
                                         <div
                                             key={i}
-                                            className="px-6 py-4 flex items-center justify-between"
+                                            className="px-5 py-4 flex items-center justify-between hover:bg-white/[0.03] transition-all duration-150"
                                         >
                                             <div className="flex items-center gap-4">
-                                                <span className="text-xs text-neutral-600 w-6">
+                                                <span className="text-[11px] text-white/20 w-6">
                                                     #{i + 1}
                                                 </span>
                                                 <div>
-                                                    <p className="text-sm text-white">
+                                                    <p className="text-sm text-white/70">
                                                         {service.name || service.serviceName || service._id || '—'}
                                                     </p>
-                                                    <p className="text-xs text-neutral-500 mt-0.5">
+                                                    <p className="text-[11px] text-white/25 mt-0.5">
                                                         {service.count || service.bookings || 0} bookings
                                                     </p>
                                                 </div>
                                             </div>
-                                            <p className="text-sm text-white font-medium">
+                                            <p className="text-sm text-white/80 font-medium">
                                                 ₹{(service.revenue || service.total || 0).toLocaleString('en-IN')}
                                             </p>
                                         </div>
@@ -294,22 +296,22 @@ export default function ReportsPage() {
                             loading={loading}
                         />
 
-                        {/* Top Services Revenue */}
+                        {/* Top Services Revenue Table */}
                         {topServices.length > 0 && (
-                            <div className="bg-neutral-950 border border-neutral-800">
-                                <div className="px-6 py-4 border-b border-neutral-800">
-                                    <p className="text-xs font-medium text-white tracking-[0.15em] uppercase">
+                            <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden">
+                                <div className="px-5 py-4 border-b border-white/[0.05]">
+                                    <p className="text-[10px] font-medium text-white/70 tracking-[0.15em] uppercase">
                                         Revenue by Service
                                     </p>
                                 </div>
                                 <div className="overflow-x-auto">
                                     <table className="w-full">
                                         <thead>
-                                            <tr className="border-b border-neutral-800">
+                                            <tr className="border-b border-white/[0.05]">
                                                 {['#', 'Service', 'Bookings', 'Revenue', 'Avg'].map(h => (
                                                     <th
                                                         key={h}
-                                                        className="px-4 py-3 text-left text-xs text-neutral-500 tracking-[0.15em] uppercase font-normal"
+                                                        className="px-4 py-3 text-left text-[10px] text-white/20 tracking-widest uppercase font-medium whitespace-nowrap"
                                                     >
                                                         {h}
                                                     </th>
@@ -325,21 +327,21 @@ export default function ReportsPage() {
                                                 return (
                                                     <tr
                                                         key={i}
-                                                        className="border-b border-neutral-800/50 hover:bg-neutral-900 transition-colors"
+                                                        className="border-b border-white/[0.03] hover:bg-white/[0.03] transition-all duration-150"
                                                     >
-                                                        <td className="px-4 py-3 text-xs text-neutral-600">
+                                                        <td className="px-4 py-3.5 text-[11px] text-white/20">
                                                             {i + 1}
                                                         </td>
-                                                        <td className="px-4 py-3 text-sm text-white">
+                                                        <td className="px-4 py-3.5 text-sm text-white/70">
                                                             {service.name || service.serviceName || service._id || '—'}
                                                         </td>
-                                                        <td className="px-4 py-3 text-sm text-neutral-400">
+                                                        <td className="px-4 py-3.5 text-sm text-white/40">
                                                             {bookings}
                                                         </td>
-                                                        <td className="px-4 py-3 text-sm text-white font-medium">
+                                                        <td className="px-4 py-3.5 text-sm text-white/80 font-medium">
                                                             ₹{revenue.toLocaleString('en-IN')}
                                                         </td>
-                                                        <td className="px-4 py-3 text-sm text-neutral-400">
+                                                        <td className="px-4 py-3.5 text-sm text-white/40">
                                                             ₹{avg.toLocaleString('en-IN')}
                                                         </td>
                                                     </tr>
@@ -391,9 +393,9 @@ export default function ReportsPage() {
 
                         {/* Status Breakdown */}
                         {Object.keys(statusBreakdown).length > 0 && (
-                            <div className="bg-neutral-950 border border-neutral-800">
-                                <div className="px-6 py-4 border-b border-neutral-800">
-                                    <p className="text-xs font-medium text-white tracking-[0.15em] uppercase">
+                            <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden">
+                                <div className="px-5 py-4 border-b border-white/[0.05]">
+                                    <p className="text-[10px] font-medium text-white/70 tracking-[0.15em] uppercase">
                                         Status Breakdown
                                     </p>
                                 </div>
@@ -406,17 +408,17 @@ export default function ReportsPage() {
 
                                             return (
                                                 <div key={status}>
-                                                    <div className="flex items-center justify-between mb-1.5">
-                                                        <span className="text-sm text-neutral-300 capitalize">
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <span className="text-sm text-white/50 capitalize">
                                                             {status}
                                                         </span>
-                                                        <span className="text-xs text-neutral-500">
+                                                        <span className="text-[11px] text-white/25">
                                                             {count} ({percentage}%)
                                                         </span>
                                                     </div>
-                                                    <div className="h-1.5 bg-neutral-800 overflow-hidden">
+                                                    <div className="h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
                                                         <div
-                                                            className="h-full bg-white transition-all duration-500"
+                                                            className="h-full bg-white rounded-full transition-all duration-500"
                                                             style={{ width: `${percentage}%` }}
                                                         />
                                                     </div>
