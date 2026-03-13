@@ -40,7 +40,7 @@ export default function DashboardPage() {
 
     return (
         <DashboardLayout>
-            <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto">
+            <div className="p-1 sm:p-1 lg:p-1 max-w-[1600px] mx-auto">
 
                 {/* Header */}
                 <div className="mb-8">
