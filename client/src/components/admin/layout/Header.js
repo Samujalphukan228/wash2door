@@ -1,47 +1,43 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useSocket } from '@/context/SocketContext';
 import Image from 'next/image';
-import {
-    Bell,
-    Menu,
-} from 'lucide-react';
+import { Bell, Menu } from 'lucide-react';
 
 const pageTitles = {
     '/admin/dashboard': {
         title: 'Dashboard',
-        subtitle: 'Overview of your business'
+        subtitle: 'Overview of your business',
     },
     '/admin/bookings': {
         title: 'Bookings',
-        subtitle: 'Manage all bookings'
+        subtitle: 'Manage all bookings',
+    },
+    '/admin/categories': {
+        title: 'Categories',
+        subtitle: 'Manage categories',
     },
     '/admin/services': {
         title: 'Services',
-        subtitle: 'Manage your services'
+        subtitle: 'Manage your services',
     },
     '/admin/users': {
         title: 'Users',
-        subtitle: 'Manage customers'
-    },
-    '/admin/reviews': {
-        title: 'Reviews',
-        subtitle: 'Customer reviews'
+        subtitle: 'Manage customers',
     },
     '/admin/reports': {
         title: 'Reports',
-        subtitle: 'Analytics and reports'
+        subtitle: 'Analytics and reports',
     },
     '/admin/settings': {
         title: 'Settings',
-        subtitle: 'Account settings'
-    }
+        subtitle: 'Account settings',
+    },
 };
 
-// Helper to get avatar URL
 const getAvatarUrl = (avatar) => {
     if (!avatar) return null;
     if (typeof avatar === 'object' && avatar?.url) return avatar.url;
@@ -59,35 +55,52 @@ export default function Header({ onMenuClick }) {
     const [notifications, setNotifications] = useState([]);
     const [showNotifications, setShowNotifications] = useState(false);
     const [time, setTime] = useState('');
+    const notifRef = useRef(null);
 
     const pageInfo = pageTitles[pathname] || {
         title: 'Admin',
-        subtitle: ''
+        subtitle: '',
     };
 
     const avatarUrl = getAvatarUrl(user?.avatar);
 
+    // Clock
     useEffect(() => {
         const updateTime = () => {
-            setTime(new Date().toLocaleTimeString('en-IN', {
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: true
-            }));
+            setTime(
+                new Date().toLocaleTimeString('en-IN', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true,
+                })
+            );
         };
         updateTime();
-        const interval = setInterval(updateTime, 1000);
+        const interval = setInterval(updateTime, 60000); // Update every minute instead of every second
         return () => clearInterval(interval);
     }, []);
 
-    return (
-        <header className="h-14 sm:h-16 border-b border-neutral-800 bg-black flex items-center justify-between px-4 sm:px-6 lg:px-8 sticky top-0 z-30">
+    // Close notifications on outside click
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (notifRef.current && !notifRef.current.contains(e.target)) {
+                setShowNotifications(false);
+            }
+        };
+        if (showNotifications) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [showNotifications]);
 
+    return (
+        <header className="h-14 sm:h-16 border-b border-neutral-800 bg-black/95 backdrop-blur-sm flex items-center justify-between px-4 sm:px-6 lg:px-8 sticky top-0 z-30">
             {/* Left */}
             <div className="flex items-center gap-3 sm:gap-4">
                 <button
                     onClick={onMenuClick}
                     className="lg:hidden w-8 h-8 flex items-center justify-center text-neutral-400 hover:text-white transition-colors"
+                    aria-label="Open menu"
                 >
                     <Menu className="w-5 h-5" />
                 </button>
@@ -106,27 +119,29 @@ export default function Header({ onMenuClick }) {
 
             {/* Right */}
             <div className="flex items-center gap-3 sm:gap-5">
-
                 {/* Time */}
-                <span className="text-xs text-neutral-500 font-mono hidden md:block">
+                <span className="text-xs text-neutral-500 font-mono hidden md:block tabular-nums">
                     {time}
                 </span>
 
                 {/* Socket Status */}
                 <div className="flex items-center gap-1.5">
-                    <div className={`w-1.5 h-1.5 rounded-full ${
-                        isConnected ? 'bg-white' : 'bg-neutral-600'
-                    }`} />
+                    <div
+                        className={`w-1.5 h-1.5 rounded-full transition-colors ${
+                            isConnected ? 'bg-emerald-500' : 'bg-neutral-600'
+                        }`}
+                    />
                     <span className="text-xs text-neutral-500 hidden md:block">
                         {isConnected ? 'Live' : 'Offline'}
                     </span>
                 </div>
 
                 {/* Notifications */}
-                <div className="relative">
+                <div className="relative" ref={notifRef}>
                     <button
                         onClick={() => setShowNotifications(!showNotifications)}
                         className="relative w-8 h-8 flex items-center justify-center text-neutral-500 hover:text-white transition-colors"
+                        aria-label="Notifications"
                     >
                         <Bell className="w-4 h-4" />
                         {notifications.length > 0 && (
@@ -135,9 +150,9 @@ export default function Header({ onMenuClick }) {
                     </button>
 
                     {showNotifications && (
-                        <div className="absolute right-0 top-10 w-72 sm:w-80 bg-black border border-neutral-800 shadow-xl z-50">
+                        <div className="absolute right-0 top-12 w-72 sm:w-80 bg-neutral-950 border border-neutral-800 rounded-lg shadow-2xl z-50 overflow-hidden">
                             <div className="px-4 py-3 border-b border-neutral-800 flex items-center justify-between">
-                                <p className="text-xs font-medium text-white tracking-widest uppercase">
+                                <p className="text-xs font-medium text-white">
                                     Notifications
                                 </p>
                                 {notifications.length > 0 && (
@@ -151,6 +166,7 @@ export default function Header({ onMenuClick }) {
                             </div>
                             {notifications.length === 0 ? (
                                 <div className="px-4 py-8 text-center">
+                                    <Bell className="w-8 h-8 text-neutral-700 mx-auto mb-2" />
                                     <p className="text-xs text-neutral-500">
                                         No new notifications
                                     </p>
@@ -160,7 +176,7 @@ export default function Header({ onMenuClick }) {
                                     {notifications.map((notif, i) => (
                                         <div
                                             key={i}
-                                            className="px-4 py-3 border-b border-neutral-800 hover:bg-neutral-900 transition-colors"
+                                            className="px-4 py-3 border-b border-neutral-800/50 hover:bg-neutral-900 transition-colors"
                                         >
                                             <p className="text-sm text-white">
                                                 {notif.message}
@@ -176,9 +192,12 @@ export default function Header({ onMenuClick }) {
                     )}
                 </div>
 
-                {/* User Avatar + Name */}
+                {/* Divider */}
+                <div className="w-px h-6 bg-neutral-800 hidden sm:block" />
+
+                {/* User */}
                 <div className="flex items-center gap-2 sm:gap-3">
-                    <div className="relative w-8 h-8 rounded-sm overflow-hidden bg-white shrink-0">
+                    <div className="relative w-8 h-8 rounded-full overflow-hidden bg-neutral-800 shrink-0">
                         {avatarUrl ? (
                             <Image
                                 src={avatarUrl}
@@ -188,18 +207,19 @@ export default function Header({ onMenuClick }) {
                             />
                         ) : (
                             <div className="w-full h-full flex items-center justify-center">
-                                <span className="text-black text-xs font-medium">
-                                    {user?.firstName?.[0]}{user?.lastName?.[0]}
+                                <span className="text-neutral-400 text-xs font-medium">
+                                    {user?.firstName?.[0]}
+                                    {user?.lastName?.[0]}
                                 </span>
                             </div>
                         )}
                     </div>
                     <div className="hidden md:block">
-                        <p className="text-xs font-medium text-white">
+                        <p className="text-xs font-medium text-white leading-none">
                             {user?.firstName} {user?.lastName}
                         </p>
-                        <p className="text-xs text-neutral-500">
-                            Administrator
+                        <p className="text-[11px] text-neutral-500 mt-0.5">
+                            Admin
                         </p>
                     </div>
                 </div>

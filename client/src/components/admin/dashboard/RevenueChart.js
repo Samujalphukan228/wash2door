@@ -1,4 +1,4 @@
-// RevenueChart.jsx
+// RevenueChart.jsx - Today's Focus, Clean Design
 'use client';
 
 import { useState } from 'react';
@@ -12,10 +12,14 @@ import {
     CartesianGrid,
     Cell
 } from 'recharts';
-import { TrendingUp, ArrowUpRight, BarChart3 } from 'lucide-react';
+import { TrendingUp, ArrowUpRight, BarChart3, Calendar } from 'lucide-react';
 
 const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
+        const bookings = payload[0]?.value || 0;
+        const revenue = payload[1]?.value || payload[0]?.payload?.revenue || 0;
+        const avgPerBooking = bookings > 0 ? Math.round(revenue / bookings) : 0;
+
         return (
             <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 shadow-2xl backdrop-blur-sm">
                 <p className="text-sm font-semibold text-white mb-3 capitalize">
@@ -28,7 +32,7 @@ const CustomTooltip = ({ active, payload, label }) => {
                             <span className="text-xs text-zinc-400">Bookings</span>
                         </div>
                         <span className="text-sm font-bold text-white tabular-nums">
-                            {payload[0].value}
+                            {bookings}
                         </span>
                     </div>
                     <div className="flex items-center justify-between gap-6">
@@ -37,7 +41,7 @@ const CustomTooltip = ({ active, payload, label }) => {
                             <span className="text-xs text-zinc-400">Revenue</span>
                         </div>
                         <span className="text-sm font-bold text-white tabular-nums">
-                            ₹{payload[1]?.value?.toLocaleString('en-IN')}
+                            ₹{revenue.toLocaleString('en-IN')}
                         </span>
                     </div>
                 </div>
@@ -45,7 +49,7 @@ const CustomTooltip = ({ active, payload, label }) => {
                     <div className="flex items-center justify-between text-xs">
                         <span className="text-zinc-500">Avg per booking</span>
                         <span className="text-white font-semibold">
-                            ₹{Math.round(payload[1]?.value / payload[0].value).toLocaleString('en-IN')}
+                            ₹{avgPerBooking.toLocaleString('en-IN')}
                         </span>
                     </div>
                 </div>
@@ -56,7 +60,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 export default function RevenueChart({ data, loading }) {
-    const [viewMode, setViewMode] = useState('bookings'); // 'bookings' or 'revenue'
+    const [viewMode, setViewMode] = useState('bookings');
 
     const chartData = data?.map((item) => ({
         name: item._id,
@@ -65,40 +69,49 @@ export default function RevenueChart({ data, loading }) {
         avgPerBooking: item.count > 0 ? Math.round(item.revenue / item.count) : 0
     })) || [];
 
-    // Calculate stats
+    // Today's stats
     const totalBookings = chartData.reduce((sum, item) => sum + item.bookings, 0);
     const totalRevenue = chartData.reduce((sum, item) => sum + item.revenue, 0);
     const avgRevenue = totalBookings > 0 ? Math.round(totalRevenue / totalBookings) : 0;
-    const topCategory = chartData.length > 0 ? chartData[0] : null;
+    const sortedData = [...chartData].sort((a, b) => b.revenue - a.revenue);
+    const topCategory = sortedData.length > 0 ? sortedData[0] : null;
 
-    // For gradient effect on bars
-    const maxValue = viewMode === 'bookings' 
-        ? Math.max(...chartData.map(d => d.bookings), 0)
-        : Math.max(...chartData.map(d => d.revenue), 0);
+    const maxValue = viewMode === 'bookings'
+        ? Math.max(...chartData.map(d => d.bookings), 1)
+        : Math.max(...chartData.map(d => d.revenue), 1);
+
+    const todayFormatted = new Date().toLocaleDateString('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric'
+    });
 
     return (
         <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 overflow-hidden">
-            {/* Header - Mobile Optimized */}
+            {/* Header */}
             <div className="p-4 sm:p-5 border-b border-zinc-800">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
                     <div className="flex-1">
-                        <h3 className="text-base sm:text-sm font-semibold text-white mb-1">
-                            Bookings Overview
-                        </h3>
+                        <div className="flex items-center gap-2 mb-1">
+                            <Calendar className="w-4 h-4 text-zinc-400" />
+                            <h3 className="text-base sm:text-sm font-semibold text-white">
+                                Today's Performance
+                            </h3>
+                        </div>
                         <p className="text-xs text-zinc-500">
-                            Category-wise performance metrics
+                            Live metrics for {todayFormatted}
                         </p>
                     </div>
-                    
-                    {/* View Toggle - Mobile Friendly */}
+
+                    {/* View Toggle */}
                     {!loading && chartData.length > 0 && (
                         <div className="inline-flex items-center bg-zinc-800/50 rounded-lg p-0.5 self-start">
                             <button
                                 onClick={() => setViewMode('bookings')}
                                 className={`
                                     px-3 py-1.5 text-xs font-medium rounded-md transition-all
-                                    ${viewMode === 'bookings' 
-                                        ? 'bg-white text-black' 
+                                    ${viewMode === 'bookings'
+                                        ? 'bg-white text-black'
                                         : 'text-zinc-400 hover:text-white'
                                     }
                                 `}
@@ -109,8 +122,8 @@ export default function RevenueChart({ data, loading }) {
                                 onClick={() => setViewMode('revenue')}
                                 className={`
                                     px-3 py-1.5 text-xs font-medium rounded-md transition-all
-                                    ${viewMode === 'revenue' 
-                                        ? 'bg-white text-black' 
+                                    ${viewMode === 'revenue'
+                                        ? 'bg-white text-black'
                                         : 'text-zinc-400 hover:text-white'
                                     }
                                 `}
@@ -121,17 +134,17 @@ export default function RevenueChart({ data, loading }) {
                     )}
                 </div>
 
-                {/* Quick Stats - Mobile Cards */}
+                {/* Quick Stats */}
                 {!loading && chartData.length > 0 && (
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
                         <div className="bg-zinc-800/30 rounded-lg p-3">
-                            <p className="text-[10px] sm:text-xs text-zinc-500 mb-1">Total Bookings</p>
+                            <p className="text-[10px] sm:text-xs text-zinc-500 mb-1">Today's Bookings</p>
                             <p className="text-lg sm:text-xl font-bold text-white tabular-nums">
                                 {totalBookings}
                             </p>
                         </div>
                         <div className="bg-zinc-800/30 rounded-lg p-3">
-                            <p className="text-[10px] sm:text-xs text-zinc-500 mb-1">Total Revenue</p>
+                            <p className="text-[10px] sm:text-xs text-zinc-500 mb-1">Today's Revenue</p>
                             <p className="text-lg sm:text-xl font-bold text-white tabular-nums">
                                 ₹{(totalRevenue / 1000).toFixed(1)}k
                             </p>
@@ -150,7 +163,6 @@ export default function RevenueChart({ data, loading }) {
             <div className="p-3 sm:p-5">
                 {loading ? (
                     <div className="space-y-3">
-                        {/* Loading Skeleton */}
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                             {[...Array(3)].map((_, i) => (
                                 <div key={i} className="h-16 bg-zinc-800/30 rounded animate-pulse" />
@@ -168,41 +180,37 @@ export default function RevenueChart({ data, loading }) {
                             <BarChart3 className="w-8 h-8 sm:w-10 sm:h-10 text-zinc-600" />
                         </div>
                         <p className="text-sm sm:text-base text-zinc-400 font-medium mb-1">
-                            No data available
+                            No bookings today
                         </p>
-                        <p className="text-xs text-zinc-600 text-center max-w-[200px]">
-                            Chart will appear when bookings are made across categories
+                        <p className="text-xs text-zinc-600 text-center max-w-[220px]">
+                            Today's data will appear here as bookings come in
                         </p>
                     </div>
                 ) : (
                     <>
-                        {/* Chart - Super Mobile Friendly */}
+                        {/* Chart */}
                         <div className="w-full -mx-3 sm:mx-0 mb-4">
                             <div className="overflow-x-auto px-3 sm:px-0">
                                 <div className="min-w-[400px] sm:min-w-0">
                                     <ResponsiveContainer width="100%" height={280}>
-                                        <BarChart 
+                                        <BarChart
                                             data={chartData}
                                             margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
                                             barCategoryGap="15%"
                                         >
-                                            <CartesianGrid 
-                                                strokeDasharray="3 3" 
-                                                stroke="#27272a" 
+                                            <CartesianGrid
+                                                strokeDasharray="3 3"
+                                                stroke="#27272a"
                                                 vertical={false}
                                                 strokeOpacity={0.3}
                                             />
                                             <XAxis
                                                 dataKey="name"
-                                                tick={{ 
-                                                    fontSize: 11, 
-                                                    fill: '#71717a',
-                                                }}
+                                                tick={{ fontSize: 11, fill: '#71717a' }}
                                                 axisLine={{ stroke: '#27272a' }}
                                                 tickLine={false}
                                                 tickFormatter={(val) => {
-                                                    // Mobile: First 3 chars, Desktop: Full
-                                                    if (window.innerWidth < 640) {
+                                                    if (typeof window !== 'undefined' && window.innerWidth < 640) {
                                                         return val.substring(0, 3).toUpperCase();
                                                     }
                                                     return val.charAt(0).toUpperCase() + val.slice(1);
@@ -210,10 +218,7 @@ export default function RevenueChart({ data, loading }) {
                                                 height={35}
                                             />
                                             <YAxis
-                                                tick={{ 
-                                                    fontSize: 11, 
-                                                    fill: '#71717a',
-                                                }}
+                                                tick={{ fontSize: 11, fill: '#71717a' }}
                                                 axisLine={false}
                                                 tickLine={false}
                                                 width={45}
@@ -224,24 +229,24 @@ export default function RevenueChart({ data, loading }) {
                                                     return val;
                                                 }}
                                             />
-                                            <Tooltip 
-                                                content={<CustomTooltip />} 
-                                                cursor={{ 
+                                            <Tooltip
+                                                content={<CustomTooltip />}
+                                                cursor={{
                                                     fill: '#18181b',
                                                     opacity: 0.15,
                                                     radius: 6
-                                                }} 
+                                                }}
                                             />
-                                            
+
                                             {viewMode === 'bookings' ? (
-                                                <Bar 
-                                                    dataKey="bookings" 
+                                                <Bar
+                                                    dataKey="bookings"
                                                     radius={[6, 6, 0, 0]}
                                                     maxBarSize={60}
                                                     animationDuration={600}
                                                 >
                                                     {chartData.map((entry, index) => (
-                                                        <Cell 
+                                                        <Cell
                                                             key={`cell-${index}`}
                                                             fill="#ffffff"
                                                             fillOpacity={0.7 + (entry.bookings / maxValue) * 0.3}
@@ -249,14 +254,14 @@ export default function RevenueChart({ data, loading }) {
                                                     ))}
                                                 </Bar>
                                             ) : (
-                                                <Bar 
-                                                    dataKey="revenue" 
+                                                <Bar
+                                                    dataKey="revenue"
                                                     radius={[6, 6, 0, 0]}
                                                     maxBarSize={60}
                                                     animationDuration={600}
                                                 >
                                                     {chartData.map((entry, index) => (
-                                                        <Cell 
+                                                        <Cell
                                                             key={`cell-${index}`}
                                                             fill="#ffffff"
                                                             fillOpacity={0.5 + (entry.revenue / maxValue) * 0.5}
@@ -270,7 +275,7 @@ export default function RevenueChart({ data, loading }) {
                             </div>
                         </div>
 
-                        {/* Legend - Mobile Optimized */}
+                        {/* Legend */}
                         <div className="flex flex-wrap items-center justify-center gap-4 pb-4 mb-4 border-b border-zinc-800">
                             <div className="flex items-center gap-2">
                                 <div className="w-3 h-3 rounded-sm bg-white" />
@@ -282,12 +287,12 @@ export default function RevenueChart({ data, loading }) {
                             </div>
                         </div>
 
-                        {/* Top Category Card - Mobile First */}
+                        {/* Top Category Today */}
                         {topCategory && (
                             <div className="bg-zinc-800/30 rounded-lg p-4 mb-4">
                                 <div className="flex items-start justify-between mb-3">
                                     <div>
-                                        <p className="text-xs text-zinc-500 mb-1">Top Performer</p>
+                                        <p className="text-xs text-zinc-500 mb-1">Top Category Today</p>
                                         <p className="text-base sm:text-lg font-semibold text-white capitalize">
                                             {topCategory.name}
                                         </p>
@@ -319,17 +324,21 @@ export default function RevenueChart({ data, loading }) {
                             </div>
                         )}
 
-                        {/* Category List - Mobile Cards */}
+                        {/* Category List */}
                         <div className="space-y-2">
                             <p className="text-xs font-medium text-zinc-500 mb-3">
-                                All Categories
+                                All Categories — Today
                             </p>
-                            {chartData.map((category, index) => {
-                                const bookingPercent = Math.round((category.bookings / totalBookings) * 100);
-                                const revenuePercent = Math.round((category.revenue / totalRevenue) * 100);
-                                
+                            {sortedData.map((category, index) => {
+                                const bookingPercent = totalBookings > 0
+                                    ? Math.round((category.bookings / totalBookings) * 100)
+                                    : 0;
+                                const revenuePercent = totalRevenue > 0
+                                    ? Math.round((category.revenue / totalRevenue) * 100)
+                                    : 0;
+
                                 return (
-                                    <div 
+                                    <div
                                         key={category.name}
                                         className="bg-zinc-800/20 hover:bg-zinc-800/40 rounded-lg p-3 transition-colors"
                                     >
@@ -344,7 +353,7 @@ export default function RevenueChart({ data, loading }) {
                                             </div>
                                             <ArrowUpRight className="w-3.5 h-3.5 text-zinc-600" />
                                         </div>
-                                        
+
                                         <div className="grid grid-cols-2 gap-3">
                                             <div>
                                                 <div className="flex items-center justify-between mb-1">
@@ -352,7 +361,7 @@ export default function RevenueChart({ data, loading }) {
                                                     <span className="text-xs text-zinc-600">{bookingPercent}%</span>
                                                 </div>
                                                 <div className="h-1 bg-zinc-800 rounded-full overflow-hidden">
-                                                    <div 
+                                                    <div
                                                         className="h-full bg-white rounded-full transition-all duration-500"
                                                         style={{ width: `${bookingPercent}%` }}
                                                     />
@@ -361,14 +370,14 @@ export default function RevenueChart({ data, loading }) {
                                                     {category.bookings}
                                                 </p>
                                             </div>
-                                            
+
                                             <div>
                                                 <div className="flex items-center justify-between mb-1">
                                                     <span className="text-xs text-zinc-500">Revenue</span>
                                                     <span className="text-xs text-zinc-600">{revenuePercent}%</span>
                                                 </div>
                                                 <div className="h-1 bg-zinc-800 rounded-full overflow-hidden">
-                                                    <div 
+                                                    <div
                                                         className="h-full bg-zinc-500 rounded-full transition-all duration-500"
                                                         style={{ width: `${revenuePercent}%` }}
                                                     />
@@ -383,7 +392,7 @@ export default function RevenueChart({ data, loading }) {
                             })}
                         </div>
 
-                        {/* Insights - Mobile */}
+                        {/* Today's Insight */}
                         <div className="mt-4 pt-4 border-t border-zinc-800">
                             <div className="flex items-start gap-3 bg-zinc-800/20 rounded-lg p-3">
                                 <div className="bg-white/10 rounded-full p-2 mt-0.5">
@@ -392,17 +401,26 @@ export default function RevenueChart({ data, loading }) {
                                     </svg>
                                 </div>
                                 <div className="flex-1">
-                                    <p className="text-xs font-medium text-white mb-1">Insight</p>
+                                    <p className="text-xs font-medium text-white mb-1">Today's Summary</p>
                                     <p className="text-xs text-zinc-400 leading-relaxed">
-                                        {topCategory && (
+                                        {totalBookings > 0 ? (
                                             <>
-                                                <span className="text-white font-medium capitalize">{topCategory.name}</span>
-                                                {' '}leads with {topCategory.bookings} bookings generating{' '}
+                                                You've received{' '}
+                                                <span className="text-white font-medium">{totalBookings} bookings</span>
+                                                {' '}today, generating{' '}
                                                 <span className="text-white font-medium">
-                                                    ₹{topCategory.revenue.toLocaleString('en-IN')}
+                                                    ₹{totalRevenue.toLocaleString('en-IN')}
                                                 </span>
                                                 {' '}in revenue.
+                                                {topCategory && (
+                                                    <>
+                                                        {' '}<span className="text-white font-medium capitalize">{topCategory.name}</span>
+                                                        {' '}leads with {topCategory.bookings} bookings.
+                                                    </>
+                                                )}
                                             </>
+                                        ) : (
+                                            'No bookings received today yet. Data will update as bookings come in.'
                                         )}
                                     </p>
                                 </div>
