@@ -1,5 +1,3 @@
-// src/components/admin/categories/CategoryCard.jsx
-
 'use client';
 
 import { Pencil, Trash2, ToggleLeft, ToggleRight, Layers } from 'lucide-react';
@@ -7,11 +5,11 @@ import Image from 'next/image';
 
 export default function CategoryCard({ category, onEdit, onDelete, onToggleStatus }) {
     return (
-        <div className={`bg-neutral-950 border flex flex-col transition-colors ${
-            category.isActive ? 'border-neutral-800' : 'border-neutral-900 opacity-60'
+        <div className={`rounded-lg border bg-zinc-900/50 flex flex-col overflow-hidden transition-colors ${
+            category.isActive ? 'border-zinc-800 hover:bg-zinc-900/80' : 'border-zinc-800 opacity-60'
         }`}>
             {/* Image */}
-            <div className="relative h-32 bg-neutral-900 overflow-hidden">
+            <div className="relative h-32 bg-zinc-800">
                 {category.image?.url && !category.image.url.includes('default') ? (
                     <Image
                         src={category.image.url}
@@ -24,17 +22,17 @@ export default function CategoryCard({ category, onEdit, onDelete, onToggleStatu
                         {category.icon ? (
                             <span className="text-4xl">{category.icon}</span>
                         ) : (
-                            <Layers className="w-8 h-8 text-neutral-700" />
+                            <Layers className="w-8 h-8 text-zinc-700" />
                         )}
                     </div>
                 )}
 
                 {/* Status Badge */}
                 <div className="absolute top-2 right-2">
-                    <span className={`text-xs px-2 py-0.5 ${
+                    <span className={`text-xs px-2 py-1 rounded ${
                         category.isActive
                             ? 'bg-white text-black'
-                            : 'bg-neutral-800 text-neutral-500'
+                            : 'bg-zinc-800 text-zinc-500'
                     }`}>
                         {category.isActive ? 'Active' : 'Inactive'}
                     </span>
@@ -53,29 +51,29 @@ export default function CategoryCard({ category, onEdit, onDelete, onToggleStatu
                 </div>
 
                 {category.description && (
-                    <p className="text-neutral-500 text-xs leading-relaxed mb-3 line-clamp-2">
+                    <p className="text-zinc-500 text-xs leading-relaxed mb-3 line-clamp-2">
                         {category.description}
                     </p>
                 )}
 
-                <div className="flex items-center gap-2 mt-auto">
-                    <span className="text-xs text-neutral-600">
-                        {category.totalServices || 0} services
+                <div className="mt-auto">
+                    <span className="text-xs text-zinc-600">
+                        {category.totalServices || 0} service{category.totalServices !== 1 ? 's' : ''}
                     </span>
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center gap-1 mt-3 pt-3 border-t border-neutral-800">
+                <div className="flex items-center gap-1 mt-3 pt-3 border-t border-zinc-800">
                     <button
                         onClick={() => onEdit(category)}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs text-neutral-500 hover:text-white hover:bg-neutral-900 transition-colors"
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs text-zinc-500 hover:text-white hover:bg-zinc-800/50 transition-colors"
                     >
                         <Pencil className="w-3.5 h-3.5" />
                         <span>Edit</span>
                     </button>
                     <button
                         onClick={() => onToggleStatus(category)}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs text-neutral-500 hover:text-white hover:bg-neutral-900 transition-colors"
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs text-zinc-500 hover:text-white hover:bg-zinc-800/50 transition-colors"
                     >
                         {category.isActive
                             ? <ToggleRight className="w-3.5 h-3.5" />
@@ -86,7 +84,7 @@ export default function CategoryCard({ category, onEdit, onDelete, onToggleStatu
                     <button
                         onClick={() => onDelete(category._id)}
                         disabled={category.totalServices > 0}
-                        className="flex items-center justify-center py-2 px-2 text-xs text-neutral-700 hover:text-white hover:bg-neutral-900 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        className="p-2 rounded-lg text-xs text-zinc-700 hover:text-white hover:bg-zinc-800/50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                         title={category.totalServices > 0 ? 'Remove services first' : 'Delete'}
                     >
                         <Trash2 className="w-3.5 h-3.5" />

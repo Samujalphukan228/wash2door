@@ -1,13 +1,21 @@
-// src/components/admin/categories/EditCategoryModal.jsx
-
 'use client';
 
 import { useState } from 'react';
-import { X, Loader2, Upload } from 'lucide-react';
+import { X, Loader2, ChevronLeft } from 'lucide-react';
 import categoryService from '@/services/categoryService';
 import toast from 'react-hot-toast';
 
 const EMOJI_OPTIONS = ['🚗', '🛋️', '👟', '🏠', '🧹', '🧺', '🪟', '🛵', '🚿', '✨'];
+
+const inputCls = `
+    w-full bg-white/[0.03] border border-white/[0.08]
+    text-white/80 text-sm placeholder-white/20
+    px-3 py-2.5 rounded-lg
+    focus:outline-none focus:border-white/20 focus:bg-white/[0.05]
+    transition-all duration-150
+`;
+
+const sectionLabel = `text-[10px] text-white/25 uppercase tracking-widest font-medium mb-3 block`;
 
 export default function EditCategoryModal({ category, onClose, onSuccess }) {
     const [loading, setLoading] = useState(false);
@@ -53,187 +61,266 @@ export default function EditCategoryModal({ category, onClose, onSuccess }) {
             }
 
             await categoryService.update(category._id, formData);
-            onSuccess();
+            
+            await new Promise(resolve => setTimeout(resolve, 300));
+            onClose();
+            
+            setTimeout(() => {
+                onSuccess();
+            }, 100);
+
         } catch (error) {
             toast.error(error.response?.data?.message || 'Failed to update category');
-        } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-            <div className="bg-neutral-950 border border-neutral-800 w-full max-w-md max-h-[90vh] flex flex-col">
-                
-                {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-800 shrink-0">
-                    <div>
-                        <p className="text-xs text-neutral-500 tracking-widest uppercase mb-1">
-                            Edit Category
-                        </p>
-                        <h2 className="text-white text-lg font-light truncate max-w-xs">
-                            {category.name}
-                        </h2>
-                    </div>
-                    <button
-                        onClick={onClose}
-                        className="w-8 h-8 flex items-center justify-center text-neutral-500 hover:text-white transition-colors"
-                    >
-                        <X className="w-4 h-4" />
-                    </button>
-                </div>
+        <>
+            {/* Backdrop */}
+            <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden sm:block" onClick={onClose} />
 
-                {/* Content */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-5">
-                    
-                    {/* Name */}
-                    <div>
-                        <label className="block text-xs text-neutral-500 mb-1.5 uppercase tracking-widest">
-                            Category Name *
-                        </label>
-                        <input
-                            type="text"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            placeholder="Category name"
-                            className="w-full bg-black border border-neutral-800 text-white placeholder-neutral-600 text-sm px-3 py-2.5 focus:outline-none focus:border-neutral-600"
-                        />
-                    </div>
+            <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center pointer-events-none">
+                <div className="
+                    pointer-events-auto
+                    w-full sm:max-w-lg sm:max-h-[92vh]
+                    h-full sm:h-auto
+                    flex flex-col
+                    bg-[#0a0a0a]
+                    sm:rounded-xl
+                    border-0 sm:border sm:border-white/[0.08]
+                    shadow-2xl shadow-black/80
+                    overflow-hidden
+                ">
+                    {/* Top gradient line */}
+                    <div className="h-px w-full bg-gradient-to-r from-transparent via-white/15 to-transparent shrink-0" />
 
-                    {/* Active Toggle */}
-                    <div className="flex items-center justify-between p-3 border border-neutral-800">
-                        <div>
-                            <p className="text-sm text-white">Active Status</p>
-                            <p className="text-xs text-neutral-500 mt-0.5">
-                                {isActive ? 'Visible to customers' : 'Hidden from customers'}
+                    {/* Header */}
+                    <div className="shrink-0 flex items-center gap-3 px-4 py-4">
+                        <button
+                            onClick={onClose}
+                            className="
+                                w-8 h-8 rounded-lg flex items-center justify-center
+                                border border-white/[0.06] bg-white/[0.03]
+                                text-white/35 hover:text-white/70
+                                transition-all duration-150
+                            "
+                        >
+                            <ChevronLeft className="w-4 h-4" />
+                        </button>
+
+                        <div className="flex-1 min-w-0">
+                            <p className="text-[10px] text-white/25 uppercase tracking-widest">
+                                Edit Category
+                            </p>
+                            <p className="text-sm font-medium text-white/80 mt-0.5 truncate">
+                                {category.name}
                             </p>
                         </div>
+
                         <button
-                            type="button"
-                            onClick={() => setIsActive(!isActive)}
-                            className={`w-10 h-5 rounded-full transition-colors relative ${
-                                isActive ? 'bg-white' : 'bg-neutral-700'
-                            }`}
+                            onClick={onClose}
+                            className="
+                                w-8 h-8 rounded-lg flex items-center justify-center
+                                border border-white/[0.06] bg-white/[0.03]
+                                text-white/30 hover:text-white/70
+                                transition-all duration-150
+                            "
                         >
-                            <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-black transition-transform ${
-                                isActive ? 'translate-x-5' : 'translate-x-0.5'
-                            }`} />
+                            <X className="w-3.5 h-3.5" />
                         </button>
                     </div>
 
-                    {/* Description */}
-                    <div>
-                        <label className="block text-xs text-neutral-500 mb-1.5 uppercase tracking-widest">
-                            Description
-                        </label>
-                        <textarea
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
-                            placeholder="Brief description..."
-                            rows={3}
-                            className="w-full bg-black border border-neutral-800 text-white placeholder-neutral-600 text-sm px-3 py-2.5 focus:outline-none focus:border-neutral-600 resize-none"
-                        />
-                    </div>
+                    {/* Divider */}
+                    <div className="h-px bg-white/[0.05] shrink-0" />
 
-                    {/* Icon */}
-                    <div>
-                        <label className="block text-xs text-neutral-500 mb-2 uppercase tracking-widest">
-                            Icon (Emoji)
-                        </label>
-                        <div className="flex flex-wrap gap-2 mb-2">
-                            {EMOJI_OPTIONS.map((emoji) => (
-                                <button
-                                    key={emoji}
-                                    type="button"
-                                    onClick={() => setIcon(emoji)}
-                                    className={`w-10 h-10 text-xl border transition-colors ${
-                                        icon === emoji
-                                            ? 'border-white bg-white/10'
-                                            : 'border-neutral-800 hover:border-neutral-600'
-                                    }`}
-                                >
-                                    {emoji}
-                                </button>
-                            ))}
-                        </div>
-                        <input
-                            type="text"
-                            value={icon}
-                            onChange={(e) => setIcon(e.target.value)}
-                            placeholder="Or type custom emoji"
-                            className="w-full bg-black border border-neutral-800 text-white placeholder-neutral-600 text-sm px-3 py-2 focus:outline-none focus:border-neutral-600"
-                        />
-                    </div>
-
-                    {/* Image */}
-                    <div>
-                        <label className="block text-xs text-neutral-500 mb-2 uppercase tracking-widest">
-                            Category Image
-                        </label>
-                        <div className="flex items-start gap-4">
-                            <div className="relative w-24 h-20 bg-neutral-900 overflow-hidden shrink-0">
-                                {imagePreview ? (
-                                    <img src={imagePreview} alt="" className="w-full h-full object-cover" />
-                                ) : existingImage && !existingImage.includes('default') ? (
-                                    <img src={existingImage} alt="" className="w-full h-full object-cover" />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center">
-                                        <span className="text-2xl">{icon || '📁'}</span>
-                                    </div>
-                                )}
-                            </div>
-                            <label className="border border-dashed border-neutral-800 hover:border-neutral-600 px-3 py-2 cursor-pointer transition-colors text-xs text-neutral-500 hover:text-white">
-                                Change Image
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handleImageChange}
-                                    className="hidden"
-                                />
+                    {/* Content */}
+                    <div className="flex-1 overflow-y-auto px-4 py-5 space-y-5">
+                        
+                        {/* Name */}
+                        <div>
+                            <label className={sectionLabel}>
+                                Category Name *
                             </label>
+                            <input
+                                type="text"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                placeholder="Category name"
+                                disabled={loading}
+                                className={inputCls}
+                            />
+                        </div>
+
+                        {/* Active Toggle */}
+                        <div className="p-3.5 rounded-lg border border-white/[0.07] bg-white/[0.02]">
+                            <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                    <p className="text-sm text-white/80 font-medium">Active Status</p>
+                                    <p className="text-[11px] text-white/30 mt-0.5">
+                                        {isActive ? 'Visible to customers' : 'Hidden from customers'}
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsActive(!isActive)}
+                                    disabled={loading}
+                                    className={`
+                                        relative w-12 h-6 rounded-full transition-all duration-200
+                                        ${isActive ? 'bg-white' : 'bg-white/10'}
+                                        disabled:opacity-50
+                                    `}
+                                >
+                                    <div className={`
+                                        absolute top-1 w-4 h-4 rounded-full bg-black transition-transform duration-200
+                                        ${isActive ? 'translate-x-7' : 'translate-x-1'}
+                                    `} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Description */}
+                        <div>
+                            <label className={sectionLabel}>
+                                Description
+                            </label>
+                            <textarea
+                                value={description}
+                                onChange={(e) => setDescription(e.target.value)}
+                                placeholder="Brief description..."
+                                rows={3}
+                                disabled={loading}
+                                className={`${inputCls} resize-none`}
+                            />
+                        </div>
+
+                        {/* Icon */}
+                        <div>
+                            <label className={sectionLabel}>
+                                Icon (Emoji)
+                            </label>
+                            <div className="flex flex-wrap gap-2 mb-2">
+                                {EMOJI_OPTIONS.map((emoji) => (
+                                    <button
+                                        key={emoji}
+                                        type="button"
+                                        onClick={() => setIcon(emoji)}
+                                        disabled={loading}
+                                        className={`
+                                            w-10 h-10 text-xl rounded-lg border transition-all duration-150
+                                            ${icon === emoji
+                                                ? 'border-white/25 bg-white/[0.06]'
+                                                : 'border-white/[0.07] bg-white/[0.02] hover:border-white/[0.12]'
+                                            }
+                                            disabled:opacity-50
+                                        `}
+                                    >
+                                        {emoji}
+                                    </button>
+                                ))}
+                            </div>
+                            <input
+                                type="text"
+                                value={icon}
+                                onChange={(e) => setIcon(e.target.value)}
+                                placeholder="Or type custom emoji"
+                                disabled={loading}
+                                className={inputCls}
+                            />
+                        </div>
+
+                        {/* Image */}
+                        <div>
+                            <label className={sectionLabel}>
+                                Category Image
+                            </label>
+                            <div className="flex items-start gap-3">
+                                <div className="relative w-24 h-20 bg-white/[0.03] rounded-lg overflow-hidden shrink-0 border border-white/[0.05]">
+                                    {imagePreview ? (
+                                        <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                                    ) : existingImage && !existingImage.includes('default') ? (
+                                        <img src={existingImage} alt="Current" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center">
+                                            <span className="text-2xl">{icon || '📁'}</span>
+                                        </div>
+                                    )}
+                                </div>
+                                <label className="px-3 py-2 rounded-lg border border-dashed border-white/[0.07] hover:border-white/[0.12] cursor-pointer transition-all duration-150 text-xs text-white/40 hover:text-white/70 bg-white/[0.02]">
+                                    Change Image
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleImageChange}
+                                        disabled={loading}
+                                        className="hidden"
+                                    />
+                                </label>
+                            </div>
+                        </div>
+
+                        {/* Display Order */}
+                        <div>
+                            <label className={sectionLabel}>
+                                Display Order
+                            </label>
+                            <input
+                                type="number"
+                                value={displayOrder}
+                                onChange={(e) => setDisplayOrder(Number(e.target.value))}
+                                disabled={loading}
+                                className={inputCls}
+                            />
+                            <p className="text-[11px] text-white/20 mt-1.5">
+                                Lower numbers appear first
+                            </p>
                         </div>
                     </div>
 
-                    {/* Display Order */}
-                    <div>
-                        <label className="block text-xs text-neutral-500 mb-1.5 uppercase tracking-widest">
-                            Display Order
-                        </label>
-                        <input
-                            type="number"
-                            value={displayOrder}
-                            onChange={(e) => setDisplayOrder(Number(e.target.value))}
-                            className="w-full bg-black border border-neutral-800 text-white text-sm px-3 py-2.5 focus:outline-none focus:border-neutral-600"
-                        />
+                    {/* Footer */}
+                    <div className="shrink-0 h-px bg-white/[0.05]" />
+                    <div className="shrink-0 px-4 py-4 flex gap-2">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            disabled={loading}
+                            className="
+                                hidden sm:flex items-center px-4 py-2.5 rounded-lg
+                                border border-white/[0.08] bg-white/[0.03]
+                                text-xs text-white/40 hover:text-white/70
+                                hover:border-white/[0.14] hover:bg-white/[0.05]
+                                transition-all duration-150
+                                disabled:opacity-50 disabled:cursor-not-allowed
+                            "
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleSubmit}
+                            disabled={loading || !name.trim()}
+                            className="
+                                flex-1 flex items-center justify-center gap-2
+                                py-2.5 rounded-lg
+                                bg-white text-black text-sm font-medium
+                                hover:bg-white/90 active:bg-white/80
+                                disabled:bg-white/10 disabled:text-white/20 disabled:cursor-not-allowed
+                                shadow-lg shadow-white/10
+                                transition-all duration-150
+                            "
+                        >
+                            {loading ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    Saving…
+                                </>
+                            ) : (
+                                'Save Changes'
+                            )}
+                        </button>
                     </div>
-                </div>
-
-                {/* Footer */}
-                <div className="px-6 py-4 border-t border-neutral-800 flex items-center gap-3 shrink-0">
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="border border-neutral-800 text-neutral-400 hover:text-white text-xs tracking-widest uppercase px-4 py-3 transition-colors"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="button"
-                        onClick={handleSubmit}
-                        disabled={loading || !name.trim()}
-                        className="flex-1 bg-white hover:bg-neutral-200 disabled:bg-neutral-800 disabled:text-neutral-600 disabled:cursor-not-allowed text-black text-xs tracking-widest uppercase py-3 transition-colors flex items-center justify-center gap-2"
-                    >
-                        {loading ? (
-                            <>
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                Saving...
-                            </>
-                        ) : (
-                            'Save Changes'
-                        )}
-                    </button>
                 </div>
             </div>
-        </div>
+        </>
     );
 }
