@@ -41,16 +41,29 @@ export default function UpdateStatusModal({ booking, onClose, onSuccess }) {
         try {
             setLoading(true);
             await adminService.updateBookingStatus(booking._id, selectedStatus, reason);
+            
+            // Success toast
             toast.success(
                 selectedStatus === 'completed'
                     ? 'Booking completed! Revenue added.'
                     : `Booking ${selectedStatus}`
             );
-            onSuccess?.();
+
+            // Wait a bit for the API to process
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            // Close modal first
+            onClose();
+
+            // Then trigger refresh - this ensures parent component can refresh
+            setTimeout(() => {
+                if (onSuccess) onSuccess();
+            }, 100);
+
         } catch (error) {
+            console.error('Update status error:', error);
             toast.error(error.response?.data?.message || 'Failed to update');
-        } finally {
-            setLoading(false);
+            setLoading(false); // Only reset loading on error
         }
     };
 
@@ -60,14 +73,14 @@ export default function UpdateStatusModal({ booking, onClose, onSuccess }) {
                 
                 {/* Header */}
                 <div className="flex items-center gap-3 px-4 py-4 border-b border-zinc-800">
-                    <button onClick={onClose} className="sm:hidden">
+                    <button onClick={onClose} className="sm:hidden" disabled={loading}>
                         <ChevronLeft className="w-5 h-5 text-zinc-400" />
                     </button>
                     <div className="flex-1">
                         <p className="text-xs text-zinc-500">Update Status</p>
                         <p className="text-sm text-white font-mono">{booking.bookingCode}</p>
                     </div>
-                    <button onClick={onClose} className="hidden sm:block">
+                    <button onClick={onClose} className="hidden sm:block" disabled={loading}>
                         <X className="w-4 h-4 text-zinc-400 hover:text-white" />
                     </button>
                 </div>
@@ -91,7 +104,8 @@ export default function UpdateStatusModal({ booking, onClose, onSuccess }) {
                                     <button
                                         key={status}
                                         onClick={() => setSelectedStatus(status)}
-                                        className={`w-full flex items-center justify-between p-3 rounded-lg border text-left transition-colors ${
+                                        disabled={loading}
+                                        className={`w-full flex items-center justify-between p-3 rounded-lg border text-left transition-colors disabled:opacity-50 ${
                                             selectedStatus === status
                                                 ? 'border-zinc-600 bg-zinc-800/50'
                                                 : 'border-zinc-800 hover:border-zinc-700'
@@ -126,7 +140,8 @@ export default function UpdateStatusModal({ booking, onClose, onSuccess }) {
                                 onChange={(e) => setReason(e.target.value)}
                                 placeholder="Why is this being cancelled?"
                                 rows={3}
-                                className="w-full bg-zinc-800 border border-zinc-700 text-white placeholder-zinc-600 text-sm px-3 py-3 rounded-lg focus:outline-none focus:border-zinc-600 resize-none"
+                                disabled={loading}
+                                className="w-full bg-zinc-800 border border-zinc-700 text-white placeholder-zinc-600 text-sm px-3 py-3 rounded-lg focus:outline-none focus:border-zinc-600 resize-none disabled:opacity-50"
                             />
                         </div>
                     )}
@@ -137,7 +152,8 @@ export default function UpdateStatusModal({ booking, onClose, onSuccess }) {
                     <div className="flex gap-2">
                         <button
                             onClick={onClose}
-                            className="flex-1 sm:flex-none px-4 py-2.5 rounded-lg border border-zinc-800 text-zinc-400 text-xs font-medium hover:text-white hover:border-zinc-700 transition-colors"
+                            disabled={loading}
+                            className="flex-1 sm:flex-none px-4 py-2.5 rounded-lg border border-zinc-800 text-zinc-400 text-xs font-medium hover:text-white hover:border-zinc-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             Cancel
                         </button>
