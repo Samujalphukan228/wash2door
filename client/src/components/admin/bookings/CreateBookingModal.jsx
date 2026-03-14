@@ -32,9 +32,51 @@ const inputCls = `
 
 const sectionLabel = `text-[10px] text-white/25 uppercase tracking-widest font-medium mb-3 block`;
 
+/**
+ * Check if a time slot has already passed for today.
+ * Compares the slot's START time against the current time.
+ * e.g. "14:00-15:00" → if it's currently 14:01, this slot is past.
+ */
+function isSlotPassed(slot, selectedDate) {
+    const today = new Date();
+    const selected = new Date(selectedDate + 'T00:00:00');
+
+    // If selected date is in the future, no slots are passed
+    if (
+        selected.getFullYear() > today.getFullYear() ||
+        selected.getMonth() > today.getMonth() ||
+        selected.getDate() > today.getDate()
+    ) {
+        return false;
+    }
+
+    // If selected date is in the past (shouldn't happen due to min attr, but safety)
+    if (
+        selected.getFullYear() < today.getFullYear() ||
+        selected.getMonth() < today.getMonth() ||
+        selected.getDate() < today.getDate()
+    ) {
+        return true;
+    }
+
+    // Selected date IS today — compare slot start time with current time
+    const [startTime] = slot.split('-'); // "14:00"
+    const [startHour, startMin] = startTime.split(':').map(Number);
+
+    const currentHour = today.getHours();
+    const currentMin = today.getMinutes();
+
+    // Slot is passed if current time >= slot start time
+    if (currentHour > startHour) return true;
+    if (currentHour === startHour && currentMin >= startMin) return true;
+
+    return false;
+}
+
 export default function CreateBookingModal({ onClose, onSuccess }) {
     const [step, setStep]       = useState(1);
     const [loading, setLoading] = useState(false);
+    const [currentTime, setCurrentTime] = useState(new Date());
 
     /* Step 1 */
     const [bookingType,      setBookingType]      = useState('walkin');
@@ -62,6 +104,14 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
     });
     const [specialNotes,   setSpecialNotes]   = useState('');
     const [paymentMethod,  setPaymentMethod]  = useState('cash');
+
+    // Refresh current time every minute so slots auto-disable as time passes
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setCurrentTime(new Date());
+        }, 60000); // every 60 seconds
+        return () => clearInterval(interval);
+    }, []);
 
     /* Load services */
     useEffect(() => {
@@ -105,6 +155,13 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
             finally { setAvailabilityLoading(false); }
         })();
     }, [selectedService, bookingDate]);
+
+    // Clear selected time slot if it becomes passed (e.g. user sits on the page)
+    useEffect(() => {
+        if (timeSlot && bookingDate && isSlotPassed(timeSlot, bookingDate)) {
+            setTimeSlot('');
+        }
+    }, [currentTime, timeSlot, bookingDate]);
 
     const isSlotAvailable = (slot) => {
         const found = availability.find(a => a.slot === slot);
@@ -198,7 +255,6 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
 
                     {/* ── Step Indicators ── */}
                     <div className="shrink-0 px-4 pb-4">
-                        {/* Progress track */}
                         <div className="relative flex items-center gap-1 mb-3">
                             {STEPS.map((s, i) => (
                                 <div
@@ -210,7 +266,6 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                             ))}
                         </div>
 
-                        {/* Step dots */}
                         <div className="flex items-center justify-between">
                             {STEPS.map((s, i) => (
                                 <div key={s.label} className="flex items-center gap-1.5">
@@ -321,7 +376,6 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                                             )}
                                         </div>
 
-                                        {/* Results */}
                                         {customers.length > 0 && !selectedCustomer && (
                                             <div className="rounded-lg border border-white/[0.07] bg-white/[0.02] overflow-hidden divide-y divide-white/[0.04]">
                                                 {customers.map((c) => (
@@ -341,7 +395,6 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                                             </div>
                                         )}
 
-                                        {/* Selected */}
                                         {selectedCustomer && (
                                             <div className="flex items-center justify-between px-3.5 py-3 rounded-lg border border-white/[0.12] bg-white/[0.05]">
                                                 <div>
@@ -477,37 +530,52 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                                     <div>
                                         <div className="flex items-center justify-between mb-3">
                                             <span className={`${sectionLabel} mb-0`}>Time Slot</span>
-                                            {availabilityLoading && (
-                                                <div className="flex items-center gap-1.5">
-                                                    <Loader2 className="w-3 h-3 text-white/25 animate-spin" />
-                                                    <span className="text-[10px] text-white/25">Checking…</span>
-                                                </div>
-                                            )}
+                                            <div className="flex items-center gap-3">
+                                                {/* Show current time hint when today is selected */}
+                                                {bookingDate === new Date().toISOString().split('T')[0] && (
+                                                    <span className="text-[10px] text-white/20 font-mono">
+                                                        Now {currentTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false })}
+                                                    </span>
+                                                )}
+                                                {availabilityLoading && (
+                                                    <div className="flex items-center gap-1.5">
+                                                        <Loader2 className="w-3 h-3 text-white/25 animate-spin" />
+                                                        <span className="text-[10px] text-white/25">Checking…</span>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-2">
                                             {TIME_SLOTS.map((slot) => {
                                                 const available = isSlotAvailable(slot);
+                                                const passed    = isSlotPassed(slot, bookingDate);
+                                                const disabled  = !available || passed;
                                                 const selected  = timeSlot === slot;
 
                                                 return (
                                                     <button
                                                         key={slot}
-                                                        onClick={() => available && setTimeSlot(slot)}
-                                                        disabled={!available}
+                                                        onClick={() => !disabled && setTimeSlot(slot)}
+                                                        disabled={disabled}
                                                         className={`
                                                             relative p-3 rounded-lg border text-xs font-mono
                                                             transition-all duration-150
                                                             ${selected
                                                                 ? 'border-white/30 bg-white/[0.08] text-white'
-                                                                : !available
+                                                                : disabled
                                                                 ? 'border-white/[0.04] bg-white/[0.01] text-white/15 cursor-not-allowed'
                                                                 : 'border-white/[0.07] bg-white/[0.02] text-white/50 hover:border-white/[0.14] hover:text-white/70'
                                                             }
                                                         `}
                                                     >
                                                         {slot}
-                                                        {!available && (
+                                                        {passed && (
+                                                            <span className="block text-[10px] text-white/15 mt-0.5 font-sans">
+                                                                Passed
+                                                            </span>
+                                                        )}
+                                                        {!passed && !available && (
                                                             <span className="block text-[10px] text-white/15 mt-0.5 font-sans">
                                                                 Booked
                                                             </span>
