@@ -1,10 +1,8 @@
-// app/services/ServicesContent.jsx
 "use client"
 
 import { useEffect, useRef, useState, memo, useCallback } from "react"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter } from "next/navigation"
 import {
-  ArrowUpRight,
   ArrowRight,
   CheckCircle,
   Clock,
@@ -22,42 +20,102 @@ const ANIMATION_CONFIG = {
   ease: "power4.out",
 }
 
+const PHONE_NUMBER = "6900706456"
+
+// ── GSAP Loader (cached) ──────────────────────────────────
+let cachedGsap = null
+let scrollTriggerLoaded = false
+
+async function loadGsap() {
+  if (!cachedGsap) {
+    const { default: gsap } = await import("gsap")
+    cachedGsap = gsap
+  }
+  return cachedGsap
+}
+
+async function loadGsapWithScrollTrigger() {
+  const gsap = await loadGsap()
+  if (!scrollTriggerLoaded) {
+    const { ScrollTrigger } = await import("gsap/ScrollTrigger")
+    gsap.registerPlugin(ScrollTrigger)
+    scrollTriggerLoaded = true
+  }
+  return gsap
+}
+
+// ── Scrollbar Hide Styles ─────────────────────────────────
+const SCROLLBAR_HIDE_CLASS = "services-hide-scrollbar"
+let scrollbarStyleInjected = false
+
+function injectScrollbarStyles() {
+  if (scrollbarStyleInjected || typeof document === "undefined") return
+  const style = document.createElement("style")
+  style.textContent = `.${SCROLLBAR_HIDE_CLASS}::-webkit-scrollbar { display: none; }`
+  document.head.appendChild(style)
+  scrollbarStyleInjected = true
+}
+
+// ── Visibility helper ─────────────────────────────────────
+function makeFallbackVisible(element) {
+  if (!element) return
+  element.style.opacity = "1"
+  element.style.transform = "none"
+  element.classList.remove("opacity-0")
+}
+
 // ── Custom Hook: Scroll Animation ──────────────────────────
-function useScrollAnimation(ref, config, deps = []) {
+function useScrollAnimation(elementRef, config) {
+  const configRef = useRef(config)
   useEffect(() => {
-    if (!ref.current) return
+    configRef.current = config
+  })
+
+  useEffect(() => {
+    const element = elementRef.current
+    if (!element) return
 
     let ctx
     let observer
+    let fallbackTimer
+    let mounted = true
 
-    const init = async () => {
-      observer = new IntersectionObserver(
-        async (entries) => {
-          if (entries[0].isIntersecting) {
-            observer.disconnect()
+    observer = new IntersectionObserver(
+      async (entries) => {
+        if (entries[0].isIntersecting) {
+          observer.disconnect()
 
-            const { default: gsap } = await import("gsap")
-            const { ScrollTrigger } = await import("gsap/ScrollTrigger")
-            gsap.registerPlugin(ScrollTrigger)
+          fallbackTimer = setTimeout(() => {
+            if (mounted) makeFallbackVisible(element)
+          }, 3000)
+
+          try {
+            const gsap = await loadGsapWithScrollTrigger()
+            if (!mounted) return
+            clearTimeout(fallbackTimer)
 
             ctx = gsap.context(() => {
-              config(gsap, ScrollTrigger)
+              configRef.current(gsap)
             })
+          } catch {
+            clearTimeout(fallbackTimer)
+            if (mounted) makeFallbackVisible(element)
           }
-        },
-        { rootMargin: "50px" }
-      )
+        }
+      },
+      { rootMargin: "50px" }
+    )
 
-      observer.observe(ref.current)
-    }
-
-    init()
+    observer.observe(element)
 
     return () => {
+      mounted = false
+      if (fallbackTimer) clearTimeout(fallbackTimer)
       observer?.disconnect()
       ctx?.revert()
     }
-  }, deps)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 }
 
 // ── Helper Functions ───────────────────────────────────────
@@ -67,6 +125,37 @@ const getImageUrl = (image) => {
   if (typeof image === "object" && image.url) return image.url
   return null
 }
+
+// ── Image with Error Fallback ──────────────────────────────
+const ServiceImage = memo(function ServiceImage({
+  src,
+  alt,
+  fallbackIcon,
+  className = "",
+}) {
+  const [hasError, setHasError] = useState(false)
+
+  if (!src || hasError) {
+    return (
+      <div
+        className={`w-full h-full flex items-center justify-center 
+                    bg-gradient-to-br from-gray-50 to-gray-100 ${className}`}
+      >
+        <span className="text-5xl">{fallbackIcon || "📦"}</span>
+      </div>
+    )
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={`w-full h-full object-cover ${className}`}
+      loading="lazy"
+      onError={() => setHasError(true)}
+    />
+  )
+})
 
 // ── Skeleton Components ────────────────────────────────────
 const SkeletonCard = memo(function SkeletonCard() {
@@ -156,19 +245,17 @@ const CategoryFilter = memo(function CategoryFilter({
   activeCategory,
   onCategoryChange,
 }) {
+  useEffect(() => {
+    injectScrollbarStyles()
+  }, [])
+
   return (
     <div className="-mx-5 px-5 md:mx-0 md:px-0">
       <div
-        className="flex gap-2 md:gap-2.5 overflow-x-auto pb-2 md:pb-0 md:flex-wrap
-                   snap-x snap-mandatory"
+        className={`flex gap-2 md:gap-2.5 overflow-x-auto pb-2 md:pb-0 md:flex-wrap
+                    snap-x snap-mandatory ${SCROLLBAR_HIDE_CLASS}`}
         style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
-        <style jsx>{`
-          div::-webkit-scrollbar {
-            display: none;
-          }
-        `}</style>
-
         <button
           onClick={() => onCategoryChange(null)}
           className={`shrink-0 snap-start tracking-[0.18em] uppercase
@@ -258,6 +345,7 @@ const ServiceVariant = memo(function ServiceVariant({ variant }) {
 const MobileServiceCard = memo(function MobileServiceCard({ service, index }) {
   const cardRef = useRef(null)
   const [showVariants, setShowVariants] = useState(false)
+  const variantsId = `variants-mobile-${service._id}`
 
   const image =
     getImageUrl(service.primaryImage) || getImageUrl(service.images?.[0])
@@ -270,27 +358,23 @@ const MobileServiceCard = memo(function MobileServiceCard({ service, index }) {
 
   const highlights = service.highlights || service.includes || []
 
-  useScrollAnimation(
-    cardRef,
-    (gsap, ScrollTrigger) => {
-      gsap.fromTo(
-        cardRef.current,
-        { opacity: 0, y: 30 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.7,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: cardRef.current,
-            start: "top 90%",
-            once: true,
-          },
-        }
-      )
-    },
-    []
-  )
+  useScrollAnimation(cardRef, (gsap) => {
+    gsap.fromTo(
+      cardRef.current,
+      { opacity: 0, y: 30 },
+      {
+        opacity: 1,
+        y: 0,
+        duration: 0.7,
+        ease: "power3.out",
+        scrollTrigger: {
+          trigger: cardRef.current,
+          start: "top 90%",
+          once: true,
+        },
+      }
+    )
+  })
 
   return (
     <div
@@ -301,18 +385,11 @@ const MobileServiceCard = memo(function MobileServiceCard({ service, index }) {
       {/* Image */}
       <div className="relative">
         <div className="aspect-[16/10] overflow-hidden bg-gray-100">
-          {image ? (
-            <img
-              src={image}
-              alt={service.name}
-              className="w-full h-full object-cover"
-              loading="lazy"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
-              <span className="text-5xl">{categoryIcon || "📦"}</span>
-            </div>
-          )}
+          <ServiceImage
+            src={image}
+            alt={service.name}
+            fallbackIcon={categoryIcon || "📦"}
+          />
         </div>
 
         {/* Badges */}
@@ -360,7 +437,10 @@ const MobileServiceCard = memo(function MobileServiceCard({ service, index }) {
       <div className="p-5">
         {/* Category */}
         <div className="flex items-center gap-2 mb-3">
-          <span className="text-gray-400 tracking-wider uppercase" style={{ fontSize: "10px" }}>
+          <span
+            className="text-gray-400 tracking-wider uppercase"
+            style={{ fontSize: "10px" }}
+          >
             {categoryIcon} {categoryName}
           </span>
         </div>
@@ -409,6 +489,8 @@ const MobileServiceCard = memo(function MobileServiceCard({ service, index }) {
           <div className="mb-4">
             <button
               onClick={() => setShowVariants(!showVariants)}
+              aria-expanded={showVariants}
+              aria-controls={variantsId}
               className="flex items-center justify-between w-full py-3 border-t border-gray-100"
             >
               <span className="text-gray-500" style={{ fontSize: "13px" }}>
@@ -424,14 +506,14 @@ const MobileServiceCard = memo(function MobileServiceCard({ service, index }) {
               />
             </button>
 
+            {/* Collapse with max-height for better browser support */}
             <div
-              className={`grid gap-2 overflow-hidden transition-all duration-300 ease-out ${
-                showVariants
-                  ? "grid-rows-[1fr] opacity-100 mt-2"
-                  : "grid-rows-[0fr] opacity-0"
+              id={variantsId}
+              className={`overflow-hidden transition-all duration-300 ease-out ${
+                showVariants ? "max-h-96 opacity-100 mt-2" : "max-h-0 opacity-0"
               }`}
             >
-              <div className="overflow-hidden space-y-2">
+              <div className="space-y-2">
                 {activeVariants.map((variant) => (
                   <ServiceVariant key={variant._id} variant={variant} />
                 ))}
@@ -442,7 +524,7 @@ const MobileServiceCard = memo(function MobileServiceCard({ service, index }) {
 
         {/* CTA */}
         <a
-          href={`/bookings?service=${service._id}`}
+          href={`/bookings?service=${encodeURIComponent(service._id)}`}
           className="group flex items-center justify-center gap-2 h-12
                      bg-black text-white rounded-xl no-underline w-full
                      active:scale-[0.98] transition-all duration-300"
@@ -482,46 +564,44 @@ const DesktopServiceSection = memo(function DesktopServiceSection({
 
   const highlights = service.highlights || service.includes || []
 
-  useScrollAnimation(
-    sectionRef,
-    (gsap, ScrollTrigger) => {
-      const imageEl = sectionRef.current.querySelector("[data-image]")
-      const contentEl = sectionRef.current.querySelector("[data-content]")
+  useScrollAnimation(sectionRef, (gsap) => {
+    const imageEl = sectionRef.current?.querySelector("[data-image]")
+    const contentEl = sectionRef.current?.querySelector("[data-content]")
 
-      gsap.fromTo(
-        imageEl,
-        { opacity: 0, x: isEven ? -40 : 40 },
-        {
-          opacity: 1,
-          x: 0,
-          duration: 0.9,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: sectionRef.current,
-            start: "top 75%",
-            once: true,
-          },
-        }
-      )
+    if (!imageEl || !contentEl) return
 
-      gsap.fromTo(
-        contentEl,
-        { opacity: 0, x: isEven ? 40 : -40 },
-        {
-          opacity: 1,
-          x: 0,
-          duration: 0.9,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: sectionRef.current,
-            start: "top 75%",
-            once: true,
-          },
-        }
-      )
-    },
-    [isEven]
-  )
+    gsap.fromTo(
+      imageEl,
+      { opacity: 0, x: isEven ? -40 : 40 },
+      {
+        opacity: 1,
+        x: 0,
+        duration: 0.9,
+        ease: "power3.out",
+        scrollTrigger: {
+          trigger: sectionRef.current,
+          start: "top 75%",
+          once: true,
+        },
+      }
+    )
+
+    gsap.fromTo(
+      contentEl,
+      { opacity: 0, x: isEven ? 40 : -40 },
+      {
+        opacity: 1,
+        x: 0,
+        duration: 0.9,
+        ease: "power3.out",
+        scrollTrigger: {
+          trigger: sectionRef.current,
+          start: "top 75%",
+          once: true,
+        },
+      }
+    )
+  })
 
   return (
     <div
@@ -529,29 +609,21 @@ const DesktopServiceSection = memo(function DesktopServiceSection({
       id={service._id}
       className="py-16 lg:py-24 border-b border-gray-100 last:border-0"
     >
-      <div
-        className={`grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center ${
-          isEven ? "" : "direction-rtl"
-        }`}
-        style={{ direction: isEven ? "ltr" : "rtl" }}
-      >
+      {/* Use CSS order for alternating layout instead of RTL hack */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
         {/* Image */}
-        <div data-image className="opacity-0" style={{ direction: "ltr" }}>
+        <div
+          data-image
+          className={`opacity-0 ${isEven ? "lg:order-1" : "lg:order-2"}`}
+        >
           <div className="relative rounded-2xl overflow-hidden">
             <div className="aspect-[4/3] bg-gray-100">
-              {image ? (
-                <img
-                  src={image}
-                  alt={service.name}
-                  className="w-full h-full object-cover transition-transform duration-700
-                             hover:scale-105"
-                  loading="lazy"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <span className="text-7xl">{categoryIcon || "📦"}</span>
-                </div>
-              )}
+              <ServiceImage
+                src={image}
+                alt={service.name}
+                fallbackIcon={categoryIcon || "📦"}
+                className="transition-transform duration-700 hover:scale-105"
+              />
             </div>
 
             {/* Number badge */}
@@ -586,7 +658,10 @@ const DesktopServiceSection = memo(function DesktopServiceSection({
         </div>
 
         {/* Content */}
-        <div data-content className="opacity-0" style={{ direction: "ltr" }}>
+        <div
+          data-content
+          className={`opacity-0 ${isEven ? "lg:order-2" : "lg:order-1"}`}
+        >
           {/* Eyebrow */}
           <div className="flex items-center gap-3 mb-5">
             <span className="w-8 h-px bg-black" aria-hidden="true" />
@@ -668,10 +743,10 @@ const DesktopServiceSection = memo(function DesktopServiceSection({
             </div>
           )}
 
-          {/* CTA */}
+          {/* CTA - Fixed: changed h-13 to h-12 */}
           <a
-            href={`/bookings?service=${service._id}`}
-            className="group inline-flex items-center gap-3 h-13 px-8
+            href={`/bookings?service=${encodeURIComponent(service._id)}`}
+            className="group inline-flex items-center gap-3 h-12 px-8
                        bg-black text-white rounded-full no-underline
                        hover:bg-gray-800 active:scale-[0.97]
                        transition-all duration-300"
@@ -702,38 +777,67 @@ const Hero = memo(function Hero({
   loading,
 }) {
   const heroRef = useRef(null)
+  const hasAnimated = useRef(false)
 
   useEffect(() => {
-    if (loading) return
+    // Only animate once on initial load, not on category change
+    if (loading || hasAnimated.current) return
 
     let ctx
+    let mounted = true
+    let fallbackTimer
 
     const init = async () => {
-      const { default: gsap } = await import("gsap")
+      const currentRef = heroRef.current
+      if (!currentRef) return
 
-      if (!heroRef.current) return
+      // Fallback: show content if GSAP fails
+      fallbackTimer = setTimeout(() => {
+        if (mounted && currentRef) {
+          const elements = currentRef.querySelectorAll("[data-animate]")
+          elements.forEach((el) => makeFallbackVisible(el))
+        }
+      }, 3000)
 
-      ctx = gsap.context(() => {
-        const elements = heroRef.current.querySelectorAll("[data-animate]")
+      try {
+        const gsap = await loadGsap()
+        if (!mounted || !heroRef.current) return
+        clearTimeout(fallbackTimer)
 
-        gsap.fromTo(
-          elements,
-          { opacity: 0, y: 30 },
-          {
-            opacity: 1,
-            y: 0,
-            duration: ANIMATION_CONFIG.duration,
-            stagger: ANIMATION_CONFIG.stagger,
-            ease: ANIMATION_CONFIG.ease,
-          }
-        )
-      })
+        ctx = gsap.context(() => {
+          const elements = heroRef.current.querySelectorAll("[data-animate]")
+
+          gsap.fromTo(
+            elements,
+            { opacity: 0, y: 30 },
+            {
+              opacity: 1,
+              y: 0,
+              duration: ANIMATION_CONFIG.duration,
+              stagger: ANIMATION_CONFIG.stagger,
+              ease: ANIMATION_CONFIG.ease,
+            }
+          )
+        })
+
+        hasAnimated.current = true
+      } catch {
+        clearTimeout(fallbackTimer)
+        if (mounted && heroRef.current) {
+          const elements = heroRef.current.querySelectorAll("[data-animate]")
+          elements.forEach((el) => makeFallbackVisible(el))
+        }
+      }
     }
 
     init()
 
-    return () => ctx?.revert()
-  }, [loading, activeCategory])
+    return () => {
+      mounted = false
+      if (fallbackTimer) clearTimeout(fallbackTimer)
+      ctx?.revert()
+    }
+  }, [loading]) // Removed activeCategory from deps to prevent re-animation
 
   const pageTitle = activeCategoryData
     ? `${activeCategoryData.icon || ""} ${activeCategoryData.name}`
@@ -823,27 +927,23 @@ const Hero = memo(function Hero({
 const BottomCTA = memo(function BottomCTA() {
   const sectionRef = useRef(null)
 
-  useScrollAnimation(
-    sectionRef,
-    (gsap, ScrollTrigger) => {
-      gsap.fromTo(
-        sectionRef.current,
-        { opacity: 0, y: 40 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.8,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: sectionRef.current,
-            start: "top 85%",
-            once: true,
-          },
-        }
-      )
-    },
-    []
-  )
+  useScrollAnimation(sectionRef, (gsap) => {
+    gsap.fromTo(
+      sectionRef.current,
+      { opacity: 0, y: 40 },
+      {
+        opacity: 1,
+        y: 0,
+        duration: 0.8,
+        ease: "power3.out",
+        scrollTrigger: {
+          trigger: sectionRef.current,
+          start: "top 85%",
+          once: true,
+        },
+      }
+    )
+  })
 
   return (
     <section className="w-full bg-black py-16 md:py-24">
@@ -878,11 +978,11 @@ const BottomCTA = memo(function BottomCTA() {
             </h2>
           </div>
 
-          {/* Right */}
+          {/* Right - Fixed: changed h-13 to h-12 */}
           <div className="flex flex-col sm:flex-row gap-3">
             <a
               href="/bookings"
-              className="group inline-flex items-center justify-center gap-3 h-13 px-8
+              className="group inline-flex items-center justify-center gap-3 h-12 px-8
                          bg-white text-black rounded-full no-underline
                          hover:bg-gray-100 active:scale-[0.97]
                          transition-all duration-300"
@@ -900,8 +1000,8 @@ const BottomCTA = memo(function BottomCTA() {
             </a>
 
             <a
-              href="tel:6900706456"
-              className="inline-flex items-center justify-center gap-3 h-13 px-8
+              href={`tel:${PHONE_NUMBER}`}
+              className="inline-flex items-center justify-center gap-3 h-12 px-8
                          border border-white/20 text-white rounded-full no-underline
                          hover:bg-white/5 active:scale-[0.97]
                          transition-all duration-300"
@@ -911,7 +1011,7 @@ const BottomCTA = memo(function BottomCTA() {
                 className="tracking-wider uppercase"
                 style={{ fontSize: "11px" }}
               >
-                6900706456
+                {PHONE_NUMBER}
               </span>
             </a>
           </div>
@@ -924,6 +1024,7 @@ const BottomCTA = memo(function BottomCTA() {
 // ── Main Component ─────────────────────────────────────────
 export default function ServicesContent() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const categoryId = searchParams.get("category")
 
   const [services, setServices] = useState([])
@@ -955,7 +1056,10 @@ export default function ServicesContent() {
           setActiveCategoryData(null)
         }
       } catch (err) {
-        console.error("❌ Fetch failed:", err.message)
+        // Only log in development
+        if (process.env.NODE_ENV === "development") {
+          console.error("Fetch failed:", err.message)
+        }
         setError(true)
       } finally {
         setLoading(false)
@@ -965,15 +1069,20 @@ export default function ServicesContent() {
     fetchData()
   }, [activeCategory])
 
-  // Handle category change
-  const handleCategoryChange = useCallback((catId) => {
-    setActiveCategory(catId)
-    if (catId) {
-      window.history.pushState({}, "", `/services?category=${catId}`)
-    } else {
-      window.history.pushState({}, "", "/services")
-    }
-  }, [])
+  // Handle category change using Next.js router
+  const handleCategoryChange = useCallback(
+    (catId) => {
+      setActiveCategory(catId)
+      if (catId) {
+        router.push(`/services?category=${encodeURIComponent(catId)}`, {
+          scroll: false,
+        })
+      } else {
+        router.push("/services", { scroll: false })
+      }
+    },
+    [router]
+  )
 
   return (
     <main style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
