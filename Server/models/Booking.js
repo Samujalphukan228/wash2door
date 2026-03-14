@@ -1,4 +1,4 @@
-// models/Booking.js - UPDATED with constants import
+// models/Booking.js
 
 import mongoose from 'mongoose';
 import crypto from 'crypto';
@@ -107,6 +107,17 @@ const bookingSchema = new mongoose.Schema({
     },
 
     // ============================================
+    // SLOT LOCK KEY (for global uniqueness)
+    // Used to enforce: only ONE active booking per date+slot
+    // Format: "YYYY-MM-DD|HH:MM-HH:MM"
+    // Set to null when cancelled (so index ignores it)
+    // ============================================
+    slotLockKey: {
+        type: String,
+        default: null
+    },
+
+    // ============================================
     // LOCATION (simplified)
     // ============================================
     location: {
@@ -116,7 +127,7 @@ const bookingSchema = new mongoose.Schema({
     },
 
     // ============================================
-    // NOTES (customer can mention anything here)
+    // NOTES
     // ============================================
     specialNotes: {
         type: String,
@@ -173,15 +184,29 @@ const bookingSchema = new mongoose.Schema({
 });
 
 // ============================================
-// AUTO GENERATE BOOKING CODE
+// AUTO GENERATE BOOKING CODE + SLOT LOCK KEY
 // ============================================
-bookingSchema.pre('save', function(next) {
+bookingSchema.pre('save', function (next) {
+    // Generate booking code
     if (!this.bookingCode) {
         const random = crypto.randomBytes(3).toString('hex').toUpperCase();
         const timestamp = Date.now().toString(36).toUpperCase().slice(-3);
         const prefix = this.bookingType === 'walkin' ? 'WI' : 'BK';
         this.bookingCode = `${prefix}-${timestamp}${random}`;
     }
+
+    // ============================================
+    // SET OR CLEAR slotLockKey based on status
+    // Active booking → set the key (enforces uniqueness)
+    // Cancelled booking → null (releases the slot)
+    // ============================================
+    if (this.status === 'cancelled') {
+        this.slotLockKey = null;
+    } else {
+        const dateStr = new Date(this.bookingDate).toISOString().split('T')[0];
+        this.slotLockKey = `${dateStr}|${this.timeSlot}`;
+    }
+
     next();
 });
 
@@ -197,26 +222,31 @@ bookingSchema.index({ categoryId: 1 });
 bookingSchema.index({ bookingType: 1 });
 bookingSchema.index({ createdAt: -1 });
 
-// Unique compound index to prevent double booking
+// ============================================
+// GLOBAL UNIQUE SLOT INDEX
+// Only ONE active booking per date+timeSlot combo
+// slotLockKey is null for cancelled bookings,
+// so they are excluded by the sparse option
+// ============================================
 bookingSchema.index(
-    { serviceId: 1, bookingDate: 1, timeSlot: 1 },
+    { slotLockKey: 1 },
     {
         unique: true,
-        partialFilterExpression: { status: { $nin: ['cancelled'] } }
+        sparse: true  // ignores documents where slotLockKey is null
     }
 );
 
 // ============================================
 // VIRTUALS
 // ============================================
-bookingSchema.virtual('customerName').get(function() {
+bookingSchema.virtual('customerName').get(function () {
     if (this.bookingType === 'walkin') {
         return this.walkInCustomer?.name || 'Walk-in Customer';
     }
-    return null; // Will be populated from customerId
+    return null;
 });
 
-bookingSchema.virtual('isUpcoming').get(function() {
+bookingSchema.virtual('isUpcoming').get(function () {
     if (this.status === 'cancelled' || this.status === 'completed') {
         return false;
     }
@@ -227,7 +257,7 @@ bookingSchema.virtual('isUpcoming').get(function() {
     return bookingDateTime > now;
 });
 
-bookingSchema.virtual('canCancel').get(function() {
+bookingSchema.virtual('canCancel').get(function () {
     if (!['pending', 'confirmed'].includes(this.status)) {
         return false;
     }
@@ -235,8 +265,6 @@ bookingSchema.virtual('canCancel').get(function() {
     const bookingDateTime = new Date(this.bookingDate);
     const [startHour] = this.timeSlot.split('-')[0].split(':');
     bookingDateTime.setHours(parseInt(startHour), 0, 0, 0);
-    
-    // Can cancel up to 2 hours before
     const cancelDeadline = new Date(bookingDateTime.getTime() - 2 * 60 * 60 * 1000);
     return now < cancelDeadline;
 });
@@ -245,28 +273,23 @@ bookingSchema.virtual('canCancel').get(function() {
 // STATIC METHODS
 // ============================================
 
-// Get available slots for a service on a date
-bookingSchema.statics.getAvailableSlots = async function(serviceId, date) {
+// Get available slots for a date (GLOBAL - across all services)
+bookingSchema.statics.getAvailableSlots = async function (date) {
     const bookingDate = new Date(date);
-    const startOfDay = new Date(bookingDate);
-    startOfDay.setHours(0, 0, 0, 0);
-    
-    const endOfDay = new Date(bookingDate);
-    endOfDay.setHours(23, 59, 59, 999);
-    
+    const dateStr = bookingDate.toISOString().split('T')[0];
+
+    // Find all locked slots for this date
     const bookedSlots = await this.find({
-        serviceId,
-        bookingDate: { $gte: startOfDay, $lte: endOfDay },
-        status: { $nin: ['cancelled'] }
+        slotLockKey: { $regex: `^${dateStr}\\|` }
     }).select('timeSlot');
-    
+
     const bookedSlotNames = bookedSlots.map(b => b.timeSlot);
-    
+
     return TIME_SLOTS.filter(slot => !bookedSlotNames.includes(slot));
 };
 
 // Get booking stats for a user
-bookingSchema.statics.getUserStats = async function(userId) {
+bookingSchema.statics.getUserStats = async function (userId) {
     const stats = await this.aggregate([
         { $match: { customerId: new mongoose.Types.ObjectId(userId) } },
         {
@@ -281,7 +304,7 @@ bookingSchema.statics.getUserStats = async function(userId) {
             }
         }
     ]);
-    
+
     const result = {
         total: 0,
         pending: 0,
@@ -291,7 +314,7 @@ bookingSchema.statics.getUserStats = async function(userId) {
         cancelled: 0,
         totalSpent: 0
     };
-    
+
     stats.forEach(s => {
         result[s._id === 'in-progress' ? 'inProgress' : s._id] = s.count;
         result.total += s.count;
@@ -299,7 +322,7 @@ bookingSchema.statics.getUserStats = async function(userId) {
             result.totalSpent = s.totalSpent;
         }
     });
-    
+
     return result;
 };
 

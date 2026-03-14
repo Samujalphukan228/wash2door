@@ -1,4 +1,4 @@
-// controllers/bookingController.js - GLOBAL SLOT BOOKING
+// controllers/bookingController.js
 
 import Booking from '../models/Booking.js';
 import Service from '../models/Service.js';
@@ -95,9 +95,8 @@ export const getServiceWithPricing = async (req, res) => {
 
 export const checkAvailability = async (req, res) => {
     try {
-        const { serviceId, date } = req.query;
+        const { date } = req.query;
 
-        // serviceId is optional now, but we keep it for API compatibility
         if (!date) {
             return res.status(400).json({
                 success: false,
@@ -143,52 +142,46 @@ export const checkAvailability = async (req, res) => {
             });
         }
 
-        const startOfDay = new Date(bookingDate);
-        startOfDay.setHours(0, 0, 0, 0);
-
-        const endOfDay = new Date(bookingDate);
-        endOfDay.setHours(23, 59, 59, 999);
-
         // ============================================
-        // GLOBAL CHECK - Get ALL bookings for this date
+        // GLOBAL CHECK using slotLockKey
+        // Find all locked slots for this date
         // ============================================
-        const bookedSlots = await Booking.find({
-            bookingDate: { $gte: startOfDay, $lte: endOfDay },
-            status: { $nin: ['cancelled'] }
-        }).select('timeSlot serviceId serviceName variantName');
+        const dateStr = bookingDate.toISOString().split('T')[0];
 
-        // Create a map of booked slots with details
-        const bookedSlotMap = {};
-        bookedSlots.forEach(booking => {
-            bookedSlotMap[booking.timeSlot] = {
+        const lockedBookings = await Booking.find({
+            slotLockKey: { $regex: `^${dateStr}\\|` }
+        }).select('timeSlot serviceName variantName');
+
+        // Build a map: timeSlot → booking info
+        const lockedSlotMap = {};
+        lockedBookings.forEach(booking => {
+            lockedSlotMap[booking.timeSlot] = {
                 serviceName: booking.serviceName,
                 variantName: booking.variantName
             };
         });
 
-        // For today, filter out past time slots
+        // For today, calculate past slots
         const now = new Date();
         const isToday = bookingDate.toDateString() === now.toDateString();
 
         const slots = TIME_SLOTS.map(slot => {
             const [startTime] = slot.split('-');
-            const [hours] = startTime.split(':');
-            const slotHour = parseInt(hours);
+            const [hours, minutes] = startTime.split(':').map(Number);
 
-            // Check if slot is booked
-            const isBooked = bookedSlotMap[slot] !== undefined;
+            const isBooked = lockedSlotMap[slot] !== undefined;
 
             // Check if slot is in the past (for today)
             let isPast = false;
             if (isToday) {
                 const currentHour = now.getHours();
-                // Add 1 hour buffer - can't book slots starting within the next hour
-                if (slotHour <= currentHour + 1) {
+                const currentMin = now.getMinutes();
+                // Slot is past if current time has reached or passed the start time
+                if (currentHour > hours || (currentHour === hours && currentMin >= minutes)) {
                     isPast = true;
                 }
             }
 
-            // Determine availability and reason
             let available = true;
             let reason = null;
             let bookedBy = null;
@@ -199,15 +192,10 @@ export const checkAvailability = async (req, res) => {
             } else if (isBooked) {
                 available = false;
                 reason = 'Booked';
-                bookedBy = bookedSlotMap[slot].serviceName;
+                bookedBy = lockedSlotMap[slot].serviceName;
             }
 
-            return {
-                slot,
-                available,
-                reason,
-                bookedBy
-            };
+            return { slot, available, reason, bookedBy };
         });
 
         const availableCount = slots.filter(s => s.available).length;
@@ -234,7 +222,7 @@ export const checkAvailability = async (req, res) => {
 };
 
 // ============================================
-// CREATE BOOKING (GLOBAL SLOT CHECK)
+// CREATE BOOKING (GLOBAL SLOT LOCK)
 // ============================================
 
 export const createBooking = async (req, res) => {
@@ -316,14 +304,13 @@ export const createBooking = async (req, res) => {
         const isToday = requestedDate.toDateString() === new Date().toDateString();
         if (isToday) {
             const [startTime] = timeSlot.split('-');
-            const [hours] = startTime.split(':');
-            const slotHour = parseInt(hours);
-            const currentHour = new Date().getHours();
+            const [hours, minutes] = startTime.split(':').map(Number);
+            const now = new Date();
 
-            if (slotHour <= currentHour + 1) {
+            if (now.getHours() > hours || (now.getHours() === hours && now.getMinutes() >= minutes)) {
                 return res.status(400).json({
                     success: false,
-                    message: 'This time slot is no longer available for today'
+                    message: 'This time slot has already passed for today'
                 });
             }
         }
@@ -371,24 +358,17 @@ export const createBooking = async (req, res) => {
         }
 
         // ============================================
-        // GLOBAL SLOT CHECK - Check ALL services
+        // GLOBAL SLOT CHECK using slotLockKey
         // ============================================
-        const startOfDay = new Date(requestedDate);
-        startOfDay.setHours(0, 0, 0, 0);
+        const dateStr = requestedDate.toISOString().split('T')[0];
+        const slotLockKey = `${dateStr}|${timeSlot}`;
 
-        const endOfDay = new Date(requestedDate);
-        endOfDay.setHours(23, 59, 59, 999);
-
-        const slotTaken = await Booking.findOne({
-            bookingDate: { $gte: startOfDay, $lte: endOfDay },
-            timeSlot,
-            status: { $nin: ['cancelled'] }
-        });
+        const slotTaken = await Booking.findOne({ slotLockKey });
 
         if (slotTaken) {
             return res.status(400).json({
                 success: false,
-                message: `Time slot ${timeSlot} is already booked${slotTaken.serviceName ? ` for "${slotTaken.serviceName}"` : ''}. Please choose another slot.`
+                message: `Time slot ${timeSlot} on ${dateStr} is already booked${slotTaken.serviceName ? ` (${slotTaken.serviceName})` : ''}. Please choose another slot.`
             });
         }
 
@@ -396,6 +376,7 @@ export const createBooking = async (req, res) => {
         const finalPrice = selectedVariant.discountPrice ?? selectedVariant.price;
 
         // ---- Create booking ----
+        // slotLockKey is auto-set in pre('save') hook
         const booking = await Booking.create({
             bookingType: 'online',
             customerId: req.user._id,
@@ -438,12 +419,7 @@ export const createBooking = async (req, res) => {
             bookingDate: booking.bookingDate,
             timeSlot: booking.timeSlot,
             location: booking.location,
-            vehicleDetails: {
-                brand: '',
-                model: '',
-                color: '',
-                plateNumber: ''
-            },
+            vehicleDetails: { brand: '', model: '', color: '', plateNumber: '' },
             specialNotes: booking.specialNotes
         };
 
@@ -483,6 +459,9 @@ export const createBooking = async (req, res) => {
     } catch (error) {
         console.error('Create booking error:', error);
 
+        // ============================================
+        // Duplicate key = race condition caught by DB
+        // ============================================
         if (error.code === 11000) {
             return res.status(400).json({
                 success: false,
@@ -535,11 +514,9 @@ export const getMyBookings = async (req, res) => {
             .limit(limitNum)
             .skip((pageNum - 1) * limitNum);
 
-        // Add computed fields
         const bookingsWithMeta = bookings.map(booking => {
             const bookingObj = booking.toObject();
 
-            // Calculate if booking is upcoming
             const bookingDateTime = new Date(booking.bookingDate);
             const [startHour] = booking.timeSlot.split('-')[0].split(':');
             bookingDateTime.setHours(parseInt(startHour), 0, 0, 0);
@@ -547,7 +524,6 @@ export const getMyBookings = async (req, res) => {
             bookingObj.isUpcoming = bookingDateTime > new Date() &&
                 !['cancelled', 'completed'].includes(booking.status);
 
-            // Calculate if can cancel (2 hours before)
             const cancelDeadline = new Date(
                 bookingDateTime.getTime() - LIMITS.MIN_CANCEL_HOURS_BEFORE * 60 * 60 * 1000
             );
@@ -605,7 +581,6 @@ export const getBookingById = async (req, res) => {
 
         const bookingObj = booking.toObject();
 
-        // Add computed fields
         const bookingDateTime = new Date(booking.bookingDate);
         const [startHour] = booking.timeSlot.split('-')[0].split(':');
         bookingDateTime.setHours(parseInt(startHour), 0, 0, 0);
@@ -636,7 +611,7 @@ export const getBookingById = async (req, res) => {
 };
 
 // ============================================
-// CANCEL BOOKING
+// CANCEL BOOKING (releases slotLockKey)
 // ============================================
 
 export const cancelBooking = async (req, res) => {
@@ -686,12 +661,12 @@ export const cancelBooking = async (req, res) => {
             });
         }
 
-        // Update booking
+        // Update booking — pre('save') hook sets slotLockKey to null
         booking.status = 'cancelled';
         booking.cancellationReason = reason || 'Cancelled by customer';
         booking.cancelledBy = 'user';
         booking.cancelledAt = new Date();
-        await booking.save();
+        await booking.save(); // slotLockKey becomes null → slot is released
 
         // ---- Socket events ----
         emitBookingCancelled(booking, 'user');
@@ -725,7 +700,7 @@ export const cancelBooking = async (req, res) => {
 };
 
 // ============================================
-// RESCHEDULE BOOKING (GLOBAL SLOT CHECK)
+// RESCHEDULE BOOKING (GLOBAL SLOT LOCK)
 // ============================================
 
 export const rescheduleBooking = async (req, res) => {
@@ -812,38 +787,33 @@ export const rescheduleBooking = async (req, res) => {
         const isToday = requestedDate.toDateString() === new Date().toDateString();
         if (isToday) {
             const [startTime] = newTimeSlot.split('-');
-            const [hours] = startTime.split(':');
-            const slotHour = parseInt(hours);
-            const currentHour = new Date().getHours();
+            const [hours, minutes] = startTime.split(':').map(Number);
+            const now = new Date();
 
-            if (slotHour <= currentHour + 1) {
+            if (now.getHours() > hours || (now.getHours() === hours && now.getMinutes() >= minutes)) {
                 return res.status(400).json({
                     success: false,
-                    message: 'This time slot is no longer available for today'
+                    message: 'This time slot has already passed for today'
                 });
             }
         }
 
         // ============================================
-        // GLOBAL SLOT CHECK - Check ALL services
+        // GLOBAL SLOT CHECK using slotLockKey
         // ============================================
-        const startOfDay = new Date(requestedDate);
-        startOfDay.setHours(0, 0, 0, 0);
+        const newDateStr = requestedDate.toISOString().split('T')[0];
+        const newSlotLockKey = `${newDateStr}|${newTimeSlot}`;
 
-        const endOfDay = new Date(requestedDate);
-        endOfDay.setHours(23, 59, 59, 999);
-
+        // Check if the new slot is taken (exclude current booking)
         const slotTaken = await Booking.findOne({
-            _id: { $ne: bookingId }, // Exclude current booking
-            bookingDate: { $gte: startOfDay, $lte: endOfDay },
-            timeSlot: newTimeSlot,
-            status: { $nin: ['cancelled'] }
+            _id: { $ne: bookingId },
+            slotLockKey: newSlotLockKey
         });
 
         if (slotTaken) {
             return res.status(400).json({
                 success: false,
-                message: `Time slot ${newTimeSlot} is already booked. Please choose another slot.`
+                message: `Time slot ${newTimeSlot} on ${newDateStr} is already booked. Please choose another slot.`
             });
         }
 
@@ -851,20 +821,18 @@ export const rescheduleBooking = async (req, res) => {
         const oldDate = booking.bookingDate;
         const oldTimeSlot = booking.timeSlot;
 
-        // Update booking
+        // Update booking — pre('save') hook updates slotLockKey automatically
         booking.bookingDate = requestedDate;
         booking.timeSlot = newTimeSlot;
-        await booking.save();
+        await booking.save(); // slotLockKey auto-updates to new date|slot
 
         // ---- Socket events ----
-        // Emit that old slot is now available
         emitBookingCancelled({
             ...booking.toObject(),
             bookingDate: oldDate,
             timeSlot: oldTimeSlot
         }, 'reschedule');
 
-        // Emit that new slot is taken
         emitNewBooking(booking, `${req.user.firstName} ${req.user.lastName}`);
 
         res.status(200).json({
@@ -879,7 +847,7 @@ export const rescheduleBooking = async (req, res) => {
         if (error.code === 11000) {
             return res.status(400).json({
                 success: false,
-                message: 'This time slot was just booked by someone else'
+                message: 'This time slot was just booked by someone else. Please choose another slot.'
             });
         }
 
