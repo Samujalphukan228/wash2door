@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback, memo } from "react"
+import { flushSync } from "react-dom"
 import { Star, ChevronLeft, ChevronRight, Quote } from "lucide-react"
 
 // ── Constants ──────────────────────────────────────────────
@@ -53,56 +54,112 @@ const ANIMATION_CONFIG = {
   slide: { duration: 0.4, ease: "power3.out" },
 }
 
+// ── GSAP Loader (cached) ──────────────────────────────────
+let cachedGsap = null
+let scrollTriggerLoaded = false
+
+async function loadGsap() {
+  if (!cachedGsap) {
+    const { default: gsap } = await import("gsap")
+    cachedGsap = gsap
+  }
+  return cachedGsap
+}
+
+async function loadGsapWithScrollTrigger() {
+  const gsap = await loadGsap()
+  if (!scrollTriggerLoaded) {
+    const { ScrollTrigger } = await import("gsap/ScrollTrigger")
+    gsap.registerPlugin(ScrollTrigger)
+    scrollTriggerLoaded = true
+  }
+  return gsap
+}
+
+// ── Scrollbar Hide Styles ─────────────────────────────────
+const SCROLLBAR_HIDE_CLASS = "testimonials-hide-scrollbar"
+let scrollbarStyleInjected = false
+
+function injectScrollbarStyles() {
+  if (scrollbarStyleInjected || typeof document === "undefined") return
+  const style = document.createElement("style")
+  style.textContent = `.${SCROLLBAR_HIDE_CLASS}::-webkit-scrollbar { display: none; }`
+  document.head.appendChild(style)
+  scrollbarStyleInjected = true
+}
+
+// ── Visibility helper ─────────────────────────────────────
+function makeFallbackVisible(element) {
+  if (!element) return
+  element.style.opacity = "1"
+  element.style.transform = "none"
+  element.classList.remove("opacity-0")
+}
+
 // ── Custom Hook: Scroll Animation ──────────────────────────
-function useScrollAnimation(ref, config, deps = []) {
+function useScrollAnimation(elementRef, config) {
+  const configRef = useRef(config)
   useEffect(() => {
-    if (!ref.current) return
+    configRef.current = config
+  })
+
+  useEffect(() => {
+    const element = elementRef.current
+    if (!element) return
 
     let ctx
     let observer
+    let fallbackTimer
 
-    const init = async () => {
-      observer = new IntersectionObserver(
-        async (entries) => {
-          if (entries[0].isIntersecting) {
-            observer.disconnect()
+    observer = new IntersectionObserver(
+      async (entries) => {
+        if (entries[0].isIntersecting) {
+          observer.disconnect()
 
-            const { default: gsap } = await import("gsap")
-            const { ScrollTrigger } = await import("gsap/ScrollTrigger")
-            gsap.registerPlugin(ScrollTrigger)
+          // Fallback: show content if GSAP takes too long
+          fallbackTimer = setTimeout(() => {
+            makeFallbackVisible(element)
+          }, 3000)
+
+          try {
+            const gsap = await loadGsapWithScrollTrigger()
+            clearTimeout(fallbackTimer)
 
             ctx = gsap.context(() => {
-              config(gsap, ScrollTrigger)
+              configRef.current(gsap)
             })
+          } catch {
+            clearTimeout(fallbackTimer)
+            makeFallbackVisible(element)
           }
-        },
-        { rootMargin: "50px" }
-      )
+        }
+      },
+      { rootMargin: "50px" }
+    )
 
-      observer.observe(ref.current)
-    }
-
-    init()
+    observer.observe(element)
 
     return () => {
+      if (fallbackTimer) clearTimeout(fallbackTimer)
       observer?.disconnect()
       ctx?.revert()
     }
-  }, deps)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 }
 
 // ── Subcomponents ──────────────────────────────────────────
 
-const StarRating = memo(function StarRating({ rating, size = 14, filled = "#fff", empty = "rgba(255,255,255,0.15)" }) {
+const StarRating = memo(function StarRating({
+  rating,
+  size = 14,
+  filled = "#fff",
+  empty = "rgba(255,255,255,0.15)",
+}) {
   return (
     <div className="flex gap-1" role="img" aria-label={`${rating} out of 5 stars`}>
       {[...Array(5)].map((_, i) => (
-        <Star
-          key={i}
-          size={size}
-          strokeWidth={0}
-          fill={i < rating ? filled : empty}
-        />
+        <Star key={i} size={size} strokeWidth={0} fill={i < rating ? filled : empty} />
       ))}
     </div>
   )
@@ -163,20 +220,16 @@ const MobileTestimonialCard = memo(function MobileTestimonialCard({
       <div className="relative overflow-hidden rounded-3xl bg-black min-h-[340px] flex flex-col">
         {/* Background decorations */}
         <div className="absolute inset-0 overflow-hidden" aria-hidden="true">
-          {/* Dot pattern */}
           <div
             className="absolute inset-0 opacity-[0.03]"
             style={{
-              backgroundImage: "radial-gradient(circle at 2px 2px, white 1px, transparent 0)",
+              backgroundImage:
+                "radial-gradient(circle at 2px 2px, white 1px, transparent 0)",
               backgroundSize: "24px 24px",
             }}
           />
-
-          {/* Gradient orbs */}
           <div className="absolute -right-16 -top-16 w-48 h-48 rounded-full bg-white opacity-[0.02]" />
           <div className="absolute -left-12 bottom-1/4 w-32 h-32 rounded-full bg-white opacity-[0.015]" />
-
-          {/* Large quote icon */}
           <Quote
             size={160}
             strokeWidth={0.3}
@@ -184,7 +237,6 @@ const MobileTestimonialCard = memo(function MobileTestimonialCard({
           />
         </div>
 
-        {/* Step number watermark */}
         <span
           className="absolute top-5 left-6 text-white/[0.06] select-none"
           style={{
@@ -198,14 +250,11 @@ const MobileTestimonialCard = memo(function MobileTestimonialCard({
           {String(index + 1).padStart(2, "0")}
         </span>
 
-        {/* Content */}
         <div className="relative z-10 flex flex-col flex-1 p-6 pt-20">
-          {/* Stars */}
           <div className="mb-5">
             <StarRating rating={testimonial.rating} size={13} />
           </div>
 
-          {/* Quote text */}
           <blockquote
             className="text-white/90 leading-[1.8] flex-1 mb-6"
             style={{
@@ -215,10 +264,9 @@ const MobileTestimonialCard = memo(function MobileTestimonialCard({
               letterSpacing: "0.01em",
             }}
           >
-            "{testimonial.text}"
+            &ldquo;{testimonial.text}&rdquo;
           </blockquote>
 
-          {/* Author */}
           <footer className="flex items-center justify-between pt-5 border-t border-white/[0.08]">
             <div className="flex items-center gap-3.5">
               <Avatar name={testimonial.name} size="lg" variant="light" />
@@ -238,7 +286,6 @@ const MobileTestimonialCard = memo(function MobileTestimonialCard({
                 </span>
               </div>
             </div>
-
             <ServiceBadge service={testimonial.service} variant="dark" />
           </footer>
         </div>
@@ -258,9 +305,7 @@ const MobileCarouselControls = memo(function MobileCarouselControls({
 
   return (
     <>
-      {/* Controls row */}
       <div className="flex items-center justify-between mt-6">
-        {/* Progress bar */}
         <div className="flex-1 h-[3px] bg-gray-100 rounded-full mr-6 overflow-hidden">
           <div
             className="h-full bg-black rounded-full transition-all duration-500 ease-out"
@@ -268,7 +313,6 @@ const MobileCarouselControls = memo(function MobileCarouselControls({
           />
         </div>
 
-        {/* Navigation buttons */}
         <div className="flex gap-2">
           <button
             onClick={onPrev}
@@ -295,7 +339,6 @@ const MobileCarouselControls = memo(function MobileCarouselControls({
         </div>
       </div>
 
-      {/* Counter */}
       <div className="flex justify-center mt-5">
         <span className="text-gray-400 tabular-nums" style={{ fontSize: "13px" }}>
           <span className="text-black font-medium">{activeIndex + 1}</span>
@@ -310,8 +353,15 @@ const MobileCarouselControls = memo(function MobileCarouselControls({
 // ── Mobile: Scroll Container ───────────────────────────────
 const MobileTestimonialsScroll = memo(function MobileTestimonialsScroll() {
   const scrollRef = useRef(null)
+  const scrollTimerRef = useRef(null)
   const [activeIndex, setActiveIndex] = useState(0)
 
+  // Inject scrollbar-hide styles once
+  useEffect(() => {
+    injectScrollbarStyles()
+  }, [])
+
+  // Track scroll position
   useEffect(() => {
     const container = scrollRef.current
     if (!container) return
@@ -328,43 +378,61 @@ const MobileTestimonialsScroll = memo(function MobileTestimonialsScroll() {
     return () => container.removeEventListener("scroll", handleScroll)
   }, [])
 
-  useScrollAnimation(
-    scrollRef,
-    (gsap, ScrollTrigger) => {
-      gsap.fromTo(
-        scrollRef.current,
-        { opacity: 0, y: 40 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: ANIMATION_CONFIG.card.duration,
-          ease: ANIMATION_CONFIG.card.ease,
-          scrollTrigger: {
-            trigger: scrollRef.current,
-            start: "top 90%",
-            once: true,
-          },
-        }
-      )
-    },
-    []
-  )
+  // Scroll-triggered entrance animation
+  useScrollAnimation(scrollRef, (gsap) => {
+    gsap.fromTo(
+      scrollRef.current,
+      { opacity: 0, y: 40 },
+      {
+        opacity: 1,
+        y: 0,
+        duration: ANIMATION_CONFIG.card.duration,
+        ease: ANIMATION_CONFIG.card.ease,
+        scrollTrigger: {
+          trigger: scrollRef.current,
+          start: "top 90%",
+          once: true,
+        },
+      }
+    )
+  })
 
+  // Programmatic scroll with snap fix
   const scrollToDirection = useCallback((dir) => {
     const container = scrollRef.current
     if (!container) return
+
+    // Temporarily disable snap so scrollBy smooth works correctly
+    container.style.scrollSnapType = "none"
+
     const cardWidth = container.offsetWidth * 0.85 + 12
     container.scrollBy({ left: dir * cardWidth, behavior: "smooth" })
+
+    // Clear any previous re-enable timer
+    if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current)
+
+    // Re-enable snap after scroll finishes
+    scrollTimerRef.current = setTimeout(() => {
+      if (container) {
+        container.style.scrollSnapType = "x mandatory"
+      }
+    }, 500)
+  }, [])
+
+  // Cleanup scroll timer on unmount
+  useEffect(() => {
+    return () => {
+      if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current)
+    }
   }, [])
 
   return (
     <div className="md:hidden">
-      {/* Cards carousel */}
       <div className="-mx-5">
         <div
           ref={scrollRef}
-          className="opacity-0 flex gap-3 overflow-x-auto snap-x snap-mandatory
-                     px-5 pb-4 will-change-transform"
+          className={`opacity-0 flex gap-3 overflow-x-auto snap-x snap-mandatory
+                     px-5 pb-4 will-change-transform ${SCROLLBAR_HIDE_CLASS}`}
           style={{
             scrollPaddingLeft: "20px",
             scrollbarWidth: "none",
@@ -372,12 +440,6 @@ const MobileTestimonialsScroll = memo(function MobileTestimonialsScroll() {
             WebkitOverflowScrolling: "touch",
           }}
         >
-          <style jsx>{`
-            div::-webkit-scrollbar {
-              display: none;
-            }
-          `}</style>
-
           {TESTIMONIALS.map((testimonial, i) => (
             <MobileTestimonialCard
               key={testimonial.id}
@@ -386,8 +448,6 @@ const MobileTestimonialsScroll = memo(function MobileTestimonialsScroll() {
               isActive={i === activeIndex}
             />
           ))}
-
-          {/* End spacer */}
           <div className="shrink-0 w-3" aria-hidden="true" />
         </div>
       </div>
@@ -405,7 +465,6 @@ const MobileTestimonialsScroll = memo(function MobileTestimonialsScroll() {
 // ── Desktop: Testimonial Item in List ──────────────────────
 const DesktopTestimonialListItem = memo(function DesktopTestimonialListItem({
   testimonial,
-  index,
   isActive,
   onClick,
 }) {
@@ -422,7 +481,11 @@ const DesktopTestimonialListItem = memo(function DesktopTestimonialListItem({
         <div
           className={`w-9 h-9 rounded-full flex items-center justify-center
                       transition-all duration-300
-                      ${isActive ? "bg-black" : "border border-gray-200 group-hover:border-gray-300"}`}
+                      ${
+                        isActive
+                          ? "bg-black"
+                          : "border border-gray-200 group-hover:border-gray-300"
+                      }`}
         >
           <span
             className={`transition-colors duration-300
@@ -448,10 +511,7 @@ const DesktopTestimonialListItem = memo(function DesktopTestimonialListItem({
         </span>
       </div>
 
-      <span
-        className="tracking-wider uppercase text-gray-300"
-        style={{ fontSize: "9px" }}
-      >
+      <span className="tracking-wider uppercase text-gray-300" style={{ fontSize: "9px" }}>
         {testimonial.location}
       </span>
     </button>
@@ -459,7 +519,11 @@ const DesktopTestimonialListItem = memo(function DesktopTestimonialListItem({
 })
 
 // ── Desktop: Main Quote Card ───────────────────────────────
-const DesktopQuoteCard = memo(function DesktopQuoteCard({ testimonial, index, slideRef }) {
+const DesktopQuoteCard = memo(function DesktopQuoteCard({
+  testimonial,
+  index,
+  slideRef,
+}) {
   return (
     <div
       ref={slideRef}
@@ -468,13 +532,9 @@ const DesktopQuoteCard = memo(function DesktopQuoteCard({ testimonial, index, sl
     >
       {/* Black quote area */}
       <div className="relative bg-black px-8 lg:px-10 pt-8 lg:pt-10 pb-12 overflow-hidden">
-        {/* Background decorations */}
         <div className="absolute inset-0 overflow-hidden" aria-hidden="true">
-          {/* Gradient orbs */}
           <div className="absolute -right-20 -top-20 w-64 h-64 rounded-full bg-white opacity-[0.02]" />
           <div className="absolute -left-16 bottom-0 w-48 h-48 rounded-full bg-white opacity-[0.015]" />
-
-          {/* Grid pattern */}
           <div
             className="absolute inset-0 opacity-[0.02]"
             style={{
@@ -485,8 +545,6 @@ const DesktopQuoteCard = memo(function DesktopQuoteCard({ testimonial, index, sl
               backgroundSize: "40px 40px",
             }}
           />
-
-          {/* Large quote icon */}
           <Quote
             size={220}
             strokeWidth={0.25}
@@ -494,7 +552,6 @@ const DesktopQuoteCard = memo(function DesktopQuoteCard({ testimonial, index, sl
           />
         </div>
 
-        {/* Number watermark */}
         <span
           className="absolute bottom-4 right-8 text-white/[0.04] select-none"
           style={{
@@ -508,7 +565,6 @@ const DesktopQuoteCard = memo(function DesktopQuoteCard({ testimonial, index, sl
           {String(index + 1).padStart(2, "0")}
         </span>
 
-        {/* Content */}
         <div className="relative z-10">
           <div className="mb-6">
             <StarRating rating={testimonial.rating} size={14} />
@@ -523,7 +579,7 @@ const DesktopQuoteCard = memo(function DesktopQuoteCard({ testimonial, index, sl
               letterSpacing: "0.01em",
             }}
           >
-            "{testimonial.text}"
+            &ldquo;{testimonial.text}&rdquo;
           </blockquote>
         </div>
       </div>
@@ -558,7 +614,7 @@ const DesktopQuoteCard = memo(function DesktopQuoteCard({ testimonial, index, sl
   )
 })
 
-// ── Desktop: Rating Summary ────────────────────────────────
+// ── Desktop: Rating Summary (fixed redundant wrapper) ──────
 const DesktopRatingSummary = memo(function DesktopRatingSummary() {
   return (
     <div className="mb-8">
@@ -575,7 +631,8 @@ const DesktopRatingSummary = memo(function DesktopRatingSummary() {
         5.0
       </span>
 
-      <div className="flex gap-1 mt-3 mb-2">
+      {/* Fixed: removed redundant flex wrapper since StarRating already renders one */}
+      <div className="mt-3 mb-2">
         <StarRating rating={5} size={15} filled="#000" empty="#e5e7eb" />
       </div>
 
@@ -637,11 +694,22 @@ const DesktopNavArrows = memo(function DesktopNavArrows({
 const DesktopTestimonialsSlider = memo(function DesktopTestimonialsSlider() {
   const containerRef = useRef(null)
   const slideRef = useRef(null)
+  const isPageVisible = useRef(true)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isAutoPlaying, setIsAutoPlaying] = useState(true)
 
+  // Track page visibility to pause auto-play when tab is hidden
+  useEffect(() => {
+    const handler = () => {
+      isPageVisible.current = !document.hidden
+    }
+    document.addEventListener("visibilitychange", handler)
+    return () => document.removeEventListener("visibilitychange", handler)
+  }, [])
+
+  // Slide transition with flushSync to fix race condition
   const animateSlide = useCallback(async (newIndex, direction) => {
-    const { default: gsap } = await import("gsap")
+    const gsap = await loadGsap()
     if (!slideRef.current) return
 
     // Exit animation
@@ -652,7 +720,10 @@ const DesktopTestimonialsSlider = memo(function DesktopTestimonialsSlider() {
       ease: "power2.in",
     })
 
-    setCurrentIndex(newIndex)
+    // Force synchronous render so the DOM has new content before enter animation
+    flushSync(() => {
+      setCurrentIndex(newIndex)
+    })
 
     // Enter animation
     gsap.fromTo(
@@ -667,61 +738,71 @@ const DesktopTestimonialsSlider = memo(function DesktopTestimonialsSlider() {
     )
   }, [])
 
-  // Auto-play
+  // Auto-play with visibility check
   useEffect(() => {
     if (!isAutoPlaying) return
 
     const interval = setInterval(() => {
-      const next = (currentIndex + 1) % TESTIMONIALS.length
-      animateSlide(next, 1)
+      if (!isPageVisible.current) return
+
+      setCurrentIndex((prev) => {
+        const next = (prev + 1) % TESTIMONIALS.length
+        animateSlide(next, 1)
+        return prev // animateSlide calls setCurrentIndex internally via flushSync
+      })
     }, 6000)
 
     return () => clearInterval(interval)
-  }, [isAutoPlaying, currentIndex, animateSlide])
+  }, [isAutoPlaying, animateSlide])
 
-  // Initial animation
-  useScrollAnimation(
-    containerRef,
-    (gsap, ScrollTrigger) => {
-      gsap.fromTo(
-        containerRef.current,
-        { opacity: 0, y: 50 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: ANIMATION_CONFIG.card.duration,
-          ease: ANIMATION_CONFIG.card.ease,
-          scrollTrigger: {
-            trigger: containerRef.current,
-            start: "top 85%",
-            once: true,
-          },
-        }
-      )
-    },
-    []
-  )
+  // Initial scroll-triggered entrance animation
+  useScrollAnimation(containerRef, (gsap) => {
+    gsap.fromTo(
+      containerRef.current,
+      { opacity: 0, y: 50 },
+      {
+        opacity: 1,
+        y: 0,
+        duration: ANIMATION_CONFIG.card.duration,
+        ease: ANIMATION_CONFIG.card.ease,
+        scrollTrigger: {
+          trigger: containerRef.current,
+          start: "top 85%",
+          once: true,
+        },
+      }
+    )
+  })
 
   const goToPrev = useCallback(() => {
     setIsAutoPlaying(false)
-    const prev = currentIndex === 0 ? TESTIMONIALS.length - 1 : currentIndex - 1
-    animateSlide(prev, -1)
-  }, [currentIndex, animateSlide])
+    setCurrentIndex((prev) => {
+      const target = prev === 0 ? TESTIMONIALS.length - 1 : prev - 1
+      animateSlide(target, -1)
+      return prev
+    })
+  }, [animateSlide])
 
   const goToNext = useCallback(() => {
     setIsAutoPlaying(false)
-    const next = (currentIndex + 1) % TESTIMONIALS.length
-    animateSlide(next, 1)
-  }, [currentIndex, animateSlide])
+    setCurrentIndex((prev) => {
+      const target = (prev + 1) % TESTIMONIALS.length
+      animateSlide(target, 1)
+      return prev
+    })
+  }, [animateSlide])
 
   const goToSlide = useCallback(
     (index) => {
-      if (index === currentIndex) return
-      setIsAutoPlaying(false)
-      const direction = index > currentIndex ? 1 : -1
-      animateSlide(index, direction)
+      setCurrentIndex((prev) => {
+        if (index === prev) return prev
+        setIsAutoPlaying(false)
+        const direction = index > prev ? 1 : -1
+        animateSlide(index, direction)
+        return prev
+      })
     },
-    [currentIndex, animateSlide]
+    [animateSlide]
   )
 
   const testimonial = TESTIMONIALS[currentIndex]
@@ -743,13 +824,11 @@ const DesktopTestimonialsSlider = memo(function DesktopTestimonialsSlider() {
           <div>
             <DesktopRatingSummary />
 
-            {/* Testimonial list */}
             <div className="mt-6">
               {TESTIMONIALS.map((t, i) => (
                 <DesktopTestimonialListItem
                   key={t.id}
                   testimonial={t}
-                  index={i}
                   isActive={i === currentIndex}
                   onClick={() => goToSlide(i)}
                 />
@@ -773,10 +852,7 @@ const DesktopTestimonialsSlider = memo(function DesktopTestimonialsSlider() {
 const SectionHeader = memo(function SectionHeader({ eyebrowRef, headingRef, descRef }) {
   return (
     <header className="mb-10 md:mb-14 lg:mb-16">
-      <div
-        ref={eyebrowRef}
-        className="flex items-center gap-4 mb-4 md:mb-5 opacity-0"
-      >
+      <div ref={eyebrowRef} className="flex items-center gap-4 mb-4 md:mb-5 opacity-0">
         <span className="block w-10 h-px bg-black" aria-hidden="true" />
         <span
           className="tracking-[0.4em] uppercase text-gray-400"
@@ -786,7 +862,9 @@ const SectionHeader = memo(function SectionHeader({ eyebrowRef, headingRef, desc
         </span>
       </div>
 
+      {/* Fixed: added id to match aria-labelledby on section */}
       <h2
+        id="testimonials-heading"
         ref={headingRef}
         className="text-black mb-3 md:mb-4 opacity-0"
         style={{
@@ -818,60 +896,77 @@ export default function Testimonials() {
   const descRef = useRef(null)
   const headerAnimated = useRef(false)
 
-  // Header animation
+  // Header animation with fallback
   useEffect(() => {
     if (headerAnimated.current) return
 
     let ctx
+    let fallbackTimer
 
     const init = async () => {
-      const { default: gsap } = await import("gsap")
-      const { ScrollTrigger } = await import("gsap/ScrollTrigger")
-      gsap.registerPlugin(ScrollTrigger)
+      // Fallback: show header if GSAP never loads
+      fallbackTimer = setTimeout(() => {
+        makeFallbackVisible(eyebrowRef.current)
+        makeFallbackVisible(headingRef.current)
+        makeFallbackVisible(descRef.current)
+      }, 3000)
 
-      if (!headingRef.current) return
+      try {
+        const gsap = await loadGsapWithScrollTrigger()
 
-      ctx = gsap.context(() => {
-        const tl = gsap.timeline({
-          scrollTrigger: {
-            trigger: headingRef.current,
-            start: "top 85%",
-            once: true,
-          },
-          defaults: { ease: ANIMATION_CONFIG.header.ease },
+        if (!headingRef.current) return
+        clearTimeout(fallbackTimer)
+
+        ctx = gsap.context(() => {
+          const tl = gsap.timeline({
+            scrollTrigger: {
+              trigger: headingRef.current,
+              start: "top 85%",
+              once: true,
+            },
+            defaults: { ease: ANIMATION_CONFIG.header.ease },
+          })
+
+          if (eyebrowRef.current) {
+            tl.fromTo(
+              eyebrowRef.current,
+              { opacity: 0, x: -20 },
+              { opacity: 1, x: 0, duration: 0.5 }
+            )
+          }
+
+          tl.fromTo(
+            headingRef.current,
+            { opacity: 0, y: 35 },
+            { opacity: 1, y: 0, duration: ANIMATION_CONFIG.header.duration },
+            0.08
+          )
+
+          if (descRef.current) {
+            tl.fromTo(
+              descRef.current,
+              { opacity: 0, y: 20 },
+              { opacity: 1, y: 0, duration: 0.6 },
+              0.2
+            )
+          }
         })
 
-        if (eyebrowRef.current) {
-          tl.fromTo(
-            eyebrowRef.current,
-            { opacity: 0, x: -20 },
-            { opacity: 1, x: 0, duration: 0.5 }
-          )
-        }
-
-        tl.fromTo(
-          headingRef.current,
-          { opacity: 0, y: 35 },
-          { opacity: 1, y: 0, duration: ANIMATION_CONFIG.header.duration },
-          0.08
-        )
-
-        if (descRef.current) {
-          tl.fromTo(
-            descRef.current,
-            { opacity: 0, y: 20 },
-            { opacity: 1, y: 0, duration: 0.6 },
-            0.2
-          )
-        }
-      })
-
-      headerAnimated.current = true
+        headerAnimated.current = true
+      } catch {
+        clearTimeout(fallbackTimer)
+        makeFallbackVisible(eyebrowRef.current)
+        makeFallbackVisible(headingRef.current)
+        makeFallbackVisible(descRef.current)
+      }
     }
 
     init()
 
-    return () => ctx?.revert()
+    return () => {
+      if (fallbackTimer) clearTimeout(fallbackTimer)
+      ctx?.revert()
+    }
   }, [])
 
   return (
