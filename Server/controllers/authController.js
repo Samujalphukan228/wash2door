@@ -37,25 +37,43 @@ export const register = async (req, res) => {
         }
 
         const { firstName, lastName, email, password } = req.body;
+        const normalizedEmail = email.toLowerCase();
 
-        const registrationCheck = await User.findForRegistration(email);
+        // 1. Check if user exists
+        const registrationCheck = await User.findForRegistration(normalizedEmail);
 
-        if (!registrationCheck.canRegister) {
+        // 2. If registration exists and is NOT completed, delete it to allow a fresh start
+        if (registrationCheck.exists && registrationCheck.user.registrationStatus !== 'completed') {
+            await User.deleteOne({ _id: registrationCheck.user._id });
+        } 
+        // If registration is truly completed, we block them
+        else if (registrationCheck.exists && registrationCheck.user.registrationStatus === 'completed') {
             return res.status(409).json({
                 success: false,
-                message: registrationCheck.message,
-                canRetry: registrationCheck.isPending,
-                registrationStatus: registrationCheck.registrationStatus
+                message: 'User with this email already exists'
             });
         }
 
-        const user = await User.create({
-            firstName,
-            lastName,
-            email: email.toLowerCase(),
-            password,
-            registrationStatus: 'pending'
-        });
+        // 3. Proceed with fresh registration
+        let user;
+        try {
+            user = await User.create({
+                firstName,
+                lastName,
+                email: normalizedEmail,
+                password,
+                registrationStatus: 'pending'
+            });
+        } catch (createError) {
+            // Handle duplicate key error (race condition)
+            if (createError.code === 11000) {
+                return res.status(409).json({
+                    success: false,
+                    message: 'Email already in use. Please try again.'
+                });
+            }
+            throw createError; // Re-throw other errors
+        }
 
         const otp = user.generateOTP();
         await user.save({ validateBeforeSave: false });
@@ -94,7 +112,6 @@ export const register = async (req, res) => {
         });
     }
 };
-
 // ============================================
 // VERIFY OTP
 // ============================================
