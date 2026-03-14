@@ -9,10 +9,18 @@ import { AuthProvider } from "@/context/AuthContext"
 const ease = [0.76, 0, 0.24, 1]
 
 export default function ClientLayout({ children }) {
-  const [done, setDone] = useState(false)
+  // If already seen this session, skip straight to done
+  const [done, setDone] = useState(() => {
+    if (typeof window === "undefined") return false
+    return sessionStorage.getItem("w2d_intro") === "1"
+  })
 
   useEffect(() => {
-    const t = setTimeout(() => setDone(true), 2200)
+    if (done) return // already seen — don't run timer
+    const t = setTimeout(() => {
+      sessionStorage.setItem("w2d_intro", "1")
+      setDone(true)
+    }, 2200)
     return () => clearTimeout(t)
   }, [])
 
@@ -32,7 +40,7 @@ export default function ClientLayout({ children }) {
               transition={{ duration: 1.1, ease }}
             />
 
-            {/* Brand mark — sits at the seam */}
+            {/* Brand mark */}
             <motion.div
               className="absolute inset-0 flex flex-col items-center justify-center gap-3"
               exit={{ opacity: 0 }}
