@@ -1,389 +1,608 @@
 "use client"
 
-import { useEffect, useRef } from 'react'
-import { ArrowUpRight, Shield, Leaf, Users, Star, Phone, Mail, MapPin } from 'lucide-react'
+import { useEffect, useRef, memo } from "react"
+import {
+  ArrowUpRight,
+  ArrowRight,
+  Leaf,
+  Users,
+  Star,
+  MapPin,
+  Shield,
+  Check,
+} from "lucide-react"
 
-// ── Real data from wash2door.in/about-us ──
-const WHY_US = [
+// ── Constants ──────────────────────────────────────────────
+const FEATURES = [
   {
     icon: MapPin,
-    title: 'Doorstep Service',
-    desc: 'We come to you — at home, office, or anywhere in Duliajan. No travel, no waiting.',
+    title: "Doorstep Service",
+    desc: "We come to you — home, office, or anywhere in Duliajan",
   },
   {
     icon: Leaf,
-    title: 'Eco-Friendly',
-    desc: 'We use safe, eco-friendly cleaning products that protect your vehicle and the environment.',
+    title: "Eco-Friendly",
+    desc: "Safe products that protect your vehicle and the environment",
   },
   {
-    icon: Users,
-    title: 'Trusted Professionals',
-    desc: 'Our trained staff deliver consistent, high-quality results with complete safety and hygiene.',
+    icon: Shield,
+    title: "Trusted Team",
+    desc: "Trained professionals with consistent, quality results",
   },
   {
     icon: Star,
-    title: 'Guaranteed Satisfaction',
-    desc: 'Affordable pricing and results you can see. If you are not happy, we make it right.',
+    title: "Satisfaction Guaranteed",
+    desc: "Not happy? We make it right — no questions asked",
   },
 ]
 
-const SERVICES = [
-  { label: 'Car Wash',            href: '/Services' },
-  { label: 'Sofa Cleaning',       href: '/Services' },
-  { label: 'Water Tank Cleaning', href: '/Services' },
+const PROCESS_STEPS = [
+  { number: "01", title: "Book Online", desc: "Choose your service and time slot" },
+  { number: "02", title: "We Arrive", desc: "Our team comes to your location" },
+  { number: "03", title: "We Clean", desc: "Professional cleaning with care" },
+  { number: "04", title: "You Enjoy", desc: "Spotless results, guaranteed" },
 ]
 
-// ── Reusable animated section heading (matches site pattern) ──
-function SectionHeading({ eyebrow, heading, desc, eyebrowRef, headingRef, descRef, ruleRef }) {
-  return (
-    <div className="mb-16 md:mb-20">
-      <div ref={eyebrowRef} className="flex items-center gap-3 mb-6 opacity-0">
-        <span className="block w-6 h-px bg-black shrink-0" />
-        <span
-          className="tracking-[0.4em] uppercase text-gray-400"
-          style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontSize: 'clamp(9px, 2.2vw, 11px)' }}
-        >
-          {eyebrow}
-        </span>
-      </div>
-      <h2
-        ref={headingRef}
-        className="opacity-0 text-black mb-5"
-        style={{
-          fontFamily: 'Georgia, "Times New Roman", serif',
-          fontWeight: 300,
-          fontSize: 'clamp(2rem, 4vw, 3.8rem)',
-          lineHeight: 1.08,
-          letterSpacing: '-0.01em',
-        }}
-      >
-        {heading}
-      </h2>
-      {desc && (
-        <p
-          ref={descRef}
-          className="opacity-0 tracking-[0.18em] leading-[1.9] uppercase text-gray-400 max-w-xl"
-          style={{ fontSize: 'clamp(10px, 2.4vw, 11px)' }}
-        >
-          {desc}
-        </p>
-      )}
-      <div ref={ruleRef} className="w-full h-px bg-gray-200 mt-8" />
-    </div>
-  )
+const STATS = [
+  { value: "100+", label: "Happy Customers" },
+  { value: "500+", label: "Cars Cleaned" },
+  { value: "4.9", label: "Average Rating" },
+  { value: "2hr", label: "Avg. Service Time" },
+]
+
+const SERVICES_LIST = [
+  { name: "Car Exterior Wash", price: "₹299" },
+  { name: "Full Car Detailing", price: "₹799" },
+  { name: "Sofa Cleaning", price: "₹499" },
+  { name: "Water Tank Cleaning", price: "₹599" },
+]
+
+const ANIMATION_CONFIG = {
+  duration: 0.8,
+  stagger: 0.1,
+  ease: "power4.out",
 }
 
-function useHeadingAnim(eyebrowRef, headingRef, descRef, ruleRef) {
+// ── Custom Hook: Scroll Animation ──────────────────────────
+function useScrollAnimation(ref, config, deps = []) {
   useEffect(() => {
+    if (!ref.current) return
+
     let ctx
+    let observer
+
     const init = async () => {
-      const { default: gsap } = await import('gsap')
-      const { ScrollTrigger } = await import('gsap/ScrollTrigger')
-      gsap.registerPlugin(ScrollTrigger)
-      if (!headingRef.current) return
-      ctx = gsap.context(() => {
-        const tl = gsap.timeline({
-          scrollTrigger: { trigger: headingRef.current, start: 'top 85%' },
-          defaults: { ease: 'power3.out' },
-        })
-        tl.fromTo(eyebrowRef.current, { opacity: 0, x: -16 }, { opacity: 1, x: 0, duration: 0.5 })
-          .fromTo(headingRef.current, { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.7 }, 0.1)
-        if (descRef?.current)
-          tl.fromTo(descRef.current, { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.6 }, 0.3)
-        if (ruleRef?.current)
-          tl.fromTo(ruleRef.current, { scaleX: 0, transformOrigin: 'left' }, { scaleX: 1, duration: 0.6 }, 0.4)
-      })
+      observer = new IntersectionObserver(
+        async (entries) => {
+          if (entries[0].isIntersecting) {
+            observer.disconnect()
+
+            const { default: gsap } = await import("gsap")
+            const { ScrollTrigger } = await import("gsap/ScrollTrigger")
+            gsap.registerPlugin(ScrollTrigger)
+
+            ctx = gsap.context(() => {
+              config(gsap, ScrollTrigger)
+            })
+          }
+        },
+        { rootMargin: "50px" }
+      )
+
+      observer.observe(ref.current)
     }
+
     init()
-    return () => ctx?.revert()
-  }, [])
+
+    return () => {
+      observer?.disconnect()
+      ctx?.revert()
+    }
+  }, deps)
 }
 
-// ── Hero ──
-function Hero() {
-  const headingRef = useRef(null)
-  const subRef = useRef(null)
-  const ctaRef = useRef(null)
-  const lineRef = useRef(null)
-
-  useEffect(() => {
-    let ctx
-    const init = async () => {
-      const { default: gsap } = await import('gsap')
-      if (!headingRef.current) return
-      ctx = gsap.context(() => {
-        const tl = gsap.timeline({ defaults: { ease: 'power3.out' } })
-        tl.fromTo(lineRef.current, { scaleX: 0, transformOrigin: 'left' }, { scaleX: 1, duration: 0.7 })
-          .fromTo(headingRef.current, { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.9 }, 0.2)
-          .fromTo(subRef.current, { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.7 }, 0.5)
-          .fromTo(ctaRef.current, { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.6 }, 0.7)
-      })
-    }
-    init()
-    return () => ctx?.revert()
-  }, [])
-
-  return (
-    <section
-      className="w-full bg-black pt-24 pb-32 md:pt-32 md:pb-40 relative overflow-hidden"
-      style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
-    >
-      {/* Subtle background texture lines */}
-      <div className="absolute inset-0 opacity-[0.04]"
-        style={{
-          backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 60px, white 60px, white 61px)',
-        }}
-      />
-
-      <div className="max-w-6xl mx-auto px-8 md:px-16 relative z-10">
-        <div ref={lineRef} className="w-12 h-px bg-white/30 mb-8" />
-
-        <h1
-          ref={headingRef}
-          className="opacity-0 text-white mb-8"
-          style={{
-            fontFamily: 'Georgia, "Times New Roman", serif',
-            fontWeight: 300,
-            fontSize: 'clamp(2.4rem, 6vw, 5.5rem)',
-            lineHeight: 1.06,
-            letterSpacing: '-0.02em',
-            maxWidth: '820px',
-          }}
-        >
-          Your Trusted Partner for Doorstep Cleaning
-        </h1>
-
-        <p
-          ref={subRef}
-          className="opacity-0 tracking-[0.18em] leading-[1.9] uppercase text-white/50 max-w-lg mb-12"
-          style={{ fontSize: 'clamp(10px, 2.4vw, 11px)' }}
-        >
-          Car wash, sofa cleaning, and water tank cleaning — all at your doorstep in Duliajan, Assam.
-        </p>
-
-        <div ref={ctaRef} className="opacity-0 flex flex-wrap gap-4">
-          <a
-            href="/Bookings"
-            className="relative flex items-center gap-2 tracking-[0.22em] uppercase
-                       text-black bg-white border border-white px-7 py-4 no-underline
-                       overflow-hidden group rounded-[5px]"
-            style={{ fontSize: 'clamp(9px, 2.2vw, 11px)' }}
-          >
-            <span className="absolute inset-0 bg-black origin-bottom scale-y-0 group-hover:scale-y-100 transition-transform duration-500 ease-out" />
-            <span className="relative z-10 group-hover:text-white transition-colors duration-500">Book Now</span>
-            <ArrowUpRight size={13} strokeWidth={1.5} className="relative z-10 group-hover:text-white transition-colors duration-500" />
-          </a>
-          <a
-            href="tel:6900706456"
-            className="relative flex items-center gap-2 tracking-[0.22em] uppercase
-                       text-white border border-white/30 px-7 py-4 no-underline
-                       overflow-hidden group rounded-[5px]"
-            style={{ fontSize: 'clamp(9px, 2.2vw, 11px)' }}
-          >
-            <span className="absolute inset-0 bg-white origin-bottom scale-y-0 group-hover:scale-y-100 transition-transform duration-500 ease-out" />
-            <span className="relative z-10 group-hover:text-black transition-colors duration-500">Call Us</span>
-            <Phone size={13} strokeWidth={1.5} className="relative z-10 group-hover:text-black transition-colors duration-500" />
-          </a>
-        </div>
-      </div>
-    </section>
-  )
-}
-
-// ── Who We Are ──
-function WhoWeAre() {
-  const eyebrowRef = useRef(null)
-  const headingRef = useRef(null)
-  const descRef = useRef(null)
-  const ruleRef = useRef(null)
+// ── Hero Section ───────────────────────────────────────────
+const Hero = memo(function Hero() {
+  const sectionRef = useRef(null)
   const contentRef = useRef(null)
 
-  useHeadingAnim(eyebrowRef, headingRef, descRef, ruleRef)
-
   useEffect(() => {
     let ctx
+
     const init = async () => {
-      const { default: gsap } = await import('gsap')
-      const { ScrollTrigger } = await import('gsap/ScrollTrigger')
-      gsap.registerPlugin(ScrollTrigger)
-      if (!contentRef.current) return
+      const { default: gsap } = await import("gsap")
+
+      if (!sectionRef.current) return
+
       ctx = gsap.context(() => {
-        gsap.fromTo(contentRef.current,
-          { opacity: 0, y: 30 },
-          { opacity: 1, y: 0, duration: 0.8, ease: 'power3.out', scrollTrigger: { trigger: contentRef.current, start: 'top 85%' } }
-        )
-      })
-    }
-    init()
-    return () => ctx?.revert()
-  }, [])
+        const elements = contentRef.current.querySelectorAll("[data-animate]")
 
-  return (
-    <section
-      className="w-full bg-white py-24 md:py-32"
-      style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
-    >
-      <div className="max-w-6xl mx-auto px-8 md:px-16">
-        <SectionHeading
-          eyebrow="Who We Are"
-          heading="About Wash2Door"
-          desc={null}
-          eyebrowRef={eyebrowRef}
-          headingRef={headingRef}
-          descRef={descRef}
-          ruleRef={ruleRef}
-        />
-
-        <div ref={contentRef} className="opacity-0 grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-20 items-start">
-          {/* Left — main copy */}
-          <div>
-            <p
-              className="tracking-[0.18em] leading-[2] uppercase text-gray-500 mb-8"
-              style={{ fontSize: 'clamp(10px, 2.4vw, 11px)' }}
-            >
-              Welcome to Wash2Door — your trusted partner for professional cleaning services right at your doorstep.
-            </p>
-            <p
-              className="tracking-[0.18em] leading-[2] uppercase text-gray-500 mb-8"
-              style={{ fontSize: 'clamp(10px, 2.4vw, 11px)' }}
-            >
-              We provide a complete range of cleaning solutions, including car wash, sofa cleaning, and water tank cleaning — all delivered conveniently at your home. Our goal is to save your time while giving you top-quality cleaning with complete safety and hygiene.
-            </p>
-            <p
-              className="tracking-[0.18em] leading-[2] uppercase text-gray-500"
-              style={{ fontSize: 'clamp(10px, 2.4vw, 11px)' }}
-            >
-              At Wash2Door, we believe a clean environment means a happy life. Our trained professionals use eco-friendly products and modern techniques to ensure your car, sofa, and water tank are spotless, germ-free, and shining like new.
-            </p>
-          </div>
-
-          {/* Right — pull quote + services */}
-          <div>
-            <blockquote
-              className="border-l-2 border-black pl-8 mb-10"
-            >
-              <p
-                className="text-black leading-[1.5]"
-                style={{
-                  fontFamily: 'Georgia, "Times New Roman", serif',
-                  fontWeight: 300,
-                  fontSize: 'clamp(18px, 3.5vw, 28px)',
-                  letterSpacing: '-0.01em',
-                }}
-              >
-                "You just book — we handle the rest."
-              </p>
-            </blockquote>
-
-            <p
-              className="tracking-[0.3em] uppercase text-gray-400 mb-4"
-              style={{ fontSize: 'clamp(9px, 2.2vw, 11px)' }}
-            >
-              Our Services
-            </p>
-            <div className="flex flex-col">
-              {SERVICES.map((s, i) => (
-                <a
-                  key={i}
-                  href={s.href}
-                  className="flex items-center justify-between py-4 border-b border-gray-100 last:border-0
-                             group no-underline hover:pl-2 transition-all duration-300"
-                >
-                  <span
-                    className="tracking-[0.18em] uppercase text-black group-hover:opacity-60 transition-opacity duration-300"
-                    style={{ fontSize: 'clamp(10px, 2.4vw, 11px)' }}
-                  >
-                    {s.label}
-                  </span>
-                  <ArrowUpRight size={13} strokeWidth={1.5} className="text-gray-300 group-hover:text-black transition-colors duration-300" />
-                </a>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  )
-}
-
-// ── Why Choose Us ──
-function WhyUs() {
-  const eyebrowRef = useRef(null)
-  const headingRef = useRef(null)
-  const descRef = useRef(null)
-  const ruleRef = useRef(null)
-  const gridRef = useRef(null)
-
-  useHeadingAnim(eyebrowRef, headingRef, descRef, ruleRef)
-
-  useEffect(() => {
-    let ctx
-    const init = async () => {
-      const { default: gsap } = await import('gsap')
-      const { ScrollTrigger } = await import('gsap/ScrollTrigger')
-      gsap.registerPlugin(ScrollTrigger)
-      if (!gridRef.current) return
-      ctx = gsap.context(() => {
         gsap.fromTo(
-          gridRef.current.children,
+          elements,
           { opacity: 0, y: 40 },
           {
-            opacity: 1, y: 0, duration: 0.7, stagger: 0.12, ease: 'power3.out',
-            scrollTrigger: { trigger: gridRef.current, start: 'top 85%' },
+            opacity: 1,
+            y: 0,
+            duration: ANIMATION_CONFIG.duration,
+            stagger: ANIMATION_CONFIG.stagger,
+            ease: ANIMATION_CONFIG.ease,
           }
         )
       })
     }
+
     init()
+
     return () => ctx?.revert()
   }, [])
 
   return (
     <section
-      className="w-full bg-white py-24 md:py-32"
+      ref={sectionRef}
+      className="relative min-h-[90vh] md:min-h-screen bg-black overflow-hidden"
       style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
     >
-      <div className="max-w-6xl mx-auto px-8 md:px-16">
-        <SectionHeading
-          eyebrow="Our Promise"
-          heading="Why Choose Wash2Door?"
-          desc="We are built around one idea — your time is valuable. Everything we do is designed to make cleaning effortless for you."
-          eyebrowRef={eyebrowRef}
-          headingRef={headingRef}
-          descRef={descRef}
-          ruleRef={ruleRef}
+      {/* Background image */}
+      <div className="absolute inset-0">
+        <img
+          src="https://images.unsplash.com/photo-1607860108855-64acf2078ed9?q=80&w=2000&auto=format&fit=crop"
+          alt=""
+          role="presentation"
+          className="w-full h-full object-cover opacity-40"
         />
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-black/30" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-transparent to-transparent" />
+      </div>
 
-        <div ref={gridRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-          {WHY_US.map((item, i) => {
-            const Icon = item.icon
+      {/* Content */}
+      <div
+        ref={contentRef}
+        className="relative z-10 max-w-7xl mx-auto px-5 sm:px-8 md:px-12 lg:px-16
+                   min-h-[90vh] md:min-h-screen flex flex-col justify-end pb-16 md:pb-24"
+      >
+        {/* Eyebrow */}
+        <div data-animate className="flex items-center gap-3 mb-6 opacity-0">
+          <span className="w-10 h-px bg-white/40" />
+          <span
+            className="tracking-[0.4em] uppercase text-white/60"
+            style={{ fontSize: "10px" }}
+          >
+            About Us
+          </span>
+        </div>
+
+        {/* Main heading */}
+        <h1
+          data-animate
+          className="opacity-0 text-white mb-6 max-w-4xl"
+          style={{
+            fontFamily: 'Georgia, "Times New Roman", serif',
+            fontWeight: 300,
+            fontSize: "clamp(2.5rem, 7vw, 5.5rem)",
+            lineHeight: 1.05,
+            letterSpacing: "-0.02em",
+          }}
+        >
+          We Bring the
+          <br />
+          <span className="italic text-white/50">Clean to You</span>
+        </h1>
+
+        {/* Subtitle */}
+        <p
+          data-animate
+          className="opacity-0 text-white/50 max-w-lg mb-10 leading-relaxed"
+          style={{ fontSize: "16px" }}
+        >
+          Professional doorstep cleaning services in Duliajan. Car wash, sofa
+          cleaning, water tank cleaning — all delivered with care.
+        </p>
+
+        {/* CTA row */}
+        <div data-animate className="opacity-0 flex flex-wrap items-center gap-4 mb-12">
+          <a
+            href="/bookings"
+            className="group flex items-center gap-3 h-14 px-8 bg-white text-black
+                       rounded-full no-underline hover:bg-gray-100
+                       active:scale-[0.97] transition-all duration-300"
+          >
+            <span
+              className="tracking-wider uppercase"
+              style={{ fontSize: "11px", fontWeight: 500 }}
+            >
+              Book a Service
+            </span>
+            <ArrowRight
+              size={16}
+              className="group-hover:translate-x-0.5 transition-transform duration-300"
+            />
+          </a>
+
+          <a
+            href="#story"
+            className="group flex items-center gap-3 h-14 px-6 text-white
+                       no-underline hover:text-white/70 transition-colors duration-300"
+          >
+            <span
+              className="tracking-wider uppercase"
+              style={{ fontSize: "11px" }}
+            >
+              Our Story
+            </span>
+            <div className="w-8 h-px bg-current" />
+          </a>
+        </div>
+
+        {/* Stats row */}
+        <div
+          data-animate
+          className="opacity-0 grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-10
+                     pt-8 border-t border-white/10"
+        >
+          {STATS.map((stat, i) => (
+            <div key={i}>
+              <p
+                className="text-white mb-1"
+                style={{
+                  fontFamily: 'Georgia, "Times New Roman", serif',
+                  fontSize: "clamp(28px, 4vw, 40px)",
+                  fontWeight: 300,
+                  letterSpacing: "-0.02em",
+                }}
+              >
+                {stat.value}
+              </p>
+              <p
+                className="text-white/30 tracking-wider uppercase"
+                style={{ fontSize: "10px" }}
+              >
+                {stat.label}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Scroll indicator */}
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 hidden md:flex flex-col items-center gap-2">
+        <span className="text-white/30 tracking-widest uppercase" style={{ fontSize: "9px" }}>
+          Scroll
+        </span>
+        <div className="w-px h-12 bg-gradient-to-b from-white/30 to-transparent" />
+      </div>
+    </section>
+  )
+})
+
+// ── Story Section ──────────────────────────────────────────
+const Story = memo(function Story() {
+  const sectionRef = useRef(null)
+  const leftRef = useRef(null)
+  const rightRef = useRef(null)
+
+  useScrollAnimation(
+    sectionRef,
+    (gsap, ScrollTrigger) => {
+      gsap.fromTo(
+        leftRef.current,
+        { opacity: 0, x: -40 },
+        {
+          opacity: 1,
+          x: 0,
+          duration: 1,
+          ease: "power3.out",
+          scrollTrigger: {
+            trigger: sectionRef.current,
+            start: "top 75%",
+            once: true,
+          },
+        }
+      )
+
+      gsap.fromTo(
+        rightRef.current,
+        { opacity: 0, x: 40 },
+        {
+          opacity: 1,
+          x: 0,
+          duration: 1,
+          ease: "power3.out",
+          scrollTrigger: {
+            trigger: sectionRef.current,
+            start: "top 75%",
+            once: true,
+          },
+        }
+      )
+    },
+    []
+  )
+
+  return (
+    <section
+      ref={sectionRef}
+      id="story"
+      className="w-full bg-white py-20 md:py-32 lg:py-40"
+      style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
+    >
+      <div className="max-w-7xl mx-auto px-5 sm:px-8 md:px-12 lg:px-16">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+          {/* Left: Image composition */}
+          <div ref={leftRef} className="relative opacity-0">
+            {/* Main image */}
+            <div className="relative aspect-[4/5] rounded-2xl overflow-hidden bg-gray-100">
+              <img
+                src="https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?q=80&w=1000&auto=format&fit=crop"
+                alt="Professional car cleaning"
+                className="w-full h-full object-cover"
+                loading="lazy"
+              />
+            </div>
+
+            {/* Floating card */}
+            <div
+              className="absolute -bottom-6 -right-6 md:bottom-8 md:-right-8 bg-black text-white
+                         p-6 rounded-2xl shadow-2xl max-w-[200px]"
+            >
+              <p
+                className="mb-2"
+                style={{
+                  fontFamily: 'Georgia, "Times New Roman", serif',
+                  fontSize: "36px",
+                  fontWeight: 300,
+                  lineHeight: 1,
+                }}
+              >
+                3+
+              </p>
+              <p className="text-white/50 leading-snug" style={{ fontSize: "13px" }}>
+                Years serving Duliajan with quality cleaning
+              </p>
+            </div>
+
+            {/* Decorative element */}
+            <div
+              className="absolute -top-4 -left-4 w-24 h-24 border border-black/10 rounded-2xl -z-10"
+              aria-hidden="true"
+            />
+          </div>
+
+          {/* Right: Content */}
+          <div ref={rightRef} className="opacity-0">
+            <div className="flex items-center gap-3 mb-6">
+              <span className="w-10 h-px bg-black" />
+              <span
+                className="tracking-[0.4em] uppercase text-gray-400"
+                style={{ fontSize: "10px" }}
+              >
+                Our Story
+              </span>
+            </div>
+
+            <h2
+              className="text-black mb-8"
+              style={{
+                fontFamily: 'Georgia, "Times New Roman", serif',
+                fontWeight: 300,
+                fontSize: "clamp(2rem, 4vw, 3rem)",
+                lineHeight: 1.15,
+                letterSpacing: "-0.02em",
+              }}
+            >
+              Built on a Simple
+              <br />
+              <span className="text-gray-300">Idea</span>
+            </h2>
+
+            <div className="space-y-5 mb-10">
+              <p className="text-gray-500 leading-relaxed" style={{ fontSize: "15px" }}>
+                <span className="text-black font-medium">Your time is valuable.</span>{" "}
+                That's the belief that started Wash2Door. We saw people spending
+                hours at car washes, waiting in queues, dealing with inconsistent
+                results.
+              </p>
+
+              <p className="text-gray-500 leading-relaxed" style={{ fontSize: "15px" }}>
+                We thought — what if we brought the car wash to you? What if
+                cleaning your car was as simple as booking a slot on your phone?
+              </p>
+
+              <p className="text-gray-500 leading-relaxed" style={{ fontSize: "15px" }}>
+                Today, we serve 100+ happy customers in Duliajan. From car washing
+                to sofa cleaning to water tank maintenance — we handle it all at
+                your doorstep.
+              </p>
+            </div>
+
+            {/* Quote */}
+            <blockquote className="relative pl-6 py-4 border-l-2 border-black mb-10">
+              <p
+                className="text-black italic"
+                style={{
+                  fontFamily: 'Georgia, "Times New Roman", serif',
+                  fontSize: "20px",
+                  lineHeight: 1.5,
+                }}
+              >
+                "You book. We clean. You enjoy."
+              </p>
+              <cite
+                className="text-gray-400 not-italic mt-3 block"
+                style={{ fontSize: "13px" }}
+              >
+                — The Wash2Door Promise
+              </cite>
+            </blockquote>
+
+            {/* CTA */}
+            <a
+              href="/services"
+              className="group inline-flex items-center gap-3 text-black no-underline"
+            >
+              <span
+                className="tracking-wider uppercase border-b border-black pb-1
+                           group-hover:border-gray-400 transition-colors duration-300"
+                style={{ fontSize: "11px", fontWeight: 500 }}
+              >
+                Explore Our Services
+              </span>
+              <ArrowUpRight
+                size={14}
+                className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5
+                           transition-transform duration-300"
+              />
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+})
+
+// ── Features Section ───────────────────────────────────────
+const Features = memo(function Features() {
+  const sectionRef = useRef(null)
+  const headerRef = useRef(null)
+  const gridRef = useRef(null)
+
+  useScrollAnimation(
+    sectionRef,
+    (gsap, ScrollTrigger) => {
+      gsap.fromTo(
+        headerRef.current,
+        { opacity: 0, y: 30 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.8,
+          ease: "power3.out",
+          scrollTrigger: {
+            trigger: sectionRef.current,
+            start: "top 80%",
+            once: true,
+          },
+        }
+      )
+
+      const cards = gridRef.current.querySelectorAll("[data-feature]")
+      gsap.fromTo(
+        cards,
+        { opacity: 0, y: 40 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.8,
+          stagger: 0.1,
+          ease: "power4.out",
+          scrollTrigger: {
+            trigger: gridRef.current,
+            start: "top 80%",
+            once: true,
+          },
+        }
+      )
+    },
+    []
+  )
+
+  return (
+    <section
+      ref={sectionRef}
+      className="w-full bg-gray-50 py-20 md:py-28 lg:py-32"
+      style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
+    >
+      <div className="max-w-7xl mx-auto px-5 sm:px-8 md:px-12 lg:px-16">
+        {/* Header */}
+        <div ref={headerRef} className="text-center mb-16 md:mb-20 opacity-0">
+          <div className="flex items-center justify-center gap-3 mb-6">
+            <span className="w-10 h-px bg-black" />
+            <span
+              className="tracking-[0.4em] uppercase text-gray-400"
+              style={{ fontSize: "10px" }}
+            >
+              Why Us
+            </span>
+            <span className="w-10 h-px bg-black" />
+          </div>
+
+          <h2
+            className="text-black mb-5"
+            style={{
+              fontFamily: 'Georgia, "Times New Roman", serif',
+              fontWeight: 300,
+              fontSize: "clamp(2rem, 4vw, 3rem)",
+              lineHeight: 1.15,
+              letterSpacing: "-0.02em",
+            }}
+          >
+            What Makes Us Different
+          </h2>
+
+          <p
+            className="text-gray-400 max-w-lg mx-auto leading-relaxed"
+            style={{ fontSize: "15px" }}
+          >
+            We're not just another cleaning service. Here's why customers
+            choose Wash2Door.
+          </p>
+        </div>
+
+        {/* Features grid */}
+        <div
+          ref={gridRef}
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
+        >
+          {FEATURES.map((feature, i) => {
+            const Icon = feature.icon
+
             return (
               <div
                 key={i}
-                className="group flex flex-col border border-gray-200 p-6 md:p-7 bg-white
-                           hover:border-black transition-all duration-500 rounded-[5px]
-                           hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)]"
+                data-feature
+                className="group relative bg-white p-8 rounded-2xl opacity-0
+                           border border-transparent hover:border-black
+                           transition-all duration-500"
               >
-                <div className="w-14 h-14 border border-gray-200 rounded-full flex items-center justify-center mb-6
-                                group-hover:border-black transition-colors duration-500 shrink-0">
-                  <Icon size={20} strokeWidth={1.2} className="text-gray-400 group-hover:text-black transition-colors duration-500" />
-                </div>
-                <h3
-                  className="text-black mb-3 group-hover:opacity-70 transition-opacity duration-300"
+                {/* Number */}
+                <span
+                  className="absolute top-6 right-6 text-gray-100 group-hover:text-gray-200
+                             transition-colors duration-500"
                   style={{
                     fontFamily: 'Georgia, "Times New Roman", serif',
+                    fontSize: "48px",
                     fontWeight: 300,
-                    fontSize: 'clamp(14px, 3vw, 17px)',
-                    letterSpacing: '-0.01em',
+                    lineHeight: 1,
                   }}
                 >
-                  {item.title}
-                </h3>
-                <p
-                  className="tracking-[0.18em] leading-[1.9] uppercase text-gray-400"
-                  style={{ fontSize: 'clamp(9px, 2.2vw, 11px)' }}
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+
+                {/* Icon */}
+                <div
+                  className="w-14 h-14 rounded-full bg-gray-50 flex items-center justify-center
+                             mb-6 group-hover:bg-black transition-colors duration-500"
                 >
-                  {item.desc}
+                  <Icon
+                    size={22}
+                    strokeWidth={1.3}
+                    className="text-gray-400 group-hover:text-white transition-colors duration-500"
+                  />
+                </div>
+
+                {/* Content */}
+                <h3
+                  className="text-black mb-3"
+                  style={{
+                    fontFamily: 'Georgia, "Times New Roman", serif',
+                    fontWeight: 400,
+                    fontSize: "18px",
+                  }}
+                >
+                  {feature.title}
+                </h3>
+
+                <p className="text-gray-400 leading-relaxed" style={{ fontSize: "14px" }}>
+                  {feature.desc}
                 </p>
               </div>
             )
@@ -392,139 +611,366 @@ function WhyUs() {
       </div>
     </section>
   )
-}
+})
 
-// ── Contact CTA ──
-function ContactCTA() {
-  const ref = useRef(null)
+// ── Process Section ────────────────────────────────────────
+const Process = memo(function Process() {
+  const sectionRef = useRef(null)
+  const headerRef = useRef(null)
+  const stepsRef = useRef(null)
 
-  useEffect(() => {
-    let ctx
-    const init = async () => {
-      const { default: gsap } = await import('gsap')
-      const { ScrollTrigger } = await import('gsap/ScrollTrigger')
-      gsap.registerPlugin(ScrollTrigger)
-      if (!ref.current) return
-      ctx = gsap.context(() => {
-        gsap.fromTo(ref.current,
-          { opacity: 0, y: 30 },
-          { opacity: 1, y: 0, duration: 0.8, ease: 'power3.out', scrollTrigger: { trigger: ref.current, start: 'top 85%' } }
-        )
-      })
-    }
-    init()
-    return () => ctx?.revert()
-  }, [])
+  useScrollAnimation(
+    sectionRef,
+    (gsap, ScrollTrigger) => {
+      gsap.fromTo(
+        headerRef.current,
+        { opacity: 0, y: 30 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.8,
+          ease: "power3.out",
+          scrollTrigger: {
+            trigger: sectionRef.current,
+            start: "top 80%",
+            once: true,
+          },
+        }
+      )
+
+      const steps = stepsRef.current.querySelectorAll("[data-step]")
+      gsap.fromTo(
+        steps,
+        { opacity: 0, y: 30 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.7,
+          stagger: 0.15,
+          ease: "power3.out",
+          scrollTrigger: {
+            trigger: stepsRef.current,
+            start: "top 80%",
+            once: true,
+          },
+        }
+      )
+    },
+    []
+  )
 
   return (
     <section
-      className="w-full bg-black py-24 md:py-32"
+      ref={sectionRef}
+      className="w-full bg-black py-20 md:py-28 lg:py-32 relative overflow-hidden"
       style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
     >
-      <div className="max-w-6xl mx-auto px-8 md:px-16">
-        <div ref={ref} className="opacity-0">
+      {/* Background decoration */}
+      <div className="absolute inset-0" aria-hidden="true">
+        <div
+          className="absolute inset-0 opacity-[0.02]"
+          style={{
+            backgroundImage: `
+              linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)
+            `,
+            backgroundSize: "80px 80px",
+          }}
+        />
+      </div>
 
-          <div className="flex items-center gap-3 mb-8">
-            <span className="block w-6 h-px bg-white/30 shrink-0" />
+      <div className="max-w-7xl mx-auto px-5 sm:px-8 md:px-12 lg:px-16 relative z-10">
+        {/* Header */}
+        <div ref={headerRef} className="text-center mb-16 md:mb-20 opacity-0">
+          <div className="flex items-center justify-center gap-3 mb-6">
+            <span className="w-10 h-px bg-white/30" />
             <span
               className="tracking-[0.4em] uppercase text-white/50"
-              style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontSize: 'clamp(9px, 2.2vw, 11px)' }}
+              style={{ fontSize: "10px" }}
             >
-              Get In Touch
+              How It Works
             </span>
+            <span className="w-10 h-px bg-white/30" />
           </div>
 
-          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-10">
-            <div className="flex-1">
-              <h2
-                className="text-white mb-6"
-                style={{
-                  fontFamily: 'Georgia, "Times New Roman", serif',
-                  fontWeight: 300,
-                  fontSize: 'clamp(2rem, 4vw, 3.8rem)',
-                  lineHeight: 1.08,
-                  letterSpacing: '-0.01em',
-                }}
-              >
-                Ready to Book a Service?
-              </h2>
+          <h2
+            className="text-white mb-5"
+            style={{
+              fontFamily: 'Georgia, "Times New Roman", serif',
+              fontWeight: 300,
+              fontSize: "clamp(2rem, 4vw, 3rem)",
+              lineHeight: 1.15,
+              letterSpacing: "-0.02em",
+            }}
+          >
+            Simple as <span className="italic text-white/50">1-2-3-4</span>
+          </h2>
+        </div>
 
-              <div className="flex flex-col gap-4">
-                <a
-                  href="tel:6900706456"
-                  className="flex items-center gap-3 no-underline group w-fit"
+        {/* Steps */}
+        <div ref={stepsRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {PROCESS_STEPS.map((step, i) => (
+            <div
+              key={i}
+              data-step
+              className="relative opacity-0 group"
+            >
+              {/* Connector line */}
+              {i < PROCESS_STEPS.length - 1 && (
+                <div
+                  className="hidden lg:block absolute top-10 left-full w-full h-px bg-white/10"
+                  style={{ width: "calc(100% - 2rem)" }}
+                  aria-hidden="true"
+                />
+              )}
+
+              {/* Card */}
+              <div className="relative bg-white/[0.03] border border-white/10 rounded-2xl p-6
+                              hover:bg-white/[0.06] hover:border-white/20
+                              transition-all duration-500">
+                {/* Number */}
+                <span
+                  className="text-white/10 block mb-4 group-hover:text-white/20
+                             transition-colors duration-500"
+                  style={{
+                    fontFamily: 'Georgia, "Times New Roman", serif',
+                    fontSize: "56px",
+                    fontWeight: 300,
+                    lineHeight: 1,
+                  }}
                 >
-                  <Phone size={13} strokeWidth={1.5} className="text-white/30 shrink-0" />
-                  <span
-                    className="tracking-[0.18em] uppercase text-white/60 group-hover:text-white transition-colors duration-300"
-                    style={{ fontSize: 'clamp(10px, 2.4vw, 11px)' }}
-                  >
-                    +91 6900706456
-                  </span>
-                </a>
-                <a
-                  href="mailto:Wash2Door786602@gmail.com"
-                  className="flex items-center gap-3 no-underline group w-fit"
+                  {step.number}
+                </span>
+
+                <h3
+                  className="text-white mb-2"
+                  style={{
+                    fontFamily: 'Georgia, "Times New Roman", serif',
+                    fontWeight: 400,
+                    fontSize: "18px",
+                  }}
                 >
-                  <Mail size={13} strokeWidth={1.5} className="text-white/30 shrink-0" />
+                  {step.title}
+                </h3>
+
+                <p className="text-white/40 leading-relaxed" style={{ fontSize: "14px" }}>
+                  {step.desc}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* CTA */}
+        <div className="text-center mt-12 md:mt-16">
+          <a
+            href="/bookings"
+            className="group inline-flex items-center gap-3 h-14 px-8 bg-white text-black
+                       rounded-full no-underline hover:bg-gray-100
+                       active:scale-[0.97] transition-all duration-300"
+          >
+            <span
+              className="tracking-wider uppercase"
+              style={{ fontSize: "11px", fontWeight: 500 }}
+            >
+              Start Booking
+            </span>
+            <ArrowRight
+              size={16}
+              className="group-hover:translate-x-0.5 transition-transform duration-300"
+            />
+          </a>
+        </div>
+      </div>
+    </section>
+  )
+})
+
+// ── Services Preview ───────────────────────────────────────
+const ServicesPreview = memo(function ServicesPreview() {
+  const sectionRef = useRef(null)
+  const contentRef = useRef(null)
+
+  useScrollAnimation(
+    sectionRef,
+    (gsap, ScrollTrigger) => {
+      const elements = contentRef.current.querySelectorAll("[data-animate]")
+      gsap.fromTo(
+        elements,
+        { opacity: 0, y: 30 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.8,
+          stagger: 0.1,
+          ease: "power3.out",
+          scrollTrigger: {
+            trigger: sectionRef.current,
+            start: "top 75%",
+            once: true,
+          },
+        }
+      )
+    },
+    []
+  )
+
+  return (
+    <section
+      ref={sectionRef}
+      className="w-full bg-white py-20 md:py-28 lg:py-32"
+      style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
+    >
+      <div className="max-w-7xl mx-auto px-5 sm:px-8 md:px-12 lg:px-16">
+        <div
+          ref={contentRef}
+          className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center"
+        >
+          {/* Left: Content */}
+          <div>
+            <div data-animate className="flex items-center gap-3 mb-6 opacity-0">
+              <span className="w-10 h-px bg-black" />
+              <span
+                className="tracking-[0.4em] uppercase text-gray-400"
+                style={{ fontSize: "10px" }}
+              >
+                Our Services
+              </span>
+            </div>
+
+            <h2
+              data-animate
+              className="opacity-0 text-black mb-6"
+              style={{
+                fontFamily: 'Georgia, "Times New Roman", serif',
+                fontWeight: 300,
+                fontSize: "clamp(2rem, 4vw, 3rem)",
+                lineHeight: 1.15,
+                letterSpacing: "-0.02em",
+              }}
+            >
+              What We
+              <br />
+              <span className="text-gray-300">Clean</span>
+            </h2>
+
+            <p
+              data-animate
+              className="opacity-0 text-gray-500 leading-relaxed mb-10 max-w-md"
+              style={{ fontSize: "15px" }}
+            >
+              From cars to sofas to water tanks — we've got your cleaning needs
+              covered. All services delivered at your doorstep.
+            </p>
+
+            {/* Services list */}
+            <div data-animate className="space-y-0 mb-10 opacity-0">
+              {SERVICES_LIST.map((service, i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-between py-4 border-b border-gray-100
+                             group hover:pl-2 transition-all duration-300"
+                >
+                  <div className="flex items-center gap-3">
+                    <Check size={14} className="text-gray-300" />
+                    <span
+                      className="text-black group-hover:text-gray-500
+                                 transition-colors duration-300"
+                      style={{ fontSize: "15px" }}
+                    >
+                      {service.name}
+                    </span>
+                  </div>
                   <span
-                    className="tracking-[0.18em] uppercase text-white/60 group-hover:text-white transition-colors duration-300"
-                    style={{ fontSize: 'clamp(10px, 2.4vw, 11px)' }}
+                    className="text-gray-400"
+                    style={{
+                      fontFamily: 'Georgia, "Times New Roman", serif',
+                      fontSize: "15px",
+                    }}
                   >
-                    Wash2Door786602@gmail.com
-                  </span>
-                </a>
-                <div className="flex items-center gap-3">
-                  <MapPin size={13} strokeWidth={1.5} className="text-white/30 shrink-0" />
-                  <span
-                    className="tracking-[0.18em] uppercase text-white/40"
-                    style={{ fontSize: 'clamp(10px, 2.4vw, 11px)' }}
-                  >
-                    Near Sonapur Namghar, Duliajan, Assam
+                    {service.price}
                   </span>
                 </div>
+              ))}
+            </div>
+
+            <a
+              data-animate
+              href="/services"
+              className="opacity-0 group inline-flex items-center gap-3 h-13 px-7
+                         bg-black text-white rounded-full no-underline
+                         hover:bg-gray-800 active:scale-[0.97]
+                         transition-all duration-300"
+            >
+              <span
+                className="tracking-wider uppercase"
+                style={{ fontSize: "11px", fontWeight: 500 }}
+              >
+                View All Services
+              </span>
+              <ArrowRight
+                size={15}
+                className="group-hover:translate-x-0.5 transition-transform duration-300"
+              />
+            </a>
+          </div>
+
+          {/* Right: Image */}
+          <div data-animate className="relative opacity-0">
+            <div className="relative aspect-square rounded-2xl overflow-hidden bg-gray-100">
+              <img
+                src="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=80&w=1000&auto=format&fit=crop"
+                alt="Professional car detailing"
+                className="w-full h-full object-cover"
+                loading="lazy"
+              />
+
+              {/* Overlay card */}
+              <div className="absolute bottom-6 left-6 right-6 bg-white/95 backdrop-blur-sm
+                              p-5 rounded-xl">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="flex -space-x-2">
+                    {[1, 2, 3].map((_, i) => (
+                      <div
+                        key={i}
+                        className="w-8 h-8 rounded-full bg-gray-200 border-2 border-white"
+                      />
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map((_, i) => (
+                      <Star key={i} size={12} fill="#000" strokeWidth={0} />
+                    ))}
+                  </div>
+                </div>
+                <p className="text-gray-500" style={{ fontSize: "13px" }}>
+                  <span className="text-black font-medium">100+ customers</span> trust us
+                </p>
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-4 md:mb-2">
-              <a
-                href="/Bookings"
-                className="relative flex items-center gap-2 tracking-[0.22em] uppercase
-                           text-black bg-white border border-white px-7 py-4 no-underline
-                           overflow-hidden group rounded-[5px]"
-                style={{ fontSize: 'clamp(9px, 2.2vw, 11px)' }}
-              >
-                <span className="absolute inset-0 bg-black origin-bottom scale-y-0 group-hover:scale-y-100 transition-transform duration-500 ease-out" />
-                <span className="relative z-10 group-hover:text-white transition-colors duration-500">Book Now</span>
-                <ArrowUpRight size={13} strokeWidth={1.5} className="relative z-10 group-hover:text-white transition-colors duration-500" />
-              </a>
-              <a
-                href="/Services"
-                className="relative flex items-center gap-2 tracking-[0.22em] uppercase
-                           text-white border border-white/30 px-7 py-4 no-underline
-                           overflow-hidden group rounded-[5px]"
-                style={{ fontSize: 'clamp(9px, 2.2vw, 11px)' }}
-              >
-                <span className="absolute inset-0 bg-white origin-bottom scale-y-0 group-hover:scale-y-100 transition-transform duration-500 ease-out" />
-                <span className="relative z-10 group-hover:text-black transition-colors duration-500">Our Services</span>
-                <ArrowUpRight size={13} strokeWidth={1.5} className="relative z-10 group-hover:text-black transition-colors duration-500" />
-              </a>
-            </div>
+            {/* Decorative */}
+            <div
+              className="absolute -bottom-4 -right-4 w-32 h-32 border border-black/10
+                         rounded-2xl -z-10"
+              aria-hidden="true"
+            />
           </div>
         </div>
       </div>
     </section>
   )
-}
+})
 
-// ── Page ──
+// ── Main Page ──────────────────────────────────────────────
 export default function AboutPage() {
   return (
     <main>
       <Hero />
-      <WhoWeAre />
-      <WhyUs />
-      <ContactCTA />
+      <Story />
+      <Features />
+      <Process />
+      <ServicesPreview />
     </main>
   )
 }
