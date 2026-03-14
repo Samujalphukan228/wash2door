@@ -1,129 +1,268 @@
-// components/Services.jsx
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useCallback, memo } from "react"
 import { ArrowUpRight, ArrowRight, Shield, Clock, Sparkles } from "lucide-react"
 import { getCategories } from "@/lib/services.api"
 
-/* ═══════════════════════════════════════
-   MOBILE CARD - Bento Style with Variants
-═══════════════════════════════════════ */
-function MobileServiceCard({ category, index, variant = "default" }) {
+// ── Constants ──────────────────────────────────────────────
+const TRUST_ITEMS = [
+  { icon: Shield, label: "Satisfaction", desc: "Guaranteed" },
+  { icon: Clock, label: "Same-Day", desc: "Service" },
+  { icon: Sparkles, label: "Eco-Friendly", desc: "Products" },
+]
+
+const ANIMATION_CONFIG = {
+  card: {
+    duration: 0.9,
+    stagger: 0.08,
+    ease: "power4.out",
+  },
+  header: {
+    duration: 0.8,
+    ease: "power3.out",
+  },
+  trust: {
+    duration: 0.6,
+    stagger: 0.1,
+    ease: "power3.out",
+  },
+}
+
+// ── Utils ──────────────────────────────────────────────────
+function getMobileVariant(index, total) {
+  if (index === 0) return "large"
+  if (index === 3 && total > 4) return "tall"
+  if (index === 4 && total > 5) return "wide"
+  return "default"
+}
+
+function getVariantClasses(variant) {
+  switch (variant) {
+    case "large":
+      return "col-span-2 row-span-2"
+    case "tall":
+      return "row-span-2"
+    case "wide":
+      return "col-span-2"
+    default:
+      return ""
+  }
+}
+
+// ── Shared Hook: GSAP ScrollTrigger Animation ──────────────
+function useScrollAnimation(ref, config, deps = []) {
+  useEffect(() => {
+    if (!ref.current) return
+
+    let ctx
+    let observer
+
+    const init = async () => {
+      // Use IntersectionObserver for initial visibility check
+      // This prevents GSAP from running on elements far outside viewport
+      observer = new IntersectionObserver(
+        async (entries) => {
+          if (entries[0].isIntersecting) {
+            observer.disconnect()
+
+            const { default: gsap } = await import("gsap")
+            const { ScrollTrigger } = await import("gsap/ScrollTrigger")
+            gsap.registerPlugin(ScrollTrigger)
+
+            ctx = gsap.context(() => {
+              config(gsap, ScrollTrigger)
+            })
+          }
+        },
+        { rootMargin: "100px" }
+      )
+
+      observer.observe(ref.current)
+    }
+
+    init()
+
+    return () => {
+      observer?.disconnect()
+      ctx?.revert()
+    }
+  }, deps)
+}
+
+// ── Subcomponents ──────────────────────────────────────────
+
+const ServiceBadge = memo(function ServiceBadge({ count, size = "sm" }) {
+  if (!count || count <= 0) return null
+
+  const sizeClasses = size === "lg" ? "h-7 px-3" : "px-2.5 py-1"
+
+  return (
+    <span
+      className={`inline-flex items-center ${sizeClasses} rounded-full
+                  bg-white/10 backdrop-blur-md border border-white/10`}
+    >
+      <span
+        className="text-white/70 tracking-wider uppercase"
+        style={{ fontSize: "9px", fontWeight: 500 }}
+      >
+        {count} {size === "lg" ? "services" : ""}
+      </span>
+    </span>
+  )
+})
+
+const ArrowButton = memo(function ArrowButton({
+  size = "sm",
+  animated = false,
+}) {
+  const dimensions = size === "lg" ? "w-11 h-11" : size === "md" ? "w-10 h-10" : "w-9 h-9"
+  const iconSize = size === "lg" ? 16 : size === "md" ? 16 : 14
+
+  return (
+    <div
+      className={`${dimensions} rounded-full bg-white/10 backdrop-blur-md
+                  border border-white/10 flex items-center justify-center
+                  ${animated
+          ? "group-hover:bg-white group-hover:border-white transition-all duration-500"
+          : ""
+        }`}
+    >
+      <ArrowUpRight
+        size={iconSize}
+        strokeWidth={1.5}
+        className={`text-white ${animated
+            ? "group-hover:text-black group-hover:rotate-45 transition-all duration-500"
+            : ""
+          }`}
+      />
+    </div>
+  )
+})
+
+const CardImage = memo(function CardImage({ src, alt, icon, size = "md", animated = false }) {
+  if (src) {
+    return (
+      <img
+        src={src}
+        alt={alt}
+        className={`w-full h-full object-cover ${animated
+            ? "transition-transform duration-700 ease-out group-hover:scale-105"
+            : ""
+          }`}
+        loading="lazy"
+        decoding="async"
+      />
+    )
+  }
+
+  const iconSize = size === "lg" ? "text-7xl" : size === "md" ? "text-6xl" : "text-4xl"
+
+  return (
+    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
+      <span className={iconSize}>{icon || "🚗"}</span>
+    </div>
+  )
+})
+
+// ── Mobile Service Card ────────────────────────────────────
+
+const MobileServiceCard = memo(function MobileServiceCard({
+  category,
+  index,
+  variant = "default",
+}) {
   const cardRef = useRef(null)
   const image = category.image?.url
 
-  useEffect(() => {
-    let ctx
-    const init = async () => {
-      const { default: gsap } = await import("gsap")
-      const { ScrollTrigger } = await import("gsap/ScrollTrigger")
-      gsap.registerPlugin(ScrollTrigger)
-      if (!cardRef.current) return
-
-      ctx = gsap.context(() => {
-        gsap.fromTo(
-          cardRef.current,
-          { y: 50, opacity: 0, scale: 0.95 },
-          {
-            y: 0,
-            opacity: 1,
-            scale: 1,
-            duration: 0.8,
-            ease: "power3.out",
-            delay: index * 0.08,
-            scrollTrigger: {
-              trigger: cardRef.current,
-              start: "top 92%",
-            },
-          }
-        )
-      })
-    }
-    init()
-    return () => ctx?.revert()
-  }, [index])
-
-  // Different styles based on variant
   const isLarge = variant === "large"
   const isTall = variant === "tall"
   const isWide = variant === "wide"
+  const isExpanded = isLarge || isTall || isWide
+
+  useScrollAnimation(
+    cardRef,
+    (gsap, ScrollTrigger) => {
+      gsap.fromTo(
+        cardRef.current,
+        {
+          y: 40,
+          opacity: 0,
+          scale: 0.97,
+        },
+        {
+          y: 0,
+          opacity: 1,
+          scale: 1,
+          duration: ANIMATION_CONFIG.card.duration,
+          ease: ANIMATION_CONFIG.card.ease,
+          delay: index * ANIMATION_CONFIG.card.stagger,
+          scrollTrigger: {
+            trigger: cardRef.current,
+            start: "top 95%",
+            once: true,
+          },
+        }
+      )
+    },
+    [index]
+  )
 
   return (
     <a
       ref={cardRef}
       href={`/services?category=${category._id}`}
-      className={`group block relative overflow-hidden rounded-3xl
-                 active:scale-[0.97] transition-all duration-300 no-underline opacity-0
-                 ${isLarge ? "col-span-2 row-span-2" : ""}
-                 ${isTall ? "row-span-2" : ""}
-                 ${isWide ? "col-span-2" : ""}`}
+      className={`group block relative overflow-hidden rounded-2xl
+                  active:scale-[0.98] transition-transform duration-200
+                  no-underline opacity-0 will-change-transform
+                  ${getVariantClasses(variant)}`}
+      style={{ WebkitTapHighlightColor: "transparent" }}
     >
-      {/* Background Image */}
+      {/* Background */}
       <div className="absolute inset-0 bg-gray-100">
-        {image ? (
-          <img
-            src={image}
-            alt={category.name}
-            className="w-full h-full object-cover"
-            loading="lazy"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
-            <span className={`${isLarge || isTall ? "text-6xl" : "text-4xl"}`}>
-              {category.icon || "🚗"}
-            </span>
-          </div>
-        )}
+        <CardImage
+          src={image}
+          alt={category.name}
+          icon={category.icon}
+          size={isLarge ? "lg" : "md"}
+        />
       </div>
 
-      {/* Gradient Overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+      {/* Gradient */}
+      <div
+        className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"
+        aria-hidden="true"
+      />
 
       {/* Content */}
-      <div className={`relative z-10 h-full flex flex-col justify-between
-                       ${isLarge ? "p-6" : isTall ? "p-5" : "p-4"}`}>
-        {/* Top Row */}
+      <div
+        className={`relative z-10 h-full flex flex-col justify-between
+                    ${isLarge ? "p-5" : isTall ? "p-4" : "p-3.5"}`}
+      >
+        {/* Top */}
         <div className="flex items-start justify-between">
-          {category.totalServices > 0 && (
-            <span
-              className="px-2.5 py-1 bg-white/15 backdrop-blur-md rounded-full
-                         border border-white/10"
-            >
-              <span
-                className="text-white/80 tracking-wider uppercase"
-                style={{ fontSize: "9px" }}
-              >
-                {category.totalServices}
-              </span>
-            </span>
-          )}
-
-          <div
-            className={`rounded-full bg-white/15 backdrop-blur-md border border-white/10
-                        flex items-center justify-center ml-auto
-                        ${isLarge || isTall ? "w-11 h-11" : "w-9 h-9"}`}
-          >
-            <ArrowUpRight
-              size={isLarge || isTall ? 16 : 14}
-              className="text-white"
-            />
+          <ServiceBadge count={category.totalServices} />
+          <div className="ml-auto">
+            <ArrowButton size={isExpanded ? "md" : "sm"} />
           </div>
         </div>
 
-        {/* Bottom Content */}
+        {/* Bottom */}
         <div>
           {category.icon && (
-            <span className={`block mb-1.5 ${isLarge ? "text-2xl" : "text-lg"}`}>
+            <span
+              className={`block mb-1 ${isLarge ? "text-xl" : "text-base"}`}
+              aria-hidden="true"
+            >
               {category.icon}
             </span>
           )}
 
           <h3
-            className="text-white mb-1"
+            className="text-white"
             style={{
               fontFamily: 'Georgia, "Times New Roman", serif',
-              fontWeight: 300,
-              fontSize: isLarge ? "24px" : isTall ? "20px" : "16px",
+              fontWeight: 400,
+              fontSize: isLarge ? "22px" : isTall ? "18px" : "15px",
               lineHeight: 1.2,
               letterSpacing: "-0.02em",
             }}
@@ -131,10 +270,10 @@ function MobileServiceCard({ category, index, variant = "default" }) {
             {category.name}
           </h3>
 
-          {(isLarge || isTall || isWide) && category.description && (
+          {isExpanded && category.description && (
             <p
-              className="text-white/50 line-clamp-2 leading-relaxed"
-              style={{ fontSize: "12px" }}
+              className="text-white/45 line-clamp-2 mt-1.5 leading-relaxed"
+              style={{ fontSize: "11px" }}
             >
               {category.description}
             </p>
@@ -143,110 +282,80 @@ function MobileServiceCard({ category, index, variant = "default" }) {
       </div>
     </a>
   )
-}
+})
 
-/* ═══════════════════════════════════════
-   DESKTOP CARD - Bento style (unchanged)
-═══════════════════════════════════════ */
-function DesktopServiceCard({ category, index, variant = "default" }) {
+// ── Desktop Service Card ───────────────────────────────────
+
+const DesktopServiceCard = memo(function DesktopServiceCard({
+  category,
+  index,
+  variant = "default",
+}) {
   const cardRef = useRef(null)
   const image = category.image?.url
   const isFeatured = variant === "featured"
 
-  useEffect(() => {
-    let ctx
-    const init = async () => {
-      const { default: gsap } = await import("gsap")
-      const { ScrollTrigger } = await import("gsap/ScrollTrigger")
-      gsap.registerPlugin(ScrollTrigger)
-      if (!cardRef.current) return
-
-      ctx = gsap.context(() => {
-        gsap.fromTo(
-          cardRef.current,
-          { y: 80, opacity: 0, scale: 0.95 },
-          {
-            y: 0,
-            opacity: 1,
-            scale: 1,
-            duration: 1,
-            ease: "power3.out",
-            delay: index * 0.1,
-            scrollTrigger: {
-              trigger: cardRef.current,
-              start: "top 90%",
-            },
-          }
-        )
-      })
-    }
-    init()
-    return () => ctx?.revert()
-  }, [index])
+  useScrollAnimation(
+    cardRef,
+    (gsap, ScrollTrigger) => {
+      gsap.fromTo(
+        cardRef.current,
+        {
+          y: 60,
+          opacity: 0,
+          scale: 0.96,
+        },
+        {
+          y: 0,
+          opacity: 1,
+          scale: 1,
+          duration: ANIMATION_CONFIG.card.duration,
+          ease: ANIMATION_CONFIG.card.ease,
+          delay: index * ANIMATION_CONFIG.card.stagger,
+          scrollTrigger: {
+            trigger: cardRef.current,
+            start: "top 92%",
+            once: true,
+          },
+        }
+      )
+    },
+    [index]
+  )
 
   return (
     <a
       ref={cardRef}
       href={`/services?category=${category._id}`}
       className={`group block relative overflow-hidden rounded-3xl no-underline
-                  transition-transform duration-300 hover:scale-[1.02] opacity-0
+                  opacity-0 will-change-transform
                   ${isFeatured ? "md:row-span-2" : ""}`}
     >
       {/* Image */}
-      <div className="absolute inset-0 bg-gray-100">
-        {image ? (
-          <img
-            src={image}
-            alt={category.name}
-            className="w-full h-full object-cover transition-transform duration-700
-                       group-hover:scale-110"
-            loading="lazy"
-          />
-        ) : (
-          <div
-            className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200
-                          flex items-center justify-center"
-          >
-            <span className={`${isFeatured ? "text-7xl" : "text-5xl"}`}>
-              {category.icon || "🚗"}
-            </span>
-          </div>
-        )}
+      <div className="absolute inset-0 bg-gray-100 overflow-hidden">
+        <CardImage
+          src={image}
+          alt={category.name}
+          icon={category.icon}
+          size={isFeatured ? "lg" : "md"}
+          animated
+        />
       </div>
 
       {/* Overlay */}
       <div
-        className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent
-                      group-hover:from-black/90 transition-all duration-500"
+        className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent
+                   group-hover:from-black/85 transition-all duration-500"
+        aria-hidden="true"
       />
 
       {/* Content */}
       <div className="relative z-10 h-full min-h-[280px] flex flex-col justify-between p-6">
         {/* Top */}
         <div className="flex items-start justify-between">
-          {category.totalServices > 0 && (
-            <span
-              className="inline-flex items-center h-7 px-3 rounded-full
-                         bg-white/10 backdrop-blur-md border border-white/10
-                         tracking-widest uppercase text-white/70"
-              style={{ fontSize: "9px" }}
-            >
-              {category.totalServices} services
-            </span>
-          )}
-
-          <div
-            className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md
-                        border border-white/10 flex items-center justify-center ml-auto
-                        group-hover:bg-white group-hover:border-white
-                        transition-all duration-500"
-          >
-            <ArrowUpRight
-              size={16}
-              strokeWidth={1.5}
-              className="text-white group-hover:text-black transition-colors duration-500
-                         group-hover:rotate-45"
-            />
+          <ServiceBadge count={category.totalServices} size="lg" />
+          <div className="ml-auto">
+            <ArrowButton size="md" animated />
           </div>
         </div>
 
@@ -254,7 +363,10 @@ function DesktopServiceCard({ category, index, variant = "default" }) {
         <div>
           <div className="flex items-center gap-2.5 mb-2">
             {category.icon && (
-              <span className={isFeatured ? "text-xl" : "text-base"}>
+              <span
+                className={isFeatured ? "text-xl" : "text-base"}
+                aria-hidden="true"
+              >
                 {category.icon}
               </span>
             )}
@@ -262,8 +374,8 @@ function DesktopServiceCard({ category, index, variant = "default" }) {
               className="text-white"
               style={{
                 fontFamily: 'Georgia, "Times New Roman", serif',
-                fontWeight: 300,
-                fontSize: isFeatured ? "28px" : "20px",
+                fontWeight: 400,
+                fontSize: isFeatured ? "26px" : "20px",
                 letterSpacing: "-0.02em",
                 lineHeight: 1.15,
               }}
@@ -284,132 +396,260 @@ function DesktopServiceCard({ category, index, variant = "default" }) {
       </div>
     </a>
   )
-}
+})
 
-/* ═══════════════════════════════════════
-   SKELETON LOADERS
-═══════════════════════════════════════ */
-function MobileSkeleton({ variant = "default" }) {
-  const isLarge = variant === "large"
-  const isTall = variant === "tall"
-  const isWide = variant === "wide"
+// ── Skeleton Loaders ───────────────────────────────────────
+
+const SkeletonCard = memo(function SkeletonCard({ variant = "default", desktop = false }) {
+  const baseClasses = "bg-gray-100 animate-pulse"
+
+  if (desktop) {
+    return (
+      <div
+        className={`${baseClasses} rounded-3xl
+                    ${variant === "featured" ? "md:row-span-2 min-h-[580px]" : "min-h-[280px]"}`}
+      />
+    )
+  }
 
   return (
     <div
-      className={`bg-gray-100 rounded-3xl animate-pulse
-                  ${isLarge ? "col-span-2 row-span-2" : ""}
-                  ${isTall ? "row-span-2" : ""}
-                  ${isWide ? "col-span-2" : ""}`}
+      className={`${baseClasses} rounded-2xl ${getVariantClasses(variant)}`}
     />
+  )
+})
+
+function LoadingGrid() {
+  return (
+    <>
+      {/* Mobile */}
+      <div className="md:hidden grid grid-cols-2 gap-3 auto-rows-[140px]">
+        <SkeletonCard variant="large" />
+        <SkeletonCard />
+        <SkeletonCard />
+        <SkeletonCard variant="tall" />
+        <SkeletonCard variant="wide" />
+      </div>
+
+      {/* Desktop */}
+      <div className="hidden md:grid md:grid-cols-3 gap-5 auto-rows-[280px]">
+        <SkeletonCard variant="featured" desktop />
+        {[...Array(4)].map((_, i) => (
+          <SkeletonCard key={i} desktop />
+        ))}
+      </div>
+    </>
   )
 }
 
-function DesktopSkeleton({ featured }) {
+// ── Trust Bar ──────────────────────────────────────────────
+
+const TrustItem = memo(function TrustItem({ icon: Icon, label, desc }) {
   return (
     <div
-      className={`bg-gray-100 rounded-3xl animate-pulse
-                  ${featured ? "md:row-span-2 min-h-[580px]" : "min-h-[280px]"}`}
-    />
+      className="opacity-0 flex flex-col items-center text-center p-3 sm:p-4
+                 rounded-2xl bg-gray-50/80
+                 sm:flex-row sm:items-center sm:text-left sm:gap-3
+                 will-change-transform"
+    >
+      <div
+        className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white shadow-sm
+                   flex items-center justify-center shrink-0 mb-2 sm:mb-0"
+      >
+        <Icon size={18} strokeWidth={1.3} className="text-gray-400" />
+      </div>
+      <div>
+        <p
+          className="text-black text-xs sm:text-sm leading-tight"
+          style={{ fontFamily: "Georgia, serif", fontWeight: 400 }}
+        >
+          {label}
+        </p>
+        <p className="text-gray-400 text-[10px] sm:text-xs leading-tight">
+          {desc}
+        </p>
+      </div>
+    </div>
   )
-}
-
-/* ═══════════════════════════════════════
-   TRUST BADGES
-═══════════════════════════════════════ */
-const trustItems = [
-  { icon: Shield, label: "Satisfaction", desc: "Guaranteed" },
-  { icon: Clock, label: "Same-Day", desc: "Service" },
-  { icon: Sparkles, label: "Eco-Friendly", desc: "Products" },
-]
+})
 
 function TrustBar() {
   const ref = useRef(null)
 
-  useEffect(() => {
-    let ctx
-    const init = async () => {
-      const { default: gsap } = await import("gsap")
-      const { ScrollTrigger } = await import("gsap/ScrollTrigger")
-      gsap.registerPlugin(ScrollTrigger)
-      if (!ref.current) return
-
-      ctx = gsap.context(() => {
-        gsap.fromTo(
-          ref.current.children,
-          { y: 30, opacity: 0 },
-          {
-            y: 0,
-            opacity: 1,
-            duration: 0.7,
-            stagger: 0.1,
-            ease: "power3.out",
-            scrollTrigger: {
-              trigger: ref.current,
-              start: "top 92%",
-            },
-          }
-        )
-      })
-    }
-    init()
-    return () => ctx?.revert()
-  }, [])
+  useScrollAnimation(
+    ref,
+    (gsap, ScrollTrigger) => {
+      gsap.fromTo(
+        ref.current.children,
+        { y: 25, opacity: 0 },
+        {
+          y: 0,
+          opacity: 1,
+          duration: ANIMATION_CONFIG.trust.duration,
+          stagger: ANIMATION_CONFIG.trust.stagger,
+          ease: ANIMATION_CONFIG.trust.ease,
+          scrollTrigger: {
+            trigger: ref.current,
+            start: "top 94%",
+            once: true,
+          },
+        }
+      )
+    },
+    []
+  )
 
   return (
     <div
       ref={ref}
-      className="grid grid-cols-3 gap-2 sm:gap-6 mt-10 md:mt-20 pt-8 md:pt-12 border-t border-gray-100"
+      className="grid grid-cols-3 gap-2 sm:gap-5 mt-10 md:mt-20 pt-8 md:pt-12
+                 border-t border-gray-100"
     >
-      {trustItems.map((item, i) => {
-        const Icon = item.icon
-        return (
-          <div
-            key={i}
-            className="opacity-0 flex flex-col items-center text-center p-3 sm:p-4
-                       rounded-2xl bg-gray-50
-                       sm:flex-row sm:items-center sm:text-left sm:gap-3"
-          >
-            <div
-              className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white 
-                         flex items-center justify-center shrink-0 mb-2 sm:mb-0"
-            >
-              <Icon size={18} strokeWidth={1.3} className="text-gray-400" />
-            </div>
-            <div>
-              <p
-                className="text-black text-xs sm:text-sm leading-tight"
-                style={{ fontFamily: "Georgia, serif" }}
-              >
-                {item.label}
-              </p>
-              <p className="text-gray-400 text-[10px] sm:text-xs leading-tight">
-                {item.desc}
-              </p>
-            </div>
-          </div>
-        )
-      })}
+      {TRUST_ITEMS.map((item, i) => (
+        <TrustItem key={i} {...item} />
+      ))}
     </div>
   )
 }
 
-/* ═══════════════════════════════════════
-   HELPER: Get mobile layout variant
-═══════════════════════════════════════ */
-function getMobileVariant(index, total) {
-  // Create interesting bento pattern
-  // Pattern: large, small, small, tall, wide, small, small...
-  
-  if (index === 0) return "large" // First card is big (2x2)
-  if (index === 3 && total > 4) return "tall" // 4th card is tall (1x2)
-  if (index === 4 && total > 5) return "wide" // 5th card is wide (2x1)
-  
-  return "default"
+// ── Empty / Error States ───────────────────────────────────
+
+function EmptyState({ type = "empty", onRetry }) {
+  const isError = type === "error"
+
+  return (
+    <div className="text-center py-16 md:py-24">
+      <div
+        className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-gray-50
+                   flex items-center justify-center"
+      >
+        <span className="text-2xl">{isError ? "⚠️" : "🧹"}</span>
+      </div>
+
+      <h3
+        className="text-black mb-2"
+        style={{ fontFamily: "Georgia, serif", fontSize: "18px", fontWeight: 400 }}
+      >
+        {isError ? "Something went wrong" : "No services yet"}
+      </h3>
+
+      <p className="text-gray-400 mb-6" style={{ fontSize: "14px" }}>
+        {isError ? "Unable to load services" : "Check back soon!"}
+      </p>
+
+      {isError && onRetry && (
+        <button
+          onClick={onRetry}
+          className="h-12 px-8 bg-black text-white rounded-full
+                     tracking-wider uppercase hover:bg-gray-800
+                     active:scale-[0.97] transition-all duration-300"
+          style={{ fontSize: "11px", fontWeight: 500 }}
+        >
+          Try Again
+        </button>
+      )}
+    </div>
+  )
 }
 
-/* ═══════════════════════════════════════
-   MAIN COMPONENT
-═══════════════════════════════════════ */
+// ── Section Header ─────────────────────────────────────────
+
+function SectionHeader({ eyebrowRef, headingRef, descRef }) {
+  return (
+    <header className="mb-8 md:mb-16">
+      <div
+        ref={eyebrowRef}
+        className="flex items-center gap-4 mb-3 md:mb-5 opacity-0"
+      >
+        <span className="block w-8 h-px bg-black" aria-hidden="true" />
+        <span
+          className="tracking-[0.4em] uppercase text-gray-400"
+          style={{ fontFamily: "Georgia, serif", fontSize: "10px" }}
+        >
+          Services
+        </span>
+      </div>
+
+      <h2
+        ref={headingRef}
+        className="text-black mb-3 md:mb-4 opacity-0"
+        style={{
+          fontFamily: 'Georgia, "Times New Roman", serif',
+          fontWeight: 300,
+          fontSize: "clamp(28px, 6vw, 52px)",
+          lineHeight: 1.1,
+          letterSpacing: "-0.03em",
+        }}
+      >
+        What We Offer
+      </h2>
+
+      <p
+        ref={descRef}
+        className="text-gray-400 max-w-md leading-relaxed opacity-0"
+        style={{ fontSize: "14px" }}
+      >
+        Professional cleaning solutions delivered to your doorstep.
+      </p>
+    </header>
+  )
+}
+
+// ── View All Button ────────────────────────────────────────
+
+function ViewAllButton() {
+  const ref = useRef(null)
+
+  useScrollAnimation(
+    ref,
+    (gsap, ScrollTrigger) => {
+      gsap.fromTo(
+        ref.current,
+        { y: 20, opacity: 0 },
+        {
+          y: 0,
+          opacity: 1,
+          duration: 0.6,
+          ease: "power3.out",
+          scrollTrigger: {
+            trigger: ref.current,
+            start: "top 95%",
+            once: true,
+          },
+        }
+      )
+    },
+    []
+  )
+
+  return (
+    <div ref={ref} className="flex justify-center mt-8 md:mt-14 opacity-0">
+      <a
+        href="/services"
+        className="group flex items-center justify-center gap-3
+                   w-full sm:w-auto h-14 px-8
+                   bg-black text-white rounded-full
+                   hover:bg-gray-800 active:scale-[0.98]
+                   transition-all duration-300 no-underline"
+      >
+        <span
+          className="tracking-wider uppercase"
+          style={{ fontSize: "11px", fontWeight: 500 }}
+        >
+          View All Services
+        </span>
+        <ArrowRight
+          size={16}
+          strokeWidth={1.5}
+          className="group-hover:translate-x-0.5 transition-transform duration-300"
+        />
+      </a>
+    </div>
+  )
+}
+
+// ── Main Component ─────────────────────────────────────────
+
 export default function Services() {
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
@@ -418,10 +658,12 @@ export default function Services() {
   const eyebrowRef = useRef(null)
   const headingRef = useRef(null)
   const descRef = useRef(null)
+  const headerAnimated = useRef(false)
 
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     setLoading(true)
     setError(false)
+
     try {
       const data = await getCategories()
       setCategories(Array.isArray(data) ? data : [])
@@ -431,55 +673,65 @@ export default function Services() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     fetchCategories()
-  }, [])
+  }, [fetchCategories])
 
-  // Header animations
+  // Header animation (runs once when content loads)
   useEffect(() => {
-    if (loading) return
+    if (loading || headerAnimated.current) return
 
     let ctx
+
     const init = async () => {
       const { default: gsap } = await import("gsap")
       const { ScrollTrigger } = await import("gsap/ScrollTrigger")
       gsap.registerPlugin(ScrollTrigger)
+
       if (!headingRef.current) return
 
       ctx = gsap.context(() => {
         const tl = gsap.timeline({
-          scrollTrigger: { trigger: headingRef.current, start: "top 85%" },
-          defaults: { ease: "power3.out" },
+          scrollTrigger: {
+            trigger: headingRef.current,
+            start: "top 88%",
+            once: true,
+          },
+          defaults: { ease: ANIMATION_CONFIG.header.ease },
         })
 
         if (eyebrowRef.current) {
           tl.fromTo(
             eyebrowRef.current,
-            { x: -30, opacity: 0 },
-            { x: 0, opacity: 1, duration: 0.6 }
+            { x: -25, opacity: 0 },
+            { x: 0, opacity: 1, duration: 0.5 }
           )
         }
 
         tl.fromTo(
           headingRef.current,
-          { y: 50, opacity: 0 },
-          { y: 0, opacity: 1, duration: 0.9 },
-          0.1
+          { y: 40, opacity: 0 },
+          { y: 0, opacity: 1, duration: ANIMATION_CONFIG.header.duration },
+          0.05
         )
 
         if (descRef.current) {
           tl.fromTo(
             descRef.current,
-            { y: 30, opacity: 0 },
-            { y: 0, opacity: 1, duration: 0.7 },
-            0.3
+            { y: 25, opacity: 0 },
+            { y: 0, opacity: 1, duration: 0.6 },
+            0.2
           )
         }
       })
+
+      headerAnimated.current = true
     }
+
     init()
+
     return () => ctx?.revert()
   }, [loading])
 
@@ -487,109 +739,24 @@ export default function Services() {
     <section
       className="w-full bg-white py-14 md:py-28"
       style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
+      aria-labelledby="services-heading"
     >
       <div className="max-w-6xl mx-auto px-4 sm:px-8 md:px-12">
-        {/* ═══ HEADER ═══ */}
-        <div className="mb-8 md:mb-16">
-          <div
-            ref={eyebrowRef}
-            className="flex items-center gap-4 mb-3 md:mb-6 opacity-0"
-          >
-            <span className="block w-8 h-px bg-black" />
-            <span
-              className="tracking-[0.4em] uppercase text-gray-400"
-              style={{ fontFamily: "Georgia, serif", fontSize: "10px" }}
-            >
-              Services
-            </span>
-          </div>
+        <SectionHeader
+          eyebrowRef={eyebrowRef}
+          headingRef={headingRef}
+          descRef={descRef}
+        />
 
-          <h2
-            ref={headingRef}
-            className="text-black mb-3 md:mb-4 opacity-0"
-            style={{
-              fontFamily: 'Georgia, "Times New Roman", serif',
-              fontWeight: 300,
-              fontSize: "clamp(28px, 6vw, 56px)",
-              lineHeight: 1.1,
-              letterSpacing: "-0.03em",
-            }}
-          >
-            What We Offer
-          </h2>
-
-          <p
-            ref={descRef}
-            className="text-gray-400 max-w-md leading-relaxed opacity-0"
-            style={{ fontSize: "14px" }}
-          >
-            Professional cleaning solutions delivered to your doorstep.
-          </p>
-        </div>
-
-        {/* ═══ CONTENT ═══ */}
         {loading ? (
-          <>
-            {/* Mobile Skeleton - Bento Grid */}
-            <div className="md:hidden grid grid-cols-2 gap-3 auto-rows-[140px]">
-              <MobileSkeleton variant="large" />
-              <MobileSkeleton />
-              <MobileSkeleton />
-              <MobileSkeleton variant="tall" />
-              <MobileSkeleton variant="wide" />
-            </div>
-
-            {/* Desktop Skeleton */}
-            <div className="hidden md:grid md:grid-cols-3 gap-5 auto-rows-[280px]">
-              <DesktopSkeleton featured />
-              <DesktopSkeleton />
-              <DesktopSkeleton />
-              <DesktopSkeleton />
-              <DesktopSkeleton />
-            </div>
-          </>
+          <LoadingGrid />
         ) : error ? (
-          <div className="text-center py-16">
-            <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-gray-50 flex items-center justify-center">
-              <span className="text-2xl">⚠️</span>
-            </div>
-            <h3
-              className="text-black mb-2"
-              style={{ fontFamily: "Georgia, serif", fontSize: "18px" }}
-            >
-              Something went wrong
-            </h3>
-            <p className="text-gray-400 mb-6" style={{ fontSize: "14px" }}>
-              Unable to load services
-            </p>
-            <button
-              onClick={fetchCategories}
-              className="h-12 px-8 bg-black text-white rounded-full 
-                         tracking-wider uppercase hover:bg-gray-800
-                         active:scale-95 transition-all duration-300"
-              style={{ fontSize: "11px" }}
-            >
-              Try Again
-            </button>
-          </div>
+          <EmptyState type="error" onRetry={fetchCategories} />
         ) : categories.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-gray-50 flex items-center justify-center">
-              <span className="text-2xl">🧹</span>
-            </div>
-            <h3
-              className="text-black mb-2"
-              style={{ fontFamily: "Georgia, serif", fontSize: "18px" }}
-            >
-              No services yet
-            </h3>
-            <p className="text-gray-400" style={{ fontSize: "14px" }}>
-              Check back soon!
-            </p>
-          </div>
+          <EmptyState type="empty" />
         ) : (
           <>
-            {/* ═══ MOBILE: Bento Grid Layout ═══ */}
+            {/* Mobile Grid */}
             <div className="md:hidden grid grid-cols-2 gap-3 auto-rows-[140px]">
               {categories.map((category, i) => (
                 <MobileServiceCard
@@ -601,7 +768,7 @@ export default function Services() {
               ))}
             </div>
 
-            {/* ═══ DESKTOP: Bento Grid Layout ═══ */}
+            {/* Desktop Grid */}
             <div className="hidden md:grid md:grid-cols-3 gap-5 auto-rows-[280px]">
               {categories.map((category, i) => (
                 <DesktopServiceCard
@@ -613,27 +780,7 @@ export default function Services() {
               ))}
             </div>
 
-            {/* View All Button */}
-            <div className="flex justify-center mt-8 md:mt-14">
-              <a
-                href="/services"
-                className="group flex items-center justify-center gap-3 
-                           w-full sm:w-auto h-14 px-8
-                           bg-black text-white rounded-full
-                           hover:bg-gray-800 active:scale-[0.98] 
-                           transition-all duration-300 no-underline"
-              >
-                <span
-                  className="tracking-wider uppercase"
-                  style={{ fontSize: "11px" }}
-                >
-                  View All Services
-                </span>
-                <ArrowRight size={16} />
-              </a>
-            </div>
-
-            {/* Trust Badges */}
+            <ViewAllButton />
             <TrustBar />
           </>
         )}
