@@ -1,36 +1,31 @@
-// config/email.js - FIXED: Added better error handling
+// config/email.js - Brevo REST API
 
-import nodemailer from 'nodemailer';
+import axios from 'axios';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-// ✅ FIXED: Validate email config before creating transporter
-const createTransporter = () => {
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-        console.error('❌ Email credentials missing in environment variables');
-        console.error('Required: EMAIL_USER, EMAIL_PASS');
-    }
+if (!process.env.BREVO_API_KEY) {
+    console.error('❌ BREVO_API_KEY missing in environment variables');
+    process.exit(1);
+}
 
-    const transporter = nodemailer.createTransport({
-        service: process.env.EMAIL_SERVICE || 'gmail',
-        auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS
-        }
-    });
+// Create axios instance for Brevo API
+const brevoAPI = axios.create({
+    baseURL: 'https://api.brevo.com/v3',
+    headers: {
+        'api-key': process.env.BREVO_API_KEY,
+        'Content-Type': 'application/json'
+    },
+    timeout: 15000
+});
 
-    transporter.verify((error, success) => {
-        if (error) {
-            console.error('❌ Email configuration error:', error.message);
-        } else {
-            console.log('✅ Email server is ready to send messages');
-        }
-    });
-
-    return transporter;
+export const emailConfig = {
+    apiKey: process.env.BREVO_API_KEY,
+    emailFrom: process.env.EMAIL_FROM,
+    adminEmail: process.env.ADMIN_EMAIL
 };
 
-const transporter = createTransporter();
+console.log('✅ Brevo API configured successfully');
 
-export default transporter;
+export default brevoAPI;
