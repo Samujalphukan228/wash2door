@@ -1,983 +1,643 @@
+// components/Services.jsx
 "use client"
 
-import { useEffect, useRef, useState } from 'react'
-import { ArrowUpRight, ArrowRight, Sparkles, Clock, Shield } from 'lucide-react'
-import { getCategories } from '@/lib/services.api'
+import { useEffect, useRef, useState } from "react"
+import { ArrowUpRight, ArrowRight, Shield, Clock, Sparkles } from "lucide-react"
+import { getCategories } from "@/lib/services.api"
 
-// ── Skeleton ──
-function SkeletonFeatured() {
-    return (
-        <div className="rounded-[5px] overflow-hidden border border-gray-100">
-            <div className="aspect-[16/11] bg-gray-100 animate-pulse" />
-            <div className="p-6 space-y-3">
-                <div className="h-6 w-40 bg-gray-100 animate-pulse rounded" />
-                <div className="h-3 w-full bg-gray-100 animate-pulse rounded" />
-                <div className="h-3 w-2/3 bg-gray-100 animate-pulse rounded" />
-                <div className="h-11 w-full bg-gray-100 animate-pulse rounded-[5px] mt-4" />
-            </div>
-        </div>
-    )
-}
+/* ═══════════════════════════════════════
+   MOBILE CARD - Bento Style with Variants
+═══════════════════════════════════════ */
+function MobileServiceCard({ category, index, variant = "default" }) {
+  const cardRef = useRef(null)
+  const image = category.image?.url
 
-function SkeletonSmall() {
-    return (
-        <div className="rounded-[5px] overflow-hidden border border-gray-100">
-            <div className="aspect-[1/1] bg-gray-100 animate-pulse" />
-            <div className="p-4 space-y-2">
-                <div className="h-4 w-24 bg-gray-100 animate-pulse rounded" />
-                <div className="h-3 w-16 bg-gray-100 animate-pulse rounded" />
-            </div>
-        </div>
-    )
-}
+  useEffect(() => {
+    let ctx
+    const init = async () => {
+      const { default: gsap } = await import("gsap")
+      const { ScrollTrigger } = await import("gsap/ScrollTrigger")
+      gsap.registerPlugin(ScrollTrigger)
+      if (!cardRef.current) return
 
-function SkeletonDesktop() {
-    return (
-        <div className="flex flex-col border border-gray-100 overflow-hidden rounded-[5px]">
-            <div className="h-64 bg-gray-100 animate-pulse" />
-            <div className="p-7 flex flex-col gap-4">
-                <div className="h-5 w-32 bg-gray-100 animate-pulse rounded" />
-                <div className="h-3 w-full bg-gray-100 animate-pulse rounded" />
-                <div className="h-3 w-3/4 bg-gray-100 animate-pulse rounded" />
-            </div>
-        </div>
-    )
-}
+      ctx = gsap.context(() => {
+        gsap.fromTo(
+          cardRef.current,
+          { y: 50, opacity: 0, scale: 0.95 },
+          {
+            y: 0,
+            opacity: 1,
+            scale: 1,
+            duration: 0.8,
+            ease: "power3.out",
+            delay: index * 0.08,
+            scrollTrigger: {
+              trigger: cardRef.current,
+              start: "top 92%",
+            },
+          }
+        )
+      })
+    }
+    init()
+    return () => ctx?.revert()
+  }, [index])
 
-// ── Empty State ──
-function EmptyState() {
-    return (
-        <div className="col-span-full flex flex-col items-center justify-center py-16 md:py-24">
-            <div className="w-20 h-20 border border-gray-200 rounded-full flex items-center
-                            justify-center mb-6 bg-gray-50">
-                <span className="text-3xl">🧹</span>
-            </div>
-            <h3
-                className="text-black mb-3 text-center"
-                style={{
-                    fontFamily: 'Georgia, "Times New Roman", serif',
-                    fontWeight: 300,
-                    fontSize: 'clamp(16px, 2vw, 20px)',
-                }}
+  // Different styles based on variant
+  const isLarge = variant === "large"
+  const isTall = variant === "tall"
+  const isWide = variant === "wide"
+
+  return (
+    <a
+      ref={cardRef}
+      href={`/services?category=${category._id}`}
+      className={`group block relative overflow-hidden rounded-3xl
+                 active:scale-[0.97] transition-all duration-300 no-underline opacity-0
+                 ${isLarge ? "col-span-2 row-span-2" : ""}
+                 ${isTall ? "row-span-2" : ""}
+                 ${isWide ? "col-span-2" : ""}`}
+    >
+      {/* Background Image */}
+      <div className="absolute inset-0 bg-gray-100">
+        {image ? (
+          <img
+            src={image}
+            alt={category.name}
+            className="w-full h-full object-cover"
+            loading="lazy"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
+            <span className={`${isLarge || isTall ? "text-6xl" : "text-4xl"}`}>
+              {category.icon || "🚗"}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Gradient Overlay */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+
+      {/* Content */}
+      <div className={`relative z-10 h-full flex flex-col justify-between
+                       ${isLarge ? "p-6" : isTall ? "p-5" : "p-4"}`}>
+        {/* Top Row */}
+        <div className="flex items-start justify-between">
+          {category.totalServices > 0 && (
+            <span
+              className="px-2.5 py-1 bg-white/15 backdrop-blur-md rounded-full
+                         border border-white/10"
             >
-                No Services Available
-            </h3>
+              <span
+                className="text-white/80 tracking-wider uppercase"
+                style={{ fontSize: "9px" }}
+              >
+                {category.totalServices}
+              </span>
+            </span>
+          )}
+
+          <div
+            className={`rounded-full bg-white/15 backdrop-blur-md border border-white/10
+                        flex items-center justify-center ml-auto
+                        ${isLarge || isTall ? "w-11 h-11" : "w-9 h-9"}`}
+          >
+            <ArrowUpRight
+              size={isLarge || isTall ? 16 : 14}
+              className="text-white"
+            />
+          </div>
+        </div>
+
+        {/* Bottom Content */}
+        <div>
+          {category.icon && (
+            <span className={`block mb-1.5 ${isLarge ? "text-2xl" : "text-lg"}`}>
+              {category.icon}
+            </span>
+          )}
+
+          <h3
+            className="text-white mb-1"
+            style={{
+              fontFamily: 'Georgia, "Times New Roman", serif',
+              fontWeight: 300,
+              fontSize: isLarge ? "24px" : isTall ? "20px" : "16px",
+              lineHeight: 1.2,
+              letterSpacing: "-0.02em",
+            }}
+          >
+            {category.name}
+          </h3>
+
+          {(isLarge || isTall || isWide) && category.description && (
             <p
-                className="tracking-[0.2em] uppercase text-gray-400 text-center max-w-xs
-                           leading-[1.9] mb-8"
-                style={{ fontSize: 'clamp(9px, 1vw, 10px)' }}
+              className="text-white/50 line-clamp-2 leading-relaxed"
+              style={{ fontSize: "12px" }}
             >
-                We&apos;re currently updating our services.<br />
-                Please check back soon.
+              {category.description}
             </p>
-            <a
-                href="tel:6900706456"
-                className="relative tracking-[0.22em] uppercase text-white bg-black border
-                           border-black px-7 py-3.5 no-underline overflow-hidden group
-                           rounded-[5px] min-h-[44px] flex items-center"
-                style={{ fontSize: 'clamp(9px, 1vw, 10px)' }}
-            >
-                <span className="absolute inset-0 bg-white origin-bottom scale-y-0
-                                 group-hover:scale-y-100 transition-transform duration-500 ease-out" />
-                <span className="relative z-10 group-hover:text-black transition-colors duration-500">
-                    Contact Us
-                </span>
-            </a>
+          )}
         </div>
-    )
+      </div>
+    </a>
+  )
 }
 
-// ── Error State ──
-function ErrorState({ onRetry }) {
-    return (
-        <div className="col-span-full flex flex-col items-center justify-center py-16 md:py-24">
-            <div className="w-20 h-20 border border-gray-200 rounded-full flex items-center
-                            justify-center mb-6 bg-gray-50">
-                <span className="text-3xl">⚠️</span>
-            </div>
+/* ═══════════════════════════════════════
+   DESKTOP CARD - Bento style (unchanged)
+═══════════════════════════════════════ */
+function DesktopServiceCard({ category, index, variant = "default" }) {
+  const cardRef = useRef(null)
+  const image = category.image?.url
+  const isFeatured = variant === "featured"
+
+  useEffect(() => {
+    let ctx
+    const init = async () => {
+      const { default: gsap } = await import("gsap")
+      const { ScrollTrigger } = await import("gsap/ScrollTrigger")
+      gsap.registerPlugin(ScrollTrigger)
+      if (!cardRef.current) return
+
+      ctx = gsap.context(() => {
+        gsap.fromTo(
+          cardRef.current,
+          { y: 80, opacity: 0, scale: 0.95 },
+          {
+            y: 0,
+            opacity: 1,
+            scale: 1,
+            duration: 1,
+            ease: "power3.out",
+            delay: index * 0.1,
+            scrollTrigger: {
+              trigger: cardRef.current,
+              start: "top 90%",
+            },
+          }
+        )
+      })
+    }
+    init()
+    return () => ctx?.revert()
+  }, [index])
+
+  return (
+    <a
+      ref={cardRef}
+      href={`/services?category=${category._id}`}
+      className={`group block relative overflow-hidden rounded-3xl no-underline
+                  transition-transform duration-300 hover:scale-[1.02] opacity-0
+                  ${isFeatured ? "md:row-span-2" : ""}`}
+    >
+      {/* Image */}
+      <div className="absolute inset-0 bg-gray-100">
+        {image ? (
+          <img
+            src={image}
+            alt={category.name}
+            className="w-full h-full object-cover transition-transform duration-700
+                       group-hover:scale-110"
+            loading="lazy"
+          />
+        ) : (
+          <div
+            className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200
+                          flex items-center justify-center"
+          >
+            <span className={`${isFeatured ? "text-7xl" : "text-5xl"}`}>
+              {category.icon || "🚗"}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Overlay */}
+      <div
+        className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent
+                      group-hover:from-black/90 transition-all duration-500"
+      />
+
+      {/* Content */}
+      <div className="relative z-10 h-full min-h-[280px] flex flex-col justify-between p-6">
+        {/* Top */}
+        <div className="flex items-start justify-between">
+          {category.totalServices > 0 && (
+            <span
+              className="inline-flex items-center h-7 px-3 rounded-full
+                         bg-white/10 backdrop-blur-md border border-white/10
+                         tracking-widest uppercase text-white/70"
+              style={{ fontSize: "9px" }}
+            >
+              {category.totalServices} services
+            </span>
+          )}
+
+          <div
+            className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md
+                        border border-white/10 flex items-center justify-center ml-auto
+                        group-hover:bg-white group-hover:border-white
+                        transition-all duration-500"
+          >
+            <ArrowUpRight
+              size={16}
+              strokeWidth={1.5}
+              className="text-white group-hover:text-black transition-colors duration-500
+                         group-hover:rotate-45"
+            />
+          </div>
+        </div>
+
+        {/* Bottom */}
+        <div>
+          <div className="flex items-center gap-2.5 mb-2">
+            {category.icon && (
+              <span className={isFeatured ? "text-xl" : "text-base"}>
+                {category.icon}
+              </span>
+            )}
             <h3
-                className="text-black mb-3"
-                style={{
-                    fontFamily: 'Georgia, "Times New Roman", serif',
-                    fontWeight: 300,
-                    fontSize: 'clamp(16px, 2vw, 20px)',
-                }}
+              className="text-white"
+              style={{
+                fontFamily: 'Georgia, "Times New Roman", serif',
+                fontWeight: 300,
+                fontSize: isFeatured ? "28px" : "20px",
+                letterSpacing: "-0.02em",
+                lineHeight: 1.15,
+              }}
             >
-                Unable to Load Services
+              {category.name}
             </h3>
+          </div>
+
+          {category.description && (
             <p
-                className="tracking-[0.2em] uppercase text-gray-400 text-center max-w-xs
-                           mb-8 leading-[1.9]"
-                style={{ fontSize: 'clamp(9px, 1vw, 10px)' }}
+              className="text-white/40 leading-relaxed line-clamp-2"
+              style={{ fontSize: "13px" }}
             >
-                Something went wrong while fetching services.
+              {category.description}
             </p>
-            <button
-                className="relative tracking-[0.22em] uppercase text-white bg-black border
-                           border-black px-7 py-3.5 overflow-hidden group rounded-[5px] min-h-[44px]"
-                style={{ fontSize: 'clamp(9px, 1vw, 10px)' }}
-                onClick={onRetry}
-            >
-                <span className="absolute inset-0 bg-white origin-bottom scale-y-0
-                                 group-hover:scale-y-100 transition-transform duration-500 ease-out" />
-                <span className="relative z-10 group-hover:text-black transition-colors duration-500">
-                    Try Again
-                </span>
-            </button>
+          )}
         </div>
-    )
+      </div>
+    </a>
+  )
 }
 
-// ── Mobile Featured Card (first category) ──
-function MobileFeaturedCard({ category, index }) {
-    const cardRef = useRef(null)
-    const image = category.image?.url
-    const hasImage = !!image && image.length > 0
+/* ═══════════════════════════════════════
+   SKELETON LOADERS
+═══════════════════════════════════════ */
+function MobileSkeleton({ variant = "default" }) {
+  const isLarge = variant === "large"
+  const isTall = variant === "tall"
+  const isWide = variant === "wide"
 
-    useEffect(() => {
-        let ctx
-        const init = async () => {
-            const { default: gsap } = await import('gsap')
-            const { ScrollTrigger } = await import('gsap/ScrollTrigger')
-            gsap.registerPlugin(ScrollTrigger)
-            if (!cardRef.current) return
-            ctx = gsap.context(() => {
-                gsap.fromTo(cardRef.current,
-                    { opacity: 0, y: 50 },
-                    {
-                        opacity: 1, y: 0, duration: 0.8, ease: 'power3.out',
-                        scrollTrigger: { trigger: cardRef.current, start: 'top 90%' },
-                    }
-                )
-            })
-        }
-        init()
-        return () => ctx?.revert()
-    }, [])
-
-    return (
-        <a
-            ref={cardRef}
-            href={`/services?category=${category._id}`}
-            className="opacity-0 group block relative overflow-hidden rounded-[5px]
-                       no-underline active:scale-[0.98] transition-transform duration-200"
-        >
-            {/* Full bleed image */}
-            <div className="relative aspect-[16/11] overflow-hidden bg-gray-100">
-                {hasImage ? (
-                    <img
-                        src={image}
-                        alt={category.name}
-                        className="w-full h-full object-cover transition-transform duration-700
-                                   group-active:scale-105"
-                        loading="lazy"
-                    />
-                ) : (
-                    <div className="w-full h-full bg-gray-100 flex items-center justify-center">
-                        <span className="text-6xl">{category.icon || '📦'}</span>
-                    </div>
-                )}
-
-                {/* Gradient overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
-
-                {/* Number */}
-                <div className="absolute top-4 left-4">
-                    <span
-                        className="text-white/30"
-                        style={{
-                            fontFamily: 'Georgia, "Times New Roman", serif',
-                            fontSize: '48px',
-                            fontWeight: 300,
-                            lineHeight: 1,
-                        }}
-                    >
-                        {String(index + 1).padStart(2, '0')}
-                    </span>
-                </div>
-
-                {/* Service count */}
-                {category.totalServices > 0 && (
-                    <div className="absolute top-4 right-4 bg-white/10 backdrop-blur-md
-                                    border border-white/20 px-3 py-1.5 rounded-[3px]">
-                        <span
-                            className="tracking-[0.2em] uppercase text-white/80"
-                            style={{ fontSize: '9px' }}
-                        >
-                            {category.totalServices} {category.totalServices === 1 ? 'Service' : 'Services'}
-                        </span>
-                    </div>
-                )}
-
-                {/* Bottom content overlay */}
-                <div className="absolute bottom-0 left-0 right-0 p-5">
-                    <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                            {/* Category icon + name */}
-                            <div className="flex items-center gap-2.5 mb-2">
-                                {category.icon && <span className="text-lg">{category.icon}</span>}
-                                <h3
-                                    className="text-white"
-                                    style={{
-                                        fontFamily: 'Georgia, "Times New Roman", serif',
-                                        fontWeight: 300,
-                                        fontSize: '22px',
-                                        letterSpacing: '-0.02em',
-                                        lineHeight: 1.15,
-                                    }}
-                                >
-                                    {category.name}
-                                </h3>
-                            </div>
-
-                            {/* Description */}
-                            {category.description && (
-                                <p
-                                    className="text-white/50 leading-[1.6] line-clamp-2 tracking-[0.05em]"
-                                    style={{ fontSize: '11px' }}
-                                >
-                                    {category.description}
-                                </p>
-                            )}
-                        </div>
-
-                        {/* Arrow */}
-                        <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center
-                                        shrink-0 mt-1">
-                            <ArrowUpRight size={16} strokeWidth={1.5} className="text-black" />
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </a>
-    )
+  return (
+    <div
+      className={`bg-gray-100 rounded-3xl animate-pulse
+                  ${isLarge ? "col-span-2 row-span-2" : ""}
+                  ${isTall ? "row-span-2" : ""}
+                  ${isWide ? "col-span-2" : ""}`}
+    />
+  )
 }
 
-// ── Mobile Grid Card (smaller cards) ──
-function MobileGridCard({ category, index }) {
-    const cardRef = useRef(null)
-    const image = category.image?.url
-    const hasImage = !!image && image.length > 0
-
-    useEffect(() => {
-        let ctx
-        const init = async () => {
-            const { default: gsap } = await import('gsap')
-            const { ScrollTrigger } = await import('gsap/ScrollTrigger')
-            gsap.registerPlugin(ScrollTrigger)
-            if (!cardRef.current) return
-            ctx = gsap.context(() => {
-                gsap.fromTo(cardRef.current,
-                    { opacity: 0, y: 40 },
-                    {
-                        opacity: 1, y: 0, duration: 0.7, ease: 'power3.out',
-                        delay: (index % 2) * 0.1,
-                        scrollTrigger: { trigger: cardRef.current, start: 'top 92%' },
-                    }
-                )
-            })
-        }
-        init()
-        return () => ctx?.revert()
-    }, [index])
-
-    return (
-        <a
-            ref={cardRef}
-            href={`/services?category=${category._id}`}
-            className="opacity-0 group block relative overflow-hidden rounded-[5px]
-                       border border-gray-200 no-underline bg-white
-                       active:scale-[0.97] transition-transform duration-200"
-        >
-            {/* Square image */}
-            <div className="relative aspect-[1/1] overflow-hidden bg-gray-50">
-                {hasImage ? (
-                    <img
-                        src={image}
-                        alt={category.name}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                    />
-                ) : (
-                    <div className="w-full h-full bg-gray-100 flex items-center justify-center">
-                        <span className="text-4xl">{category.icon || '📦'}</span>
-                    </div>
-                )}
-
-                {/* Gradient */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-
-                {/* Number */}
-                <div className="absolute top-2.5 left-3">
-                    <span
-                        className="text-white/20"
-                        style={{
-                            fontFamily: 'Georgia, "Times New Roman", serif',
-                            fontSize: '32px',
-                            fontWeight: 300,
-                            lineHeight: 1,
-                        }}
-                    >
-                        {String(index + 1).padStart(2, '0')}
-                    </span>
-                </div>
-
-                {/* Service count pill */}
-                {category.totalServices > 0 && (
-                    <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm
-                                    px-2 py-1 rounded-[3px]">
-                        <span
-                            className="tracking-[0.15em] uppercase text-gray-600"
-                            style={{ fontSize: '8px' }}
-                        >
-                            {category.totalServices}
-                        </span>
-                    </div>
-                )}
-
-                {/* Bottom name */}
-                <div className="absolute bottom-0 left-0 right-0 p-3.5">
-                    <div className="flex items-center gap-2">
-                        {category.icon && <span className="text-sm">{category.icon}</span>}
-                        <h3
-                            className="text-white"
-                            style={{
-                                fontFamily: 'Georgia, "Times New Roman", serif',
-                                fontWeight: 400,
-                                fontSize: '14px',
-                                letterSpacing: '-0.01em',
-                                lineHeight: 1.2,
-                            }}
-                        >
-                            {category.name}
-                        </h3>
-                    </div>
-                </div>
-            </div>
-
-            {/* Minimal bottom bar */}
-            <div className="flex items-center justify-between px-3.5 py-3 border-t border-gray-100">
-                <span
-                    className="tracking-[0.15em] uppercase text-gray-300"
-                    style={{ fontSize: '8px' }}
-                >
-                    Explore
-                </span>
-                <ArrowRight size={11} strokeWidth={1.5} className="text-gray-400" />
-            </div>
-        </a>
-    )
+function DesktopSkeleton({ featured }) {
+  return (
+    <div
+      className={`bg-gray-100 rounded-3xl animate-pulse
+                  ${featured ? "md:row-span-2 min-h-[580px]" : "min-h-[280px]"}`}
+    />
+  )
 }
 
-// ── Mobile List Card (alternate layout for many categories) ──
-function MobileListCard({ category, index }) {
-    const cardRef = useRef(null)
-    const image = category.image?.url
-    const hasImage = !!image && image.length > 0
-
-    useEffect(() => {
-        let ctx
-        const init = async () => {
-            const { default: gsap } = await import('gsap')
-            const { ScrollTrigger } = await import('gsap/ScrollTrigger')
-            gsap.registerPlugin(ScrollTrigger)
-            if (!cardRef.current) return
-            ctx = gsap.context(() => {
-                gsap.fromTo(cardRef.current,
-                    { opacity: 0, x: -30 },
-                    {
-                        opacity: 1, x: 0, duration: 0.6, ease: 'power3.out',
-                        delay: index * 0.08,
-                        scrollTrigger: { trigger: cardRef.current, start: 'top 92%' },
-                    }
-                )
-            })
-        }
-        init()
-        return () => ctx?.revert()
-    }, [index])
-
-    return (
-        <a
-            ref={cardRef}
-            href={`/services?category=${category._id}`}
-            className="opacity-0 group flex items-center gap-4 py-5 border-b border-gray-100
-                       last:border-0 no-underline active:bg-gray-50 transition-colors duration-200
-                       -mx-1 px-1 rounded-[3px]"
-        >
-            {/* Thumbnail */}
-            <div className="w-16 h-16 rounded-[5px] overflow-hidden bg-gray-100 shrink-0 relative">
-                {hasImage ? (
-                    <img
-                        src={image}
-                        alt={category.name}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                    />
-                ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gray-50">
-                        <span className="text-2xl">{category.icon || '📦'}</span>
-                    </div>
-                )}
-            </div>
-
-            {/* Info */}
-            <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                    <h3
-                        className="text-black truncate"
-                        style={{
-                            fontFamily: 'Georgia, "Times New Roman", serif',
-                            fontWeight: 400,
-                            fontSize: '15px',
-                            letterSpacing: '-0.01em',
-                        }}
-                    >
-                        {category.name}
-                    </h3>
-                </div>
-                {category.description && (
-                    <p
-                        className="text-gray-400 truncate leading-[1.5]"
-                        style={{ fontSize: '11px', letterSpacing: '0.02em' }}
-                    >
-                        {category.description}
-                    </p>
-                )}
-                <p
-                    className="tracking-[0.2em] uppercase text-gray-300 mt-1"
-                    style={{ fontSize: '9px' }}
-                >
-                    {category.totalServices || 0} services
-                </p>
-            </div>
-
-            {/* Arrow */}
-            <div className="w-8 h-8 rounded-full border border-gray-200 flex items-center
-                            justify-center shrink-0 group-active:border-black
-                            group-active:bg-black transition-all duration-200">
-                <ArrowRight
-                    size={12}
-                    strokeWidth={1.5}
-                    className="text-gray-400 group-active:text-white transition-colors duration-200"
-                />
-            </div>
-        </a>
-    )
-}
-
-// ── Desktop Category Card ──
-function DesktopCategoryCard({ category, index }) {
-    const cardRef = useRef(null)
-    const image = category.image?.url
-    const hasImage = !!image && image.length > 0
-
-    useEffect(() => {
-        let ctx
-        const init = async () => {
-            const { default: gsap } = await import('gsap')
-            const { ScrollTrigger } = await import('gsap/ScrollTrigger')
-            gsap.registerPlugin(ScrollTrigger)
-            if (!cardRef.current) return
-            ctx = gsap.context(() => {
-                gsap.fromTo(cardRef.current,
-                    { opacity: 0, y: 50 },
-                    {
-                        opacity: 1, y: 0, duration: 0.8, ease: 'power3.out',
-                        delay: index * 0.15,
-                        scrollTrigger: { trigger: cardRef.current, start: 'top 88%' },
-                    }
-                )
-            })
-        }
-        init()
-        return () => ctx?.revert()
-    }, [index])
-
-    return (
-        <a
-            ref={cardRef}
-            href={`/services?category=${category._id}`}
-            className="opacity-0 group flex flex-col border border-gray-200 overflow-hidden
-                       hover:border-black transition-all duration-500 rounded-[5px]
-                       hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] no-underline cursor-pointer"
-        >
-            {/* Image */}
-            <div className="relative h-72 overflow-hidden bg-gray-50">
-                {hasImage ? (
-                    <>
-                        <img
-                            src={image}
-                            alt={category.name}
-                            className="w-full h-full object-cover transition-transform duration-700
-                                       group-hover:scale-105"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/40
-                                        via-black/10 to-transparent" />
-                    </>
-                ) : (
-                    <div className="w-full h-full bg-gray-100 flex items-center justify-center">
-                        <span className="text-6xl transition-transform duration-500
-                                         group-hover:scale-110">
-                            {category.icon || '📦'}
-                        </span>
-                    </div>
-                )}
-
-                {/* Number */}
-                <div className="absolute top-5 left-6">
-                    <span
-                        className="text-white/20"
-                        style={{
-                            fontFamily: 'Georgia, "Times New Roman", serif',
-                            fontSize: '56px',
-                            fontWeight: 300,
-                            lineHeight: 1,
-                        }}
-                    >
-                        {String(index + 1).padStart(2, '0')}
-                    </span>
-                </div>
-
-                {/* Service count */}
-                {category.totalServices > 0 && (
-                    <div className="absolute top-5 right-5 bg-white/90 backdrop-blur-sm
-                                    px-3 py-1.5 rounded-[3px]">
-                        <span
-                            className="tracking-[0.3em] uppercase text-gray-500"
-                            style={{ fontSize: 'clamp(7px, 0.8vw, 9px)' }}
-                        >
-                            {category.totalServices} {category.totalServices === 1 ? 'Service' : 'Services'}
-                        </span>
-                    </div>
-                )}
-
-                {/* Name overlay */}
-                {hasImage && (
-                    <div className="absolute bottom-0 left-0 right-0 p-6">
-                        <div className="flex items-center gap-3">
-                            {category.icon && <span className="text-2xl">{category.icon}</span>}
-                            <h3
-                                className="text-white"
-                                style={{
-                                    fontFamily: 'Georgia, "Times New Roman", serif',
-                                    fontWeight: 300,
-                                    fontSize: 'clamp(18px, 2vw, 24px)',
-                                    letterSpacing: '-0.01em',
-                                }}
-                            >
-                                {category.name}
-                            </h3>
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            {/* Content */}
-            <div className="p-7 flex flex-col flex-1">
-                {!hasImage && (
-                    <div className="flex items-center gap-3 mb-3">
-                        {category.icon && <span className="text-2xl">{category.icon}</span>}
-                        <h3
-                            className="text-black group-hover:opacity-70
-                                       transition-opacity duration-300"
-                            style={{
-                                fontFamily: 'Georgia, "Times New Roman", serif',
-                                fontWeight: 300,
-                                fontSize: 'clamp(16px, 1.8vw, 22px)',
-                                letterSpacing: '-0.01em',
-                            }}
-                        >
-                            {category.name}
-                        </h3>
-                    </div>
-                )}
-
-                {category.description && (
-                    <p
-                        className="tracking-[0.18em] leading-[1.9] uppercase text-gray-400
-                                   flex-1 mb-6"
-                        style={{ fontSize: 'clamp(8px, 0.9vw, 11px)' }}
-                    >
-                        {category.description}
-                    </p>
-                )}
-
-                <div className="w-full h-px bg-gray-100 mb-5" />
-
-                {/* Bottom row */}
-                <div className="flex items-center justify-between">
-                    <p
-                        className="tracking-[0.28em] uppercase text-gray-400"
-                        style={{ fontSize: 'clamp(7px, 0.75vw, 9px)' }}
-                    >
-                        {category.totalServices || 0}{' '}
-                        {category.totalServices === 1 ? 'service' : 'services'} available
-                    </p>
-
-                    <div className="flex items-center gap-2 tracking-[0.22em] uppercase text-black
-                                    transition-all duration-300"
-                        style={{ fontSize: 'clamp(8px, 0.9vw, 10px)' }}
-                    >
-                        <span className="opacity-0 group-hover:opacity-100 -translate-x-2
-                                         group-hover:translate-x-0 transition-all duration-400">
-                            Explore
-                        </span>
-                        <div className="w-9 h-9 rounded-full border border-gray-200
-                                        group-hover:border-black group-hover:bg-black
-                                        flex items-center justify-center
-                                        transition-all duration-300">
-                            <ArrowUpRight
-                                size={14}
-                                strokeWidth={1.5}
-                                className="text-gray-400 group-hover:text-white
-                                           transition-all duration-300
-                                           group-hover:translate-x-0.5
-                                           group-hover:-translate-y-0.5"
-                            />
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </a>
-    )
-}
-
-// ── Trust Badges ──
+/* ═══════════════════════════════════════
+   TRUST BADGES
+═══════════════════════════════════════ */
 const trustItems = [
-    { icon: Shield, label: '100% Satisfaction', desc: 'Guaranteed' },
-    { icon: Clock, label: 'Same Day', desc: 'Service Available' },
-    { icon: Sparkles, label: 'Eco-Friendly', desc: 'Products Used' },
+  { icon: Shield, label: "Satisfaction", desc: "Guaranteed" },
+  { icon: Clock, label: "Same-Day", desc: "Service" },
+  { icon: Sparkles, label: "Eco-Friendly", desc: "Products" },
 ]
 
 function TrustBar() {
-    const ref = useRef(null)
+  const ref = useRef(null)
 
-    useEffect(() => {
-        let ctx
-        const init = async () => {
-            const { default: gsap } = await import('gsap')
-            const { ScrollTrigger } = await import('gsap/ScrollTrigger')
-            gsap.registerPlugin(ScrollTrigger)
-            if (!ref.current) return
-            ctx = gsap.context(() => {
-                gsap.fromTo(
-                    ref.current.children,
-                    { opacity: 0, y: 20 },
-                    {
-                        opacity: 1, y: 0, duration: 0.6, stagger: 0.1, ease: 'power3.out',
-                        scrollTrigger: { trigger: ref.current, start: 'top 90%' },
-                    }
-                )
-            })
-        }
-        init()
-        return () => ctx?.revert()
-    }, [])
+  useEffect(() => {
+    let ctx
+    const init = async () => {
+      const { default: gsap } = await import("gsap")
+      const { ScrollTrigger } = await import("gsap/ScrollTrigger")
+      gsap.registerPlugin(ScrollTrigger)
+      if (!ref.current) return
 
-    return (
-        <div
-            ref={ref}
-            className="grid grid-cols-3 gap-3 sm:gap-6 mt-12 md:mt-20 pt-10 md:pt-12
-                       border-t border-gray-200"
-        >
-            {trustItems.map((item, i) => {
-                const Icon = item.icon
-                return (
-                    <div key={i} className="opacity-0 flex flex-col sm:flex-row items-center
-                                            sm:items-center gap-2 sm:gap-4 group text-center sm:text-left">
-                        <div className="w-10 h-10 sm:w-12 sm:h-12 border border-gray-200 rounded-full
-                                        flex items-center justify-center shrink-0
-                                        group-hover:border-black transition-colors duration-300">
-                            <Icon
-                                size={16}
-                                strokeWidth={1.2}
-                                className="text-gray-400 group-hover:text-black
-                                           transition-colors duration-300 sm:[&]:w-[18px] sm:[&]:h-[18px]"
-                            />
-                        </div>
-                        <div>
-                            <p
-                                className="text-black"
-                                style={{
-                                    fontFamily: 'Georgia, "Times New Roman", serif',
-                                    fontWeight: 300,
-                                    fontSize: 'clamp(10px, 1.2vw, 14px)',
-                                    letterSpacing: '-0.01em',
-                                }}
-                            >
-                                {item.label}
-                            </p>
-                            <p
-                                className="tracking-[0.2em] uppercase text-gray-400 mt-0.5
-                                           hidden sm:block"
-                                style={{ fontSize: 'clamp(7px, 0.75vw, 9px)' }}
-                            >
-                                {item.desc}
-                            </p>
-                        </div>
-                    </div>
-                )
-            })}
-        </div>
-    )
+      ctx = gsap.context(() => {
+        gsap.fromTo(
+          ref.current.children,
+          { y: 30, opacity: 0 },
+          {
+            y: 0,
+            opacity: 1,
+            duration: 0.7,
+            stagger: 0.1,
+            ease: "power3.out",
+            scrollTrigger: {
+              trigger: ref.current,
+              start: "top 92%",
+            },
+          }
+        )
+      })
+    }
+    init()
+    return () => ctx?.revert()
+  }, [])
+
+  return (
+    <div
+      ref={ref}
+      className="grid grid-cols-3 gap-2 sm:gap-6 mt-10 md:mt-20 pt-8 md:pt-12 border-t border-gray-100"
+    >
+      {trustItems.map((item, i) => {
+        const Icon = item.icon
+        return (
+          <div
+            key={i}
+            className="opacity-0 flex flex-col items-center text-center p-3 sm:p-4
+                       rounded-2xl bg-gray-50
+                       sm:flex-row sm:items-center sm:text-left sm:gap-3"
+          >
+            <div
+              className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white 
+                         flex items-center justify-center shrink-0 mb-2 sm:mb-0"
+            >
+              <Icon size={18} strokeWidth={1.3} className="text-gray-400" />
+            </div>
+            <div>
+              <p
+                className="text-black text-xs sm:text-sm leading-tight"
+                style={{ fontFamily: "Georgia, serif" }}
+              >
+                {item.label}
+              </p>
+              <p className="text-gray-400 text-[10px] sm:text-xs leading-tight">
+                {item.desc}
+              </p>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
-// ── Main Component ──
+/* ═══════════════════════════════════════
+   HELPER: Get mobile layout variant
+═══════════════════════════════════════ */
+function getMobileVariant(index, total) {
+  // Create interesting bento pattern
+  // Pattern: large, small, small, tall, wide, small, small...
+  
+  if (index === 0) return "large" // First card is big (2x2)
+  if (index === 3 && total > 4) return "tall" // 4th card is tall (1x2)
+  if (index === 4 && total > 5) return "wide" // 5th card is wide (2x1)
+  
+  return "default"
+}
+
+/* ═══════════════════════════════════════
+   MAIN COMPONENT
+═══════════════════════════════════════ */
 export default function Services() {
-    const [categories, setCategories] = useState([])
-    const [loading, setLoading] = useState(true)
-    const [error, setError] = useState(false)
+  const [categories, setCategories] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
 
-    const eyebrowRef = useRef(null)
-    const headingRef = useRef(null)
-    const descRef = useRef(null)
-    const ruleRef = useRef(null)
+  const eyebrowRef = useRef(null)
+  const headingRef = useRef(null)
+  const descRef = useRef(null)
 
-    const fetchCategories = async () => {
-        setLoading(true)
-        setError(false)
-        try {
-            const data = await getCategories()
-            if (!Array.isArray(data)) {
-                setCategories([])
-                return
-            }
-            setCategories(data || [])
-        } catch (err) {
-            console.error('❌ Categories fetch failed:', err.message)
-            setError(true)
-            setCategories([])
-        } finally {
-            setLoading(false)
-        }
+  const fetchCategories = async () => {
+    setLoading(true)
+    setError(false)
+    try {
+      const data = await getCategories()
+      setCategories(Array.isArray(data) ? data : [])
+    } catch {
+      setError(true)
+      setCategories([])
+    } finally {
+      setLoading(false)
     }
+  }
 
-    useEffect(() => {
-        fetchCategories()
-    }, [])
+  useEffect(() => {
+    fetchCategories()
+  }, [])
 
-    useEffect(() => {
-        if (loading) return
-        let ctx
-        const init = async () => {
-            const { default: gsap } = await import('gsap')
-            const { ScrollTrigger } = await import('gsap/ScrollTrigger')
-            gsap.registerPlugin(ScrollTrigger)
-            const trigger = headingRef.current
-            if (!trigger) return
-            ctx = gsap.context(() => {
-                const tl = gsap.timeline({
-                    scrollTrigger: { trigger, start: 'top 85%' },
-                    defaults: { ease: 'power3.out' },
-                })
-                tl.fromTo(eyebrowRef.current, { opacity: 0, x: -16 }, { opacity: 1, x: 0, duration: 0.5 })
-                    .fromTo(headingRef.current, { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.7 }, 0.1)
-                    .fromTo(descRef.current, { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.6 }, 0.3)
-                    .fromTo(ruleRef.current, { scaleX: 0, transformOrigin: 'left' }, { scaleX: 1, duration: 0.6 }, 0.4)
-            })
+  // Header animations
+  useEffect(() => {
+    if (loading) return
+
+    let ctx
+    const init = async () => {
+      const { default: gsap } = await import("gsap")
+      const { ScrollTrigger } = await import("gsap/ScrollTrigger")
+      gsap.registerPlugin(ScrollTrigger)
+      if (!headingRef.current) return
+
+      ctx = gsap.context(() => {
+        const tl = gsap.timeline({
+          scrollTrigger: { trigger: headingRef.current, start: "top 85%" },
+          defaults: { ease: "power3.out" },
+        })
+
+        if (eyebrowRef.current) {
+          tl.fromTo(
+            eyebrowRef.current,
+            { x: -30, opacity: 0 },
+            { x: 0, opacity: 1, duration: 0.6 }
+          )
         }
-        init()
-        return () => ctx?.revert()
-    }, [loading])
 
-    const desktopGridCols =
-        categories.length <= 2
-            ? 'md:grid-cols-2'
-            : categories.length === 3
-                ? 'md:grid-cols-3'
-                : 'md:grid-cols-2 lg:grid-cols-3'
+        tl.fromTo(
+          headingRef.current,
+          { y: 50, opacity: 0 },
+          { y: 0, opacity: 1, duration: 0.9 },
+          0.1
+        )
 
-    // Split categories for mobile layout
-    const featuredCategory = categories[0]
-    const gridCategories = categories.slice(1, 5) // 2x2 grid
-    const listCategories = categories.slice(5)     // remaining as list
+        if (descRef.current) {
+          tl.fromTo(
+            descRef.current,
+            { y: 30, opacity: 0 },
+            { y: 0, opacity: 1, duration: 0.7 },
+            0.3
+          )
+        }
+      })
+    }
+    init()
+    return () => ctx?.revert()
+  }, [loading])
 
-    return (
-        <section
-            className="w-full bg-white py-16 md:py-32"
-            style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
-        >
-            <div className="max-w-6xl mx-auto px-5 md:px-16">
+  return (
+    <section
+      className="w-full bg-white py-14 md:py-28"
+      style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
+    >
+      <div className="max-w-6xl mx-auto px-4 sm:px-8 md:px-12">
+        {/* ═══ HEADER ═══ */}
+        <div className="mb-8 md:mb-16">
+          <div
+            ref={eyebrowRef}
+            className="flex items-center gap-4 mb-3 md:mb-6 opacity-0"
+          >
+            <span className="block w-8 h-px bg-black" />
+            <span
+              className="tracking-[0.4em] uppercase text-gray-400"
+              style={{ fontFamily: "Georgia, serif", fontSize: "10px" }}
+            >
+              Services
+            </span>
+          </div>
 
-                {/* ── Heading ── */}
-                <div className="mb-10 md:mb-20">
-                    <div ref={eyebrowRef} className="flex items-center gap-3 mb-4 md:mb-6 opacity-0">
-                        <span className="block w-8 h-px bg-black shrink-0" />
-                        <span
-                            className="tracking-[0.4em] uppercase text-gray-400"
-                            style={{
-                                fontFamily: 'Georgia, "Times New Roman", serif',
-                                fontSize: 'clamp(8px, 0.8vw, 9px)',
-                            }}
-                        >
-                            What We Offer
-                        </span>
-                    </div>
+          <h2
+            ref={headingRef}
+            className="text-black mb-3 md:mb-4 opacity-0"
+            style={{
+              fontFamily: 'Georgia, "Times New Roman", serif',
+              fontWeight: 300,
+              fontSize: "clamp(28px, 6vw, 56px)",
+              lineHeight: 1.1,
+              letterSpacing: "-0.03em",
+            }}
+          >
+            What We Offer
+          </h2>
 
-                    <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-5 md:gap-6">
-                        <div className="flex-1">
-                            <h2
-                                ref={headingRef}
-                                className="opacity-0 text-black mb-3 md:mb-5"
-                                style={{
-                                    fontFamily: 'Georgia, "Times New Roman", serif',
-                                    fontWeight: 300,
-                                    fontSize: 'clamp(1.8rem, 4vw, 3.8rem)',
-                                    lineHeight: 1.08,
-                                    letterSpacing: '-0.01em',
-                                }}
-                            >
-                                Our Services
-                            </h2>
-                            <p
-                                ref={descRef}
-                                className="opacity-0 tracking-[0.18em] leading-[1.9] uppercase
-                                           text-gray-400 max-w-md"
-                                style={{ fontSize: 'clamp(9px, 0.9vw, 11px)' }}
-                            >
-                                Professional cleaning at your doorstep —
-                                <br className="hidden md:block" />
-                                choose a category to explore our packages.
-                            </p>
-                        </div>
+          <p
+            ref={descRef}
+            className="text-gray-400 max-w-md leading-relaxed opacity-0"
+            style={{ fontSize: "14px" }}
+          >
+            Professional cleaning solutions delivered to your doorstep.
+          </p>
+        </div>
 
-                        {/* Desktop View All */}
-                        <a
-                            href="/services"
-                            className="hidden md:flex items-center gap-3 group mb-2"
-                        >
-                            <span
-                                className="tracking-[0.28em] uppercase text-gray-400
-                                           group-hover:text-black transition-colors duration-300"
-                                style={{ fontSize: 'clamp(7px, 0.8vw, 9px)' }}
-                            >
-                                View All
-                            </span>
-                            <div className="w-8 h-8 rounded-full border border-gray-200
-                                            group-hover:border-black group-hover:bg-black
-                                            flex items-center justify-center
-                                            transition-all duration-300">
-                                <ArrowRight
-                                    size={12}
-                                    strokeWidth={1.5}
-                                    className="text-gray-400 group-hover:text-white
-                                               transition-colors duration-300"
-                                />
-                            </div>
-                        </a>
-                    </div>
-
-                    <div ref={ruleRef} className="w-full h-px bg-gray-200 mt-6 md:mt-8" />
-                </div>
-
-                {/* ── Content ── */}
-                {loading ? (
-                    <>
-                        {/* Mobile skeleton */}
-                        <div className="md:hidden space-y-4">
-                            <SkeletonFeatured />
-                            <div className="grid grid-cols-2 gap-3">
-                                <SkeletonSmall />
-                                <SkeletonSmall />
-                            </div>
-                        </div>
-                        {/* Desktop skeleton */}
-                        <div className={`hidden md:grid ${desktopGridCols} gap-6`}>
-                            <SkeletonDesktop />
-                            <SkeletonDesktop />
-                            <SkeletonDesktop />
-                        </div>
-                    </>
-                ) : error ? (
-                    <ErrorState onRetry={fetchCategories} />
-                ) : categories.length === 0 ? (
-                    <EmptyState />
-                ) : (
-                    <>
-                        {/* ═══ Mobile Layout ═══ */}
-                        <div className="md:hidden space-y-3">
-
-                            {/* Featured card (first category) */}
-                            {featuredCategory && (
-                                <MobileFeaturedCard
-                                    category={featuredCategory}
-                                    index={0}
-                                />
-                            )}
-
-                            {/* 2-column grid (next 4 categories) */}
-                            {gridCategories.length > 0 && (
-                                <div className="grid grid-cols-2 gap-3">
-                                    {gridCategories.map((cat, i) => (
-                                        <MobileGridCard
-                                            key={cat._id}
-                                            category={cat}
-                                            index={i + 1}
-                                        />
-                                    ))}
-                                </div>
-                            )}
-
-                            {/* List style (remaining categories) */}
-                            {listCategories.length > 0 && (
-                                <div className="pt-2">
-                                    {listCategories.map((cat, i) => (
-                                        <MobileListCard
-                                            key={cat._id}
-                                            category={cat}
-                                            index={i + 5}
-                                        />
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* ═══ Desktop Layout ═══ */}
-                        <div className={`hidden md:grid ${desktopGridCols} gap-6`}>
-                            {categories.map((category, i) => (
-                                <DesktopCategoryCard
-                                    key={category._id}
-                                    category={category}
-                                    index={i}
-                                />
-                            ))}
-                        </div>
-                    </>
-                )}
-
-                {/* ── Mobile View All ── */}
-                {!loading && !error && categories.length > 0 && (
-                    <div className="mt-8 flex md:hidden">
-                        <a
-                            href="/services"
-                            className="relative flex items-center justify-center gap-2.5
-                                       tracking-[0.22em] uppercase text-white bg-black
-                                       border border-black px-8 py-4 no-underline
-                                       overflow-hidden group rounded-[5px] min-h-[52px] w-full
-                                       active:scale-[0.98] transition-all duration-200"
-                            style={{ fontSize: 'clamp(9px, 2.4vw, 10px)' }}
-                        >
-                            <span className="absolute inset-0 bg-white origin-bottom scale-y-0
-                                             group-hover:scale-y-100 transition-transform
-                                             duration-500 ease-out" />
-                            <span className="relative z-10 group-hover:text-black
-                                             transition-colors duration-500">
-                                View All Services
-                            </span>
-                            <ArrowUpRight
-                                size={13}
-                                strokeWidth={1.5}
-                                className="relative z-10 group-hover:text-black
-                                           transition-colors duration-500"
-                            />
-                        </a>
-                    </div>
-                )}
-
-                {/* ── Trust Badges ── */}
-                {!loading && !error && categories.length > 0 && <TrustBar />}
+        {/* ═══ CONTENT ═══ */}
+        {loading ? (
+          <>
+            {/* Mobile Skeleton - Bento Grid */}
+            <div className="md:hidden grid grid-cols-2 gap-3 auto-rows-[140px]">
+              <MobileSkeleton variant="large" />
+              <MobileSkeleton />
+              <MobileSkeleton />
+              <MobileSkeleton variant="tall" />
+              <MobileSkeleton variant="wide" />
             </div>
-        </section>
-    )
+
+            {/* Desktop Skeleton */}
+            <div className="hidden md:grid md:grid-cols-3 gap-5 auto-rows-[280px]">
+              <DesktopSkeleton featured />
+              <DesktopSkeleton />
+              <DesktopSkeleton />
+              <DesktopSkeleton />
+              <DesktopSkeleton />
+            </div>
+          </>
+        ) : error ? (
+          <div className="text-center py-16">
+            <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-gray-50 flex items-center justify-center">
+              <span className="text-2xl">⚠️</span>
+            </div>
+            <h3
+              className="text-black mb-2"
+              style={{ fontFamily: "Georgia, serif", fontSize: "18px" }}
+            >
+              Something went wrong
+            </h3>
+            <p className="text-gray-400 mb-6" style={{ fontSize: "14px" }}>
+              Unable to load services
+            </p>
+            <button
+              onClick={fetchCategories}
+              className="h-12 px-8 bg-black text-white rounded-full 
+                         tracking-wider uppercase hover:bg-gray-800
+                         active:scale-95 transition-all duration-300"
+              style={{ fontSize: "11px" }}
+            >
+              Try Again
+            </button>
+          </div>
+        ) : categories.length === 0 ? (
+          <div className="text-center py-16">
+            <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-gray-50 flex items-center justify-center">
+              <span className="text-2xl">🧹</span>
+            </div>
+            <h3
+              className="text-black mb-2"
+              style={{ fontFamily: "Georgia, serif", fontSize: "18px" }}
+            >
+              No services yet
+            </h3>
+            <p className="text-gray-400" style={{ fontSize: "14px" }}>
+              Check back soon!
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* ═══ MOBILE: Bento Grid Layout ═══ */}
+            <div className="md:hidden grid grid-cols-2 gap-3 auto-rows-[140px]">
+              {categories.map((category, i) => (
+                <MobileServiceCard
+                  key={category._id}
+                  category={category}
+                  index={i}
+                  variant={getMobileVariant(i, categories.length)}
+                />
+              ))}
+            </div>
+
+            {/* ═══ DESKTOP: Bento Grid Layout ═══ */}
+            <div className="hidden md:grid md:grid-cols-3 gap-5 auto-rows-[280px]">
+              {categories.map((category, i) => (
+                <DesktopServiceCard
+                  key={category._id}
+                  category={category}
+                  index={i}
+                  variant={i === 0 ? "featured" : "default"}
+                />
+              ))}
+            </div>
+
+            {/* View All Button */}
+            <div className="flex justify-center mt-8 md:mt-14">
+              <a
+                href="/services"
+                className="group flex items-center justify-center gap-3 
+                           w-full sm:w-auto h-14 px-8
+                           bg-black text-white rounded-full
+                           hover:bg-gray-800 active:scale-[0.98] 
+                           transition-all duration-300 no-underline"
+              >
+                <span
+                  className="tracking-wider uppercase"
+                  style={{ fontSize: "11px" }}
+                >
+                  View All Services
+                </span>
+                <ArrowRight size={16} />
+              </a>
+            </div>
+
+            {/* Trust Badges */}
+            <TrustBar />
+          </>
+        )}
+      </div>
+    </section>
+  )
 }
