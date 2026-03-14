@@ -42,13 +42,18 @@ export default function ReportsPage() {
             ]);
 
             if (revenueRes.status === 'fulfilled' && revenueRes.value.success) {
-                setRevenueData(revenueRes.value.data || revenueRes.value);
+                const data = revenueRes.value.data || revenueRes.value;
+                console.log('Revenue Data:', data);
+                setRevenueData(data);
             }
 
             if (bookingRes.status === 'fulfilled' && bookingRes.value.success) {
-                setBookingData(bookingRes.value.data || bookingRes.value);
+                const data = bookingRes.value.data || bookingRes.value;
+                console.log('Booking Data:', data);
+                setBookingData(data);
             }
         } catch (error) {
+            console.error('Fetch error:', error);
             toast.error('Failed to fetch reports');
         } finally {
             setLoading(false);
@@ -64,28 +69,64 @@ export default function ReportsPage() {
         setFilters(prev => ({ ...prev, ...newFilters }));
     };
 
-    // ── Computed Stats ──
-    const totalRevenue = revenueData?.totalRevenue
+    // ── Extract chart data from various possible paths ──
+    const extractChartData = (data) => {
+        if (!data) return [];
+        
+        // Check all possible paths where chart data might be
+        const possiblePaths = [
+            data.revenueData,      // ← This is what your API returns!
+            data.bookingData,
+            data.chart,
+            data.data,
+            data.breakdown,
+            data.timeline,
+            data.byDay,
+            data.byMonth,
+            data.byCategory,
+            data.categories,
+            data.dailyData,
+            data.monthlyData,
+        ];
+        
+        for (const path of possiblePaths) {
+            if (Array.isArray(path) && path.length > 0) {
+                return path;
+            }
+        }
+        
+        // If data itself is an array
+        if (Array.isArray(data) && data.length > 0) {
+            return data;
+        }
+        
+        return [];
+    };
+
+    // ── Computed Stats - Updated to match your API structure ──
+    const totalRevenue = revenueData?.summary?.totalRevenue
+        || revenueData?.totalRevenue
         || revenueData?.total
-        || revenueData?.summary?.totalRevenue
         || 0;
 
-    const totalBookings = bookingData?.totalBookings
-        || bookingData?.total
+    const totalBookings = revenueData?.summary?.totalBookings
         || bookingData?.summary?.totalBookings
+        || bookingData?.totalBookings
+        || bookingData?.total
         || 0;
 
-    const completedBookings = bookingData?.completedBookings
-        || bookingData?.summary?.completed
+    const completedBookings = bookingData?.summary?.completed
+        || bookingData?.completedBookings
+        || bookingData?.completed
         || 0;
 
-    const cancelledBookings = bookingData?.cancelledBookings
-        || bookingData?.summary?.cancelled
+    const cancelledBookings = bookingData?.summary?.cancelled
+        || bookingData?.cancelledBookings
+        || bookingData?.cancelled
         || 0;
 
-    const avgBookingValue = totalBookings > 0
-        ? Math.round(totalRevenue / totalBookings)
-        : 0;
+    const avgBookingValue = revenueData?.summary?.averageOrderValue
+        || (totalBookings > 0 ? Math.round(totalRevenue / totalBookings) : 0);
 
     const completionRate = totalBookings > 0
         ? Math.round((completedBookings / totalBookings) * 100)
@@ -95,15 +136,9 @@ export default function ReportsPage() {
         ? Math.round((cancelledBookings / totalBookings) * 100)
         : 0;
 
-    const revenueChart = revenueData?.chart
-        || revenueData?.data
-        || revenueData?.breakdown
-        || [];
-
-    const bookingChart = bookingData?.chart
-        || bookingData?.data
-        || bookingData?.breakdown
-        || [];
+    // Extract chart arrays
+    const revenueChart = extractChartData(revenueData);
+    const bookingChart = extractChartData(bookingData);
 
     const topServices = revenueData?.topServices
         || revenueData?.byService
@@ -113,6 +148,7 @@ export default function ReportsPage() {
 
     const statusBreakdown = bookingData?.statusBreakdown
         || bookingData?.byStatus
+        || bookingData?.summary?.byStatus
         || {};
 
     const tabs = ['overview', 'revenue', 'bookings'];
@@ -296,7 +332,6 @@ export default function ReportsPage() {
                             loading={loading}
                         />
 
-                        {/* Top Services Revenue Table */}
                         {topServices.length > 0 && (
                             <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden">
                                 <div className="px-5 py-4 border-b border-white/[0.05]">
@@ -391,7 +426,6 @@ export default function ReportsPage() {
                             loading={loading}
                         />
 
-                        {/* Status Breakdown */}
                         {Object.keys(statusBreakdown).length > 0 && (
                             <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden">
                                 <div className="px-5 py-4 border-b border-white/[0.05]">

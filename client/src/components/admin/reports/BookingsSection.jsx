@@ -23,7 +23,7 @@ const CustomTooltip = ({ active, payload, label }) => {
             px-4 py-3 rounded-lg
             shadow-xl shadow-black/50
         ">
-            <p className="text-[11px] text-white/30 mb-1">{label}</p>
+            <p className="text-[11px] text-white/30 mb-1 capitalize">{label}</p>
             <p className="text-sm text-white/80 font-medium">
                 {payload[0].value} bookings
             </p>
@@ -69,27 +69,64 @@ export default function BookingsSection({
         );
     }
 
+    // ============================================
+    // FLEXIBLE DATA MAPPING
+    // Handles multiple formats:
+    // - { _id, count, revenue } (bookingsByCategory)
+    // - { label, bookings }
+    // - { date, count }
+    // - { period, total }
+    // ============================================
     const chartData = (data || []).map(item => ({
-        label: item.label || item.date || item._id || item.period || '—',
+        label: item.label || item._id || item.date || item.period || item.name || '—',
         bookings: item.bookings || item.count || item.total || 0
     }));
 
-    const pieData = Object.entries(statusBreakdown || {}).map(([status, count]) => ({
-        name: status,
-        value: count
-    }));
+    // ============================================
+    // STATUS BREAKDOWN
+    // Handles both object and array formats
+    // ============================================
+    let pieData = [];
+    
+    if (statusBreakdown) {
+        if (Array.isArray(statusBreakdown)) {
+            // Array format: [{ _id: "pending", count: 5 }]
+            pieData = statusBreakdown.map(item => ({
+                name: item._id || item.status || item.name,
+                value: item.count || item.value || item.total || 0
+            }));
+        } else {
+            // Object format: { pending: 5, completed: 10 }
+            pieData = Object.entries(statusBreakdown).map(([status, count]) => ({
+                name: status,
+                value: typeof count === 'number' ? count : (count?.count || count?.total || 0)
+            }));
+        }
+    }
+
+    // Filter out zero values from pie chart
+    pieData = pieData.filter(item => item.value > 0);
+
+    const totalBookings = chartData.reduce((sum, item) => sum + item.bookings, 0);
 
     return (
         <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden">
             
             {/* Header */}
             <div className="px-5 py-4 border-b border-white/[0.05] flex items-center justify-between">
-                <p className="text-[10px] font-medium text-white/70 tracking-[0.15em] uppercase">
-                    Bookings
-                </p>
+                <div>
+                    <p className="text-[10px] font-medium text-white/70 tracking-[0.15em] uppercase">
+                        Bookings
+                    </p>
+                    {totalBookings > 0 && (
+                        <p className="text-lg font-semibold text-white mt-1">
+                            {totalBookings} <span className="text-sm text-white/40 font-normal">total</span>
+                        </p>
+                    )}
+                </div>
                 {chartData.length > 0 && (
                     <p className="text-[11px] text-white/25">
-                        {chartData.length} data points
+                        {chartData.length} categories
                     </p>
                 )}
             </div>
@@ -110,8 +147,8 @@ export default function BookingsSection({
 
                         {/* Bar Chart */}
                         {chartData.length > 0 && (
-                            <ResponsiveContainer width="100%" height={compact ? 200 : 300}>
-                                <BarChart data={chartData}>
+                            <ResponsiveContainer width="100%" height={compact ? 200 : 280}>
+                                <BarChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                                     <CartesianGrid
                                         strokeDasharray="3 3"
                                         stroke="rgba(255,255,255,0.05)"
@@ -121,21 +158,26 @@ export default function BookingsSection({
                                         dataKey="label"
                                         axisLine={false}
                                         tickLine={false}
-                                        tick={{ fill: 'rgba(255,255,255,0.25)', fontSize: 11 }}
+                                        tick={{ fill: 'rgba(255,255,255,0.35)', fontSize: 11 }}
                                         dy={10}
+                                        tickFormatter={(val) => {
+                                            // Capitalize first letter
+                                            return val.charAt(0).toUpperCase() + val.slice(1);
+                                        }}
                                     />
                                     <YAxis
                                         axisLine={false}
                                         tickLine={false}
                                         tick={{ fill: 'rgba(255,255,255,0.25)', fontSize: 11 }}
                                         dx={-10}
+                                        allowDecimals={false}
                                     />
                                     <Tooltip content={<CustomTooltip />} />
                                     <Bar
                                         dataKey="bookings"
                                         fill="rgba(255,255,255,0.7)"
                                         radius={[4, 4, 0, 0]}
-                                        maxBarSize={40}
+                                        maxBarSize={50}
                                     />
                                 </BarChart>
                             </ResponsiveContainer>
@@ -175,7 +217,7 @@ export default function BookingsSection({
                                 {/* Legend */}
                                 <div className="flex flex-col justify-center">
                                     <p className="text-[10px] text-white/25 tracking-widest uppercase mb-4 font-medium">
-                                        Legend
+                                        Status Breakdown
                                     </p>
                                     <div className="space-y-3">
                                         {pieData.map((entry) => (
@@ -191,10 +233,10 @@ export default function BookingsSection({
                                                         }}
                                                     />
                                                     <span className="text-sm text-white/50 capitalize">
-                                                        {entry.name}
+                                                        {entry.name.replace('-', ' ')}
                                                     </span>
                                                 </div>
-                                                <span className="text-sm text-white/30">
+                                                <span className="text-sm font-medium text-white/70 tabular-nums">
                                                     {entry.value}
                                                 </span>
                                             </div>
