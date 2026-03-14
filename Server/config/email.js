@@ -1,26 +1,42 @@
-// config/email.js - Brevo API Configuration
+// config/email.js - Brevo SMTP Configuration
 
-import brevo from '@getbrevo/brevo';
+import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Validate Brevo API key
-if (!process.env.BREVO_API_KEY) {
-    console.error('❌ BREVO_API_KEY missing in environment variables');
-    process.exit(1);
-}
+// ✅ Validate email config
+const createTransporter = () => {
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+        console.error('❌ Email credentials missing in environment variables');
+        console.error('Required: EMAIL_USER, EMAIL_PASS');
+    }
 
-// Initialize Brevo API
-const apiInstance = new brevo.TransactionalEmailsApi();
+    const transporter = nodemailer.createTransport({
+        host: process.env.EMAIL_HOST || 'smtp-relay.brevo.com',
+        port: parseInt(process.env.EMAIL_PORT) || 587,
+        secure: false, // Use TLS
+        auth: {
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASS
+        },
+        tls: {
+            rejectUnauthorized: false
+        }
+    });
 
-// Set API key
-apiInstance.setApiKey(
-    brevo.TransactionalEmailsApiApiKeys.apiKey,
-    process.env.BREVO_API_KEY
-);
+    // Verify connection
+    transporter.verify((error, success) => {
+        if (error) {
+            console.error('❌ Brevo SMTP configuration error:', error.message);
+        } else {
+            console.log('✅ Brevo SMTP server is ready to send messages');
+        }
+    });
 
-// Verify configuration
-console.log('✅ Brevo API configured successfully');
+    return transporter;
+};
 
-export default apiInstance;
+const transporter = createTransporter();
+
+export default transporter;
