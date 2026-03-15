@@ -1,12 +1,13 @@
 "use client"
 
-import { useRef, useState, useEffect, memo } from "react"
-import { motion, useInView, AnimatePresence, useMotionValue, useTransform } from "framer-motion"
+import { useRef, useState, useEffect, memo, useCallback } from "react"
+import { motion, useInView, AnimatePresence } from "framer-motion"
 import { ArrowRight, CalendarCheck, Car, MapPin, Sparkles, ChevronLeft, ChevronRight } from "lucide-react"
 
 // ── Constants ──────────────────────────────────────────────
 const STEPS = [
   {
+    id: "choose-service",
     icon: Car,
     number: "01",
     title: "Choose Your Service",
@@ -14,6 +15,7 @@ const STEPS = [
     detail: "Browse our curated selection of premium services",
   },
   {
+    id: "share-location",
     icon: MapPin,
     number: "02",
     title: "Share Your Location",
@@ -21,6 +23,7 @@ const STEPS = [
     detail: "Flexible doorstep service across the city",
   },
   {
+    id: "pick-time",
     icon: CalendarCheck,
     number: "03",
     title: "Pick a Time Slot",
@@ -28,6 +31,7 @@ const STEPS = [
     detail: "Book at your convenience, any day of the week",
   },
   {
+    id: "sit-relax",
     icon: Sparkles,
     number: "04",
     title: "Sit Back & Relax",
@@ -160,28 +164,152 @@ const ProgressRing = memo(function ProgressRing({ progress, size = 48 }) {
   )
 })
 
-// ── Cool Mobile Carousel ───────────────────────────────────
+// ── Mobile Step Card Component ─────────────────────────────
+const MobileStepCard = memo(function MobileStepCard({ step, isActive, progress }) {
+  const Icon = step.icon
+
+  if (!isActive) return null
+
+  return (
+    <motion.div
+      key={step.id}
+      variants={{
+        enter: { x: 300, opacity: 0 },
+        center: { x: 0, opacity: 1 },
+        exit: { x: -300, opacity: 0 }
+      }}
+      initial="enter"
+      animate="center"
+      exit="exit"
+      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      className="relative w-full"
+    >
+      {/* Main black card */}
+      <div className="relative bg-black rounded-[2rem] overflow-hidden aspect-[4/5]">
+        {/* Background patterns */}
+        <div className="absolute inset-0" aria-hidden="true">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full blur-3xl" />
+          <div
+            className="absolute inset-0 opacity-[0.03]"
+            style={{
+              backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 30px, rgba(255,255,255,0.1) 30px, rgba(255,255,255,0.1) 31px)`,
+            }}
+          />
+        </div>
+
+        {/* Progress indicator */}
+        <div className="absolute top-4 right-4 z-20">
+          <div className="relative">
+            <ProgressRing progress={progress} size={40} />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-white text-xs font-medium">{step.number}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="relative z-10 h-full flex flex-col p-6">
+          {/* Top section */}
+          <div className="flex-1 flex flex-col items-center justify-center text-center">
+            <div
+              className="w-20 h-20 rounded-2xl bg-white flex items-center justify-center mb-6 shadow-2xl"
+              style={{ boxShadow: "0 25px 60px -15px rgba(255,255,255,0.25)" }}
+            >
+              <Icon size={32} strokeWidth={1.5} className="text-black" />
+            </div>
+
+            <span
+              className="text-white/[0.08] mb-4"
+              style={{
+                fontFamily: "Georgia, serif",
+                fontSize: "90px",
+                fontWeight: 300,
+                lineHeight: 0.85,
+              }}
+            >
+              {step.number}
+            </span>
+
+            <h3
+              className="text-white mb-3 px-2"
+              style={{
+                fontFamily: 'Georgia, "Times New Roman", serif',
+                fontSize: "26px",
+                fontWeight: 400,
+                letterSpacing: "-0.01em",
+                lineHeight: 1.2,
+              }}
+            >
+              {step.title}
+            </h3>
+
+            <p className="text-white/50 px-4 leading-relaxed" style={{ fontSize: "14px" }}>
+              {step.description}
+            </p>
+          </div>
+
+          {/* Bottom section */}
+          <div className="mt-auto">
+            <button className="w-full py-4 bg-white/10 backdrop-blur-sm rounded-2xl 
+                             text-white/60 text-sm tracking-wider uppercase
+                             hover:bg-white/20 active:bg-white/30 transition-colors duration-300">
+              Learn More
+            </button>
+
+            <div className="flex items-center justify-center gap-2 mt-4">
+              <span className="text-white/30 text-xs tracking-wider uppercase">
+                Swipe to explore
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Glow effect */}
+        <div
+          className="absolute inset-0 opacity-50 pointer-events-none"
+          style={{
+            background: "radial-gradient(circle at 50% 30%, rgba(255,255,255,0.1), transparent 60%)",
+          }}
+          aria-hidden="true"
+        />
+      </div>
+    </motion.div>
+  )
+})
+
+// ── Cool Mobile Carousel (FIXED) ───────────────────────────
 const MobileStepCarousel = memo(function MobileStepCarousel() {
   const [activeIndex, setActiveIndex] = useState(0)
   const [progress, setProgress] = useState(0)
   const [touchStart, setTouchStart] = useState(0)
   const [touchEnd, setTouchEnd] = useState(0)
+  const [isMounted, setIsMounted] = useState(false)
+  
+  const containerRef = useRef(null)
   const intervalRef = useRef(null)
-  const progressIntervalRef = useRef(null)
+  const progressRef = useRef(null)
 
-  const activeStep = STEPS[activeIndex]
-  const Icon = activeStep.icon
+  // Ensure component is mounted
+  useEffect(() => {
+    setIsMounted(true)
+    return () => {
+      setIsMounted(false)
+      if (intervalRef.current) clearInterval(intervalRef.current)
+      if (progressRef.current) clearInterval(progressRef.current)
+    }
+  }, [])
 
-  // Touch handlers for swipe
-  const handleTouchStart = (e) => {
-    setTouchStart(e.touches[0].clientX)
-  }
+  // Handle touch events
+  const handleTouchStart = useCallback((e) => {
+    setTouchStart(e.targetTouches[0].clientX)
+  }, [])
 
-  const handleTouchMove = (e) => {
-    setTouchEnd(e.touches[0].clientX)
-  }
+  const handleTouchMove = useCallback((e) => {
+    setTouchEnd(e.targetTouches[0].clientX)
+  }, [])
 
-  const handleTouchEnd = () => {
+  const handleTouchEnd = useCallback(() => {
     if (!touchStart || !touchEnd) return
     
     const distance = touchStart - touchEnd
@@ -189,181 +317,77 @@ const MobileStepCarousel = memo(function MobileStepCarousel() {
     const isRightSwipe = distance < -50
 
     if (isLeftSwipe && activeIndex < STEPS.length - 1) {
-      setActiveIndex((prev) => prev + 1)
+      setActiveIndex(prev => prev + 1)
       setProgress(0)
     }
     if (isRightSwipe && activeIndex > 0) {
-      setActiveIndex((prev) => prev - 1)
+      setActiveIndex(prev => prev - 1)
       setProgress(0)
     }
-  }
+  }, [touchStart, touchEnd, activeIndex])
 
-  // Auto-play functionality
+  // Auto-play functionality - FIXED
   useEffect(() => {
-    // Progress bar animation
-    progressIntervalRef.current = setInterval(() => {
-      setProgress((prev) => {
+    if (!isMounted) return
+
+    // Clear existing intervals
+    if (intervalRef.current) clearInterval(intervalRef.current)
+    if (progressRef.current) clearInterval(progressRef.current)
+
+    // Progress animation
+    progressRef.current = setInterval(() => {
+      setProgress(prev => {
         if (prev >= 100) return 0
-        return prev + (100 / (AUTO_PLAY_INTERVAL / 50))
+        return prev + 2 // 2% every 80ms = 100% in 4 seconds
       })
-    }, 50)
+    }, 80)
 
     // Step change
     intervalRef.current = setInterval(() => {
-      setActiveIndex((prev) => (prev + 1) % STEPS.length)
+      setActiveIndex(prev => (prev + 1) % STEPS.length)
       setProgress(0)
     }, AUTO_PLAY_INTERVAL)
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)
-      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current)
+      if (progressRef.current) clearInterval(progressRef.current)
     }
-  }, [activeIndex])
+  }, [activeIndex, isMounted])
+
+  // Handle manual navigation
+  const goToStep = useCallback((index) => {
+    setActiveIndex(index)
+    setProgress(0)
+  }, [])
+
+  if (!isMounted) return null
 
   return (
-    <div className="md:hidden">
+    <div className="md:hidden" ref={containerRef}>
       {/* Main Card Viewer */}
       <div className="relative px-5 mb-8">
         <div 
-          className="relative"
+          className="relative touch-pan-y"
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
         >
           <AnimatePresence mode="wait">
-            <motion.div
-              key={activeIndex}
-              variants={{
-                enter: { x: 300, opacity: 0 },
-                center: { x: 0, opacity: 1 },
-                exit: { x: -300, opacity: 0 }
-              }}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-              className="relative"
-            >
-              {/* Main black card */}
-              <div className="relative bg-black rounded-[2rem] overflow-hidden aspect-[4/5]">
-                {/* Background patterns */}
-                <div className="absolute inset-0" aria-hidden="true">
-                  <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl" />
-                  <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full blur-3xl" />
-                  <div
-                    className="absolute inset-0 opacity-[0.03]"
-                    style={{
-                      backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 30px, rgba(255,255,255,0.1) 30px, rgba(255,255,255,0.1) 31px)`,
-                    }}
-                  />
-                </div>
-
-                {/* Progress indicator */}
-                <div className="absolute top-4 right-4 z-20">
-                  <div className="relative">
-                    <ProgressRing progress={progress} size={40} />
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-white text-xs font-medium">{activeIndex + 1}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Content */}
-                <div className="relative z-10 h-full flex flex-col p-6">
-                  {/* Top section */}
-                  <div className="flex-1 flex flex-col items-center justify-center text-center">
-                    <motion.div
-                      initial={{ scale: 0.8, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      transition={{ duration: 0.5, delay: 0.2 }}
-                      className="w-20 h-20 rounded-2xl bg-white flex items-center justify-center mb-6 shadow-2xl"
-                      style={{ boxShadow: "0 25px 60px -15px rgba(255,255,255,0.25)" }}
-                    >
-                      <Icon size={32} strokeWidth={1.5} className="text-black" />
-                    </motion.div>
-
-                    <motion.span
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 0.5, delay: 0.3 }}
-                      className="text-white/[0.08] mb-4"
-                      style={{
-                        fontFamily: "Georgia, serif",
-                        fontSize: "90px",
-                        fontWeight: 300,
-                        lineHeight: 0.85,
-                      }}
-                    >
-                      {activeStep.number}
-                    </motion.span>
-
-                    <motion.h3
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.5, delay: 0.4 }}
-                      className="text-white mb-3 px-2"
-                      style={{
-                        fontFamily: 'Georgia, "Times New Roman", serif',
-                        fontSize: "26px",
-                        fontWeight: 400,
-                        letterSpacing: "-0.01em",
-                        lineHeight: 1.2,
-                      }}
-                    >
-                      {activeStep.title}
-                    </motion.h3>
-
-                    <motion.p 
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 0.5, delay: 0.5 }}
-                      className="text-white/50 px-4 leading-relaxed" 
-                      style={{ fontSize: "14px" }}
-                    >
-                      {activeStep.description}
-                    </motion.p>
-                  </div>
-
-                  {/* Bottom section */}
-                  <div className="mt-auto">
-                    {/* Quick action */}
-                    <button className="w-full py-4 bg-white/10 backdrop-blur-sm rounded-2xl 
-                                     text-white/60 text-sm tracking-wider uppercase
-                                     hover:bg-white/20 transition-colors duration-300">
-                      Learn More
-                    </button>
-
-                    {/* Step indicator */}
-                    <div className="flex items-center justify-center gap-2 mt-4">
-                      <span className="text-white/30 text-xs tracking-wider uppercase">
-                        Swipe to explore
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Glow effect */}
-                <div
-                  className="absolute inset-0 opacity-50 pointer-events-none"
-                  style={{
-                    background: "radial-gradient(circle at 50% 30%, rgba(255,255,255,0.1), transparent 60%)",
-                  }}
-                  aria-hidden="true"
-                />
-              </div>
-            </motion.div>
+            <MobileStepCard
+              key={STEPS[activeIndex].id}
+              step={STEPS[activeIndex]}
+              isActive={true}
+              progress={progress}
+            />
           </AnimatePresence>
         </div>
 
-        {/* Swipe hint */}
+        {/* Swipe hint dots */}
         <div className="absolute left-1/2 bottom-[-20px] -translate-x-1/2 flex gap-2">
           {STEPS.map((_, i) => (
             <button
-              key={i}
-              onClick={() => {
-                setActiveIndex(i)
-                setProgress(0)
-              }}
+              key={`dot-${i}`}
+              onClick={() => goToStep(i)}
               className={`h-1.5 rounded-full transition-all duration-500 ${
                 i === activeIndex ? "w-8 bg-black" : "w-1.5 bg-gray-300"
               }`}
@@ -381,14 +405,11 @@ const MobileStepCarousel = memo(function MobileStepCarousel() {
 
           return (
             <motion.button
-              key={i}
+              key={step.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: i * 0.1 }}
-              onClick={() => {
-                setActiveIndex(i)
-                setProgress(0)
-              }}
+              onClick={() => goToStep(i)}
               className={`w-full p-4 rounded-2xl flex items-center gap-4 text-left
                        transition-all duration-500 ${
                          isActive
@@ -430,7 +451,7 @@ const MobileStepCarousel = memo(function MobileStepCarousel() {
       <div className="grid grid-cols-3 gap-3 mt-10 mx-5">
         {STATS.map((stat, i) => (
           <motion.div
-            key={i}
+            key={`stat-${i}`}
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5, delay: 0.8 + i * 0.1 }}
@@ -456,49 +477,65 @@ const DesktopStepViewer = memo(function DesktopStepViewer() {
   const [activeIndex, setActiveIndex] = useState(0)
   const [progress, setProgress] = useState(0)
   const [isPaused, setIsPaused] = useState(false)
+  const [isMounted, setIsMounted] = useState(false)
+  
   const intervalRef = useRef(null)
-  const progressIntervalRef = useRef(null)
+  const progressRef = useRef(null)
 
   const activeStep = STEPS[activeIndex]
   const Icon = activeStep.icon
 
-  const nextStep = () => {
+  // Ensure component is mounted
+  useEffect(() => {
+    setIsMounted(true)
+    return () => {
+      setIsMounted(false)
+      if (intervalRef.current) clearInterval(intervalRef.current)
+      if (progressRef.current) clearInterval(progressRef.current)
+    }
+  }, [])
+
+  const nextStep = useCallback(() => {
     setActiveIndex((prev) => (prev + 1) % STEPS.length)
     setProgress(0)
-  }
+  }, [])
 
-  const prevStep = () => {
+  const prevStep = useCallback(() => {
     setActiveIndex((prev) => (prev - 1 + STEPS.length) % STEPS.length)
     setProgress(0)
-  }
+  }, [])
 
-  const goToStep = (index) => {
+  const goToStep = useCallback((index) => {
     setActiveIndex(index)
     setProgress(0)
-  }
+  }, [])
 
-  // Auto-play functionality
+  // Auto-play functionality - FIXED
   useEffect(() => {
-    if (isPaused) return
+    if (isPaused || !isMounted) return
 
-    // Progress bar animation
-    progressIntervalRef.current = setInterval(() => {
-      setProgress((prev) => {
+    // Clear existing intervals
+    if (intervalRef.current) clearInterval(intervalRef.current)
+    if (progressRef.current) clearInterval(progressRef.current)
+
+    // Progress animation
+    progressRef.current = setInterval(() => {
+      setProgress(prev => {
         if (prev >= 100) return 0
-        return prev + (100 / (AUTO_PLAY_INTERVAL / 50))
+        return prev + 2
       })
-    }, 50)
+    }, 80)
 
     // Step change
-    intervalRef.current = setInterval(() => {
-      nextStep()
-    }, AUTO_PLAY_INTERVAL)
+    intervalRef.current = setInterval(nextStep, AUTO_PLAY_INTERVAL)
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)
-      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current)
+      if (progressRef.current) clearInterval(progressRef.current)
     }
-  }, [isPaused, activeIndex])
+  }, [isPaused, activeIndex, nextStep, isMounted])
+
+  if (!isMounted) return null
 
   return (
     <div 
@@ -510,7 +547,7 @@ const DesktopStepViewer = memo(function DesktopStepViewer() {
       <div className="relative">
         <AnimatePresence mode="wait">
           <motion.div
-            key={activeIndex}
+            key={activeStep.id}
             variants={slideIn}
             initial="hidden"
             animate="visible"
@@ -663,7 +700,7 @@ const DesktopStepViewer = memo(function DesktopStepViewer() {
                 <div className="flex gap-2">
                   {STEPS.map((_, i) => (
                     <button
-                      key={i}
+                      key={`nav-${i}`}
                       onClick={() => goToStep(i)}
                       className={`h-1.5 rounded-full transition-all duration-500 ${
                         i === activeIndex ? "w-12 bg-black" : "w-1.5 bg-gray-200 hover:bg-gray-300"
@@ -687,7 +724,7 @@ const DesktopStepViewer = memo(function DesktopStepViewer() {
               <div className="grid grid-cols-3 gap-4 pt-8">
                 {STATS.map((stat, i) => (
                   <div
-                    key={i}
+                    key={`stat-desktop-${i}`}
                     className="bg-gradient-to-br from-gray-50 to-white rounded-2xl p-4 border border-gray-100
                              hover:shadow-md hover:-translate-y-0.5 transition-all duration-300"
                   >
@@ -714,13 +751,13 @@ const DesktopStepViewer = memo(function DesktopStepViewer() {
 
           return (
             <button
-              key={i}
+              key={`thumb-${step.id}`}
               onClick={() => goToStep(i)}
               className={`relative rounded-2xl p-6 text-left transition-all duration-500
                        ${
                          isActive
                            ? "bg-black text-white shadow-xl scale-105"
-                           : "bg-gray-50 text-gray-900 hover:bg-gray-100 hover:scale-102"
+                           : "bg-gray-50 text-gray-900 hover:bg-gray-100 hover:scale-[1.02]"
                        }`}
             >
               <div
@@ -807,7 +844,7 @@ const CTASection = memo(function CTASection() {
 export default function HowItWorks() {
   return (
     <section
-      className="w-full bg-white py-16 md:py-36 lg:py-44"
+      className="w-full bg-white py-16 md:py-36 lg:py-44 overflow-hidden"
       style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
       aria-labelledby="how-it-works-heading"
     >
