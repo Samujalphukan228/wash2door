@@ -26,6 +26,9 @@ const app = express();
 const server = createServer(app);
 initSocket(server);
 
+// ✅ ADD THIS - Trust proxy for Render/Vercel
+app.set('trust proxy', 1);
+
 connectDB().then(() => {
     startCleanupScheduler();
 }).catch((error) => {
@@ -46,6 +49,12 @@ app.use(cors({
     origin: (origin, callback) => {
         if (!origin) return callback(null, true);
         if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+        
+        // ✅ ADD THIS - Allow Vercel preview deployments
+        if (origin.match(/^https:\/\/wash2door.*\.vercel\.app$/)) {
+            return callback(null, true);
+        }
+        
         console.warn(`⚠️ CORS blocked: ${origin}`);
         callback(new Error(`CORS: origin ${origin} not allowed`));
     },
