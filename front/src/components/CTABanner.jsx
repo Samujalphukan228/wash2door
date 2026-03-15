@@ -1,563 +1,439 @@
 "use client"
 
-import { useEffect, useRef, memo } from "react"
-import { ArrowRight, Phone, Clock, MapPin, Sparkles } from "lucide-react"
+import { useRef, memo } from "react"
+import { motion, useInView } from "framer-motion"
+import { ArrowRight, Phone, Clock, MapPin, Sparkles, Zap } from "lucide-react"
 
 // ── Constants ──────────────────────────────────────────────
-const INFO_ITEMS = {
-  mobile: [
-    { icon: Clock, text: "9AM – 5PM" },
-    { icon: MapPin, text: "Duliajan" },
-    { icon: Phone, text: "6900706456", href: "tel:6900706456" },
-  ],
-  desktop: [
-    { icon: Clock, text: "Open 9AM – 5PM" },
-    { icon: Phone, text: "6900706456", href: "tel:6900706456" },
-  ],
+const INFO_ITEMS = [
+  { icon: Clock, text: "9AM – 5PM", label: "Open Daily" },
+  { icon: MapPin, text: "Duliajan", label: "All Areas" },
+  { icon: Phone, text: "6900706456", label: "Quick Response", href: "tel:6900706456" },
+]
+
+const FEATURES = [
+  "Professional Team",
+  "Eco-Friendly Products",
+  "100% Satisfaction",
+  "Doorstep Service",
+]
+
+// ── Animation Variants ─────────────────────────────────────
+const fadeInUp = {
+  hidden: { opacity: 0, y: 40 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] },
+  },
 }
 
-const ANIMATION_CONFIG = {
-  section: { duration: 1, ease: "power3.out" },
-  content: { duration: 0.7, stagger: 0.08, ease: "power4.out" },
+const fadeInLeft = {
+  hidden: { opacity: 0, x: -40 },
+  visible: {
+    opacity: 1,
+    x: 0,
+    transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] },
+  },
 }
 
-const BG_IMAGE =
-  "https://images.unsplash.com/photo-1601362840469-51e4d8d58785?q=80&w=1200&auto=format&fit=crop"
-
-// ── Custom Hook: Scroll Animation ──────────────────────────
-function useScrollAnimation(ref, config, deps = []) {
-  useEffect(() => {
-    if (!ref.current) return
-
-    let ctx
-    let observer
-
-    const init = async () => {
-      observer = new IntersectionObserver(
-        async (entries) => {
-          if (entries[0].isIntersecting) {
-            observer.disconnect()
-
-            const { default: gsap } = await import("gsap")
-            const { ScrollTrigger } = await import("gsap/ScrollTrigger")
-            gsap.registerPlugin(ScrollTrigger)
-
-            ctx = gsap.context(() => {
-              config(gsap, ScrollTrigger)
-            })
-          }
-        },
-        { rootMargin: "50px" }
-      )
-
-      observer.observe(ref.current)
-    }
-
-    init()
-
-    return () => {
-      observer?.disconnect()
-      ctx?.revert()
-    }
-  }, deps)
+const fadeInRight = {
+  hidden: { opacity: 0, x: 40 },
+  visible: {
+    opacity: 1,
+    x: 0,
+    transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] },
+  },
 }
 
-// ── Subcomponents ──────────────────────────────────────────
+const scaleIn = {
+  hidden: { opacity: 0, scale: 0.9 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] },
+  },
+}
 
-const AvailabilityBadge = memo(function AvailabilityBadge({ size = "sm" }) {
-  const sizes = {
-    sm: "px-3 py-1.5 text-[11px]",
-    md: "px-4 py-2 text-[12px]",
-  }
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+      delayChildren: 0.2,
+    },
+  },
+}
 
-  const dotSizes = {
-    sm: "w-1.5 h-1.5",
-    md: "w-2 h-2",
-  }
-
+// ── Availability Badge ─────────────────────────────────────
+const AvailabilityBadge = memo(function AvailabilityBadge() {
   return (
-    <span
-      className={`inline-flex items-center gap-2 bg-white/10 
-                  border border-white/10 rounded-full ${sizes[size]}`}
+    <motion.div
+      initial={{ opacity: 0, scale: 0.8 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.5, delay: 0.1 }}
+      className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500/10 
+                 border border-emerald-500/20 rounded-full"
     >
       <span className="relative flex">
-        <span
-          className={`absolute inline-flex h-full w-full rounded-full 
-                      bg-emerald-400 opacity-75 animate-ping`}
-          style={{ animationDuration: "2s" }}
-        />
-        <span className={`relative rounded-full bg-emerald-400 ${dotSizes[size]}`} />
+        <span className="absolute inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400 opacity-75 animate-ping" />
+        <span className="relative inline-flex rounded-full bg-emerald-400 w-2.5 h-2.5" />
       </span>
-      <span className="text-white/70">Available Today</span>
-    </span>
+      <span className="text-emerald-400 text-sm tracking-wide">Available Today</span>
+    </motion.div>
   )
 })
 
-const InfoPill = memo(function InfoPill({ icon: Icon, text, href, size = "sm" }) {
-  const sizes = {
-    sm: "px-3 py-2 text-[11px] gap-2",
-    md: "px-4 py-2.5 text-[12px] gap-2.5",
-  }
-
-  const iconSizes = {
-    sm: 12,
-    md: 14,
-  }
-
-  const content = (
-    <>
-      <Icon size={iconSizes[size]} className="text-white/40" />
-      <span className="text-white/60">{text}</span>
-    </>
-  )
-
-  const className = `flex items-center ${sizes[size]} 
-                     bg-white/[0.03] border border-white/10 rounded-full
-                     transition-colors duration-300
-                     ${href ? "hover:bg-white/[0.08] hover:border-white/20" : ""}`
-
-  if (href) {
-    return (
-      <a href={href} className={`${className} no-underline`}>
-        {content}
-      </a>
-    )
-  }
-
-  return <div className={className}>{content}</div>
-})
-
-const PriceBadge = memo(function PriceBadge({ size = "sm" }) {
-  const sizes = {
-    sm: "px-5 py-4 text-[28px]",
-    md: "px-6 py-5 text-[32px]",
-  }
+// ── Mobile CTA (CLEAN REDESIGN) ───────────────────────────
+const MobileCTA = memo(function MobileCTA() {
+  const ref = useRef(null)
+  const isInView = useInView(ref, { once: true, margin: "-50px" })
 
   return (
-    <div className={`bg-white rounded-2xl ${size === "sm" ? "px-5 py-4" : "px-6 py-5"}`}>
-      <p className="text-gray-400 mb-1" style={{ fontSize: "11px" }}>
-        Starting from
-      </p>
-      <p
-        className="text-black"
-        style={{
-          fontFamily: 'Georgia, "Times New Roman", serif',
-          fontSize: size === "sm" ? "28px" : "32px",
-          fontWeight: 300,
-          lineHeight: 1,
-          letterSpacing: "-0.02em",
-        }}
-      >
-        ₹299
-      </p>
-    </div>
-  )
-})
-
-const PrimaryButton = memo(function PrimaryButton({ href, children, className = "" }) {
-  return (
-    <a
-      href={href}
-      className={`group flex items-center justify-center gap-3
-                  bg-white text-black rounded-full no-underline
-                  active:scale-[0.97] hover:bg-gray-100
-                  transition-all duration-300 ${className}`}
+    <motion.div
+      ref={ref}
+      initial="hidden"
+      animate={isInView ? "visible" : "hidden"}
+      variants={staggerContainer}
+      className="md:hidden space-y-6"
     >
-      <span
-        className="tracking-wider uppercase font-medium"
-        style={{ fontSize: "12px" }}
-      >
-        {children}
-      </span>
-      <ArrowRight
-        size={16}
-        strokeWidth={2}
-        className="group-hover:translate-x-0.5 transition-transform duration-300"
-      />
-    </a>
-  )
-})
-
-const SecondaryButton = memo(function SecondaryButton({ href, icon: Icon, children, className = "" }) {
-  return (
-    <a
-      href={href}
-      className={`group flex items-center justify-center gap-3
-                  border border-white/20 text-white rounded-full no-underline
-                  active:scale-[0.97] hover:bg-white/[0.05] hover:border-white/30
-                  transition-all duration-300 ${className}`}
-    >
-      {Icon && <Icon size={16} strokeWidth={1.5} />}
-      <span className="tracking-wider uppercase" style={{ fontSize: "12px" }}>
-        {children}
-      </span>
-    </a>
-  )
-})
-
-// ── Background Decorations ─────────────────────────────────
-const BackgroundDecorations = memo(function BackgroundDecorations() {
-  return (
-    <div className="absolute inset-0 overflow-hidden" aria-hidden="true">
-      {/* Gradient orbs */}
-      <div
-        className="absolute -top-32 -right-32 w-96 h-96 rounded-full
-                   bg-white opacity-[0.02] blur-3xl"
-      />
-      <div
-        className="absolute -bottom-48 -left-48 w-[500px] h-[500px] rounded-full
-                   bg-white opacity-[0.015] blur-3xl"
-      />
-
-      {/* Grid pattern */}
-      <div
-        className="absolute inset-0 opacity-[0.02]"
-        style={{
-          backgroundImage: `
-            linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)
-          `,
-          backgroundSize: "60px 60px",
-        }}
-      />
-
-      {/* Diagonal accent lines */}
-      <div
-        className="absolute inset-0 opacity-[0.015]"
-        style={{
-          backgroundImage: `repeating-linear-gradient(
-            -45deg,
-            transparent,
-            transparent 80px,
-            rgba(255,255,255,0.1) 80px,
-            rgba(255,255,255,0.1) 81px
-          )`,
-        }}
-      />
-    </div>
-  )
-})
-
-// ── Mobile CTA ─────────────────────────────────────────────
-const MobileCTA = memo(function MobileCTA({ contentRef }) {
-  return (
-    <div className="md:hidden">
-      <div
-        ref={contentRef}
-        className="relative overflow-hidden rounded-3xl bg-black"
-      >
-        {/* Background image */}
-        <div className="absolute inset-0">
-          <img
-            src={BG_IMAGE}
-            alt=""
-            role="presentation"
-            className="w-full h-full object-cover opacity-30"
-            loading="lazy"
-            decoding="async"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/85 to-black/50" />
-        </div>
-
-        <BackgroundDecorations />
-
-        {/* Content */}
-        <div className="relative z-10 p-6 pt-8">
-          {/* Badge */}
-          <div data-animate className="mb-6">
-            <AvailabilityBadge size="sm" />
+      {/* Main black card - Simplified */}
+      <motion.div variants={scaleIn} className="relative">
+        <div className="bg-black rounded-3xl p-8 overflow-hidden text-center">
+          {/* Subtle background */}
+          <div className="absolute inset-0" aria-hidden="true">
+            <div className="absolute top-0 right-0 w-48 h-48 bg-white/[0.03] rounded-full blur-3xl" />
           </div>
 
-          {/* Heading */}
-          <h2
-            data-animate
-            className="text-white mb-4"
-            style={{
-              fontFamily: 'Georgia, "Times New Roman", serif',
-              fontWeight: 300,
-              fontSize: "32px",
-              lineHeight: 1.12,
-              letterSpacing: "-0.02em",
-            }}
-          >
-            Ready for a
-            <br />
-            <span className="text-white/40">Spotless Ride?</span>
-          </h2>
-
-          {/* Description */}
-          <p
-            data-animate
-            className="text-white/45 leading-relaxed mb-6 max-w-[280px]"
-            style={{ fontSize: "14px" }}
-          >
-            Book in under 2 minutes. We come to you — home, office, anywhere.
-          </p>
-
-          {/* Info pills */}
-          <div data-animate className="flex flex-wrap gap-2 mb-8">
-            {INFO_ITEMS.mobile.map((item, i) => (
-              <InfoPill key={i} {...item} size="sm" />
-            ))}
-          </div>
-
-          {/* Price badge */}
-          <div data-animate className="inline-block mb-6">
-            <PriceBadge size="sm" />
-          </div>
-
-          {/* CTAs */}
-          <div data-animate className="flex flex-col gap-3">
-            <PrimaryButton href="/bookings" className="h-14">
-              Book Now
-            </PrimaryButton>
-            <SecondaryButton href="tel:6900706456" icon={Phone} className="h-14">
-              Call Us
-            </SecondaryButton>
-          </div>
-
-          {/* Trust indicator */}
-          <div data-animate className="flex items-center justify-center gap-2 mt-6 pt-6 border-t border-white/[0.06]">
-            <Sparkles size={12} className="text-white/20" />
-            <span className="text-white/25 tracking-wider uppercase" style={{ fontSize: "9px" }}>
-              100+ Happy Customers
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-})
-
-// ── Desktop CTA ────────────────────────────────────────────
-const DesktopCTA = memo(function DesktopCTA() {
-  const desktopRef = useRef(null)
-
-  useScrollAnimation(
-    desktopRef,
-    (gsap, ScrollTrigger) => {
-      // Animate content elements
-      const elements = desktopRef.current.querySelectorAll("[data-desktop-animate]")
-
-      gsap.fromTo(
-        elements,
-        { opacity: 0, y: 25 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: ANIMATION_CONFIG.content.duration,
-          stagger: ANIMATION_CONFIG.content.stagger,
-          ease: ANIMATION_CONFIG.content.ease,
-          scrollTrigger: {
-            trigger: desktopRef.current,
-            start: "top 80%",
-            once: true,
-          },
-        }
-      )
-
-      // Animate image
-      const image = desktopRef.current.querySelector("[data-image]")
-      if (image) {
-        gsap.fromTo(
-          image,
-          { opacity: 0, scale: 1.05 },
-          {
-            opacity: 1,
-            scale: 1,
-            duration: 1.2,
-            ease: "power2.out",
-            scrollTrigger: {
-              trigger: desktopRef.current,
-              start: "top 80%",
-              once: true,
-            },
-          }
-        )
-      }
-    },
-    []
-  )
-
-  return (
-    <div ref={desktopRef} className="hidden md:block">
-      <div className="relative overflow-hidden rounded-3xl bg-black">
-        <BackgroundDecorations />
-
-        <div className="grid grid-cols-2">
-          {/* Left: Content */}
-          <div className="relative z-10 p-10 lg:p-14 xl:p-16">
+          {/* Content */}
+          <div className="relative z-10">
             {/* Badge */}
-            <div data-desktop-animate className="mb-8">
-              <AvailabilityBadge size="md" />
+            <div className="mb-6 flex justify-center">
+              <AvailabilityBadge />
             </div>
 
             {/* Heading */}
             <h2
-              data-desktop-animate
-              className="text-white mb-5"
+              className="text-white mb-4"
               style={{
                 fontFamily: 'Georgia, "Times New Roman", serif',
                 fontWeight: 300,
-                fontSize: "clamp(32px, 4vw, 48px)",
-                lineHeight: 1.08,
+                fontSize: "32px",
+                lineHeight: 1.15,
                 letterSpacing: "-0.02em",
               }}
             >
-              Ready for a
-              <br />
-              <span className="text-white/35">Spotless Ride?</span>
+              Ready for a{" "}
+              <span className="italic text-white/40">Spotless Ride?</span>
             </h2>
 
-            {/* Description */}
-            <p
-              data-desktop-animate
-              className="text-white/40 leading-relaxed mb-8 max-w-sm"
-              style={{ fontSize: "15px" }}
-            >
-              Book your professional car wash in under 2 minutes.
-              We come to you — home, office, anywhere in Duliajan.
+            {/* Simple description */}
+            <p className="text-white/50 mb-8 max-w-[280px] mx-auto" style={{ fontSize: "15px" }}>
+              Professional car wash at your doorstep in Duliajan
             </p>
 
-            {/* Info pills */}
-            <div data-desktop-animate className="flex flex-wrap gap-3 mb-10">
-              {INFO_ITEMS.desktop.map((item, i) => (
-                <InfoPill key={i} {...item} size="md" />
-              ))}
-            </div>
-
-            {/* CTAs */}
-            <div data-desktop-animate className="flex gap-4">
-              <PrimaryButton href="/bookings" className="h-13 px-8">
-                Book Now
-              </PrimaryButton>
-              <SecondaryButton href="tel:6900706456" icon={Phone} className="h-13 px-8">
-                Call Us
-              </SecondaryButton>
-            </div>
-
-            {/* Trust indicator */}
-            <div data-desktop-animate className="flex items-center gap-2 mt-10 pt-8 border-t border-white/[0.06]">
-              <Sparkles size={14} className="text-white/20" />
-              <span className="text-white/25 tracking-wider uppercase" style={{ fontSize: "10px" }}>
-                Trusted by 100+ Customers in Duliajan
-              </span>
-            </div>
-          </div>
-
-          {/* Right: Image */}
-          <div className="relative min-h-[480px] lg:min-h-[520px]">
-            <div data-image className="absolute inset-0 opacity-0">
-              <img
-                src={BG_IMAGE}
-                alt="Professional car detailing service"
-                className="w-full h-full object-cover"
-                loading="lazy"
-                decoding="async"
-              />
-              <div className="absolute inset-0 bg-gradient-to-r from-black via-black/40 to-transparent" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
-            </div>
-
-            {/* Decorative corner accent */}
-            <div
-              className="absolute top-0 right-0 w-32 h-32 opacity-10"
-              style={{
-                background: "linear-gradient(135deg, white 0%, transparent 60%)",
-              }}
-              aria-hidden="true"
-            />
-
-            {/* Price badge */}
-            <div className="absolute bottom-8 right-8 z-10">
-              <div className="relative">
-                {/* Glow effect */}
-                <div
-                  className="absolute inset-0 bg-white rounded-2xl blur-xl opacity-20"
-                  aria-hidden="true"
-                />
-                <PriceBadge size="md" />
-              </div>
-            </div>
-
-            {/* Feature badge */}
-            <div className="absolute top-8 right-8 z-10">
-              <div
-                className="flex items-center gap-2 px-4 py-2.5 
-                           bg-black/60 backdrop-blur-md border border-white/10 rounded-full"
+            {/* Price */}
+            <div className="mb-8">
+              <p className="text-white/40 text-xs mb-1">Starting from</p>
+              <p
+                className="text-white"
+                style={{
+                  fontFamily: 'Georgia, "Times New Roman", serif',
+                  fontSize: "48px",
+                  fontWeight: 300,
+                  letterSpacing: "-0.02em",
+                }}
               >
-                <MapPin size={12} className="text-white/50" />
-                <span className="text-white/60" style={{ fontSize: "11px" }}>
-                  Doorstep Service
-                </span>
-              </div>
+                ₹299
+              </p>
             </div>
+
+            {/* Primary CTA */}
+            <motion.a
+              href="/bookings"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="group inline-flex items-center gap-3 h-14 px-10
+                         bg-white text-black rounded-full no-underline
+                         hover:bg-gray-100 transition-all duration-300"
+            >
+              <span className="tracking-wider uppercase text-sm font-medium">
+                Book Now
+              </span>
+              <ArrowRight size={18} strokeWidth={2} />
+            </motion.a>
+
+            {/* Simple phone link */}
+            <a
+              href="tel:6900706456"
+              className="block mt-4 text-white/40 text-sm hover:text-white/60 transition-colors"
+            >
+              or call 6900706456
+            </a>
           </div>
         </div>
+      </motion.div>
+
+      {/* Info pills - Clean grid below */}
+      <motion.div 
+        variants={staggerContainer}
+        className="grid grid-cols-3 gap-3"
+      >
+        {INFO_ITEMS.map((item, i) => (
+          <motion.div
+            key={i}
+            custom={i}
+            variants={fadeInUp}
+            className="bg-gray-50 rounded-2xl p-4 text-center"
+          >
+            <item.icon size={20} className="mx-auto mb-2 text-gray-600" />
+            <p className="text-gray-900 text-sm font-medium">{item.text}</p>
+            <p className="text-gray-500 text-xs mt-0.5">{item.label}</p>
+          </motion.div>
+        ))}
+      </motion.div>
+
+      {/* Trust indicator - Simple */}
+      <motion.div
+        variants={fadeInUp}
+        className="text-center"
+      >
+        <div className="inline-flex items-center gap-2 text-gray-400">
+          <Sparkles size={14} />
+          <span className="text-xs tracking-wider uppercase">
+            100+ Happy Customers
+          </span>
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+})
+
+// ── Desktop CTA (keeping the good one) ─────────────────────
+const DesktopCTA = memo(function DesktopCTA() {
+  const ref = useRef(null)
+  const isInView = useInView(ref, { once: true, margin: "-100px" })
+
+  return (
+    <motion.div
+      ref={ref}
+      initial="hidden"
+      animate={isInView ? "visible" : "hidden"}
+      className="hidden md:block"
+    >
+      {/* Main container with gradient border */}
+      <div className="relative p-1 rounded-[3rem] bg-gradient-to-br from-white/10 via-white/5 to-white/10">
+        <div className="relative bg-black rounded-[2.8rem] overflow-hidden">
+          {/* Background decorations */}
+          <div className="absolute inset-0" aria-hidden="true">
+            <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-white/5 rounded-full blur-3xl" />
+            <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-emerald-500/5 rounded-full blur-3xl" />
+            <div
+              className="absolute inset-0 opacity-[0.02]"
+              style={{
+                backgroundImage: `linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+                                 linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)`,
+                backgroundSize: "50px 50px",
+              }}
+            />
+          </div>
+
+          <div className="relative z-10 grid lg:grid-cols-2 gap-12 lg:gap-16 p-12 lg:p-16">
+            {/* Left: Content */}
+            <motion.div variants={staggerContainer} className="flex flex-col justify-center">
+              {/* Badge */}
+              <div className="mb-8">
+                <AvailabilityBadge />
+              </div>
+
+              {/* Heading */}
+              <motion.h2
+                variants={fadeInUp}
+                className="text-white mb-6"
+                style={{
+                  fontFamily: 'Georgia, "Times New Roman", serif',
+                  fontWeight: 300,
+                  fontSize: "clamp(2.5rem, 5vw, 4rem)",
+                  lineHeight: 1.05,
+                  letterSpacing: "-0.02em",
+                }}
+              >
+                Ready for a{" "}
+                <span className="italic text-white/40">Spotless Ride?</span>
+              </motion.h2>
+
+              {/* Description */}
+              <motion.p
+                variants={fadeInUp}
+                className="text-white/50 leading-relaxed mb-10 max-w-lg"
+                style={{ fontSize: "17px" }}
+              >
+                Book your professional car wash in under 2 minutes. We come to you — 
+                home, office, anywhere in Duliajan. Experience the convenience of doorstep service.
+              </motion.p>
+
+              {/* Features list */}
+              <motion.div variants={staggerContainer} className="grid grid-cols-2 gap-3 mb-10">
+                {FEATURES.map((feature, i) => (
+                  <motion.div
+                    key={i}
+                    custom={i}
+                    variants={fadeInUp}
+                    className="flex items-center gap-2"
+                  >
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                    <span className="text-white/60 text-sm">{feature}</span>
+                  </motion.div>
+                ))}
+              </motion.div>
+
+              {/* CTAs */}
+              <motion.div
+                variants={staggerContainer}
+                className="flex flex-wrap gap-4"
+              >
+                <motion.a
+                  variants={fadeInUp}
+                  href="/bookings"
+                  whileHover={{ scale: 1.02, y: -2 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="group inline-flex items-center gap-3 h-14 px-10
+                             bg-white text-black rounded-full no-underline
+                             hover:shadow-2xl hover:shadow-white/20 transition-all duration-300"
+                >
+                  <span className="tracking-wider uppercase text-sm font-medium">
+                    Book Now
+                  </span>
+                  <ArrowRight
+                    size={18}
+                    strokeWidth={2}
+                    className="group-hover:translate-x-1 transition-transform duration-300"
+                  />
+                </motion.a>
+
+                <motion.a
+                  variants={fadeInUp}
+                  href="tel:6900706456"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="inline-flex items-center gap-3 h-14 px-10
+                             border border-white/20 text-white rounded-full no-underline
+                             hover:bg-white/5 hover:border-white/30 transition-all duration-300"
+                >
+                  <Phone size={18} strokeWidth={1.5} />
+                  <span className="tracking-wider uppercase text-sm">Call Now</span>
+                </motion.a>
+              </motion.div>
+            </motion.div>
+
+            {/* Right: Info & Price */}
+            <motion.div variants={staggerContainer} className="flex flex-col justify-center">
+              {/* Info grid */}
+              <motion.div
+                variants={staggerContainer}
+                className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 gap-4 mb-8"
+              >
+                {INFO_ITEMS.map((item, i) => (
+                  <motion.div
+                    key={i}
+                    custom={i}
+                    variants={fadeInRight}
+                    className={`group ${item.href ? "cursor-pointer" : ""}`}
+                    onClick={() => item.href && window.open(item.href, '_self')}
+                  >
+                    <div className="flex items-center gap-4 p-4 bg-white/5 border border-white/10 
+                                   rounded-2xl hover:bg-white/10 hover:border-white/20 
+                                   transition-all duration-300">
+                      <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center 
+                                     group-hover:bg-white/20 transition-colors duration-300">
+                        <item.icon size={20} className="text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-white text-sm font-medium">{item.text}</p>
+                        <p className="text-white/40 text-xs">{item.label}</p>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </motion.div>
+
+              {/* Price showcase */}
+              <motion.div variants={fadeInRight} className="relative">
+                {/* Glow effect */}
+                <div className="absolute inset-0 bg-white/10 rounded-3xl blur-3xl" />
+                
+                <div className="relative bg-gradient-to-br from-white/10 to-white/5 
+                               border border-white/20 rounded-3xl p-8 text-center">
+                  <div className="flex items-center justify-center gap-2 mb-4">
+                    <Zap size={20} className="text-yellow-400" />
+                    <span className="text-yellow-400 text-sm tracking-wide uppercase">
+                      Limited Time Offer
+                    </span>
+                  </div>
+
+                  <div className="mb-4">
+                    <p className="text-white/40 text-xs mb-1">Starting from</p>
+                    <p
+                      className="text-white"
+                      style={{
+                        fontFamily: 'Georgia, "Times New Roman", serif',
+                        fontSize: "48px",
+                        fontWeight: 300,
+                        letterSpacing: "-0.02em",
+                      }}
+                    >
+                      ₹299
+                    </p>
+                    <p className="text-white/50 text-sm">Per wash</p>
+                  </div>
+
+                  <div className="flex items-center justify-center gap-2">
+                    <Sparkles size={14} className="text-white/40" />
+                    <span className="text-white/50 text-sm">Save ₹50 on first booking</span>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          </div>
+
+          {/* Bottom trust bar */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.8, delay: 0.6 }}
+            className="relative z-10 border-t border-white/10 px-12 lg:px-16 py-6"
+          >
+            <div className="flex flex-wrap items-center justify-center gap-8">
+              {[
+                { value: "100+", label: "Happy Customers" },
+                { value: "4.9★", label: "Average Rating" },
+                { value: "2min", label: "Booking Time" },
+                { value: "365", label: "Days Available" },
+              ].map((stat, i) => (
+                <div key={i} className="text-center">
+                  <p className="text-white text-lg font-medium">{stat.value}</p>
+                  <p className="text-white/40 text-xs uppercase tracking-wider">{stat.label}</p>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        </div>
       </div>
-    </div>
+    </motion.div>
   )
 })
 
 // ── Main Component ─────────────────────────────────────────
 export default function CTABanner() {
-  const sectionRef = useRef(null)
-  const mobileContentRef = useRef(null)
-
-  // Section animation
-  useScrollAnimation(
-    sectionRef,
-    (gsap, ScrollTrigger) => {
-      gsap.fromTo(
-        sectionRef.current,
-        { opacity: 0, y: 50 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: ANIMATION_CONFIG.section.duration,
-          ease: ANIMATION_CONFIG.section.ease,
-          scrollTrigger: {
-            trigger: sectionRef.current,
-            start: "top 88%",
-            once: true,
-          },
-        }
-      )
-
-      // Mobile content animation
-      if (mobileContentRef.current) {
-        const elements = mobileContentRef.current.querySelectorAll("[data-animate]")
-
-        gsap.fromTo(
-          elements,
-          { opacity: 0, y: 25 },
-          {
-            opacity: 1,
-            y: 0,
-            duration: ANIMATION_CONFIG.content.duration,
-            stagger: ANIMATION_CONFIG.content.stagger,
-            ease: ANIMATION_CONFIG.content.ease,
-            scrollTrigger: {
-              trigger: mobileContentRef.current,
-              start: "top 80%",
-              once: true,
-            },
-          }
-        )
-      }
-    },
-    []
-  )
-
   return (
     <section
-      ref={sectionRef}
-      className="w-full bg-white py-8 md:py-16 lg:py-20 opacity-0"
+      className="w-full bg-white py-12 md:py-24 lg:py-32"
       style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
-      aria-label="Book a car wash"
+      aria-label="Book your car wash service"
     >
-      <div className="max-w-6xl mx-auto px-5 sm:px-8 md:px-12">
-        <MobileCTA contentRef={mobileContentRef} />
+      <div className="max-w-[1400px] mx-auto px-5 sm:px-8 md:px-12 lg:px-16">
+        <MobileCTA />
         <DesktopCTA />
       </div>
     </section>
