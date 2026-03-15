@@ -324,14 +324,16 @@ const DesktopServiceCard = memo(function DesktopServiceCard({
     [index]
   )
 
+  // ✅ Cleaner featured sizing for desktop - not too dominant
+  const cardClasses = [
+    "group block relative overflow-hidden rounded-3xl no-underline opacity-0 will-change-transform",
+    isFeatured
+      ? "md:h-[520px] lg:h-[560px] xl:min-h-[620px]" // controlled featured height
+      : "md:min-h-[280px] lg:min-h-[320px] xl:min-h-[360px]", // consistent small cards
+  ].join(" ")
+
   return (
-    <a
-      ref={cardRef}
-      href={`/services?category=${category._id}`}
-      className={`group block relative overflow-hidden rounded-3xl no-underline
-                  opacity-0 will-change-transform
-                  ${isFeatured ? "md:row-span-2" : ""}`}
-    >
+    <a ref={cardRef} href={`/services?category=${category._id}`} className={cardClasses}>
       {/* Image */}
       <div className="absolute inset-0 bg-gray-100 overflow-hidden">
         <CardImage
@@ -351,7 +353,7 @@ const DesktopServiceCard = memo(function DesktopServiceCard({
       />
 
       {/* Content */}
-      <div className="relative z-10 h-full min-h-[280px] flex flex-col justify-between p-6">
+      <div className="relative z-10 h-full flex flex-col justify-between p-6 md:p-7">
         {/* Top */}
         <div className="flex items-start justify-between">
           <ServiceBadge count={category.totalServices} size="lg" />
@@ -364,10 +366,7 @@ const DesktopServiceCard = memo(function DesktopServiceCard({
         <div>
           <div className="flex items-center gap-2.5 mb-2">
             {category.icon && (
-              <span
-                className={isFeatured ? "text-xl" : "text-base"}
-                aria-hidden="true"
-              >
+              <span className={isFeatured ? "text-xl" : "text-base"} aria-hidden="true">
                 {category.icon}
               </span>
             )}
@@ -387,7 +386,9 @@ const DesktopServiceCard = memo(function DesktopServiceCard({
 
           {category.description && (
             <p
-              className="text-white/40 leading-relaxed line-clamp-2"
+              className={`text-white/40 leading-relaxed ${
+                isFeatured ? "line-clamp-3" : "line-clamp-2"
+              }`}
               style={{ fontSize: "13px" }}
             >
               {category.description}
@@ -408,16 +409,16 @@ const SkeletonCard = memo(function SkeletonCard({ variant = "default", desktop =
     return (
       <div
         className={`${baseClasses} rounded-3xl
-                    ${variant === "featured" ? "md:row-span-2 min-h-[580px]" : "min-h-[280px]"}`}
+          ${
+            variant === "featured"
+              ? "md:h-[520px] lg:h-[560px] xl:min-h-[620px]"
+              : "md:min-h-[280px] lg:min-h-[320px] xl:min-h-[360px]"
+          }`}
       />
     )
   }
 
-  return (
-    <div
-      className={`${baseClasses} rounded-2xl ${getVariantClasses(variant)}`}
-    />
-  )
+  return <div className={`${baseClasses} rounded-2xl ${getVariantClasses(variant)}`} />
 })
 
 function LoadingGrid() {
@@ -431,7 +432,7 @@ function LoadingGrid() {
       </div>
 
       {/* Desktop - 3 skeletons */}
-      <div className="hidden md:grid md:grid-cols-3 gap-5 auto-rows-[280px]">
+      <div className="hidden md:grid md:grid-cols-3 gap-5 auto-rows-auto">
         <SkeletonCard variant="featured" desktop />
         <SkeletonCard desktop />
         <SkeletonCard desktop />
@@ -769,8 +770,8 @@ export default function Services() {
               ))}
             </div>
 
-            {/* Desktop Grid - Only 3 services */}
-            <div className="hidden md:grid md:grid-cols-3 gap-5 auto-rows-[280px]">
+            {/* Desktop Grid - Only 3 services; tighter grid + controlled heights */}
+            <div className="hidden md:grid md:grid-cols-3 gap-6 lg:gap-7 auto-rows-auto">
               {visibleCategories.map((category, i) => (
                 <DesktopServiceCard
                   key={category._id}
