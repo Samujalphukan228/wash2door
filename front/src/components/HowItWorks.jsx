@@ -1,7 +1,8 @@
 "use client"
 
-import { useEffect, useRef, useState, useCallback, memo } from "react"
-import { ArrowRight, CalendarCheck, Car, MapPin, Sparkles, Play } from "lucide-react"
+import { useRef, useState, useEffect, memo } from "react"
+import { motion, useInView, AnimatePresence, useMotionValue, useTransform } from "framer-motion"
+import { ArrowRight, CalendarCheck, Car, MapPin, Sparkles, ChevronLeft, ChevronRight } from "lucide-react"
 
 // ── Constants ──────────────────────────────────────────────
 const STEPS = [
@@ -10,24 +11,28 @@ const STEPS = [
     number: "01",
     title: "Choose Your Service",
     description: "Pick from exterior wash, interior detailing, sofa cleaning, and more.",
+    detail: "Browse our curated selection of premium services",
   },
   {
     icon: MapPin,
     number: "02",
     title: "Share Your Location",
     description: "We come to you — home, office, parking lot. Anywhere in Duliajan.",
+    detail: "Flexible doorstep service across the city",
   },
   {
     icon: CalendarCheck,
     number: "03",
     title: "Pick a Time Slot",
     description: "Flexible scheduling, 7 days a week. Morning, afternoon, or evening.",
+    detail: "Book at your convenience, any day of the week",
   },
   {
     icon: Sparkles,
     number: "04",
     title: "Sit Back & Relax",
     description: "Our experts arrive on time with everything needed. Spotless results guaranteed.",
+    detail: "Professional service with 100% satisfaction",
   },
 ]
 
@@ -37,583 +42,780 @@ const STATS = [
   { value: "100%", label: "Satisfaction" },
 ]
 
-const ANIMATION_CONFIG = {
-  header: { duration: 0.8, ease: "power3.out" },
-  card: { duration: 0.9, stagger: 0.12, ease: "power4.out" },
-  line: { duration: 1.2, ease: "power2.inOut" },
+const AUTO_PLAY_INTERVAL = 4000 // 4 seconds per step
+
+// ── Animation Variants ─────────────────────────────────────
+const fadeInUp = {
+  hidden: { opacity: 0, y: 40 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] },
+  },
 }
 
-// ── Custom Hook: Scroll Animation ──────────────────────────
-function useScrollAnimation(ref, config, deps = []) {
-  useEffect(() => {
-    if (!ref.current) return
+const slideIn = {
+  hidden: { opacity: 0, x: -60 },
+  visible: {
+    opacity: 1,
+    x: 0,
+    transition: { duration: 0.8, ease: [0.22, 1, 0.36, 1] },
+  },
+  exit: {
+    opacity: 0,
+    x: 60,
+    transition: { duration: 0.5 },
+  },
+}
 
-    let ctx
-    let observer
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+      delayChildren: 0.2,
+    },
+  },
+}
 
-    const init = async () => {
-      observer = new IntersectionObserver(
-        async (entries) => {
-          if (entries[0].isIntersecting) {
-            observer.disconnect()
+// ── Section Header ─────────────────────────────────────────
+const SectionHeader = memo(function SectionHeader() {
+  const ref = useRef(null)
+  const isInView = useInView(ref, { once: true, margin: "-100px" })
 
-            const { default: gsap } = await import("gsap")
-            const { ScrollTrigger } = await import("gsap/ScrollTrigger")
-            gsap.registerPlugin(ScrollTrigger)
+  return (
+    <motion.div
+      ref={ref}
+      initial="hidden"
+      animate={isInView ? "visible" : "hidden"}
+      variants={staggerContainer}
+      className="text-center mb-12 md:mb-24"
+    >
+      <motion.div variants={fadeInUp} className="inline-flex items-center gap-3 mb-5 px-5 py-2 rounded-full bg-gray-50">
+        <span className="w-2 h-2 rounded-full bg-black animate-pulse" />
+        <span
+          className="tracking-[0.3em] uppercase text-gray-600"
+          style={{ fontFamily: "Georgia, serif", fontSize: "10px", fontWeight: 500 }}
+        >
+          Simple Process
+        </span>
+      </motion.div>
 
-            ctx = gsap.context(() => {
-              config(gsap, ScrollTrigger)
-            })
-          }
-        },
-        { rootMargin: "50px" }
-      )
+      <motion.h2
+        variants={fadeInUp}
+        className="text-black mb-4 px-4"
+        style={{
+          fontFamily: 'Georgia, "Times New Roman", serif',
+          fontWeight: 300,
+          fontSize: "clamp(2rem, 7vw, 2.5rem)",
+          lineHeight: 1.15,
+          letterSpacing: "-0.02em",
+        }}
+      >
+        How It Works
+      </motion.h2>
 
-      observer.observe(ref.current)
+      <motion.p
+        variants={fadeInUp}
+        className="text-gray-500 px-6 max-w-sm mx-auto leading-relaxed"
+        style={{ fontSize: "15px" }}
+      >
+        Four simple steps from booking to brilliance
+      </motion.p>
+    </motion.div>
+  )
+})
+
+// ── Progress Ring Component ────────────────────────────────
+const ProgressRing = memo(function ProgressRing({ progress, size = 48 }) {
+  const radius = (size - 4) / 2
+  const circumference = radius * 2 * Math.PI
+  const offset = circumference - (progress / 100) * circumference
+
+  return (
+    <svg width={size} height={size} className="transform -rotate-90">
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        stroke="currentColor"
+        strokeWidth="2"
+        fill="none"
+        className="text-white/10"
+      />
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        stroke="currentColor"
+        strokeWidth="2"
+        fill="none"
+        strokeDasharray={circumference}
+        strokeDashoffset={offset}
+        className="text-white transition-all duration-100 ease-linear"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+})
+
+// ── Cool Mobile Carousel ───────────────────────────────────
+const MobileStepCarousel = memo(function MobileStepCarousel() {
+  const [activeIndex, setActiveIndex] = useState(0)
+  const [progress, setProgress] = useState(0)
+  const [touchStart, setTouchStart] = useState(0)
+  const [touchEnd, setTouchEnd] = useState(0)
+  const intervalRef = useRef(null)
+  const progressIntervalRef = useRef(null)
+
+  const activeStep = STEPS[activeIndex]
+  const Icon = activeStep.icon
+
+  // Touch handlers for swipe
+  const handleTouchStart = (e) => {
+    setTouchStart(e.touches[0].clientX)
+  }
+
+  const handleTouchMove = (e) => {
+    setTouchEnd(e.touches[0].clientX)
+  }
+
+  const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd) return
+    
+    const distance = touchStart - touchEnd
+    const isLeftSwipe = distance > 50
+    const isRightSwipe = distance < -50
+
+    if (isLeftSwipe && activeIndex < STEPS.length - 1) {
+      setActiveIndex((prev) => prev + 1)
+      setProgress(0)
     }
+    if (isRightSwipe && activeIndex > 0) {
+      setActiveIndex((prev) => prev - 1)
+      setProgress(0)
+    }
+  }
 
-    init()
+  // Auto-play functionality
+  useEffect(() => {
+    // Progress bar animation
+    progressIntervalRef.current = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 100) return 0
+        return prev + (100 / (AUTO_PLAY_INTERVAL / 50))
+      })
+    }, 50)
+
+    // Step change
+    intervalRef.current = setInterval(() => {
+      setActiveIndex((prev) => (prev + 1) % STEPS.length)
+      setProgress(0)
+    }, AUTO_PLAY_INTERVAL)
 
     return () => {
-      observer?.disconnect()
-      ctx?.revert()
+      if (intervalRef.current) clearInterval(intervalRef.current)
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current)
     }
-  }, deps)
-}
-
-// ── Desktop: Timeline Step ─────────────────────────────────
-const DesktopTimelineStep = memo(function DesktopTimelineStep({ step, index, isLast, isActive, onHover }) {
-  const Icon = step.icon
-  const cardRef = useRef(null)
-  const lineRef = useRef(null)
-
-  useScrollAnimation(
-    cardRef,
-    (gsap, ScrollTrigger) => {
-      const tl = gsap.timeline({
-        scrollTrigger: {
-          trigger: cardRef.current,
-          start: "top 88%",
-          once: true,
-        },
-      })
-
-      tl.fromTo(
-        cardRef.current,
-        { y: 50, opacity: 0 },
-        {
-          y: 0,
-          opacity: 1,
-          duration: ANIMATION_CONFIG.card.duration,
-          ease: ANIMATION_CONFIG.card.ease,
-          delay: index * ANIMATION_CONFIG.card.stagger,
-        }
-      )
-
-      if (lineRef.current) {
-        tl.fromTo(
-          lineRef.current,
-          { scaleX: 0, transformOrigin: "left" },
-          {
-            scaleX: 1,
-            duration: ANIMATION_CONFIG.line.duration,
-            ease: ANIMATION_CONFIG.line.ease,
-          },
-          `-=${ANIMATION_CONFIG.card.duration * 0.6}`
-        )
-      }
-    },
-    [index]
-  )
+  }, [activeIndex])
 
   return (
-    <div
-      ref={cardRef}
-      className="opacity-0 relative group cursor-pointer"
-      onMouseEnter={() => onHover(index)}
-      onMouseLeave={() => onHover(null)}
-    >
-      {!isLast && (
-        <div
-          ref={lineRef}
-          className={`absolute top-7 left-[56px] right-0 h-[2px] transition-colors duration-500 ${isActive ? "bg-black" : "bg-gray-100"}`}
-          style={{ transform: "scaleX(0)" }}
-          aria-hidden="true"
-        />
-      )}
-
-      <div
-        className={`relative z-10 w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-all duration-500 border-2 ${isActive ? "bg-black border-transparent shadow-xl" : "bg-white border-gray-100 group-hover:border-gray-200"}`}
-      >
-        <span
-          className={`transition-colors duration-500 ${isActive ? "text-white" : "text-gray-300 group-hover:text-gray-400"}`}
-          style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontSize: "18px", fontWeight: 400 }}
+    <div className="md:hidden">
+      {/* Main Card Viewer */}
+      <div className="relative px-5 mb-8">
+        <div 
+          className="relative"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
         >
-          {step.number}
-        </span>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeIndex}
+              variants={{
+                enter: { x: 300, opacity: 0 },
+                center: { x: 0, opacity: 1 },
+                exit: { x: -300, opacity: 0 }
+              }}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+              className="relative"
+            >
+              {/* Main black card */}
+              <div className="relative bg-black rounded-[2rem] overflow-hidden aspect-[4/5]">
+                {/* Background patterns */}
+                <div className="absolute inset-0" aria-hidden="true">
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl" />
+                  <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full blur-3xl" />
+                  <div
+                    className="absolute inset-0 opacity-[0.03]"
+                    style={{
+                      backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 30px, rgba(255,255,255,0.1) 30px, rgba(255,255,255,0.1) 31px)`,
+                    }}
+                  />
+                </div>
 
-        {isActive && (
-          <span
-            className="absolute inset-0 rounded-2xl bg-black opacity-20 animate-ping"
-            style={{ animationDuration: "2s" }}
-            aria-hidden="true"
-          />
-        )}
-      </div>
+                {/* Progress indicator */}
+                <div className="absolute top-4 right-4 z-20">
+                  <div className="relative">
+                    <ProgressRing progress={progress} size={40} />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-white text-xs font-medium">{activeIndex + 1}</span>
+                    </div>
+                  </div>
+                </div>
 
-      <div
-        className={`w-11 h-11 rounded-xl flex items-center justify-center mb-5 transition-all duration-500 ${isActive ? "bg-black text-white" : "bg-gray-50 text-gray-400 group-hover:bg-gray-100"}`}
-      >
-        <Icon size={20} strokeWidth={1.4} />
-      </div>
+                {/* Content */}
+                <div className="relative z-10 h-full flex flex-col p-6">
+                  {/* Top section */}
+                  <div className="flex-1 flex flex-col items-center justify-center text-center">
+                    <motion.div
+                      initial={{ scale: 0.8, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ duration: 0.5, delay: 0.2 }}
+                      className="w-20 h-20 rounded-2xl bg-white flex items-center justify-center mb-6 shadow-2xl"
+                      style={{ boxShadow: "0 25px 60px -15px rgba(255,255,255,0.25)" }}
+                    >
+                      <Icon size={32} strokeWidth={1.5} className="text-black" />
+                    </motion.div>
 
-      <h3
-        className={`mb-3 transition-all duration-300 text-black ${isActive ? "translate-x-1" : "group-hover:translate-x-0.5"}`}
-        style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontWeight: 400, fontSize: "20px", letterSpacing: "-0.02em", lineHeight: 1.25 }}
-      >
-        {step.title}
-      </h3>
+                    <motion.span
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.5, delay: 0.3 }}
+                      className="text-white/[0.08] mb-4"
+                      style={{
+                        fontFamily: "Georgia, serif",
+                        fontSize: "90px",
+                        fontWeight: 300,
+                        lineHeight: 0.85,
+                      }}
+                    >
+                      {activeStep.number}
+                    </motion.span>
 
-      <p className="text-gray-400 leading-relaxed max-w-[240px]" style={{ fontSize: "14px" }}>
-        {step.description}
-      </p>
+                    <motion.h3
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.5, delay: 0.4 }}
+                      className="text-white mb-3 px-2"
+                      style={{
+                        fontFamily: 'Georgia, "Times New Roman", serif',
+                        fontSize: "26px",
+                        fontWeight: 400,
+                        letterSpacing: "-0.01em",
+                        lineHeight: 1.2,
+                      }}
+                    >
+                      {activeStep.title}
+                    </motion.h3>
 
-      <div className={`mt-4 flex items-center gap-2 transition-all duration-500 ${isActive ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2"}`}>
-        <span className="tracking-[0.15em] uppercase text-black" style={{ fontSize: "10px", fontWeight: 500 }}>
-          Learn more
-        </span>
-        <ArrowRight size={12} className="text-black" />
-      </div>
-    </div>
-  )
-})
+                    <motion.p 
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.5, delay: 0.5 }}
+                      className="text-white/50 px-4 leading-relaxed" 
+                      style={{ fontSize: "14px" }}
+                    >
+                      {activeStep.description}
+                    </motion.p>
+                  </div>
 
-// ── Desktop: Visual Feature ────────────────────────────────
-const DesktopFeatureVisual = memo(function DesktopFeatureVisual({ activeStep }) {
-  const step = activeStep !== null ? STEPS[activeStep] : STEPS[0]
-  const Icon = step.icon
-  const visualRef = useRef(null)
+                  {/* Bottom section */}
+                  <div className="mt-auto">
+                    {/* Quick action */}
+                    <button className="w-full py-4 bg-white/10 backdrop-blur-sm rounded-2xl 
+                                     text-white/60 text-sm tracking-wider uppercase
+                                     hover:bg-white/20 transition-colors duration-300">
+                      Learn More
+                    </button>
 
-  useScrollAnimation(
-    visualRef,
-    (gsap, ScrollTrigger) => {
-      gsap.fromTo(
-        visualRef.current,
-        { opacity: 0, scale: 0.95, y: 30 },
-        {
-          opacity: 1,
-          scale: 1,
-          y: 0,
-          duration: 1,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: visualRef.current,
-            start: "top 85%",
-            once: true,
-          },
-        }
-      )
-    },
-    []
-  )
+                    {/* Step indicator */}
+                    <div className="flex items-center justify-center gap-2 mt-4">
+                      <span className="text-white/30 text-xs tracking-wider uppercase">
+                        Swipe to explore
+                      </span>
+                    </div>
+                  </div>
+                </div>
 
-  return (
-    <div ref={visualRef} className="opacity-0 relative rounded-[2rem] overflow-hidden bg-black aspect-[4/3] lg:aspect-[16/10]">
-      <div className="absolute inset-0 overflow-hidden" aria-hidden="true">
-        <div className="absolute -right-16 -bottom-16 w-80 h-80 rounded-full bg-white opacity-[0.03] transition-all duration-700" />
-        <div className="absolute -left-20 -top-20 w-64 h-64 rounded-full bg-white opacity-[0.02] transition-all duration-700" />
-        <div
-          className="absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
-            backgroundSize: "50px 50px",
-          }}
-        />
-        <div
-          className="absolute inset-0 opacity-[0.02]"
-          style={{
-            backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 40px, rgba(255,255,255,0.1) 40px, rgba(255,255,255,0.1) 41px)`,
-          }}
-        />
-      </div>
-
-      <div className="relative z-10 h-full flex flex-col items-center justify-center p-8">
-        <div
-          className="w-20 h-20 rounded-3xl bg-white flex items-center justify-center mb-6 shadow-2xl transition-all duration-500"
-          style={{ boxShadow: "0 25px 60px -15px rgba(255,255,255,0.25)" }}
-        >
-          <Icon size={32} strokeWidth={1.3} className="text-black" />
+                {/* Glow effect */}
+                <div
+                  className="absolute inset-0 opacity-50 pointer-events-none"
+                  style={{
+                    background: "radial-gradient(circle at 50% 30%, rgba(255,255,255,0.1), transparent 60%)",
+                  }}
+                  aria-hidden="true"
+                />
+              </div>
+            </motion.div>
+          </AnimatePresence>
         </div>
 
-        <span
-          className="text-white/10 mb-2 transition-all duration-500"
-          style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontSize: "80px", fontWeight: 300, lineHeight: 1 }}
-        >
-          {step.number}
-        </span>
-
-        <h4
-          className="text-white text-center transition-all duration-500"
-          style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontSize: "28px", fontWeight: 400, letterSpacing: "-0.02em" }}
-        >
-          {step.title}
-        </h4>
-
-        <p className="text-white/40 text-center mt-3 max-w-sm leading-relaxed transition-all duration-500" style={{ fontSize: "15px" }}>
-          {step.description}
-        </p>
+        {/* Swipe hint */}
+        <div className="absolute left-1/2 bottom-[-20px] -translate-x-1/2 flex gap-2">
+          {STEPS.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => {
+                setActiveIndex(i)
+                setProgress(0)
+              }}
+              className={`h-1.5 rounded-full transition-all duration-500 ${
+                i === activeIndex ? "w-8 bg-black" : "w-1.5 bg-gray-300"
+              }`}
+              aria-label={`Go to step ${i + 1}`}
+            />
+          ))}
+        </div>
       </div>
 
-      <div className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" aria-hidden="true" />
-    </div>
-  )
-})
-
-// ── Desktop: Stats Bar ─────────────────────────────────────
-const StatsBar = memo(function StatsBar() {
-  return (
-    <div className="grid grid-cols-3 gap-4 mt-6">
-      {STATS.map((stat, i) => (
-        <div key={i} className="text-center p-4 rounded-2xl bg-gray-50">
-          <p className="text-black" style={{ fontFamily: "Georgia, serif", fontSize: "20px", fontWeight: 400 }}>
-            {stat.value}
-          </p>
-          <p className="text-gray-400 mt-1" style={{ fontSize: "11px" }}>
-            {stat.label}
-          </p>
-        </div>
-      ))}
-    </div>
-  )
-})
-
-// ── Mobile: Card Carousel ──────────────────────────────────
-const MobileSteps = memo(function MobileSteps() {
-  const scrollRef = useRef(null)
-  const [activeIndex, setActiveIndex] = useState(0)
-
-  useEffect(() => {
-    const container = scrollRef.current
-    if (!container) return
-
-    const handleScroll = () => {
-      const scrollLeft = container.scrollLeft
-      const cardWidth = container.offsetWidth * 0.82
-      const gap = 12
-      const newIndex = Math.round(scrollLeft / (cardWidth + gap))
-      setActiveIndex(Math.min(Math.max(newIndex, 0), STEPS.length - 1))
-    }
-
-    container.addEventListener("scroll", handleScroll, { passive: true })
-    return () => container.removeEventListener("scroll", handleScroll)
-  }, [])
-
-  useScrollAnimation(
-    scrollRef,
-    (gsap, ScrollTrigger) => {
-      gsap.fromTo(
-        scrollRef.current,
-        { opacity: 0, y: 30 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.7,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: scrollRef.current,
-            start: "top 90%",
-            once: true,
-          },
-        }
-      )
-    },
-    []
-  )
-
-  const scrollToCard = useCallback((index) => {
-    if (!scrollRef.current) return
-    const cardWidth = scrollRef.current.offsetWidth * 0.82
-    const gap = 12
-    scrollRef.current.scrollTo({ left: index * (cardWidth + gap), behavior: "smooth" })
-  }, [])
-
-  return (
-    <div className="md:hidden -mx-5">
-      {/* ── FIX: removed <style jsx> block; webkit scrollbar hidden via style prop ── */}
-      <div
-        ref={scrollRef}
-        className="opacity-0 flex gap-3 overflow-x-auto snap-x snap-mandatory px-5 pb-4 will-change-transform"
-        style={{ scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" }}
-      >
+      {/* Compact step list below */}
+      <div className="px-5 space-y-3 mt-12">
         {STEPS.map((step, i) => {
           const Icon = step.icon
           const isActive = i === activeIndex
 
           return (
-            <div
-              key={step.number}
-              className={`shrink-0 w-[82vw] snap-center transition-all duration-300 ${isActive ? "scale-100" : "scale-[0.97] opacity-70"}`}
+            <motion.button
+              key={i}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: i * 0.1 }}
+              onClick={() => {
+                setActiveIndex(i)
+                setProgress(0)
+              }}
+              className={`w-full p-4 rounded-2xl flex items-center gap-4 text-left
+                       transition-all duration-500 ${
+                         isActive
+                           ? "bg-black text-white shadow-lg scale-[1.02]"
+                           : "bg-gray-50 text-gray-900"
+                       }`}
             >
-              <div className="rounded-3xl overflow-hidden min-h-[300px] flex flex-col justify-between relative bg-black">
-                <div className="absolute inset-0 overflow-hidden" aria-hidden="true">
-                  <div className="absolute -right-10 -bottom-10 w-48 h-48 rounded-full bg-white opacity-[0.03]" />
-                  <div className="absolute -left-8 top-1/3 w-32 h-32 rounded-full bg-white opacity-[0.02]" />
-                  <div
-                    className="absolute inset-0 opacity-[0.03]"
-                    style={{
-                      backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
-                      backgroundSize: "30px 30px",
-                    }}
-                  />
-                </div>
-
-                <div className="relative z-10 p-6 flex flex-col h-full justify-between">
-                  <div className="flex items-start justify-between">
-                    <span
-                      className="text-white/[0.07]"
-                      style={{ fontFamily: "Georgia, serif", fontSize: "72px", fontWeight: 300, lineHeight: 0.85 }}
-                    >
-                      {step.number}
-                    </span>
-
-                    <div
-                      className="w-14 h-14 rounded-2xl bg-white flex items-center justify-center shadow-xl"
-                      style={{ boxShadow: "0 15px 40px -10px rgba(255,255,255,0.2)" }}
-                    >
-                      <Icon size={24} strokeWidth={1.3} className="text-black" />
-                    </div>
-                  </div>
-
-                  <div className="mt-auto pt-6">
-                    <h3
-                      className="text-white mb-2.5"
-                      style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontWeight: 400, fontSize: "24px", letterSpacing: "-0.02em", lineHeight: 1.15 }}
-                    >
-                      {step.title}
-                    </h3>
-                    <p className="text-white/40 leading-relaxed" style={{ fontSize: "14px" }}>
-                      {step.description}
-                    </p>
-                    <div className="flex items-center gap-2 mt-5 pt-5 border-t border-white/[0.06]">
-                      <span className="text-white/20 tracking-[0.2em] uppercase" style={{ fontSize: "9px" }}>
-                        Step {step.number} of 04
-                      </span>
-                    </div>
-                  </div>
-                </div>
+              <div
+                className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
+                  isActive ? "bg-white text-black" : "bg-white text-gray-900"
+                }`}
+              >
+                <Icon size={20} strokeWidth={1.5} />
               </div>
-            </div>
+              <div className="flex-1">
+                <p
+                  className={`text-sm mb-0.5 ${isActive ? "text-white" : "text-gray-900"}`}
+                  style={{ fontFamily: "Georgia, serif", fontWeight: 400 }}
+                >
+                  {step.title}
+                </p>
+                <span
+                  className={`text-xs tracking-wider uppercase ${
+                    isActive ? "text-white/50" : "text-gray-400"
+                  }`}
+                >
+                  Step {step.number}
+                </span>
+              </div>
+              {isActive && (
+                <ChevronRight size={18} strokeWidth={2} className="text-white shrink-0" />
+              )}
+            </motion.button>
           )
         })}
-
-        <div className="shrink-0 w-3" aria-hidden="true" />
       </div>
 
-      <div className="flex items-center justify-center gap-2 mt-6">
-        {STEPS.map((_, i) => (
-          <button
-            key={i}
-            onClick={() => scrollToCard(i)}
-            className={`rounded-full transition-all duration-300 ${i === activeIndex ? "w-8 h-2 bg-black" : "w-2 h-2 bg-gray-200 hover:bg-gray-300"}`}
-            aria-label={`Go to step ${i + 1}`}
-          />
-        ))}
-      </div>
-
-      <div className="grid grid-cols-3 gap-2 mt-8 mx-5">
+      {/* Stats grid */}
+      <div className="grid grid-cols-3 gap-3 mt-10 mx-5">
         {STATS.map((stat, i) => (
-          <div key={i} className="text-center p-3 rounded-xl bg-gray-50">
-            <p className="text-black" style={{ fontFamily: "Georgia, serif", fontSize: "16px", fontWeight: 400 }}>
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, delay: 0.8 + i * 0.1 }}
+            className="bg-gradient-to-br from-gray-50 to-white rounded-2xl p-4 
+                     border border-gray-100 text-center"
+          >
+            <p
+              className="text-black mb-1"
+              style={{ fontFamily: "Georgia, serif", fontSize: "20px", fontWeight: 400 }}
+            >
               {stat.value}
             </p>
-            <p className="text-gray-400 mt-0.5" style={{ fontSize: "9px" }}>
-              {stat.label}
-            </p>
-          </div>
+            <p className="text-gray-400 text-xs tracking-wider uppercase">{stat.label}</p>
+          </motion.div>
         ))}
       </div>
     </div>
   )
 })
 
-// ── Section Header ─────────────────────────────────────────
-const SectionHeader = memo(function SectionHeader({ eyebrowRef, headingRef, descRef }) {
+// ── Desktop Step Viewer (keeping the cool one) ────────────
+const DesktopStepViewer = memo(function DesktopStepViewer() {
+  const [activeIndex, setActiveIndex] = useState(0)
+  const [progress, setProgress] = useState(0)
+  const [isPaused, setIsPaused] = useState(false)
+  const intervalRef = useRef(null)
+  const progressIntervalRef = useRef(null)
+
+  const activeStep = STEPS[activeIndex]
+  const Icon = activeStep.icon
+
+  const nextStep = () => {
+    setActiveIndex((prev) => (prev + 1) % STEPS.length)
+    setProgress(0)
+  }
+
+  const prevStep = () => {
+    setActiveIndex((prev) => (prev - 1 + STEPS.length) % STEPS.length)
+    setProgress(0)
+  }
+
+  const goToStep = (index) => {
+    setActiveIndex(index)
+    setProgress(0)
+  }
+
+  // Auto-play functionality
+  useEffect(() => {
+    if (isPaused) return
+
+    // Progress bar animation
+    progressIntervalRef.current = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 100) return 0
+        return prev + (100 / (AUTO_PLAY_INTERVAL / 50))
+      })
+    }, 50)
+
+    // Step change
+    intervalRef.current = setInterval(() => {
+      nextStep()
+    }, AUTO_PLAY_INTERVAL)
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current)
+    }
+  }, [isPaused, activeIndex])
+
   return (
-    <div className="mb-12 md:mb-16 lg:mb-20">
-      <div ref={eyebrowRef} className="flex items-center gap-4 mb-5 md:mb-6 opacity-0">
-        <span className="block w-10 h-px bg-black" aria-hidden="true" />
-        <span className="tracking-[0.4em] uppercase text-gray-400" style={{ fontFamily: "Georgia, serif", fontSize: "10px" }}>
-          How It Works
-        </span>
+    <div 
+      className="hidden md:block"
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+    >
+      {/* Main Stage */}
+      <div className="relative">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeIndex}
+            variants={slideIn}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            className="grid md:grid-cols-2 gap-8 lg:gap-16 items-center"
+          >
+            {/* Left: Visual */}
+            <div className="relative">
+              <div className="aspect-square rounded-[3rem] bg-black overflow-hidden relative group">
+                {/* Background patterns */}
+                <div className="absolute inset-0" aria-hidden="true">
+                  <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl 
+                                group-hover:scale-110 transition-transform duration-1000" />
+                  <div className="absolute bottom-0 left-0 w-80 h-80 bg-white/5 rounded-full blur-3xl
+                                group-hover:scale-110 transition-transform duration-1000" />
+                  <div
+                    className="absolute inset-0 opacity-[0.03]"
+                    style={{
+                      backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 40px, rgba(255,255,255,0.1) 40px, rgba(255,255,255,0.1) 41px)`,
+                    }}
+                  />
+                </div>
+
+                {/* Content */}
+                <div className="relative z-10 h-full flex flex-col items-center justify-center p-12">
+                  <motion.div
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ duration: 0.5, delay: 0.2 }}
+                    className="w-24 h-24 rounded-3xl bg-white flex items-center justify-center mb-8 shadow-2xl
+                             group-hover:scale-110 transition-transform duration-500"
+                    style={{ boxShadow: "0 30px 70px -15px rgba(255,255,255,0.3)" }}
+                  >
+                    <Icon size={40} strokeWidth={1.5} className="text-black" />
+                  </motion.div>
+
+                  <motion.span
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.5, delay: 0.3 }}
+                    className="text-white/10 mb-6"
+                    style={{
+                      fontFamily: "Georgia, serif",
+                      fontSize: "120px",
+                      fontWeight: 300,
+                      lineHeight: 0.85,
+                    }}
+                  >
+                    {activeStep.number}
+                  </motion.span>
+
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 0.4 }}
+                    className="text-center"
+                  >
+                    <h3
+                      className="text-white mb-3"
+                      style={{
+                        fontFamily: 'Georgia, "Times New Roman", serif',
+                        fontSize: "32px",
+                        fontWeight: 400,
+                        letterSpacing: "-0.01em",
+                      }}
+                    >
+                      {activeStep.title}
+                    </h3>
+                    <p className="text-white/50 max-w-sm mx-auto" style={{ fontSize: "15px" }}>
+                      {activeStep.detail}
+                    </p>
+                  </motion.div>
+                </div>
+
+                {/* Glow effect */}
+                <div
+                  className="absolute inset-0 opacity-50 group-hover:opacity-70 transition-opacity duration-1000"
+                  style={{
+                    background: "radial-gradient(circle at 50% 50%, rgba(255,255,255,0.1), transparent 70%)",
+                  }}
+                  aria-hidden="true"
+                />
+
+                {/* Auto-play indicator */}
+                {!isPaused && (
+                  <div className="absolute top-6 right-6">
+                    <div className="relative">
+                      <ProgressRing progress={progress} size={48} />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-white text-xs font-medium">{activeIndex + 1}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Paused indicator */}
+                {isPaused && (
+                  <div className="absolute top-6 right-6 bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-full">
+                    <span className="text-white/60 text-xs tracking-wider uppercase">Paused</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right: Info */}
+            <div className="space-y-8">
+              <div>
+                <div className="flex items-center gap-3 mb-4">
+                  <span
+                    className="text-black/20"
+                    style={{ fontFamily: "Georgia, serif", fontSize: "14px", fontWeight: 500 }}
+                  >
+                    STEP {activeStep.number}
+                  </span>
+                  <div className="h-px flex-1 bg-gray-200" />
+                </div>
+
+                <h3
+                  className="text-black mb-5"
+                  style={{
+                    fontFamily: 'Georgia, "Times New Roman", serif',
+                    fontSize: "clamp(2rem, 4vw, 3rem)",
+                    fontWeight: 400,
+                    letterSpacing: "-0.02em",
+                    lineHeight: 1.2,
+                  }}
+                >
+                  {activeStep.title}
+                </h3>
+
+                <p
+                  className="text-gray-600 leading-relaxed max-w-md"
+                  style={{ fontSize: "17px" }}
+                >
+                  {activeStep.description}
+                </p>
+              </div>
+
+              {/* Navigation */}
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={prevStep}
+                  className="w-12 h-12 rounded-full border-2 border-gray-200 flex items-center justify-center
+                           hover:border-black hover:bg-black hover:text-white transition-all duration-300"
+                  aria-label="Previous step"
+                >
+                  <ChevronLeft size={20} strokeWidth={2} />
+                </button>
+
+                <div className="flex gap-2">
+                  {STEPS.map((_, i) => (
+                    <button
+                      key={i}
+                      onClick={() => goToStep(i)}
+                      className={`h-1.5 rounded-full transition-all duration-500 ${
+                        i === activeIndex ? "w-12 bg-black" : "w-1.5 bg-gray-200 hover:bg-gray-300"
+                      }`}
+                      aria-label={`Go to step ${i + 1}`}
+                    />
+                  ))}
+                </div>
+
+                <button
+                  onClick={nextStep}
+                  className="w-12 h-12 rounded-full bg-black text-white flex items-center justify-center
+                           hover:bg-gray-800 hover:scale-110 transition-all duration-300"
+                  aria-label="Next step"
+                >
+                  <ChevronRight size={20} strokeWidth={2} />
+                </button>
+              </div>
+
+              {/* Quick stats */}
+              <div className="grid grid-cols-3 gap-4 pt-8">
+                {STATS.map((stat, i) => (
+                  <div
+                    key={i}
+                    className="bg-gradient-to-br from-gray-50 to-white rounded-2xl p-4 border border-gray-100
+                             hover:shadow-md hover:-translate-y-0.5 transition-all duration-300"
+                  >
+                    <p
+                      className="text-black mb-1"
+                      style={{ fontFamily: "Georgia, serif", fontSize: "18px", fontWeight: 400 }}
+                    >
+                      {stat.value}
+                    </p>
+                    <p className="text-gray-400 text-xs tracking-wider uppercase">{stat.label}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        </AnimatePresence>
       </div>
 
-      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6 lg:gap-16">
-        <div className="max-w-xl">
-          <h2
-            ref={headingRef}
-            className="opacity-0 text-black"
-            style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontWeight: 300, fontSize: "clamp(2rem, 5vw, 3.5rem)", lineHeight: 1.1, letterSpacing: "-0.03em" }}
-          >
-            Four Simple Steps to
-            <br className="hidden sm:block" />
-            <span className="text-gray-300"> a Spotless Ride</span>
-          </h2>
+      {/* Bottom step thumbnails */}
+      <div className="grid grid-cols-4 gap-4 mt-12">
+        {STEPS.map((step, i) => {
+          const Icon = step.icon
+          const isActive = i === activeIndex
 
-          <p
-            ref={descRef}
-            className="opacity-0 text-gray-400 mt-5 md:mt-6 max-w-md leading-relaxed"
-            style={{ fontSize: "15px" }}
-          >
-            From booking to a spotless finish — the entire process takes under 2 minutes to schedule and a couple of hours to complete.
-          </p>
-        </div>
+          return (
+            <button
+              key={i}
+              onClick={() => goToStep(i)}
+              className={`relative rounded-2xl p-6 text-left transition-all duration-500
+                       ${
+                         isActive
+                           ? "bg-black text-white shadow-xl scale-105"
+                           : "bg-gray-50 text-gray-900 hover:bg-gray-100 hover:scale-102"
+                       }`}
+            >
+              <div
+                className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 transition-all duration-300 ${
+                  isActive ? "bg-white text-black" : "bg-white/80 text-gray-900"
+                }`}
+              >
+                <Icon size={18} strokeWidth={1.5} />
+              </div>
+              <p
+                className={`text-sm mb-1 ${isActive ? "text-white" : "text-gray-900"}`}
+                style={{ fontFamily: "Georgia, serif", fontWeight: 400 }}
+              >
+                {step.title}
+              </p>
+              <span
+                className={`text-xs tracking-wider uppercase ${
+                  isActive ? "text-white/50" : "text-gray-400"
+                }`}
+              >
+                Step {step.number}
+              </span>
 
-        <div className="hidden lg:flex items-center gap-4 shrink-0">
-          <a
-            href="/bookings"
-            className="group inline-flex items-center gap-3 h-14 px-8 bg-black text-white rounded-full tracking-[0.15em] uppercase hover:bg-gray-800 active:scale-[0.98] transition-all duration-300 no-underline"
-            style={{ fontSize: "11px", fontWeight: 500 }}
-          >
-            Get Started
-            <ArrowRight size={16} strokeWidth={2} className="group-hover:translate-x-0.5 transition-transform duration-300" />
-          </a>
+              {isActive && (
+                <motion.div
+                  layoutId="activeIndicator"
+                  className="absolute inset-0 rounded-2xl border-2 border-white/20"
+                  aria-hidden="true"
+                />
+              )}
+            </button>
+          )
+        })}
+      </div>
 
-          <a
-            href="#video"
-            className="group w-14 h-14 rounded-full border-2 border-gray-200 flex items-center justify-center hover:border-black hover:bg-black transition-all duration-300"
-            aria-label="Watch video"
-          >
-            <Play size={18} strokeWidth={2} className="text-gray-400 group-hover:text-white ml-0.5 transition-colors duration-300" />
-          </a>
-        </div>
+      {/* Auto-play hint */}
+      <div className="text-center mt-6">
+        <p className="text-gray-400 text-sm">
+          {isPaused ? "Hover away to resume" : "Hover to pause • Auto-playing every 4 seconds"}
+        </p>
       </div>
     </div>
+  )
+})
+
+// ── CTA Section ────────────────────────────────────────────
+const CTASection = memo(function CTASection() {
+  const ref = useRef(null)
+  const isInView = useInView(ref, { once: true, margin: "-100px" })
+
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, y: 30 }}
+      animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
+      transition={{ duration: 0.6, delay: 0.3 }}
+      className="mt-12 md:mt-24 text-center"
+    >
+      <motion.a
+        href="/bookings"
+        whileHover={{ scale: 1.02, y: -2 }}
+        whileTap={{ scale: 0.98 }}
+        className="group inline-flex items-center gap-4 h-14 md:h-16 px-10 md:px-12
+                   bg-black text-white rounded-full
+                   hover:shadow-2xl hover:shadow-black/30
+                   transition-all duration-300 no-underline mx-5"
+      >
+        <span
+          className="tracking-[0.15em] uppercase"
+          style={{ fontSize: "11px", fontWeight: 500 }}
+        >
+          Start Your First Booking
+        </span>
+        <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center 
+                       group-hover:bg-white group-hover:text-black transition-all duration-300">
+          <ArrowRight size={16} strokeWidth={2} />
+        </div>
+      </motion.a>
+    </motion.div>
   )
 })
 
 // ── Main Component ─────────────────────────────────────────
 export default function HowItWorks() {
-  const [activeStep, setActiveStep] = useState(null)
-
-  const eyebrowRef = useRef(null)
-  const headingRef = useRef(null)
-  const descRef = useRef(null)
-  const ctaRef = useRef(null)
-  const headerAnimated = useRef(false)
-
-  useEffect(() => {
-    if (headerAnimated.current) return
-
-    let ctx
-
-    const init = async () => {
-      const { default: gsap } = await import("gsap")
-      const { ScrollTrigger } = await import("gsap/ScrollTrigger")
-      gsap.registerPlugin(ScrollTrigger)
-
-      if (!headingRef.current) return
-
-      ctx = gsap.context(() => {
-        const tl = gsap.timeline({
-          scrollTrigger: { trigger: headingRef.current, start: "top 85%", once: true },
-          defaults: { ease: ANIMATION_CONFIG.header.ease },
-        })
-
-        if (eyebrowRef.current) {
-          tl.fromTo(eyebrowRef.current, { opacity: 0, x: -25 }, { opacity: 1, x: 0, duration: 0.5 })
-        }
-
-        tl.fromTo(headingRef.current, { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: ANIMATION_CONFIG.header.duration }, 0.05)
-
-        if (descRef.current) {
-          tl.fromTo(descRef.current, { opacity: 0, y: 25 }, { opacity: 1, y: 0, duration: 0.6 }, 0.2)
-        }
-      })
-
-      headerAnimated.current = true
-    }
-
-    init()
-
-    return () => ctx?.revert()
-  }, [])
-
-  useScrollAnimation(
-    ctaRef,
-    (gsap, ScrollTrigger) => {
-      gsap.fromTo(
-        ctaRef.current,
-        { opacity: 0, y: 25 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.6,
-          ease: "power3.out",
-          scrollTrigger: { trigger: ctaRef.current, start: "top 94%", once: true },
-        }
-      )
-    },
-    []
-  )
-
-  const handleStepHover = useCallback((index) => {
-    setActiveStep(index)
-  }, [])
-
   return (
     <section
-      className="w-full bg-white py-16 md:py-28 lg:py-36 border-t border-gray-100"
+      className="w-full bg-white py-16 md:py-36 lg:py-44"
       style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
       aria-labelledby="how-it-works-heading"
     >
-      <div className="max-w-[1400px] mx-auto px-5 sm:px-8 md:px-12 lg:px-16">
-        <SectionHeader eyebrowRef={eyebrowRef} headingRef={headingRef} descRef={descRef} />
-
-        <MobileSteps />
-
-        <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-5 gap-12 lg:gap-16 items-start">
-          <div className="lg:col-span-2 lg:sticky lg:top-24">
-            <DesktopFeatureVisual activeStep={activeStep} />
-            <StatsBar />
-          </div>
-
-          <div className="lg:col-span-3">
-            <div className="grid grid-cols-2 gap-x-8 gap-y-12 lg:gap-y-16">
-              {STEPS.map((step, i) => (
-                <DesktopTimelineStep
-                  key={step.number}
-                  step={step}
-                  index={i}
-                  isLast={i === STEPS.length - 1}
-                  isActive={activeStep === i}
-                  onHover={handleStepHover}
-                />
-              ))}
-            </div>
-
-            <div className="mt-12 lg:hidden">
-              <a
-                href="/bookings"
-                className="group inline-flex items-center gap-3 h-14 px-8 bg-black text-white rounded-full tracking-[0.15em] uppercase hover:bg-gray-800 active:scale-[0.98] transition-all duration-300 no-underline"
-                style={{ fontSize: "11px", fontWeight: 500 }}
-              >
-                Get Started
-                <ArrowRight size={16} strokeWidth={2} />
-              </a>
-            </div>
-          </div>
-        </div>
-
-        <div ref={ctaRef} className="opacity-0 mt-8 md:hidden">
-          <a
-            href="/bookings"
-            className="group w-full h-14 flex items-center justify-center gap-2.5 bg-black text-white rounded-full tracking-[0.2em] uppercase active:scale-[0.98] transition-all duration-200 no-underline"
-            style={{ fontSize: "10px", fontWeight: 500 }}
-          >
-            Book Now
-            <ArrowRight size={14} strokeWidth={2} className="group-active:translate-x-0.5 transition-transform duration-200" />
-          </a>
-        </div>
+      <div className="max-w-[1400px] mx-auto">
+        <SectionHeader />
+        <MobileStepCarousel />
+        <DesktopStepViewer />
+        <CTASection />
       </div>
     </section>
   )
