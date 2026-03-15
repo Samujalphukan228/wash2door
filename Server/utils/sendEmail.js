@@ -97,7 +97,7 @@ export const sendVerificationEmail = async (user, verificationToken) => {
 
 // Password Reset
 export const sendPasswordResetEmail = async (user, resetToken) => {
-    const resetLink = `${process.env.FRONTEND_URL}/admin/reset-password/${resetToken}`;
+    const resetLink = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
     return await sendEmail({
         email: user.email,
         name: `${user.firstName} ${user.lastName}`,
