@@ -28,6 +28,9 @@ const ANIMATION_CONFIG = {
   },
 }
 
+// ── How many services to show on homepage ──────────────────
+const MAX_VISIBLE_SERVICES = 3
+
 // ── Utils ──────────────────────────────────────────────────
 function getMobileVariant(index, total) {
   if (index === 0) return "large"
@@ -58,8 +61,6 @@ function useScrollAnimation(ref, config, deps = []) {
     let observer
 
     const init = async () => {
-      // Use IntersectionObserver for initial visibility check
-      // This prevents GSAP from running on elements far outside viewport
       observer = new IntersectionObserver(
         async (entries) => {
           if (entries[0].isIntersecting) {
@@ -422,21 +423,18 @@ const SkeletonCard = memo(function SkeletonCard({ variant = "default", desktop =
 function LoadingGrid() {
   return (
     <>
-      {/* Mobile */}
+      {/* Mobile - 3 skeletons */}
       <div className="md:hidden grid grid-cols-2 gap-3 auto-rows-[140px]">
         <SkeletonCard variant="large" />
         <SkeletonCard />
         <SkeletonCard />
-        <SkeletonCard variant="tall" />
-        <SkeletonCard variant="wide" />
       </div>
 
-      {/* Desktop */}
+      {/* Desktop - 3 skeletons */}
       <div className="hidden md:grid md:grid-cols-3 gap-5 auto-rows-[280px]">
         <SkeletonCard variant="featured" desktop />
-        {[...Array(4)].map((_, i) => (
-          <SkeletonCard key={i} desktop />
-        ))}
+        <SkeletonCard desktop />
+        <SkeletonCard desktop />
       </div>
     </>
   )
@@ -735,6 +733,9 @@ export default function Services() {
     return () => ctx?.revert()
   }, [loading])
 
+  // ✅ Limit to 3 categories for display
+  const visibleCategories = categories.slice(0, MAX_VISIBLE_SERVICES)
+
   return (
     <section
       className="w-full bg-white py-14 md:py-28"
@@ -756,21 +757,21 @@ export default function Services() {
           <EmptyState type="empty" />
         ) : (
           <>
-            {/* Mobile Grid */}
+            {/* Mobile Grid - Only 3 services */}
             <div className="md:hidden grid grid-cols-2 gap-3 auto-rows-[140px]">
-              {categories.map((category, i) => (
+              {visibleCategories.map((category, i) => (
                 <MobileServiceCard
                   key={category._id}
                   category={category}
                   index={i}
-                  variant={getMobileVariant(i, categories.length)}
+                  variant={getMobileVariant(i, visibleCategories.length)}
                 />
               ))}
             </div>
 
-            {/* Desktop Grid */}
+            {/* Desktop Grid - Only 3 services */}
             <div className="hidden md:grid md:grid-cols-3 gap-5 auto-rows-[280px]">
-              {categories.map((category, i) => (
+              {visibleCategories.map((category, i) => (
                 <DesktopServiceCard
                   key={category._id}
                   category={category}
