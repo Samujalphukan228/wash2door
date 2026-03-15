@@ -27,6 +27,7 @@ const navItems = [
     { label: 'Services', href: '/admin/services', icon: Wrench },
     { label: 'Users', href: '/admin/users', icon: Users },
     { label: 'Reports', href: '/admin/reports', icon: BarChart3 },
+    { label: 'subcategories', href: '/admin/subcategories', icon: BarChart3 },
 ];
 
 const getAvatarUrl = (avatar) => {

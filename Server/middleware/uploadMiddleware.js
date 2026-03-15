@@ -1,4 +1,4 @@
-// middleware/uploadMiddleware.js - COMPLETE FILE (Single source for all uploads)
+// middleware/uploadMiddleware.js - COMPLETE WITH SUBCATEGORY
 
 import multer from 'multer';
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
@@ -30,6 +30,15 @@ const categoryStorage = new CloudinaryStorage({
     cloudinary,
     params: {
         folder: 'wash2door/categories',
+        allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+        transformation: [{ width: 800, height: 600, crop: 'fill', quality: 'auto' }]
+    }
+});
+
+const subcategoryStorage = new CloudinaryStorage({
+    cloudinary,
+    params: {
+        folder: 'wash2door/subcategories',
         allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
         transformation: [{ width: 800, height: 600, crop: 'fill', quality: 'auto' }]
     }
@@ -71,6 +80,12 @@ const uploadCategoryImage = multer({
     limits: { fileSize: 5 * 1024 * 1024 } // 5MB
 }).single('image');
 
+const uploadSubcategoryImage = multer({
+    storage: subcategoryStorage,
+    fileFilter: imageFileFilter,
+    limits: { fileSize: 5 * 1024 * 1024 } // 5MB
+}).single('image');
+
 const uploadServiceImages = multer({
     storage: serviceStorage,
     fileFilter: imageFileFilter,
@@ -97,6 +112,35 @@ export const handleCategoryImageUpload = (req, res, next) => {
     uploadCategoryImage(req, res, (err) => {
         if (err) {
             console.error('❌ Category upload error:', err.message);
+
+            if (err.code === 'LIMIT_FILE_SIZE') {
+                return res.status(400).json({
+                    success: false,
+                    message: 'File too large. Maximum size is 5MB.'
+                });
+            }
+
+            if (err.message.includes('Only')) {
+                return res.status(400).json({
+                    success: false,
+                    message: err.message
+                });
+            }
+
+            return res.status(400).json({
+                success: false,
+                message: err.message || 'Image upload failed'
+            });
+        }
+
+        next();
+    });
+};
+
+export const handleSubcategoryImageUpload = (req, res, next) => {
+    uploadSubcategoryImage(req, res, (err) => {
+        if (err) {
+            console.error('❌ Subcategory upload error:', err.message);
 
             if (err.code === 'LIMIT_FILE_SIZE') {
                 return res.status(400).json({
@@ -205,6 +249,7 @@ export const handleAvatarUpload = (req, res, next) => {
 // Export raw multer instances if needed elsewhere
 export {
     uploadCategoryImage,
+    uploadSubcategoryImage,
     uploadServiceImages,
     uploadVariantImage,
     uploadAvatar

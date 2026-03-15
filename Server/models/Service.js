@@ -1,14 +1,7 @@
-// models/Service.js
+// models/Service.js - COMPLETE WITH SUBCATEGORY
 
 import mongoose from 'mongoose';
 
-// ============================================
-// VARIANT SUB-SCHEMA
-// Generic: works for any category
-// Car Wash → "Sedan", "SUV", "Hatchback"
-// Sofa     → "2 Seater", "3 Seater", "L-Shape"
-// Shoes    → "Sneakers", "Leather", "Boots"
-// ============================================
 const variantSchema = new mongoose.Schema({
     name: {
         type: String,
@@ -43,7 +36,6 @@ const variantSchema = new mongoose.Schema({
         type: Number,
         required: [true, 'Duration is required'],
         min: [1, 'Duration must be at least 1 minute']
-        // in minutes
     },
     features: {
         type: [String],
@@ -59,15 +51,17 @@ const variantSchema = new mongoose.Schema({
     }
 });
 
-// ============================================
-// MAIN SERVICE SCHEMA
-// ============================================
 const serviceSchema = new mongoose.Schema({
-    // Reference to Category
+    // Parent references
     category: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Category',
         required: [true, 'Category is required']
+    },
+    subcategory: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Subcategory',
+        required: [true, 'Subcategory is required']
     },
 
     name: {
@@ -92,14 +86,12 @@ const serviceSchema = new mongoose.Schema({
         default: ''
     },
 
-    // Service tier for visual badges
     tier: {
         type: String,
         enum: ['basic', 'standard', 'premium', 'custom'],
         default: 'basic'
     },
 
-    // Service images (max 3)
     images: {
         type: [
             {
@@ -117,7 +109,6 @@ const serviceSchema = new mongoose.Schema({
         default: []
     },
 
-    // Variants (the pricing options)
     variants: {
         type: [variantSchema],
         validate: {
@@ -128,7 +119,6 @@ const serviceSchema = new mongoose.Schema({
         }
     },
 
-    // Service info lists
     highlights: {
         type: [String],
         default: []
@@ -142,7 +132,6 @@ const serviceSchema = new mongoose.Schema({
         default: []
     },
 
-    // Meta
     isActive: {
         type: Boolean,
         default: true
@@ -156,7 +145,6 @@ const serviceSchema = new mongoose.Schema({
         default: 0
     },
 
-    // Stats
     averageRating: {
         type: Number,
         default: 0,
@@ -172,7 +160,6 @@ const serviceSchema = new mongoose.Schema({
         default: 0
     },
 
-    // Auto calculated from cheapest active variant
     startingPrice: {
         type: Number,
         default: 0
@@ -189,19 +176,16 @@ const serviceSchema = new mongoose.Schema({
     toObject: { virtuals: true }
 });
 
-// ============================================
-// INDEXES
-// ============================================
-serviceSchema.index({ category: 1, isActive: 1 });
+// Indexes
+serviceSchema.index({ category: 1, subcategory: 1, isActive: 1 });
+serviceSchema.index({ subcategory: 1, isActive: 1, displayOrder: 1 });
 serviceSchema.index({ slug: 1 });
 serviceSchema.index({ isActive: 1, displayOrder: 1 });
 serviceSchema.index({ isFeatured: 1, isActive: 1 });
 serviceSchema.index({ startingPrice: 1 });
-serviceSchema.index({ category: 1, name: 1 }, { unique: true });
+serviceSchema.index({ subcategory: 1, tier: 1 }, { unique: true });
 
-// ============================================
-// PRE SAVE
-// ============================================
+// Pre save hooks
 serviceSchema.pre('save', function(next) {
     // Auto generate slug
     if (this.isModified('name')) {
@@ -236,47 +220,41 @@ serviceSchema.pre('save', function(next) {
     next();
 });
 
-// ============================================
-// POST SAVE - Update category service count
-// ============================================
+// Post save - update subcategory service count
 serviceSchema.post('save', async function() {
     try {
         const count = await this.constructor.countDocuments({
-            category: this.category,
+            subcategory: this.subcategory,
             isActive: true
         });
-        await mongoose.model('Category').findByIdAndUpdate(
-            this.category,
+        await mongoose.model('Subcategory').findByIdAndUpdate(
+            this.subcategory,
             { totalServices: count }
         );
     } catch (err) {
-        console.error('Error updating category count:', err);
+        console.error('Error updating subcategory count:', err);
     }
 });
 
-// ============================================
-// POST DELETE - Update category service count
-// ============================================
+// Post delete - update subcategory service count
 serviceSchema.post('findOneAndDelete', async function(doc) {
     if (doc) {
         try {
             const count = await mongoose.model('Service').countDocuments({
-                category: doc.category,
+                subcategory: doc.subcategory,
                 isActive: true
             });
-            await mongoose.model('Category').findByIdAndUpdate(
-                doc.category,
+            await mongoose.model('Subcategory').findByIdAndUpdate(
+                doc.subcategory,
                 { totalServices: count }
             );
         } catch (err) {
-            console.error('Error updating category count:', err);
+            console.error('Error updating subcategory count:', err);
         }
     }
 });
 
-// ============================================
-// VIRTUALS
-// ============================================
+// Virtuals
 serviceSchema.virtual('primaryImage').get(function() {
     if (!this.images || this.images.length === 0) {
         return 'default-service.jpg';

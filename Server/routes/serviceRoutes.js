@@ -25,6 +25,12 @@ import {
 
 const router = express.Router();
 
+// Debug middleware
+router.use((req, res, next) => {
+    console.log(`📍 Service Route: ${req.method} ${req.path}`);
+    next();
+});
+
 // Health check
 router.get('/health', (req, res) => {
     res.json({ success: true, message: 'Service routes OK' });

@@ -1,4 +1,4 @@
-// utils/socketEmitter.js
+// utils/socketEmitter.js - COMPLETE WITH SUBCATEGORY EVENTS
 
 import { getIO } from '../config/socket.js';
 
@@ -77,6 +77,45 @@ export const emitBookingCancelled = (booking, cancelledBy) => {
 };
 
 // ============================================
+// CATEGORY EVENTS
+// ============================================
+export const emitCategoryUpdate = (category, action) => {
+    const io = getIO();
+    if (!io) return;
+
+    const payload = {
+        categoryId: category._id,
+        name: category.name,
+        isActive: category.isActive,
+        action,
+        updatedAt: new Date()
+    };
+
+    io.emit(`category:${action}`, payload);
+    console.log(`📡 Emitted category:${action} - ${category.name}`);
+};
+
+// ============================================
+// SUBCATEGORY EVENTS
+// ============================================
+export const emitSubcategoryUpdate = (subcategory, action) => {
+    const io = getIO();
+    if (!io) return;
+
+    const payload = {
+        subcategoryId: subcategory._id,
+        name: subcategory.name,
+        categoryId: subcategory.category,
+        isActive: subcategory.isActive,
+        action,
+        updatedAt: new Date()
+    };
+
+    io.emit(`subcategory:${action}`, payload);
+    console.log(`📡 Emitted subcategory:${action} - ${subcategory.name}`);
+};
+
+// ============================================
 // SERVICE EVENTS
 // ============================================
 export const emitServiceUpdate = (service, action) => {
@@ -87,6 +126,7 @@ export const emitServiceUpdate = (service, action) => {
         serviceId: service._id,
         name: service.name,
         category: service.category,
+        subcategory: service.subcategory,
         isActive: service.isActive,
         isFeatured: service.isFeatured,
         action,
@@ -112,25 +152,6 @@ export const emitVariantUpdate = (serviceId, variant, action) => {
     });
 
     console.log(`📡 Emitted ${eventName} - ${variant.name}`);
-};
-
-// ============================================
-// CATEGORY EVENTS
-// ============================================
-export const emitCategoryUpdate = (category, action) => {
-    const io = getIO();
-    if (!io) return;
-
-    const payload = {
-        categoryId: category._id,
-        name: category.name,
-        isActive: category.isActive,
-        action,
-        updatedAt: new Date()
-    };
-
-    io.emit(`category:${action}`, payload);
-    console.log(`📡 Emitted category:${action} - ${category.name}`);
 };
 
 // ============================================
@@ -185,9 +206,10 @@ export default {
     emitNewBooking,
     emitBookingStatusUpdate,
     emitBookingCancelled,
+    emitCategoryUpdate,
+    emitSubcategoryUpdate,
     emitServiceUpdate,
     emitVariantUpdate,
-    emitCategoryUpdate,
     emitNewReview,
     emitUserBlocked,
     emitUserRoleChanged

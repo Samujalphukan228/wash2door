@@ -1,7 +1,8 @@
-// controllers/serviceController.js - COMPLETE with socket emissions
+// controllers/serviceController.js - COMPLETE with subcategory
 
 import Service from '../models/Service.js';
 import Category from '../models/Category.js';
+import Subcategory from '../models/Subcategory.js';
 import Booking from '../models/Booking.js';
 import mongoose from 'mongoose';
 import { deleteCloudinaryImage } from '../config/cloudinary.js';
@@ -23,11 +24,11 @@ const parseArray = (value) => {
 // ============================================
 // GET ALL SERVICES (ADMIN)
 // ============================================
-
 export const getAllServicesAdmin = async (req, res) => {
     try {
         const {
             category,
+            subcategory,
             tier,
             isActive,
             isFeatured,
@@ -45,6 +46,10 @@ export const getAllServicesAdmin = async (req, res) => {
 
         if (category && category !== '' && isValidObjectId(category)) {
             query.category = category;
+        }
+
+        if (subcategory && subcategory !== '' && isValidObjectId(subcategory)) {
+            query.subcategory = subcategory;
         }
 
         if (tier && tier !== '') {
@@ -72,7 +77,8 @@ export const getAllServicesAdmin = async (req, res) => {
         const total = await Service.countDocuments(query);
 
         const services = await Service.find(query)
-            .populate('category', 'name slug icon image')
+            .populate('category', 'name slug icon')
+            .populate('subcategory', 'name slug icon')
             .sort(sortOptions)
             .limit(limitNum)
             .skip((pageNum - 1) * limitNum)
@@ -99,7 +105,6 @@ export const getAllServicesAdmin = async (req, res) => {
 // ============================================
 // GET SINGLE SERVICE (ADMIN)
 // ============================================
-
 export const getServiceById = async (req, res) => {
     try {
         const { serviceId } = req.params;
@@ -113,6 +118,7 @@ export const getServiceById = async (req, res) => {
 
         const service = await Service.findById(serviceId)
             .populate('category', 'name slug icon image')
+            .populate('subcategory', 'name slug icon image')
             .populate('createdBy', 'firstName lastName');
 
         if (!service) {
@@ -153,7 +159,6 @@ export const getServiceById = async (req, res) => {
 // ============================================
 // CREATE SERVICE (ADMIN)
 // ============================================
-
 export const createService = async (req, res) => {
     try {
         const {
@@ -161,6 +166,7 @@ export const createService = async (req, res) => {
             description,
             shortDescription,
             category,
+            subcategory,
             tier,
             highlights,
             includes,
@@ -171,7 +177,7 @@ export const createService = async (req, res) => {
         } = req.body;
 
         // Validate required fields
-        if (!name || !description || !category) {
+        if (!name || !description || !category || !subcategory) {
             if (req.files) {
                 for (const file of req.files) {
                     await deleteCloudinaryImage(file.filename);
@@ -179,11 +185,11 @@ export const createService = async (req, res) => {
             }
             return res.status(400).json({
                 success: false,
-                message: 'Name, description and category are required'
+                message: 'Name, description, category and subcategory are required'
             });
         }
 
-        // Validate category exists
+        // Validate category
         if (!isValidObjectId(category)) {
             if (req.files) {
                 for (const file of req.files) {
@@ -206,6 +212,69 @@ export const createService = async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: 'Category not found'
+            });
+        }
+
+        if (!categoryExists.isActive) {
+            if (req.files) {
+                for (const file of req.files) {
+                    await deleteCloudinaryImage(file.filename);
+                }
+            }
+            return res.status(400).json({
+                success: false,
+                message: 'Cannot add service to inactive category'
+            });
+        }
+
+        // Validate subcategory
+        if (!isValidObjectId(subcategory)) {
+            if (req.files) {
+                for (const file of req.files) {
+                    await deleteCloudinaryImage(file.filename);
+                }
+            }
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid subcategory ID'
+            });
+        }
+
+        const subcategoryExists = await Subcategory.findById(subcategory);
+        if (!subcategoryExists) {
+            if (req.files) {
+                for (const file of req.files) {
+                    await deleteCloudinaryImage(file.filename);
+                }
+            }
+            return res.status(400).json({
+                success: false,
+                message: 'Subcategory not found'
+            });
+        }
+
+        if (!subcategoryExists.isActive) {
+            if (req.files) {
+                for (const file of req.files) {
+                    await deleteCloudinaryImage(file.filename);
+                }
+            }
+            return res.status(400).json({
+                success: false,
+                message: 'Cannot add service to inactive subcategory'
+            });
+        }
+
+        // Verify subcategory belongs to category
+        if (subcategoryExists.category.toString() !== category) {
+            if (req.files) {
+                for (const file of req.files) {
+                    await deleteCloudinaryImage(file.filename);
+                }
+            }
+            return res.status(400).json({
+                success: false,
+                message: 'Subcategory does not belong to selected category'
             });
         }
 
@@ -310,12 +379,31 @@ export const createService = async (req, res) => {
         const validTiers = ['basic', 'standard', 'premium', 'custom'];
         const serviceTier = validTiers.includes(tier) ? tier : 'basic';
 
+        // Check duplicate: subcategory + tier must be unique
+        const existingService = await Service.findOne({
+            subcategory,
+            tier: serviceTier
+        });
+
+        if (existingService) {
+            if (req.files) {
+                for (const file of req.files) {
+                    await deleteCloudinaryImage(file.filename);
+                }
+            }
+            return res.status(400).json({
+                success: false,
+                message: `A ${serviceTier} service already exists for ${subcategoryExists.name}`
+            });
+        }
+
         // Create service
         const service = await Service.create({
             name: name.trim(),
             description,
             shortDescription: shortDescription || '',
             category,
+            subcategory,
             tier: serviceTier,
             images: serviceImages,
             variants: parsedVariants,
@@ -327,10 +415,14 @@ export const createService = async (req, res) => {
             createdBy: req.user._id
         });
 
-        // Populate category before sending response
+        // Populate category and subcategory
         await service.populate('category', 'name slug icon');
+        await service.populate('subcategory', 'name slug icon');
 
-        // ---- Socket event ----
+        // Update category service count
+        await updateCategoryCounts(category);
+
+        // Socket event
         emitServiceUpdate(service, 'created');
 
         res.status(201).json({
@@ -351,7 +443,7 @@ export const createService = async (req, res) => {
         if (error.code === 11000) {
             return res.status(400).json({
                 success: false,
-                message: 'A service with this name already exists in this category'
+                message: 'A service with this configuration already exists'
             });
         }
 
@@ -375,7 +467,6 @@ export const createService = async (req, res) => {
 // ============================================
 // UPDATE SERVICE (ADMIN)
 // ============================================
-
 export const updateService = async (req, res) => {
     try {
         const { serviceId } = req.params;
@@ -411,6 +502,7 @@ export const updateService = async (req, res) => {
             description,
             shortDescription,
             category,
+            subcategory,
             tier,
             highlights,
             includes,
@@ -422,7 +514,10 @@ export const updateService = async (req, res) => {
             removeImages
         } = req.body;
 
-        // Validate category if being changed
+        const oldCategoryId = service.category;
+        const oldSubcategoryId = service.subcategory;
+
+        // Handle category change
         if (category && category !== service.category.toString()) {
             if (!isValidObjectId(category)) {
                 if (req.files) {
@@ -449,7 +544,115 @@ export const updateService = async (req, res) => {
                 });
             }
 
+            if (!categoryExists.isActive) {
+                if (req.files) {
+                    for (const file of req.files) {
+                        await deleteCloudinaryImage(file.filename);
+                    }
+                }
+                return res.status(400).json({
+                    success: false,
+                    message: 'Cannot move service to inactive category'
+                });
+            }
+
             service.category = category;
+        }
+
+        // Handle subcategory change
+        if (subcategory && subcategory !== service.subcategory.toString()) {
+            if (!isValidObjectId(subcategory)) {
+                if (req.files) {
+                    for (const file of req.files) {
+                        await deleteCloudinaryImage(file.filename);
+                    }
+                }
+                return res.status(400).json({
+                    success: false,
+                    message: 'Invalid subcategory ID'
+                });
+            }
+
+            const subcategoryExists = await Subcategory.findById(subcategory);
+            if (!subcategoryExists) {
+                if (req.files) {
+                    for (const file of req.files) {
+                        await deleteCloudinaryImage(file.filename);
+                    }
+                }
+                return res.status(400).json({
+                    success: false,
+                    message: 'Subcategory not found'
+                });
+            }
+
+            if (!subcategoryExists.isActive) {
+                if (req.files) {
+                    for (const file of req.files) {
+                        await deleteCloudinaryImage(file.filename);
+                    }
+                }
+                return res.status(400).json({
+                    success: false,
+                    message: 'Cannot move service to inactive subcategory'
+                });
+            }
+
+            // Verify subcategory belongs to the current/new category
+            const targetCategory = category || service.category.toString();
+            if (subcategoryExists.category.toString() !== targetCategory) {
+                if (req.files) {
+                    for (const file of req.files) {
+                        await deleteCloudinaryImage(file.filename);
+                    }
+                }
+                return res.status(400).json({
+                    success: false,
+                    message: 'Subcategory does not belong to selected category'
+                });
+            }
+
+            service.subcategory = subcategory;
+        }
+
+        // Handle tier change - check uniqueness
+        const newTier = tier || service.tier;
+        const newSubcategory = subcategory || service.subcategory.toString();
+
+        if (tier && tier !== service.tier) {
+            const validTiers = ['basic', 'standard', 'premium', 'custom'];
+            if (!validTiers.includes(tier)) {
+                if (req.files) {
+                    for (const file of req.files) {
+                        await deleteCloudinaryImage(file.filename);
+                    }
+                }
+                return res.status(400).json({
+                    success: false,
+                    message: 'Invalid tier value'
+                });
+            }
+
+            // Check if new subcategory + tier combination already exists
+            const existingService = await Service.findOne({
+                subcategory: newSubcategory,
+                tier: tier,
+                _id: { $ne: serviceId }
+            });
+
+            if (existingService) {
+                if (req.files) {
+                    for (const file of req.files) {
+                        await deleteCloudinaryImage(file.filename);
+                    }
+                }
+                return res.status(400).json({
+                    success: false,
+                    message: `A ${tier} service already exists for this subcategory`
+                });
+            }
+
+            service.tier = tier;
         }
 
         // Handle image removal
@@ -503,12 +706,6 @@ export const updateService = async (req, res) => {
         if (isActive !== undefined) service.isActive = isActive === 'true' || isActive === true;
         if (isFeatured !== undefined) service.isFeatured = isFeatured === 'true' || isFeatured === true;
 
-        // Update tier
-        const validTiers = ['basic', 'standard', 'premium', 'custom'];
-        if (tier && validTiers.includes(tier)) {
-            service.tier = tier;
-        }
-
         // Update arrays
         if (highlights !== undefined) service.highlights = parseArray(highlights);
         if (includes !== undefined) service.includes = parseArray(includes);
@@ -530,7 +727,7 @@ export const updateService = async (req, res) => {
 
             if (parsedVariants && parsedVariants.length > 0) {
                 service.variants = parsedVariants.map((v, i) => ({
-                    _id: v._id || undefined, // preserve existing IDs
+                    _id: v._id || undefined,
                     name: v.name?.trim() || 'Unnamed',
                     description: v.description || '',
                     price: Number(v.price) || 0,
@@ -548,8 +745,24 @@ export const updateService = async (req, res) => {
 
         await service.save();
         await service.populate('category', 'name slug icon');
+        await service.populate('subcategory', 'name slug icon');
 
-        // ---- Socket event ----
+        // Update counts for old and new categories/subcategories if changed
+        if (category && category !== oldCategoryId.toString()) {
+            await updateCategoryCounts(oldCategoryId);
+            await updateCategoryCounts(category);
+        } else {
+            await updateCategoryCounts(service.category);
+        }
+
+        if (subcategory && subcategory !== oldSubcategoryId.toString()) {
+            await updateSubcategoryServiceCount(oldSubcategoryId);
+            await updateSubcategoryServiceCount(subcategory);
+        } else {
+            await updateSubcategoryServiceCount(service.subcategory);
+        }
+
+        // Socket event
         emitServiceUpdate(service, 'updated');
 
         res.status(200).json({
@@ -570,7 +783,7 @@ export const updateService = async (req, res) => {
         if (error.code === 11000) {
             return res.status(400).json({
                 success: false,
-                message: 'A service with this name already exists in this category'
+                message: 'A service with this configuration already exists'
             });
         }
 
@@ -585,7 +798,6 @@ export const updateService = async (req, res) => {
 // ============================================
 // DELETE SERVICE (ADMIN)
 // ============================================
-
 export const deleteService = async (req, res) => {
     try {
         const { serviceId } = req.params;
@@ -619,12 +831,16 @@ export const deleteService = async (req, res) => {
             });
         }
 
-        // Store data for socket emission
+        // Store data for socket emission and count updates
         const deletedServiceData = {
             _id: service._id,
             name: service.name,
-            category: service.category
+            category: service.category,
+            subcategory: service.subcategory
         };
+
+        const categoryId = service.category;
+        const subcategoryId = service.subcategory;
 
         // Delete service images
         for (const image of service.images) {
@@ -640,21 +856,13 @@ export const deleteService = async (req, res) => {
             }
         }
 
-        const categoryId = service.category;
         await service.deleteOne();
 
-        // Update category count
-        try {
-            const count = await Service.countDocuments({
-                category: categoryId,
-                isActive: true
-            });
-            await Category.findByIdAndUpdate(categoryId, { totalServices: count });
-        } catch (err) {
-            console.error('Error updating category count:', err);
-        }
+        // Update counts
+        await updateCategoryCounts(categoryId);
+        await updateSubcategoryServiceCount(subcategoryId);
 
-        // ---- Socket event ----
+        // Socket event
         emitServiceUpdate(deletedServiceData, 'deleted');
 
         res.status(200).json({
@@ -672,10 +880,10 @@ export const deleteService = async (req, res) => {
     }
 };
 
+
 // ============================================
 // ADD VARIANT (ADMIN)
 // ============================================
-
 export const addVariant = async (req, res) => {
     try {
         const { serviceId } = req.params;
@@ -747,11 +955,12 @@ export const addVariant = async (req, res) => {
         service.variants.push(newVariant);
         await service.save();
         await service.populate('category', 'name slug icon');
+        await service.populate('subcategory', 'name slug icon');
 
         // Get the added variant
         const addedVariant = service.variants[service.variants.length - 1];
 
-        // ---- Socket event ----
+        // Socket event
         emitVariantUpdate(serviceId, addedVariant, 'added');
 
         res.status(200).json({
@@ -773,7 +982,6 @@ export const addVariant = async (req, res) => {
 // ============================================
 // UPDATE VARIANT (ADMIN)
 // ============================================
-
 export const updateVariant = async (req, res) => {
     try {
         const { serviceId, variantId } = req.params;
@@ -849,8 +1057,9 @@ export const updateVariant = async (req, res) => {
 
         await service.save();
         await service.populate('category', 'name slug icon');
+        await service.populate('subcategory', 'name slug icon');
 
-        // ---- Socket event ----
+        // Socket event
         emitVariantUpdate(serviceId, variant, 'updated');
 
         res.status(200).json({
@@ -872,7 +1081,6 @@ export const updateVariant = async (req, res) => {
 // ============================================
 // DELETE VARIANT (ADMIN)
 // ============================================
-
 export const deleteVariant = async (req, res) => {
     try {
         const { serviceId, variantId } = req.params;
@@ -938,8 +1146,9 @@ export const deleteVariant = async (req, res) => {
         service.variants.pull(variantId);
         await service.save();
         await service.populate('category', 'name slug icon');
+        await service.populate('subcategory', 'name slug icon');
 
-        // ---- Socket event ----
+        // Socket event
         emitVariantUpdate(serviceId, deletedVariantData, 'deleted');
 
         res.status(200).json({
@@ -960,7 +1169,6 @@ export const deleteVariant = async (req, res) => {
 // ============================================
 // SET PRIMARY IMAGE (ADMIN)
 // ============================================
-
 export const setPrimaryImage = async (req, res) => {
     try {
         const { serviceId, imageId } = req.params;
@@ -1015,7 +1223,6 @@ export const setPrimaryImage = async (req, res) => {
 // ============================================
 // DELETE IMAGE (ADMIN)
 // ============================================
-
 export const deleteImage = async (req, res) => {
     try {
         const { serviceId, imageId } = req.params;
@@ -1080,7 +1287,6 @@ export const deleteImage = async (req, res) => {
 // ============================================
 // TOGGLE SERVICE FEATURED (ADMIN)
 // ============================================
-
 export const toggleFeatured = async (req, res) => {
     try {
         const { serviceId } = req.params;
@@ -1104,7 +1310,7 @@ export const toggleFeatured = async (req, res) => {
         service.isFeatured = !service.isFeatured;
         await service.save();
 
-        // ---- Socket event ----
+        // Socket event
         emitServiceUpdate(service, 'updated');
 
         res.status(200).json({
@@ -1125,7 +1331,6 @@ export const toggleFeatured = async (req, res) => {
 // ============================================
 // TOGGLE SERVICE ACTIVE STATUS (ADMIN)
 // ============================================
-
 export const toggleActive = async (req, res) => {
     try {
         const { serviceId } = req.params;
@@ -1146,6 +1351,25 @@ export const toggleActive = async (req, res) => {
             });
         }
 
+        // If activating, check if parent category and subcategory are active
+        if (!service.isActive) {
+            const parentCategory = await Category.findById(service.category);
+            if (!parentCategory || !parentCategory.isActive) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Cannot activate service when parent category is inactive'
+                });
+            }
+
+            const parentSubcategory = await Subcategory.findById(service.subcategory);
+            if (!parentSubcategory || !parentSubcategory.isActive) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Cannot activate service when parent subcategory is inactive'
+                });
+            }
+        }
+
         // If deactivating, check for active bookings
         if (service.isActive) {
             const activeBookings = await Booking.countDocuments({
@@ -1164,18 +1388,11 @@ export const toggleActive = async (req, res) => {
         service.isActive = !service.isActive;
         await service.save();
 
-        // Update category service count
-        try {
-            const count = await Service.countDocuments({
-                category: service.category,
-                isActive: true
-            });
-            await Category.findByIdAndUpdate(service.category, { totalServices: count });
-        } catch (err) {
-            console.error('Error updating category count:', err);
-        }
+        // Update counts
+        await updateCategoryCounts(service.category);
+        await updateSubcategoryServiceCount(service.subcategory);
 
-        // ---- Socket event ----
+        // Socket event
         emitServiceUpdate(service, 'updated');
 
         res.status(200).json({
@@ -1196,7 +1413,6 @@ export const toggleActive = async (req, res) => {
 // ============================================
 // REORDER SERVICES (ADMIN)
 // ============================================
-
 export const reorderServices = async (req, res) => {
     try {
         const { orderedIds } = req.body;
@@ -1228,6 +1444,48 @@ export const reorderServices = async (req, res) => {
             success: false,
             message: 'Error reordering services'
         });
+    }
+};
+
+// ============================================
+// HELPER: Update category counts
+// ============================================
+const updateCategoryCounts = async (categoryId) => {
+    try {
+        const subcategoryCount = await Subcategory.countDocuments({
+            category: categoryId,
+            isActive: true
+        });
+
+        const serviceCount = await Service.countDocuments({
+            category: categoryId,
+            isActive: true
+        });
+
+        await Category.findByIdAndUpdate(categoryId, {
+            totalSubcategories: subcategoryCount,
+            totalServices: serviceCount
+        });
+    } catch (err) {
+        console.error('Error updating category counts:', err);
+    }
+};
+
+// ============================================
+// HELPER: Update subcategory service count
+// ============================================
+const updateSubcategoryServiceCount = async (subcategoryId) => {
+    try {
+        const count = await Service.countDocuments({
+            subcategory: subcategoryId,
+            isActive: true
+        });
+
+        await Subcategory.findByIdAndUpdate(subcategoryId, {
+            totalServices: count
+        });
+    } catch (err) {
+        console.error('Error updating subcategory service count:', err);
     }
 };
 

@@ -1,4 +1,4 @@
-// src/hooks/useSocketEvents.js
+// src/hooks/useSocketEvents.js - COMPLETE FILE
 
 import { useEffect, useCallback } from 'react';
 import { useSocket } from '@/context/SocketContext';
@@ -63,6 +63,90 @@ export const useBookingSocket = (callbacks = {}) => {
 };
 
 // ============================================
+// CATEGORY SOCKET HOOK
+// ============================================
+export const useCategorySocket = (callbacks = {}) => {
+    const { socket, isConnected } = useSocket();
+
+    useEffect(() => {
+        if (!socket || !isConnected) return;
+
+        // Category created
+        socket.on('category:created', (data) => {
+            toast.success(`New category: ${data.name}`, {
+                icon: '📁',
+                duration: 4000
+            });
+            callbacks.onCreated?.(data);
+        });
+
+        // Category updated
+        socket.on('category:updated', (data) => {
+            callbacks.onUpdated?.(data);
+        });
+
+        // Category deleted
+        socket.on('category:deleted', (data) => {
+            toast(`Category deleted: ${data.name}`, {
+                icon: '🗑️',
+                duration: 4000
+            });
+            callbacks.onDeleted?.(data);
+        });
+
+        return () => {
+            socket.off('category:created');
+            socket.off('category:updated');
+            socket.off('category:deleted');
+        };
+    }, [socket, isConnected, callbacks]);
+
+    return { isConnected };
+};
+
+// ============================================
+// SUBCATEGORY SOCKET HOOK - NEW
+// ============================================
+export const useSubcategorySocket = (callbacks = {}) => {
+    const { socket, isConnected } = useSocket();
+
+    useEffect(() => {
+        if (!socket || !isConnected) return;
+
+        // Subcategory created
+        socket.on('subcategory:created', (data) => {
+            toast.success(`New subcategory: ${data.name}`, {
+                icon: '📂',
+                duration: 4000
+            });
+            callbacks.onCreated?.(data);
+        });
+
+        // Subcategory updated
+        socket.on('subcategory:updated', (data) => {
+            callbacks.onUpdated?.(data);
+        });
+
+        // Subcategory deleted
+        socket.on('subcategory:deleted', (data) => {
+            toast(`Subcategory deleted: ${data.name}`, {
+                icon: '🗑️',
+                duration: 4000
+            });
+            callbacks.onDeleted?.(data);
+        });
+
+        return () => {
+            socket.off('subcategory:created');
+            socket.off('subcategory:updated');
+            socket.off('subcategory:deleted');
+        };
+    }, [socket, isConnected, callbacks]);
+
+    return { isConnected };
+};
+
+// ============================================
 // SERVICE SOCKET HOOK
 // ============================================
 export const useServiceSocket = (callbacks = {}) => {
@@ -116,48 +200,6 @@ export const useServiceSocket = (callbacks = {}) => {
             socket.off('service:variantAdded');
             socket.off('service:variantUpdated');
             socket.off('service:variantDeleted');
-        };
-    }, [socket, isConnected, callbacks]);
-
-    return { isConnected };
-};
-
-// ============================================
-// CATEGORY SOCKET HOOK
-// ============================================
-export const useCategorySocket = (callbacks = {}) => {
-    const { socket, isConnected } = useSocket();
-
-    useEffect(() => {
-        if (!socket || !isConnected) return;
-
-        // Category created
-        socket.on('category:created', (data) => {
-            toast.success(`New category: ${data.name}`, {
-                icon: '📁',
-                duration: 4000
-            });
-            callbacks.onCreated?.(data);
-        });
-
-        // Category updated
-        socket.on('category:updated', (data) => {
-            callbacks.onUpdated?.(data);
-        });
-
-        // Category deleted
-        socket.on('category:deleted', (data) => {
-            toast(`Category deleted: ${data.name}`, {
-                icon: '🗑️',
-                duration: 4000
-            });
-            callbacks.onDeleted?.(data);
-        });
-
-        return () => {
-            socket.off('category:created');
-            socket.off('category:updated');
-            socket.off('category:deleted');
         };
     }, [socket, isConnected, callbacks]);
 
@@ -270,6 +312,7 @@ export default {
     useBookingSocket,
     useServiceSocket,
     useCategorySocket,
+    useSubcategorySocket,
     useReviewSocket,
     useUserSocket,
     useAdminNotifications

@@ -1,3 +1,5 @@
+// server.js - COMPLETE WITH SUBCATEGORY ROUTES
+
 import express from 'express';
 import { createServer } from 'http';
 import dotenv from 'dotenv';
@@ -15,6 +17,7 @@ import publicRoutes from './routes/publicRoutes.js';
 import bookingRoutes from './routes/bookingRoutes.js';
 import reviewRoutes from './routes/reviewRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
+import subcategoryRoutes from './routes/subcategoryRoutes.js';
 import serviceRoutes from './routes/serviceRoutes.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { generalLimiter } from './middleware/rateLimiter.js';
@@ -26,7 +29,7 @@ const app = express();
 const server = createServer(app);
 initSocket(server);
 
-// ✅ ADD THIS - Trust proxy for Render/Vercel
+// Trust proxy for Render/Vercel
 app.set('trust proxy', 1);
 
 connectDB().then(() => {
@@ -49,12 +52,12 @@ app.use(cors({
     origin: (origin, callback) => {
         if (!origin) return callback(null, true);
         if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
-        
-        // ✅ ADD THIS - Allow Vercel preview deployments
+
+        // Allow Vercel preview deployments
         if (origin.match(/^https:\/\/wash2door.*\.vercel\.app$/)) {
             return callback(null, true);
         }
-        
+
         console.warn(`⚠️ CORS blocked: ${origin}`);
         callback(new Error(`CORS: origin ${origin} not allowed`));
     },
@@ -84,6 +87,7 @@ app.use('/api/public', publicRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/categories', categoryRoutes);
+app.use('/api/subcategories', subcategoryRoutes);
 app.use('/api/services', serviceRoutes);
 
 app.use(notFound);
@@ -96,13 +100,14 @@ server.listen(PORT, () => {
     ╔═══════════════════════════════════════════════════════════╗
     ║        🚀 SERVER RUNNING - Port ${PORT}                      ║
     ╠═══════════════════════════════════════════════════════════╣
-    ║   Auth:       /api/auth/*                                 ║
-    ║   Admin:      /api/admin/*                                ║
-    ║   Public:     /api/public/*                               ║
-    ║   Bookings:   /api/bookings/*                             ║
-    ║   Reviews:    /api/reviews/*                              ║
-    ║   Categories: /api/categories/*                           ║
-    ║   Services:   /api/services/*                             ║
+    ║   Auth:          /api/auth/*                              ║
+    ║   Admin:         /api/admin/*                             ║
+    ║   Public:        /api/public/*                            ║
+    ║   Bookings:      /api/bookings/*                          ║
+    ║   Reviews:       /api/reviews/*                           ║
+    ║   Categories:    /api/categories/*                        ║
+    ║   Subcategories: /api/subcategories/*                     ║
+    ║   Services:      /api/services/*                          ║
     ╚═══════════════════════════════════════════════════════════╝
     `);
 });

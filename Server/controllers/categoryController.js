@@ -1,6 +1,7 @@
-// controllers/categoryController.js - COMPLETE with socket emissions
+// controllers/categoryController.js - UPDATED WITH SUBCATEGORY CASCADE
 
 import Category from '../models/Category.js';
+import Subcategory from '../models/Subcategory.js';
 import Service from '../models/Service.js';
 import mongoose from 'mongoose';
 import { deleteCloudinaryImage } from '../config/cloudinary.js';
@@ -12,7 +13,6 @@ const isValidObjectId = (id) =>
 // ============================================
 // GET ALL CATEGORIES (ADMIN)
 // ============================================
-
 export const getAllCategories = async (req, res) => {
     try {
         const {
@@ -48,15 +48,20 @@ export const getAllCategories = async (req, res) => {
             .skip((pageNum - 1) * limitNum)
             .lean();
 
-        // Add service count to each category
-        const categoriesWithCount = await Promise.all(
+        // Add subcategory and service counts
+        const categoriesWithCounts = await Promise.all(
             categories.map(async (cat) => {
+                const subcategoryCount = await Subcategory.countDocuments({
+                    category: cat._id,
+                    isActive: true
+                });
                 const serviceCount = await Service.countDocuments({
                     category: cat._id,
                     isActive: true
                 });
                 return {
                     ...cat,
+                    activeSubcategories: subcategoryCount,
                     activeServices: serviceCount
                 };
             })
@@ -67,7 +72,7 @@ export const getAllCategories = async (req, res) => {
             total,
             pages: Math.ceil(total / limitNum),
             page: pageNum,
-            data: categoriesWithCount
+            data: categoriesWithCounts
         });
 
     } catch (error) {
@@ -83,7 +88,6 @@ export const getAllCategories = async (req, res) => {
 // ============================================
 // GET SINGLE CATEGORY
 // ============================================
-
 export const getCategoryById = async (req, res) => {
     try {
         const { categoryId } = req.params;
@@ -105,12 +109,20 @@ export const getCategoryById = async (req, res) => {
             });
         }
 
+        // Get subcategories in this category
+        const subcategories = await Subcategory.find({ category: categoryId })
+            .select('name slug icon image isActive totalServices displayOrder')
+            .sort({ displayOrder: 1 });
+
         // Get services in this category
         const services = await Service.find({ category: categoryId })
-            .select('name isActive tier startingPrice averageRating totalBookings')
+            .select('name isActive tier startingPrice averageRating totalBookings subcategory')
+            .populate('subcategory', 'name')
             .sort({ displayOrder: 1 });
 
         const stats = {
+            totalSubcategories: subcategories.length,
+            activeSubcategories: subcategories.filter(s => s.isActive).length,
             totalServices: services.length,
             activeServices: services.filter(s => s.isActive).length,
             totalBookings: services.reduce((sum, s) => sum + (s.totalBookings || 0), 0)
@@ -120,6 +132,7 @@ export const getCategoryById = async (req, res) => {
             success: true,
             data: {
                 category,
+                subcategories,
                 services,
                 stats
             }
@@ -137,7 +150,6 @@ export const getCategoryById = async (req, res) => {
 // ============================================
 // CREATE CATEGORY
 // ============================================
-
 export const createCategory = async (req, res) => {
     try {
         const { name, description, icon, displayOrder } = req.body;
@@ -187,10 +199,12 @@ export const createCategory = async (req, res) => {
             icon: icon || '',
             image: categoryImage,
             displayOrder: order,
+            totalSubcategories: 0,
+            totalServices: 0,
             createdBy: req.user._id
         });
 
-        // ---- Socket event ----
+        // Socket event
         emitCategoryUpdate(category, 'created');
 
         res.status(201).json({
@@ -231,7 +245,6 @@ export const createCategory = async (req, res) => {
 // ============================================
 // UPDATE CATEGORY
 // ============================================
-
 export const updateCategory = async (req, res) => {
     try {
         const { categoryId } = req.params;
@@ -274,7 +287,6 @@ export const updateCategory = async (req, res) => {
 
         // Handle image update
         if (req.file) {
-            // Delete old image
             if (category.image.publicId) {
                 await deleteCloudinaryImage(category.image.publicId);
             }
@@ -293,7 +305,22 @@ export const updateCategory = async (req, res) => {
 
         await category.save();
 
-        // ---- Socket event ----
+        // CASCADE: If category deactivated, deactivate subcategories and services
+        if (isActive !== undefined && !category.isActive) {
+            const subcategoryResult = await Subcategory.updateMany(
+                { category: categoryId },
+                { isActive: false }
+            );
+            console.log(`⚠️ Deactivated ${subcategoryResult.modifiedCount} subcategories`);
+
+            const serviceResult = await Service.updateMany(
+                { category: categoryId },
+                { isActive: false }
+            );
+            console.log(`⚠️ Deactivated ${serviceResult.modifiedCount} services`);
+        }
+
+        // Socket event
         emitCategoryUpdate(category, 'updated');
 
         res.status(200).json({
@@ -316,7 +343,6 @@ export const updateCategory = async (req, res) => {
 // ============================================
 // DELETE CATEGORY
 // ============================================
-
 export const deleteCategory = async (req, res) => {
     try {
         const { categoryId } = req.params;
@@ -337,13 +363,23 @@ export const deleteCategory = async (req, res) => {
             });
         }
 
-        // Check if category has services
+        // Check if category has subcategories
+        const subcategoryCount = await Subcategory.countDocuments({ category: categoryId });
+
+        if (subcategoryCount > 0) {
+            return res.status(400).json({
+                success: false,
+                message: `Cannot delete category with ${subcategoryCount} subcategory(ies). Delete subcategories first.`
+            });
+        }
+
+        // Check if category has services (direct check for safety)
         const serviceCount = await Service.countDocuments({ category: categoryId });
 
         if (serviceCount > 0) {
             return res.status(400).json({
                 success: false,
-                message: `Cannot delete category with ${serviceCount} service(s). Delete or move services first.`
+                message: `Cannot delete category with ${serviceCount} service(s). Delete services first.`
             });
         }
 
@@ -361,7 +397,7 @@ export const deleteCategory = async (req, res) => {
 
         await category.deleteOne();
 
-        // ---- Socket event ----
+        // Socket event
         emitCategoryUpdate(deletedCategoryData, 'deleted');
 
         res.status(200).json({
@@ -382,7 +418,6 @@ export const deleteCategory = async (req, res) => {
 // ============================================
 // TOGGLE CATEGORY STATUS
 // ============================================
-
 export const toggleCategoryStatus = async (req, res) => {
     try {
         const { categoryId } = req.params;
@@ -406,16 +441,22 @@ export const toggleCategoryStatus = async (req, res) => {
         category.isActive = !category.isActive;
         await category.save();
 
-        // If category is deactivated, deactivate all its services
+        // CASCADE: If category deactivated, deactivate all subcategories and services
         if (!category.isActive) {
-            const result = await Service.updateMany(
+            const subcategoryResult = await Subcategory.updateMany(
                 { category: categoryId },
                 { isActive: false }
             );
-            console.log(`⚠️ Deactivated ${result.modifiedCount} services in category`);
+            console.log(`⚠️ Deactivated ${subcategoryResult.modifiedCount} subcategories in category`);
+
+            const serviceResult = await Service.updateMany(
+                { category: categoryId },
+                { isActive: false }
+            );
+            console.log(`⚠️ Deactivated ${serviceResult.modifiedCount} services in category`);
         }
 
-        // ---- Socket event ----
+        // Socket event
         emitCategoryUpdate(category, 'updated');
 
         res.status(200).json({
@@ -436,7 +477,6 @@ export const toggleCategoryStatus = async (req, res) => {
 // ============================================
 // REORDER CATEGORIES
 // ============================================
-
 export const reorderCategories = async (req, res) => {
     try {
         const { orderedIds } = req.body;

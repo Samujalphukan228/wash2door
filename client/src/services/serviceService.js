@@ -1,4 +1,4 @@
-// src/services/serviceService.js
+// src/services/serviceService.js - COMPLETE FILE
 
 import axiosInstance from '@/lib/axios';
 
@@ -45,13 +45,13 @@ const serviceService = {
         return response.data;
     },
 
-    // ✅ NEW: Toggle active status
+    // Toggle active status
     toggleActive: async (serviceId) => {
         const response = await axiosInstance.patch(`/services/${serviceId}/active`);
         return response.data;
     },
 
-    // ✅ NEW: Reorder services
+    // Reorder services
     reorder: async (orderedIds) => {
         const response = await axiosInstance.put('/services/reorder/bulk', {
             orderedIds
@@ -67,7 +67,7 @@ const serviceService = {
         return response.data;
     },
 
-    // ✅ NEW: Delete image
+    // Delete image
     deleteImage: async (serviceId, imageId) => {
         const response = await axiosInstance.delete(
             `/services/${serviceId}/images/${imageId}`

@@ -1,18 +1,21 @@
-// models/Category.js - UPDATED WITH SUBCATEGORY COUNT
+// models/Subcategory.js
 
 import mongoose from 'mongoose';
 
-const categorySchema = new mongoose.Schema({
+const subcategorySchema = new mongoose.Schema({
     name: {
         type: String,
-        required: [true, 'Category name is required'],
-        trim: true,
-        unique: true
+        required: [true, 'Subcategory name is required'],
+        trim: true
     },
     slug: {
         type: String,
-        unique: true,
         lowercase: true
+    },
+    category: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Category',
+        required: [true, 'Category is required']
     },
     description: {
         type: String,
@@ -26,7 +29,7 @@ const categorySchema = new mongoose.Schema({
     image: {
         url: {
             type: String,
-            default: 'default-category.jpg'
+            default: 'default-subcategory.jpg'
         },
         publicId: {
             type: String,
@@ -38,10 +41,6 @@ const categorySchema = new mongoose.Schema({
         default: true
     },
     displayOrder: {
-        type: Number,
-        default: 0
-    },
-    totalSubcategories: {
         type: Number,
         default: 0
     },
@@ -61,11 +60,12 @@ const categorySchema = new mongoose.Schema({
 });
 
 // Indexes
-categorySchema.index({ slug: 1 });
-categorySchema.index({ isActive: 1, displayOrder: 1 });
+subcategorySchema.index({ category: 1, slug: 1 });
+subcategorySchema.index({ category: 1, isActive: 1, displayOrder: 1 });
+subcategorySchema.index({ category: 1, name: 1 }, { unique: true });
 
 // Auto generate slug
-categorySchema.pre('save', function(next) {
+subcategorySchema.pre('save', function(next) {
     if (this.isModified('name')) {
         this.slug = this.name
             .toLowerCase()
@@ -75,22 +75,14 @@ categorySchema.pre('save', function(next) {
     next();
 });
 
-// Virtual: get subcategories in this category
-categorySchema.virtual('subcategories', {
-    ref: 'Subcategory',
-    localField: '_id',
-    foreignField: 'category',
-    justOne: false
-});
-
-// Virtual: get services in this category
-categorySchema.virtual('services', {
+// Virtual: get services in this subcategory
+subcategorySchema.virtual('services', {
     ref: 'Service',
     localField: '_id',
-    foreignField: 'category',
+    foreignField: 'subcategory',
     justOne: false
 });
 
-const Category = mongoose.model('Category', categorySchema);
+const Subcategory = mongoose.model('Subcategory', subcategorySchema);
 
-export default Category;
+export default Subcategory;

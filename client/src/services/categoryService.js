@@ -1,4 +1,4 @@
-// src/services/categoryService.js
+// src/services/categoryService.js - COMPLETE FILE
 
 import axiosInstance from '@/lib/axios';
 
