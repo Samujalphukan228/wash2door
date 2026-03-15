@@ -1,6 +1,8 @@
 "use client"
 
-import { useEffect, useRef, useState, useCallback, memo } from "react"
+import { useEffect, useState, useCallback, memo } from "react"
+import { motion, useInView, AnimatePresence } from "framer-motion"
+import { useRef } from "react"
 import { ArrowUpRight, ArrowRight, Shield, Clock, Sparkles } from "lucide-react"
 import { getCategories } from "@/lib/services.api"
 
@@ -11,82 +13,102 @@ const TRUST_ITEMS = [
   { icon: Sparkles, label: "Eco-Friendly", desc: "Products" },
 ]
 
-const ANIMATION_CONFIG = {
-  card: {
-    duration: 0.9,
-    stagger: 0.08,
-    ease: "power4.out",
-  },
-  header: {
-    duration: 0.8,
-    ease: "power3.out",
-  },
-  trust: {
-    duration: 0.6,
-    stagger: 0.1,
-    ease: "power3.out",
-  },
+const MAX_VISIBLE_SERVICES = 6
+
+// ── Animation Variants ─────────────────────────────────────
+const fadeInUp = {
+  hidden: { opacity: 0, y: 40 },
+  visible: { 
+    opacity: 1, 
+    y: 0,
+    transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] }
+  }
 }
 
-const MAX_VISIBLE_SERVICES = 3
+const fadeInLeft = {
+  hidden: { opacity: 0, x: -30 },
+  visible: { 
+    opacity: 1, 
+    x: 0,
+    transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] }
+  }
+}
 
-// ── Utils ──────────────────────────────────────────────────
-function getMobileVariant(index, total) {
+const scaleIn = {
+  hidden: { opacity: 0, scale: 0.95, y: 30 },
+  visible: { 
+    opacity: 1, 
+    scale: 1,
+    y: 0,
+    transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] }
+  }
+}
+
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+      delayChildren: 0.1
+    }
+  }
+}
+
+// ── Desktop Layout Config ──────────────────────────────────
+// Dynamic grid positions based on number of items
+const getDesktopLayout = (index, total) => {
+  // For 3 items: Featured left (2x2), stacked right (2x1 each)
+  if (total <= 3) {
+    if (index === 0) return { colSpan: 2, rowSpan: 2, variant: "featured" }
+    if (index === 1) return { colSpan: 2, rowSpan: 1, variant: "wide" }
+    if (index === 2) return { colSpan: 2, rowSpan: 1, variant: "wide" }
+  }
+  
+  // For 4 items: Featured (2x2), one tall (1x2), two small (1x1)
+  if (total === 4) {
+    if (index === 0) return { colSpan: 2, rowSpan: 2, variant: "featured" }
+    if (index === 1) return { colSpan: 1, rowSpan: 2, variant: "tall" }
+    if (index === 2) return { colSpan: 1, rowSpan: 1, variant: "default" }
+    if (index === 3) return { colSpan: 1, rowSpan: 1, variant: "default" }
+  }
+  
+  // For 5 items: Featured (2x2), tall (1x2), wide (2x1), two small
+  if (total === 5) {
+    if (index === 0) return { colSpan: 2, rowSpan: 2, variant: "featured" }
+    if (index === 1) return { colSpan: 1, rowSpan: 2, variant: "tall" }
+    if (index === 2) return { colSpan: 1, rowSpan: 1, variant: "default" }
+    if (index === 3) return { colSpan: 1, rowSpan: 1, variant: "default" }
+    if (index === 4) return { colSpan: 1, rowSpan: 1, variant: "default" }
+  }
+  
+  // For 6 items: Optimized bento layout
+  if (total >= 6) {
+    if (index === 0) return { colSpan: 2, rowSpan: 2, variant: "featured" }
+    if (index === 1) return { colSpan: 1, rowSpan: 1, variant: "default" }
+    if (index === 2) return { colSpan: 1, rowSpan: 1, variant: "default" }
+    if (index === 3) return { colSpan: 1, rowSpan: 1, variant: "default" }
+    if (index === 4) return { colSpan: 1, rowSpan: 1, variant: "default" }
+    if (index === 5) return { colSpan: 2, rowSpan: 1, variant: "wide" }
+  }
+  
+  return { colSpan: 1, rowSpan: 1, variant: "default" }
+}
+
+const getMobileLayout = (index, total) => {
   if (index === 0) return "large"
   if (index === 3 && total > 4) return "tall"
   if (index === 4 && total > 5) return "wide"
   return "default"
 }
 
-function getVariantClasses(variant) {
+const getMobileClasses = (variant) => {
   switch (variant) {
-    case "large":
-      return "col-span-2 row-span-2"
-    case "tall":
-      return "row-span-2"
-    case "wide":
-      return "col-span-2"
-    default:
-      return ""
+    case "large": return "col-span-2 row-span-2"
+    case "tall": return "row-span-2"
+    case "wide": return "col-span-2"
+    default: return ""
   }
-}
-
-// ── Shared Hook: GSAP ScrollTrigger Animation ──────────────
-function useScrollAnimation(ref, config, deps = []) {
-  useEffect(() => {
-    if (!ref.current) return
-
-    let ctx
-    let observer
-
-    const init = async () => {
-      observer = new IntersectionObserver(
-        async (entries) => {
-          if (entries[0].isIntersecting) {
-            observer.disconnect()
-
-            const { default: gsap } = await import("gsap")
-            const { ScrollTrigger } = await import("gsap/ScrollTrigger")
-            gsap.registerPlugin(ScrollTrigger)
-
-            ctx = gsap.context(() => {
-              config(gsap, ScrollTrigger)
-            })
-          }
-        },
-        { rootMargin: "100px" }
-      )
-
-      observer.observe(ref.current)
-    }
-
-    init()
-
-    return () => {
-      observer?.disconnect()
-      ctx?.revert()
-    }
-  }, deps)
 }
 
 // ── Subcomponents ──────────────────────────────────────────
@@ -111,10 +133,7 @@ const ServiceBadge = memo(function ServiceBadge({ count, size = "sm" }) {
   )
 })
 
-const ArrowButton = memo(function ArrowButton({
-  size = "sm",
-  animated = false,
-}) {
+const ArrowButton = memo(function ArrowButton({ size = "sm", animated = false }) {
   const dimensions = size === "lg" ? "w-12 h-12" : size === "md" ? "w-10 h-10" : "w-9 h-9"
   const iconSize = size === "lg" ? 18 : size === "md" ? 16 : 14
 
@@ -123,34 +142,37 @@ const ArrowButton = memo(function ArrowButton({
       className={`${dimensions} rounded-full bg-white/10 backdrop-blur-md
                   border border-white/10 flex items-center justify-center
                   ${animated
-          ? "group-hover:bg-white group-hover:border-white group-hover:scale-110 transition-all duration-500"
-          : ""
-        }`}
+                    ? "group-hover:bg-white group-hover:border-white group-hover:scale-110 transition-all duration-500"
+                    : ""
+                  }`}
     >
       <ArrowUpRight
         size={iconSize}
         strokeWidth={1.5}
         className={`text-white ${animated
-            ? "group-hover:text-black group-hover:rotate-45 transition-all duration-500"
-            : ""
-          }`}
+          ? "group-hover:text-black group-hover:rotate-45 transition-all duration-500"
+          : ""
+        }`}
       />
     </div>
   )
 })
 
 const CardImage = memo(function CardImage({ src, alt, icon, size = "md", animated = false }) {
-  if (src) {
+  const [hasError, setHasError] = useState(false)
+
+  if (src && !hasError) {
     return (
       <img
         src={src}
         alt={alt}
         className={`w-full h-full object-cover ${animated
-            ? "transition-transform duration-[800ms] ease-out group-hover:scale-110"
-            : ""
-          }`}
+          ? "transition-transform duration-[800ms] ease-out group-hover:scale-110"
+          : ""
+        }`}
         loading="lazy"
         decoding="async"
+        onError={() => setHasError(true)}
       />
     )
   }
@@ -166,12 +188,7 @@ const CardImage = memo(function CardImage({ src, alt, icon, size = "md", animate
 
 // ── Mobile Service Card ────────────────────────────────────
 
-const MobileServiceCard = memo(function MobileServiceCard({
-  category,
-  index,
-  variant = "default",
-}) {
-  const cardRef = useRef(null)
+const MobileServiceCard = memo(function MobileServiceCard({ category, index, variant = "default" }) {
   const image = category.image?.url
 
   const isLarge = variant === "large"
@@ -179,42 +196,14 @@ const MobileServiceCard = memo(function MobileServiceCard({
   const isWide = variant === "wide"
   const isExpanded = isLarge || isTall || isWide
 
-  useScrollAnimation(
-    cardRef,
-    (gsap, ScrollTrigger) => {
-      gsap.fromTo(
-        cardRef.current,
-        {
-          y: 40,
-          opacity: 0,
-          scale: 0.97,
-        },
-        {
-          y: 0,
-          opacity: 1,
-          scale: 1,
-          duration: ANIMATION_CONFIG.card.duration,
-          ease: ANIMATION_CONFIG.card.ease,
-          delay: index * ANIMATION_CONFIG.card.stagger,
-          scrollTrigger: {
-            trigger: cardRef.current,
-            start: "top 95%",
-            once: true,
-          },
-        }
-      )
-    },
-    [index]
-  )
-
   return (
-    <a
-      ref={cardRef}
+    <motion.a
       href={`/services?category=${category._id}`}
+      variants={scaleIn}
       className={`group block relative overflow-hidden rounded-2xl
                   active:scale-[0.98] transition-transform duration-200
-                  no-underline opacity-0 will-change-transform
-                  ${getVariantClasses(variant)}`}
+                  no-underline will-change-transform
+                  ${getMobileClasses(variant)}`}
       style={{ WebkitTapHighlightColor: "transparent" }}
     >
       <div className="absolute inset-0 bg-gray-100">
@@ -275,61 +264,50 @@ const MobileServiceCard = memo(function MobileServiceCard({
           )}
         </div>
       </div>
-    </a>
+    </motion.a>
   )
 })
 
-// ── Desktop Service Card - REDESIGNED ──────────────────────
+// ── Desktop Service Card ───────────────────────────────────
 
-const DesktopServiceCard = memo(function DesktopServiceCard({
-  category,
-  index,
-  variant = "default",
-}) {
-  const cardRef = useRef(null)
+const DesktopServiceCard = memo(function DesktopServiceCard({ category, index, layout }) {
   const image = category.image?.url
+  const { colSpan, rowSpan, variant } = layout
+  
   const isFeatured = variant === "featured"
+  const isWide = variant === "wide"
+  const isTall = variant === "tall"
 
-  useScrollAnimation(
-    cardRef,
-    (gsap, ScrollTrigger) => {
-      gsap.fromTo(
-        cardRef.current,
-        {
-          y: 80,
-          opacity: 0,
-          rotateX: 8,
-        },
-        {
-          y: 0,
-          opacity: 1,
-          rotateX: 0,
-          duration: ANIMATION_CONFIG.card.duration,
-          ease: ANIMATION_CONFIG.card.ease,
-          delay: index * 0.12,
-          scrollTrigger: {
-            trigger: cardRef.current,
-            start: "top 92%",
-            once: true,
-          },
-        }
-      )
-    },
-    [index]
-  )
+  const gridClasses = `col-span-${colSpan} row-span-${rowSpan}`
+  
+  // Determine content sizing based on variant
+  const getPadding = () => {
+    if (isFeatured) return "p-8 lg:p-10"
+    if (isWide) return "p-6 lg:p-8"
+    if (isTall) return "p-6"
+    return "p-5 lg:p-6"
+  }
+
+  const getTitleSize = () => {
+    if (isFeatured) return "clamp(28px, 3vw, 40px)"
+    if (isWide) return "clamp(22px, 2.5vw, 28px)"
+    if (isTall) return "clamp(20px, 2vw, 26px)"
+    return "clamp(18px, 1.8vw, 22px)"
+  }
 
   return (
-    <a
-      ref={cardRef}
+    <motion.a
       href={`/services?category=${category._id}`}
-      className={`group block relative overflow-hidden no-underline opacity-0 will-change-transform
-                  ${isFeatured 
-                    ? "col-span-2 row-span-2 rounded-[2rem]" 
-                    : "rounded-3xl"
-                  }`}
+      variants={scaleIn}
+      className={`group block relative overflow-hidden no-underline will-change-transform
+                  ${isFeatured ? "rounded-[2rem]" : "rounded-3xl"}
+                  ${colSpan === 2 ? "col-span-2" : "col-span-1"}
+                  ${rowSpan === 2 ? "row-span-2" : "row-span-1"}`}
       style={{ perspective: "1000px" }}
+      whileHover={{ y: -4 }}
+      transition={{ duration: 0.3 }}
     >
-      {/* Image with parallax-like zoom */}
+      {/* Image */}
       <div className="absolute inset-0 bg-gray-100 overflow-hidden">
         <CardImage
           src={image}
@@ -340,17 +318,17 @@ const DesktopServiceCard = memo(function DesktopServiceCard({
         />
       </div>
 
-      {/* Gradient overlay - more dramatic on hover */}
+      {/* Gradient overlay */}
       <div
         className={`absolute inset-0 transition-all duration-700
                     ${isFeatured 
-                      ? "bg-gradient-to-t from-black/80 via-black/20 to-black/5 group-hover:from-black/90 group-hover:via-black/40" 
-                      : "bg-gradient-to-t from-black/75 via-black/30 to-transparent group-hover:from-black/85"
+                      ? "bg-gradient-to-t from-black/85 via-black/30 to-black/5 group-hover:from-black/90 group-hover:via-black/40" 
+                      : "bg-gradient-to-t from-black/80 via-black/25 to-transparent group-hover:from-black/85"
                     }`}
         aria-hidden="true"
       />
 
-      {/* Shine effect on hover */}
+      {/* Shine effect */}
       <div 
         className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700
                    bg-gradient-to-tr from-transparent via-white/5 to-transparent"
@@ -358,17 +336,16 @@ const DesktopServiceCard = memo(function DesktopServiceCard({
       />
 
       {/* Content */}
-      <div className={`relative z-10 h-full flex flex-col justify-between
-                       ${isFeatured ? "p-8 lg:p-10" : "p-6 lg:p-7"}`}>
+      <div className={`relative z-10 h-full flex flex-col justify-between ${getPadding()}`}>
         
         {/* Top Row */}
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <ServiceBadge count={category.totalServices} size="lg" />
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <ServiceBadge count={category.totalServices} size={isFeatured ? "lg" : "sm"} />
             {isFeatured && (
               <span 
                 className="px-3 py-1 rounded-full bg-white/20 backdrop-blur-md
-                           text-white/80 tracking-wider uppercase"
+                           text-white/80 tracking-wider uppercase hidden sm:inline-flex"
                 style={{ fontSize: "9px", fontWeight: 500 }}
               >
                 Popular
@@ -379,12 +356,12 @@ const DesktopServiceCard = memo(function DesktopServiceCard({
         </div>
 
         {/* Bottom Content */}
-        <div className={`${isFeatured ? "max-w-md" : ""}`}>
+        <div className={isFeatured ? "max-w-lg" : ""}>
           {/* Category icon */}
           {category.icon && (
             <span 
-              className={`block mb-3 transition-transform duration-500 group-hover:scale-110 origin-left
-                          ${isFeatured ? "text-3xl" : "text-xl"}`}
+              className={`block mb-2 transition-transform duration-500 group-hover:scale-110 origin-left
+                          ${isFeatured ? "text-3xl" : isWide || isTall ? "text-2xl" : "text-xl"}`}
               aria-hidden="true"
             >
               {category.icon}
@@ -393,32 +370,34 @@ const DesktopServiceCard = memo(function DesktopServiceCard({
 
           {/* Title */}
           <h3
-            className="text-white mb-2 transition-transform duration-500 group-hover:translate-x-1"
+            className="text-white mb-1.5 transition-transform duration-500 group-hover:translate-x-1"
             style={{
               fontFamily: 'Georgia, "Times New Roman", serif',
               fontWeight: 400,
-              fontSize: isFeatured ? "clamp(28px, 3vw, 36px)" : "clamp(20px, 2vw, 24px)",
+              fontSize: getTitleSize(),
               letterSpacing: "-0.02em",
-              lineHeight: 1.1,
+              lineHeight: 1.15,
             }}
           >
             {category.name}
           </h3>
 
-          {/* Description */}
+          {/* Description - show more lines for larger cards */}
           {category.description && (
             <p
               className={`text-white/50 leading-relaxed transition-all duration-500
                           group-hover:text-white/70
-                          ${isFeatured ? "line-clamp-3 text-sm lg:text-base" : "line-clamp-2 text-sm"}`}
+                          ${isFeatured ? "line-clamp-3 text-sm lg:text-base" : 
+                            isWide ? "line-clamp-2 text-sm" : 
+                            isTall ? "line-clamp-3 text-sm" : "line-clamp-2 text-xs"}`}
             >
               {category.description}
             </p>
           )}
 
-          {/* CTA hint - only on featured */}
-          {isFeatured && (
-            <div className="mt-6 flex items-center gap-2 text-white/40 group-hover:text-white/70 transition-colors duration-500">
+          {/* CTA hint - for featured and wide */}
+          {(isFeatured || isWide) && (
+            <div className="mt-4 flex items-center gap-2 text-white/40 group-hover:text-white/70 transition-colors duration-500">
               <span className="text-xs tracking-wider uppercase">Explore services</span>
               <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform duration-300" />
             </div>
@@ -428,67 +407,63 @@ const DesktopServiceCard = memo(function DesktopServiceCard({
 
       {/* Border glow on hover */}
       <div 
-        className={`absolute inset-0 rounded-[inherit] opacity-0 group-hover:opacity-100 
-                    transition-opacity duration-500 pointer-events-none
-                    ${isFeatured 
-                      ? "shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)]" 
-                      : "shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]"
-                    }`}
+        className="absolute inset-0 rounded-[inherit] opacity-0 group-hover:opacity-100 
+                   transition-opacity duration-500 pointer-events-none
+                   shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)]"
         aria-hidden="true"
       />
-    </a>
+    </motion.a>
   )
 })
 
 // ── Skeleton Loaders ───────────────────────────────────────
 
-const SkeletonCard = memo(function SkeletonCard({ variant = "default", desktop = false }) {
+const SkeletonCard = memo(function SkeletonCard({ colSpan = 1, rowSpan = 1, mobile = false }) {
   const baseClasses = "bg-gradient-to-br from-gray-100 to-gray-50 animate-pulse"
 
-  if (desktop) {
-    return (
-      <div
-        className={`${baseClasses} 
-          ${variant === "featured" 
-            ? "col-span-2 row-span-2 rounded-[2rem]" 
-            : "rounded-3xl"
-          }`}
-      />
-    )
+  if (mobile) {
+    return <div className={`${baseClasses} rounded-2xl`} />
   }
 
-  return <div className={`${baseClasses} rounded-2xl ${getVariantClasses(variant)}`} />
+  return (
+    <div 
+      className={`${baseClasses} rounded-3xl
+                  ${colSpan === 2 ? "col-span-2" : "col-span-1"}
+                  ${rowSpan === 2 ? "row-span-2" : "row-span-1"}`} 
+    />
+  )
 })
 
-function LoadingGrid() {
+const LoadingGrid = memo(function LoadingGrid() {
   return (
     <>
       {/* Mobile */}
       <div className="md:hidden grid grid-cols-2 gap-3 auto-rows-[140px]">
-        <SkeletonCard variant="large" />
-        <SkeletonCard />
-        <SkeletonCard />
+        <div className="col-span-2 row-span-2 bg-gradient-to-br from-gray-100 to-gray-50 animate-pulse rounded-2xl" />
+        <div className="bg-gradient-to-br from-gray-100 to-gray-50 animate-pulse rounded-2xl" />
+        <div className="bg-gradient-to-br from-gray-100 to-gray-50 animate-pulse rounded-2xl" />
       </div>
 
       {/* Desktop */}
-      <div className="hidden md:grid md:grid-cols-4 gap-5 lg:gap-6 auto-rows-[200px] lg:auto-rows-[220px]">
-        <SkeletonCard variant="featured" desktop />
-        <SkeletonCard desktop />
-        <SkeletonCard desktop />
+      <div className="hidden md:grid md:grid-cols-4 gap-5 lg:gap-6 auto-rows-[180px] lg:auto-rows-[200px]">
+        <SkeletonCard colSpan={2} rowSpan={2} />
+        <SkeletonCard colSpan={2} rowSpan={1} />
+        <SkeletonCard colSpan={2} rowSpan={1} />
       </div>
     </>
   )
-}
+})
 
 // ── Trust Bar ──────────────────────────────────────────────
 
-const TrustItem = memo(function TrustItem({ icon: Icon, label, desc }) {
+const TrustItem = memo(function TrustItem({ icon: Icon, label, desc, index }) {
   return (
-    <div
-      className="opacity-0 flex flex-col items-center text-center p-3 sm:p-4
+    <motion.div
+      variants={fadeInUp}
+      className="flex flex-col items-center text-center p-3 sm:p-4
                  rounded-2xl bg-gray-50/80 hover:bg-gray-100/80
                  sm:flex-row sm:items-center sm:text-left sm:gap-3
-                 will-change-transform transition-colors duration-300"
+                 transition-colors duration-300"
     >
       <div
         className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white shadow-sm
@@ -507,56 +482,42 @@ const TrustItem = memo(function TrustItem({ icon: Icon, label, desc }) {
           {desc}
         </p>
       </div>
-    </div>
+    </motion.div>
   )
 })
 
-function TrustBar() {
+const TrustBar = memo(function TrustBar() {
   const ref = useRef(null)
-
-  useScrollAnimation(
-    ref,
-    (gsap, ScrollTrigger) => {
-      gsap.fromTo(
-        ref.current.children,
-        { y: 25, opacity: 0 },
-        {
-          y: 0,
-          opacity: 1,
-          duration: ANIMATION_CONFIG.trust.duration,
-          stagger: ANIMATION_CONFIG.trust.stagger,
-          ease: ANIMATION_CONFIG.trust.ease,
-          scrollTrigger: {
-            trigger: ref.current,
-            start: "top 94%",
-            once: true,
-          },
-        }
-      )
-    },
-    []
-  )
+  const isInView = useInView(ref, { once: true, margin: "-50px" })
 
   return (
-    <div
+    <motion.div
       ref={ref}
+      initial="hidden"
+      animate={isInView ? "visible" : "hidden"}
+      variants={staggerContainer}
       className="grid grid-cols-3 gap-2 sm:gap-5 mt-10 md:mt-20 pt-8 md:pt-12
                  border-t border-gray-100"
     >
       {TRUST_ITEMS.map((item, i) => (
-        <TrustItem key={i} {...item} />
+        <TrustItem key={i} index={i} {...item} />
       ))}
-    </div>
+    </motion.div>
   )
-}
+})
 
 // ── Empty / Error States ───────────────────────────────────
 
-function EmptyState({ type = "empty", onRetry }) {
+const EmptyState = memo(function EmptyState({ type = "empty", onRetry }) {
   const isError = type === "error"
 
   return (
-    <div className="text-center py-16 md:py-24">
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="text-center py-16 md:py-24"
+    >
       <div
         className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-gray-50
                    flex items-center justify-center"
@@ -576,28 +537,39 @@ function EmptyState({ type = "empty", onRetry }) {
       </p>
 
       {isError && onRetry && (
-        <button
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.97 }}
           onClick={onRetry}
           className="h-12 px-8 bg-black text-white rounded-full
                      tracking-wider uppercase hover:bg-gray-800
-                     active:scale-[0.97] transition-all duration-300"
+                     transition-colors duration-300"
           style={{ fontSize: "11px", fontWeight: 500 }}
         >
           Try Again
-        </button>
+        </motion.button>
       )}
-    </div>
+    </motion.div>
   )
-}
+})
 
 // ── Section Header ─────────────────────────────────────────
 
-function SectionHeader({ eyebrowRef, headingRef, descRef }) {
+const SectionHeader = memo(function SectionHeader() {
+  const ref = useRef(null)
+  const isInView = useInView(ref, { once: true, margin: "-100px" })
+
   return (
-    <header className="mb-10 md:mb-16 lg:mb-20">
-      <div
-        ref={eyebrowRef}
-        className="flex items-center gap-4 mb-4 md:mb-6 opacity-0"
+    <motion.header 
+      ref={ref}
+      initial="hidden"
+      animate={isInView ? "visible" : "hidden"}
+      variants={staggerContainer}
+      className="mb-10 md:mb-16 lg:mb-20"
+    >
+      <motion.div
+        variants={fadeInLeft}
+        className="flex items-center gap-4 mb-4 md:mb-6"
       >
         <span className="block w-10 h-px bg-black" aria-hidden="true" />
         <span
@@ -606,12 +578,13 @@ function SectionHeader({ eyebrowRef, headingRef, descRef }) {
         >
           Our Services
         </span>
-      </div>
+      </motion.div>
 
       <div className="md:flex md:items-end md:justify-between md:gap-8">
-        <h2
-          ref={headingRef}
-          className="text-black mb-4 md:mb-0 opacity-0"
+        <motion.h2
+          variants={fadeInUp}
+          id="services-heading"
+          className="text-black mb-4 md:mb-0"
           style={{
             fontFamily: 'Georgia, "Times New Roman", serif',
             fontWeight: 300,
@@ -621,56 +594,43 @@ function SectionHeader({ eyebrowRef, headingRef, descRef }) {
           }}
         >
           What We<br className="hidden sm:block" /> Offer
-        </h2>
+        </motion.h2>
 
-        <p
-          ref={descRef}
-          className="text-gray-400 max-w-sm leading-relaxed opacity-0 md:text-right"
+        <motion.p
+          variants={fadeInUp}
+          className="text-gray-400 max-w-sm leading-relaxed md:text-right"
           style={{ fontSize: "15px" }}
         >
           Premium car care solutions crafted for perfection, delivered right to your doorstep.
-        </p>
+        </motion.p>
       </div>
-    </header>
+    </motion.header>
   )
-}
+})
 
 // ── View All Button ────────────────────────────────────────
 
-function ViewAllButton() {
+const ViewAllButton = memo(function ViewAllButton() {
   const ref = useRef(null)
-
-  useScrollAnimation(
-    ref,
-    (gsap, ScrollTrigger) => {
-      gsap.fromTo(
-        ref.current,
-        { y: 20, opacity: 0 },
-        {
-          y: 0,
-          opacity: 1,
-          duration: 0.6,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: ref.current,
-            start: "top 95%",
-            once: true,
-          },
-        }
-      )
-    },
-    []
-  )
+  const isInView = useInView(ref, { once: true, margin: "-50px" })
 
   return (
-    <div ref={ref} className="flex justify-center mt-10 md:mt-16 opacity-0">
-      <a
+    <motion.div 
+      ref={ref}
+      initial={{ opacity: 0, y: 20 }}
+      animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+      transition={{ duration: 0.6, delay: 0.2 }}
+      className="flex justify-center mt-10 md:mt-16"
+    >
+      <motion.a
         href="/services"
+        whileHover={{ scale: 1.02, y: -2 }}
+        whileTap={{ scale: 0.98 }}
         className="group relative flex items-center justify-center gap-3
                    w-full sm:w-auto h-14 sm:h-16 px-10
                    bg-black text-white rounded-full overflow-hidden
                    hover:shadow-xl hover:shadow-black/10
-                   active:scale-[0.98] transition-all duration-500 no-underline"
+                   transition-shadow duration-500 no-underline"
       >
         {/* Hover background sweep */}
         <div 
@@ -690,10 +650,50 @@ function ViewAllButton() {
           strokeWidth={1.5}
           className="relative z-10 group-hover:translate-x-1 transition-transform duration-300"
         />
-      </a>
-    </div>
+      </motion.a>
+    </motion.div>
   )
-}
+})
+
+// ── Services Grid ──────────────────────────────────────────
+
+const ServicesGrid = memo(function ServicesGrid({ categories }) {
+  const ref = useRef(null)
+  const isInView = useInView(ref, { once: true, margin: "-50px" })
+
+  return (
+    <motion.div
+      ref={ref}
+      initial="hidden"
+      animate={isInView ? "visible" : "hidden"}
+      variants={staggerContainer}
+    >
+      {/* Mobile Grid */}
+      <div className="md:hidden grid grid-cols-2 gap-3 auto-rows-[140px]">
+        {categories.map((category, i) => (
+          <MobileServiceCard
+            key={category._id}
+            category={category}
+            index={i}
+            variant={getMobileLayout(i, categories.length)}
+          />
+        ))}
+      </div>
+
+      {/* Desktop Grid - Optimized Bento Layout */}
+      <div className="hidden md:grid md:grid-cols-4 gap-5 lg:gap-6 auto-rows-[180px] lg:auto-rows-[200px]">
+        {categories.map((category, i) => (
+          <DesktopServiceCard
+            key={category._id}
+            category={category}
+            index={i}
+            layout={getDesktopLayout(i, categories.length)}
+          />
+        ))}
+      </div>
+    </motion.div>
+  )
+})
 
 // ── Main Component ─────────────────────────────────────────
 
@@ -702,11 +702,6 @@ export default function Services() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
 
-  const eyebrowRef = useRef(null)
-  const headingRef = useRef(null)
-  const descRef = useRef(null)
-  const headerAnimated = useRef(false)
-
   const fetchCategories = useCallback(async () => {
     setLoading(true)
     setError(false)
@@ -714,7 +709,10 @@ export default function Services() {
     try {
       const data = await getCategories()
       setCategories(Array.isArray(data) ? data : [])
-    } catch {
+    } catch (err) {
+      if (process.env.NODE_ENV === "development") {
+        console.error("Failed to fetch categories:", err)
+      }
       setError(true)
       setCategories([])
     } finally {
@@ -723,63 +721,32 @@ export default function Services() {
   }, [])
 
   useEffect(() => {
-    fetchCategories()
-  }, [fetchCategories])
-
-  useEffect(() => {
-    if (loading || headerAnimated.current) return
-
-    let ctx
-
-    const init = async () => {
-      const { default: gsap } = await import("gsap")
-      const { ScrollTrigger } = await import("gsap/ScrollTrigger")
-      gsap.registerPlugin(ScrollTrigger)
-
-      if (!headingRef.current) return
-
-      ctx = gsap.context(() => {
-        const tl = gsap.timeline({
-          scrollTrigger: {
-            trigger: headingRef.current,
-            start: "top 88%",
-            once: true,
-          },
-          defaults: { ease: ANIMATION_CONFIG.header.ease },
-        })
-
-        if (eyebrowRef.current) {
-          tl.fromTo(
-            eyebrowRef.current,
-            { x: -30, opacity: 0 },
-            { x: 0, opacity: 1, duration: 0.6 }
-          )
+    let isMounted = true
+    
+    const load = async () => {
+      try {
+        const data = await getCategories()
+        if (isMounted) {
+          setCategories(Array.isArray(data) ? data : [])
+          setLoading(false)
         }
-
-        tl.fromTo(
-          headingRef.current,
-          { y: 50, opacity: 0 },
-          { y: 0, opacity: 1, duration: ANIMATION_CONFIG.header.duration },
-          0.05
-        )
-
-        if (descRef.current) {
-          tl.fromTo(
-            descRef.current,
-            { y: 30, opacity: 0 },
-            { y: 0, opacity: 1, duration: 0.7 },
-            0.15
-          )
+      } catch (err) {
+        if (isMounted) {
+          if (process.env.NODE_ENV === "development") {
+            console.error("Failed to fetch categories:", err)
+          }
+          setError(true)
+          setLoading(false)
         }
-      })
-
-      headerAnimated.current = true
+      }
     }
 
-    init()
-
-    return () => ctx?.revert()
-  }, [loading])
+    load()
+    
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   const visibleCategories = categories.slice(0, MAX_VISIBLE_SERVICES)
 
@@ -790,48 +757,49 @@ export default function Services() {
       aria-labelledby="services-heading"
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-8 md:px-12 lg:px-16">
-        <SectionHeader
-          eyebrowRef={eyebrowRef}
-          headingRef={headingRef}
-          descRef={descRef}
-        />
+        <SectionHeader />
 
-        {loading ? (
-          <LoadingGrid />
-        ) : error ? (
-          <EmptyState type="error" onRetry={fetchCategories} />
-        ) : categories.length === 0 ? (
-          <EmptyState type="empty" />
-        ) : (
-          <>
-            {/* Mobile Grid */}
-            <div className="md:hidden grid grid-cols-2 gap-3 auto-rows-[140px]">
-              {visibleCategories.map((category, i) => (
-                <MobileServiceCard
-                  key={category._id}
-                  category={category}
-                  index={i}
-                  variant={getMobileVariant(i, visibleCategories.length)}
-                />
-              ))}
-            </div>
-
-            {/* ✨ Desktop Grid - Asymmetric Bento Layout */}
-            <div className="hidden md:grid md:grid-cols-4 gap-5 lg:gap-6 auto-rows-[200px] lg:auto-rows-[220px]">
-              {visibleCategories.map((category, i) => (
-                <DesktopServiceCard
-                  key={category._id}
-                  category={category}
-                  index={i}
-                  variant={i === 0 ? "featured" : "default"}
-                />
-              ))}
-            </div>
-
-            <ViewAllButton />
-            <TrustBar />
-          </>
-        )}
+        <AnimatePresence mode="wait">
+          {loading ? (
+            <motion.div
+              key="loading"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <LoadingGrid />
+            </motion.div>
+          ) : error ? (
+            <motion.div
+              key="error"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <EmptyState type="error" onRetry={fetchCategories} />
+            </motion.div>
+          ) : categories.length === 0 ? (
+            <motion.div
+              key="empty"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <EmptyState type="empty" />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="content"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <ServicesGrid categories={visibleCategories} />
+              <ViewAllButton />
+              <TrustBar />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </section>
   )

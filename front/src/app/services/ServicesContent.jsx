@@ -1,7 +1,8 @@
 "use client"
 
-import { useEffect, useRef, useState, memo, useCallback } from "react"
+import { useEffect, useState, memo, useCallback, useMemo } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
+import { motion, AnimatePresence } from "framer-motion"
 import {
   ArrowRight,
   CheckCircle,
@@ -14,108 +15,54 @@ import {
 import { getPublicServices, getCategories } from "@/lib/services.api"
 
 // ── Constants ──────────────────────────────────────────────
-const ANIMATION_CONFIG = {
-  duration: 0.8,
-  stagger: 0.1,
-  ease: "power4.out",
-}
-
 const PHONE_NUMBER = "6900706456"
 
-// ── GSAP Loader (cached) ──────────────────────────────────
-let cachedGsap = null
-let scrollTriggerLoaded = false
-
-async function loadGsap() {
-  if (!cachedGsap) {
-    const { default: gsap } = await import("gsap")
-    cachedGsap = gsap
+// ── Animation Variants ─────────────────────────────────────
+const fadeInUp = {
+  hidden: { opacity: 0, y: 30 },
+  visible: { 
+    opacity: 1, 
+    y: 0,
+    transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] }
   }
-  return cachedGsap
 }
 
-async function loadGsapWithScrollTrigger() {
-  const gsap = await loadGsap()
-  if (!scrollTriggerLoaded) {
-    const { ScrollTrigger } = await import("gsap/ScrollTrigger")
-    gsap.registerPlugin(ScrollTrigger)
-    scrollTriggerLoaded = true
-  }
-  return gsap
-}
-
-// ── Scrollbar Hide Styles ─────────────────────────────────
-const SCROLLBAR_HIDE_CLASS = "services-hide-scrollbar"
-let scrollbarStyleInjected = false
-
-function injectScrollbarStyles() {
-  if (scrollbarStyleInjected || typeof document === "undefined") return
-  const style = document.createElement("style")
-  style.textContent = `.${SCROLLBAR_HIDE_CLASS}::-webkit-scrollbar { display: none; }`
-  document.head.appendChild(style)
-  scrollbarStyleInjected = true
-}
-
-// ── Visibility helper ─────────────────────────────────────
-function makeFallbackVisible(element) {
-  if (!element) return
-  element.style.opacity = "1"
-  element.style.transform = "none"
-  element.classList.remove("opacity-0")
-}
-
-// ── Custom Hook: Scroll Animation ──────────────────────────
-function useScrollAnimation(elementRef, config) {
-  const configRef = useRef(config)
-  useEffect(() => {
-    configRef.current = config
-  })
-
-  useEffect(() => {
-    const element = elementRef.current
-    if (!element) return
-
-    let ctx
-    let observer
-    let fallbackTimer
-    let mounted = true
-
-    observer = new IntersectionObserver(
-      async (entries) => {
-        if (entries[0].isIntersecting) {
-          observer.disconnect()
-
-          fallbackTimer = setTimeout(() => {
-            if (mounted) makeFallbackVisible(element)
-          }, 3000)
-
-          try {
-            const gsap = await loadGsapWithScrollTrigger()
-            if (!mounted) return
-            clearTimeout(fallbackTimer)
-
-            ctx = gsap.context(() => {
-              configRef.current(gsap)
-            })
-          } catch {
-            clearTimeout(fallbackTimer)
-            if (mounted) makeFallbackVisible(element)
-          }
-        }
-      },
-      { rootMargin: "50px" }
-    )
-
-    observer.observe(element)
-
-    return () => {
-      mounted = false
-      if (fallbackTimer) clearTimeout(fallbackTimer)
-      observer?.disconnect()
-      ctx?.revert()
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+      delayChildren: 0.1
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }
+}
+
+const slideInLeft = {
+  hidden: { opacity: 0, x: -40 },
+  visible: { 
+    opacity: 1, 
+    x: 0,
+    transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] }
+  }
+}
+
+const slideInRight = {
+  hidden: { opacity: 0, x: 40 },
+  visible: { 
+    opacity: 1, 
+    x: 0,
+    transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] }
+  }
+}
+
+const scaleIn = {
+  hidden: { opacity: 0, scale: 0.95 },
+  visible: { 
+    opacity: 1, 
+    scale: 1,
+    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] }
+  }
 }
 
 // ── Helper Functions ───────────────────────────────────────
@@ -138,8 +85,7 @@ const ServiceImage = memo(function ServiceImage({
   if (!src || hasError) {
     return (
       <div
-        className={`w-full h-full flex items-center justify-center 
-                    bg-gradient-to-br from-gray-50 to-gray-100 ${className}`}
+        className={`w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 ${className}`}
       >
         <span className="text-5xl">{fallbackIcon || "📦"}</span>
       </div>
@@ -197,7 +143,12 @@ const SkeletonSection = memo(function SkeletonSection() {
 // ── Empty State ────────────────────────────────────────────
 const EmptyState = memo(function EmptyState() {
   return (
-    <div className="flex flex-col items-center justify-center py-20 md:py-32 px-4">
+    <motion.div 
+      className="flex flex-col items-center justify-center py-20 md:py-32 px-4"
+      initial="hidden"
+      animate="visible"
+      variants={fadeInUp}
+    >
       <div className="w-20 h-20 bg-gray-50 rounded-2xl flex items-center justify-center mb-6">
         <span className="text-3xl">🧹</span>
       </div>
@@ -235,7 +186,7 @@ const EmptyState = memo(function EmptyState() {
         </span>
         <ArrowRight size={14} />
       </a>
-    </div>
+    </motion.div>
   )
 })
 
@@ -245,49 +196,51 @@ const CategoryFilter = memo(function CategoryFilter({
   activeCategory,
   onCategoryChange,
 }) {
-  useEffect(() => {
-    injectScrollbarStyles()
-  }, [])
-
   return (
     <div className="-mx-5 px-5 md:mx-0 md:px-0">
       <div
-        className={`flex gap-2 md:gap-2.5 overflow-x-auto pb-2 md:pb-0 md:flex-wrap
-                    snap-x snap-mandatory ${SCROLLBAR_HIDE_CLASS}`}
+        className="flex gap-2 md:gap-2.5 overflow-x-auto pb-2 md:pb-0 md:flex-wrap snap-x snap-mandatory"
         style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
-        <button
+        <style jsx>{`
+          div::-webkit-scrollbar {
+            display: none;
+          }
+        `}</style>
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
           onClick={() => onCategoryChange(null)}
           className={`shrink-0 snap-start tracking-[0.18em] uppercase
-                     px-5 py-2.5 border rounded-full transition-all duration-300
+                     px-5 py-2.5 border rounded-full transition-colors duration-300
                      whitespace-nowrap min-h-[44px]
-                     ${
-                       !activeCategory
-                         ? "bg-white text-black border-white"
-                         : "text-white/70 border-white/20 hover:border-white/50 hover:text-white"
+                     ${!activeCategory
+                       ? "bg-white text-black border-white"
+                       : "text-white/70 border-white/20 hover:border-white/50 hover:text-white"
                      }`}
           style={{ fontSize: "10px", fontWeight: 500 }}
         >
           All Services
-        </button>
+        </motion.button>
 
         {categories.map((cat) => (
-          <button
+          <motion.button
             key={cat._id}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => onCategoryChange(cat._id)}
             className={`shrink-0 snap-start tracking-[0.18em] uppercase
-                       px-5 py-2.5 border rounded-full transition-all duration-300
+                       px-5 py-2.5 border rounded-full transition-colors duration-300
                        flex items-center gap-2 whitespace-nowrap min-h-[44px]
-                       ${
-                         activeCategory === cat._id
-                           ? "bg-white text-black border-white"
-                           : "text-white/70 border-white/20 hover:border-white/50 hover:text-white"
+                       ${activeCategory === cat._id
+                         ? "bg-white text-black border-white"
+                         : "text-white/70 border-white/20 hover:border-white/50 hover:text-white"
                        }`}
             style={{ fontSize: "10px", fontWeight: 500 }}
           >
             {cat.icon && <span className="text-sm">{cat.icon}</span>}
             {cat.name}
-          </button>
+          </motion.button>
         ))}
       </div>
     </div>
@@ -343,44 +296,27 @@ const ServiceVariant = memo(function ServiceVariant({ variant }) {
 
 // ── Mobile Service Card ────────────────────────────────────
 const MobileServiceCard = memo(function MobileServiceCard({ service, index }) {
-  const cardRef = useRef(null)
   const [showVariants, setShowVariants] = useState(false)
   const variantsId = `variants-mobile-${service._id}`
 
-  const image =
-    getImageUrl(service.primaryImage) || getImageUrl(service.images?.[0])
+  const image = getImageUrl(service.primaryImage) || getImageUrl(service.images?.[0])
   const categoryName = service.category?.name || ""
   const categoryIcon = service.category?.icon || ""
 
-  const activeVariants = service.variants
-    ? service.variants.filter((v) => v.isActive !== false)
-    : []
+  const activeVariants = useMemo(() => 
+    service.variants?.filter((v) => v.isActive !== false) || [],
+    [service.variants]
+  )
 
   const highlights = service.highlights || service.includes || []
 
-  useScrollAnimation(cardRef, (gsap) => {
-    gsap.fromTo(
-      cardRef.current,
-      { opacity: 0, y: 30 },
-      {
-        opacity: 1,
-        y: 0,
-        duration: 0.7,
-        ease: "power3.out",
-        scrollTrigger: {
-          trigger: cardRef.current,
-          start: "top 90%",
-          once: true,
-        },
-      }
-    )
-  })
-
   return (
-    <div
-      ref={cardRef}
-      className="opacity-0 bg-white rounded-2xl overflow-hidden border border-gray-100
-                 shadow-sm"
+    <motion.div
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once: true, margin: "-50px" }}
+      variants={scaleIn}
+      className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm"
     >
       {/* Image */}
       <div className="relative">
@@ -497,37 +433,43 @@ const MobileServiceCard = memo(function MobileServiceCard({ service, index }) {
                 {activeVariants.length} pricing option
                 {activeVariants.length > 1 ? "s" : ""}
               </span>
-              <ChevronDown
-                size={16}
-                strokeWidth={1.5}
-                className={`text-gray-400 transition-transform duration-300 ${
-                  showVariants ? "rotate-180" : ""
-                }`}
-              />
+              <motion.div
+                animate={{ rotate: showVariants ? 180 : 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <ChevronDown size={16} strokeWidth={1.5} className="text-gray-400" />
+              </motion.div>
             </button>
 
-            {/* Collapse with max-height for better browser support */}
-            <div
-              id={variantsId}
-              className={`overflow-hidden transition-all duration-300 ease-out ${
-                showVariants ? "max-h-96 opacity-100 mt-2" : "max-h-0 opacity-0"
-              }`}
-            >
-              <div className="space-y-2">
-                {activeVariants.map((variant) => (
-                  <ServiceVariant key={variant._id} variant={variant} />
-                ))}
-              </div>
-            </div>
+            <AnimatePresence initial={false}>
+              {showVariants && (
+                <motion.div
+                  id={variantsId}
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                  className="overflow-hidden"
+                >
+                  <div className="space-y-2 pt-2">
+                    {activeVariants.map((variant) => (
+                      <ServiceVariant key={variant._id} variant={variant} />
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         )}
 
         {/* CTA */}
-        <a
+        <motion.a
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
           href={`/bookings?service=${encodeURIComponent(service._id)}`}
           className="group flex items-center justify-center gap-2 h-12
                      bg-black text-white rounded-xl no-underline w-full
-                     active:scale-[0.98] transition-all duration-300"
+                     transition-colors duration-300"
         >
           <span
             className="tracking-wider uppercase"
@@ -535,13 +477,10 @@ const MobileServiceCard = memo(function MobileServiceCard({ service, index }) {
           >
             Book Now
           </span>
-          <ArrowRight
-            size={14}
-            className="group-hover:translate-x-0.5 transition-transform duration-300"
-          />
-        </a>
+          <ArrowRight size={14} />
+        </motion.a>
       </div>
-    </div>
+    </motion.div>
   )
 })
 
@@ -550,79 +489,40 @@ const DesktopServiceSection = memo(function DesktopServiceSection({
   service,
   index,
 }) {
-  const sectionRef = useRef(null)
   const isEven = index % 2 === 0
 
-  const image =
-    getImageUrl(service.primaryImage) || getImageUrl(service.images?.[0])
+  const image = getImageUrl(service.primaryImage) || getImageUrl(service.images?.[0])
   const categoryName = service.category?.name || ""
   const categoryIcon = service.category?.icon || ""
 
-  const activeVariants = service.variants
-    ? service.variants.filter((v) => v.isActive !== false)
-    : []
+  const activeVariants = useMemo(() => 
+    service.variants?.filter((v) => v.isActive !== false) || [],
+    [service.variants]
+  )
 
   const highlights = service.highlights || service.includes || []
 
-  useScrollAnimation(sectionRef, (gsap) => {
-    const imageEl = sectionRef.current?.querySelector("[data-image]")
-    const contentEl = sectionRef.current?.querySelector("[data-content]")
-
-    if (!imageEl || !contentEl) return
-
-    gsap.fromTo(
-      imageEl,
-      { opacity: 0, x: isEven ? -40 : 40 },
-      {
-        opacity: 1,
-        x: 0,
-        duration: 0.9,
-        ease: "power3.out",
-        scrollTrigger: {
-          trigger: sectionRef.current,
-          start: "top 75%",
-          once: true,
-        },
-      }
-    )
-
-    gsap.fromTo(
-      contentEl,
-      { opacity: 0, x: isEven ? 40 : -40 },
-      {
-        opacity: 1,
-        x: 0,
-        duration: 0.9,
-        ease: "power3.out",
-        scrollTrigger: {
-          trigger: sectionRef.current,
-          start: "top 75%",
-          once: true,
-        },
-      }
-    )
-  })
-
   return (
-    <div
-      ref={sectionRef}
+    <motion.div
       id={service._id}
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once: true, margin: "-100px" }}
       className="py-16 lg:py-24 border-b border-gray-100 last:border-0"
     >
-      {/* Use CSS order for alternating layout instead of RTL hack */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
         {/* Image */}
-        <div
-          data-image
-          className={`opacity-0 ${isEven ? "lg:order-1" : "lg:order-2"}`}
+        <motion.div
+          variants={isEven ? slideInLeft : slideInRight}
+          className={isEven ? "lg:order-1" : "lg:order-2"}
         >
-          <div className="relative rounded-2xl overflow-hidden">
+          <div className="relative rounded-2xl overflow-hidden group">
             <div className="aspect-[4/3] bg-gray-100">
               <ServiceImage
                 src={image}
                 alt={service.name}
                 fallbackIcon={categoryIcon || "📦"}
-                className="transition-transform duration-700 hover:scale-105"
+                className="transition-transform duration-700 group-hover:scale-105"
               />
             </div>
 
@@ -655,12 +555,12 @@ const DesktopServiceSection = memo(function DesktopServiceSection({
               </span>
             </div>
           </div>
-        </div>
+        </motion.div>
 
         {/* Content */}
-        <div
-          data-content
-          className={`opacity-0 ${isEven ? "lg:order-2" : "lg:order-1"}`}
+        <motion.div
+          variants={isEven ? slideInRight : slideInLeft}
+          className={isEven ? "lg:order-2" : "lg:order-1"}
         >
           {/* Eyebrow */}
           <div className="flex items-center gap-3 mb-5">
@@ -743,13 +643,14 @@ const DesktopServiceSection = memo(function DesktopServiceSection({
             </div>
           )}
 
-          {/* CTA - Fixed: changed h-13 to h-12 */}
-          <a
+          {/* CTA */}
+          <motion.a
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.97 }}
             href={`/bookings?service=${encodeURIComponent(service._id)}`}
             className="group inline-flex items-center gap-3 h-12 px-8
                        bg-black text-white rounded-full no-underline
-                       hover:bg-gray-800 active:scale-[0.97]
-                       transition-all duration-300"
+                       hover:bg-gray-800 transition-colors duration-300"
           >
             <span
               className="tracking-wider uppercase"
@@ -757,14 +658,11 @@ const DesktopServiceSection = memo(function DesktopServiceSection({
             >
               Book {service.name}
             </span>
-            <ArrowRight
-              size={16}
-              className="group-hover:translate-x-0.5 transition-transform duration-300"
-            />
-          </a>
-        </div>
+            <ArrowRight size={16} />
+          </motion.a>
+        </motion.div>
       </div>
-    </div>
+    </motion.div>
   )
 })
 
@@ -774,71 +672,7 @@ const Hero = memo(function Hero({
   categories,
   activeCategory,
   onCategoryChange,
-  loading,
 }) {
-  const heroRef = useRef(null)
-  const hasAnimated = useRef(false)
-
-  useEffect(() => {
-    // Only animate once on initial load, not on category change
-    if (loading || hasAnimated.current) return
-
-    let ctx
-    let mounted = true
-    let fallbackTimer
-
-    const init = async () => {
-      const currentRef = heroRef.current
-      if (!currentRef) return
-
-      // Fallback: show content if GSAP fails
-      fallbackTimer = setTimeout(() => {
-        if (mounted && currentRef) {
-          const elements = currentRef.querySelectorAll("[data-animate]")
-          elements.forEach((el) => makeFallbackVisible(el))
-        }
-      }, 3000)
-
-      try {
-        const gsap = await loadGsap()
-        if (!mounted || !heroRef.current) return
-        clearTimeout(fallbackTimer)
-
-        ctx = gsap.context(() => {
-          const elements = heroRef.current.querySelectorAll("[data-animate]")
-
-          gsap.fromTo(
-            elements,
-            { opacity: 0, y: 30 },
-            {
-              opacity: 1,
-              y: 0,
-              duration: ANIMATION_CONFIG.duration,
-              stagger: ANIMATION_CONFIG.stagger,
-              ease: ANIMATION_CONFIG.ease,
-            }
-          )
-        })
-
-        hasAnimated.current = true
-      } catch {
-        clearTimeout(fallbackTimer)
-        if (mounted && heroRef.current) {
-          const elements = heroRef.current.querySelectorAll("[data-animate]")
-          elements.forEach((el) => makeFallbackVisible(el))
-        }
-      }
-    }
-
-    init()
-
-    return () => {
-      mounted = false
-      if (fallbackTimer) clearTimeout(fallbackTimer)
-      ctx?.revert()
-    }
-  }, [loading]) // Removed activeCategory from deps to prevent re-animation
-
   const pageTitle = activeCategoryData
     ? `${activeCategoryData.icon || ""} ${activeCategoryData.name}`
     : "Our Services"
@@ -854,10 +688,8 @@ const Hero = memo(function Hero({
         <div
           className="absolute inset-0 opacity-[0.03]"
           style={{
-            backgroundImage: `
-              linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)
-            `,
+            backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
             backgroundSize: "60px 60px",
           }}
         />
@@ -870,12 +702,14 @@ const Hero = memo(function Hero({
         />
       </div>
 
-      <div
-        ref={heroRef}
+      <motion.div
+        initial="hidden"
+        animate="visible"
+        variants={staggerContainer}
         className="relative z-10 max-w-6xl mx-auto px-5 sm:px-8 md:px-12"
       >
         {/* Eyebrow */}
-        <div data-animate className="flex items-center gap-3 mb-5 opacity-0">
+        <motion.div variants={fadeInUp} className="flex items-center gap-3 mb-5">
           <span className="w-10 h-px bg-white/30" aria-hidden="true" />
           <span
             className="tracking-[0.35em] uppercase text-white/50"
@@ -883,12 +717,12 @@ const Hero = memo(function Hero({
           >
             {activeCategoryData ? "Category" : "What We Offer"}
           </span>
-        </div>
+        </motion.div>
 
         {/* Title */}
-        <h1
-          data-animate
-          className="opacity-0 text-white mb-4"
+        <motion.h1
+          variants={fadeInUp}
+          className="text-white mb-4"
           style={{
             fontFamily: 'Georgia, "Times New Roman", serif',
             fontWeight: 300,
@@ -899,57 +733,40 @@ const Hero = memo(function Hero({
           }}
         >
           {pageTitle}
-        </h1>
+        </motion.h1>
 
         {/* Subtitle */}
-        <p
-          data-animate
-          className="opacity-0 text-white/40 max-w-md mb-8 leading-relaxed"
+        <motion.p
+          variants={fadeInUp}
+          className="text-white/40 max-w-md mb-8 leading-relaxed"
           style={{ fontSize: "15px" }}
         >
           {pageSubtitle}
-        </p>
+        </motion.p>
 
         {/* Category filter */}
-        <div data-animate className="opacity-0">
+        <motion.div variants={fadeInUp}>
           <CategoryFilter
             categories={categories}
             activeCategory={activeCategory}
             onCategoryChange={onCategoryChange}
           />
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
     </section>
   )
 })
 
 // ── Bottom CTA Section ─────────────────────────────────────
 const BottomCTA = memo(function BottomCTA() {
-  const sectionRef = useRef(null)
-
-  useScrollAnimation(sectionRef, (gsap) => {
-    gsap.fromTo(
-      sectionRef.current,
-      { opacity: 0, y: 40 },
-      {
-        opacity: 1,
-        y: 0,
-        duration: 0.8,
-        ease: "power3.out",
-        scrollTrigger: {
-          trigger: sectionRef.current,
-          start: "top 85%",
-          once: true,
-        },
-      }
-    )
-  })
-
   return (
     <section className="w-full bg-black py-16 md:py-24">
-      <div
-        ref={sectionRef}
-        className="opacity-0 max-w-6xl mx-auto px-5 sm:px-8 md:px-12"
+      <motion.div
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true, margin: "-100px" }}
+        variants={fadeInUp}
+        className="max-w-6xl mx-auto px-5 sm:px-8 md:px-12"
       >
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-8">
           {/* Left */}
@@ -978,14 +795,15 @@ const BottomCTA = memo(function BottomCTA() {
             </h2>
           </div>
 
-          {/* Right - Fixed: changed h-13 to h-12 */}
+          {/* Right */}
           <div className="flex flex-col sm:flex-row gap-3">
-            <a
+            <motion.a
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
               href="/bookings"
               className="group inline-flex items-center justify-center gap-3 h-12 px-8
                          bg-white text-black rounded-full no-underline
-                         hover:bg-gray-100 active:scale-[0.97]
-                         transition-all duration-300"
+                         hover:bg-gray-100 transition-colors duration-300"
             >
               <span
                 className="tracking-wider uppercase"
@@ -993,18 +811,16 @@ const BottomCTA = memo(function BottomCTA() {
               >
                 Book Now
               </span>
-              <ArrowRight
-                size={16}
-                className="group-hover:translate-x-0.5 transition-transform duration-300"
-              />
-            </a>
+              <ArrowRight size={16} />
+            </motion.a>
 
-            <a
+            <motion.a
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
               href={`tel:${PHONE_NUMBER}`}
               className="inline-flex items-center justify-center gap-3 h-12 px-8
                          border border-white/20 text-white rounded-full no-underline
-                         hover:bg-white/5 active:scale-[0.97]
-                         transition-all duration-300"
+                         hover:bg-white/5 transition-colors duration-300"
             >
               <Phone size={16} strokeWidth={1.5} />
               <span
@@ -1013,11 +829,98 @@ const BottomCTA = memo(function BottomCTA() {
               >
                 {PHONE_NUMBER}
               </span>
-            </a>
+            </motion.a>
           </div>
         </div>
-      </div>
+      </motion.div>
     </section>
+  )
+})
+
+// ── Error State ────────────────────────────────────────────
+const ErrorState = memo(function ErrorState({ onRetry }) {
+  return (
+    <motion.div
+      initial="hidden"
+      animate="visible"
+      variants={fadeInUp}
+      className="flex flex-col items-center justify-center py-20 md:py-32"
+    >
+      <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mb-5">
+        <span className="text-2xl">⚠️</span>
+      </div>
+
+      <h3
+        className="text-black mb-2"
+        style={{
+          fontFamily: 'Georgia, "Times New Roman", serif',
+          fontSize: "18px",
+          fontWeight: 400,
+        }}
+      >
+        Something went wrong
+      </h3>
+
+      <p className="text-gray-400 mb-6" style={{ fontSize: "14px" }}>
+        Failed to load services
+      </p>
+
+      <motion.button
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.97 }}
+        onClick={onRetry}
+        className="group inline-flex items-center gap-2 h-12 px-6
+                   bg-black text-white rounded-full
+                   hover:bg-gray-800 transition-colors duration-300"
+      >
+        <span
+          className="tracking-wider uppercase"
+          style={{ fontSize: "11px", fontWeight: 500 }}
+        >
+          Try Again
+        </span>
+      </motion.button>
+    </motion.div>
+  )
+})
+
+// ── Services List ──────────────────────────────────────────
+const ServicesList = memo(function ServicesList({ services }) {
+  return (
+    <>
+      {/* Mobile: Card grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-6 md:hidden">
+        {services.map((service, i) => (
+          <MobileServiceCard key={service._id} service={service} index={i} />
+        ))}
+      </div>
+
+      {/* Desktop: Alternating sections */}
+      <div className="hidden md:block">
+        {services.map((service, i) => (
+          <DesktopServiceSection key={service._id} service={service} index={i} />
+        ))}
+      </div>
+    </>
+  )
+})
+
+// ── Loading State ──────────────────────────────────────────
+const LoadingState = memo(function LoadingState() {
+  return (
+    <>
+      {/* Mobile skeletons */}
+      <div className="flex flex-col gap-5 py-6 md:hidden">
+        <SkeletonCard />
+        <SkeletonCard />
+      </div>
+
+      {/* Desktop skeletons */}
+      <div className="hidden md:block">
+        <SkeletonSection />
+        <SkeletonSection />
+      </div>
+    </>
   )
 })
 
@@ -1029,13 +932,20 @@ export default function ServicesContent() {
 
   const [services, setServices] = useState([])
   const [categories, setCategories] = useState([])
-  const [activeCategory, setActiveCategory] = useState(categoryId || null)
+  const [activeCategory, setActiveCategory] = useState(categoryId)
   const [activeCategoryData, setActiveCategoryData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
 
+  // Sync URL param with state
+  useEffect(() => {
+    setActiveCategory(categoryId)
+  }, [categoryId])
+
   // Fetch data
   useEffect(() => {
+    let isMounted = true
+
     const fetchData = async () => {
       setLoading(true)
       setError(false)
@@ -1045,6 +955,8 @@ export default function ServicesContent() {
           getPublicServices(activeCategory ? { category: activeCategory } : {}),
           getCategories(),
         ])
+
+        if (!isMounted) return
 
         setServices(servicesData || [])
         setCategories(categoriesData || [])
@@ -1056,23 +968,28 @@ export default function ServicesContent() {
           setActiveCategoryData(null)
         }
       } catch (err) {
-        // Only log in development
+        if (!isMounted) return
         if (process.env.NODE_ENV === "development") {
-          console.error("Fetch failed:", err.message)
+          console.error("Fetch failed:", err)
         }
         setError(true)
       } finally {
-        setLoading(false)
+        if (isMounted) {
+          setLoading(false)
+        }
       }
     }
 
     fetchData()
+
+    return () => {
+      isMounted = false
+    }
   }, [activeCategory])
 
-  // Handle category change using Next.js router
+  // Handle category change
   const handleCategoryChange = useCallback(
     (catId) => {
-      setActiveCategory(catId)
       if (catId) {
         router.push(`/services?category=${encodeURIComponent(catId)}`, {
           scroll: false,
@@ -1084,6 +1001,11 @@ export default function ServicesContent() {
     [router]
   )
 
+  // Handle retry
+  const handleRetry = useCallback(() => {
+    window.location.reload()
+  }, [])
+
   return (
     <main style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
       {/* Hero */}
@@ -1092,89 +1014,50 @@ export default function ServicesContent() {
         categories={categories}
         activeCategory={activeCategory}
         onCategoryChange={handleCategoryChange}
-        loading={loading}
       />
 
       {/* Services List */}
       <section className="w-full bg-white">
         <div className="max-w-6xl mx-auto px-5 sm:px-8 md:px-12">
-          {loading ? (
-            <>
-              {/* Mobile skeletons */}
-              <div className="flex flex-col gap-5 py-6 md:hidden">
-                <SkeletonCard />
-                <SkeletonCard />
-              </div>
-
-              {/* Desktop skeletons */}
-              <div className="hidden md:block">
-                <SkeletonSection />
-                <SkeletonSection />
-              </div>
-            </>
-          ) : error ? (
-            <div className="flex flex-col items-center justify-center py-20 md:py-32">
-              <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mb-5">
-                <span className="text-2xl">⚠️</span>
-              </div>
-
-              <h3
-                className="text-black mb-2"
-                style={{
-                  fontFamily: 'Georgia, "Times New Roman", serif',
-                  fontSize: "18px",
-                  fontWeight: 400,
-                }}
+          <AnimatePresence mode="wait">
+            {loading ? (
+              <motion.div
+                key="loading"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
               >
-                Something went wrong
-              </h3>
-
-              <p className="text-gray-400 mb-6" style={{ fontSize: "14px" }}>
-                Failed to load services
-              </p>
-
-              <button
-                onClick={() => window.location.reload()}
-                className="group inline-flex items-center gap-2 h-12 px-6
-                           bg-black text-white rounded-full
-                           hover:bg-gray-800 active:scale-[0.97]
-                           transition-all duration-300"
+                <LoadingState />
+              </motion.div>
+            ) : error ? (
+              <motion.div
+                key="error"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
               >
-                <span
-                  className="tracking-wider uppercase"
-                  style={{ fontSize: "11px", fontWeight: 500 }}
-                >
-                  Try Again
-                </span>
-              </button>
-            </div>
-          ) : services.length === 0 ? (
-            <EmptyState />
-          ) : (
-            <>
-              {/* Mobile: Card grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-6 md:hidden">
-                {services.map((service, i) => (
-                  <MobileServiceCard
-                    key={service._id}
-                    service={service}
-                    index={i}
-                  />
-                ))}
-              </div>
-
-              {/* Desktop: Alternating sections */}
-              <div className="hidden md:block">
-                {services.map((service, i) => (
-                  <DesktopServiceSection
-                    key={service._id}
-                    service={service}
-                    index={i}
-                  />
-                ))}
-              </div>
-            </>
-          )}
+                <ErrorState onRetry={handleRetry} />
+              </motion.div>
+            ) : services.length === 0 ? (
+              <motion.div
+                key="empty"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <EmptyState />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="services"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <ServicesList services={services} />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </section>
 
