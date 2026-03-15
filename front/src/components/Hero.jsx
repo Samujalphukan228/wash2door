@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useRef } from "react"
 import { motion, useScroll, useTransform, useSpring } from "framer-motion"
 import { ArrowUpRight, Phone } from "lucide-react"
 
@@ -52,7 +52,7 @@ const fadeIn = {
   },
 }
 
-const scaleX = {
+const scaleXVariant = {
   hidden: { scaleX: 0 },
   visible: {
     scaleX: 1,
@@ -77,41 +77,25 @@ const accentLine = {
   },
 }
 
-const staggerContainer = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.08, delayChildren: 0.2 },
-  },
-}
-
 // ── Parallax Background Component ──────────────────────────
-function ParallaxBackground() {
-  const ref = useRef(null)
+function ParallaxBackground({ sectionRef }) {
   const { scrollYProgress } = useScroll({
-    target: ref,
+    target: sectionRef,
     offset: ["start start", "end start"],
   })
 
-  // Smooth spring animation
   const smoothProgress = useSpring(scrollYProgress, {
     stiffness: 100,
     damping: 30,
     restDelta: 0.001,
   })
 
-  // Parallax: image moves down slower (40% speed)
   const y = useTransform(smoothProgress, [0, 1], ["0%", "40%"])
-  
-  // Scale up slightly as you scroll
   const scale = useTransform(smoothProgress, [0, 1], [1, 1.15])
-  
-  // Fade out slightly as you scroll
   const opacity = useTransform(scrollYProgress, [0, 0.5, 1], [1, 0.8, 0.6])
 
   return (
     <motion.div
-      ref={ref}
       initial="hidden"
       animate="visible"
       variants={bgReveal}
@@ -122,7 +106,9 @@ function ParallaxBackground() {
         src={BG_IMAGE}
         alt=""
         role="presentation"
-        className="w-full h-full object-cover"
+        width={2400}
+        height={1600}
+        className="w-full h-[120%] object-cover"
         style={{ filter: "brightness(0.35) contrast(1.05) saturate(0.9)" }}
         loading="eager"
       />
@@ -130,35 +116,23 @@ function ParallaxBackground() {
   )
 }
 
-// ── Parallax Gradient Overlay ──────────────────────────────
-function ParallaxGradients() {
-  const { scrollYProgress } = useScroll()
-  
-  // Gradients get darker as you scroll
-  const bottomOpacity = useTransform(scrollYProgress, [0, 0.3], [1, 0.7])
-  const leftOpacity = useTransform(scrollYProgress, [0, 0.3], [1, 0.8])
-
+// ── Gradient Overlay ───────────────────────────────────────
+function GradientOverlays() {
   return (
-    <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
+    <div className="absolute inset-0 pointer-events-none z-[1]" aria-hidden="true">
       {/* Bottom fade */}
-      <motion.div 
-        style={{ opacity: bottomOpacity }}
-        className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-neutral-950/50 to-transparent" 
-      />
-      
+      <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-neutral-950/50 to-transparent" />
+
       {/* Left fade */}
-      <motion.div 
-        style={{ opacity: leftOpacity }}
-        className="absolute inset-0 bg-gradient-to-r from-neutral-950/90 via-neutral-950/30 to-transparent" 
-      />
-      
-      {/* Top fade - static */}
+      <div className="absolute inset-0 bg-gradient-to-r from-neutral-950/90 via-neutral-950/30 to-transparent" />
+
+      {/* Top fade */}
       <div className="absolute inset-x-0 top-0 h-48 bg-gradient-to-b from-neutral-950/80 to-transparent" />
-      
-      {/* Right accent - static */}
+
+      {/* Right accent */}
       <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-gradient-to-l from-neutral-950/60 to-transparent hidden lg:block" />
-      
-      {/* Subtle noise - static */}
+
+      {/* Subtle noise */}
       <div
         className="absolute inset-0 opacity-[0.02] mix-blend-overlay"
         style={{
@@ -167,20 +141,6 @@ function ParallaxGradients() {
         }}
       />
     </div>
-  )
-}
-
-// ── Content with Parallax ──────────────────────────────────
-function ParallaxContent({ children }) {
-  const { scrollYProgress } = useScroll()
-  
-  // Content moves up slower than scroll (inverse of background)
-  const y = useTransform(scrollYProgress, [0, 1], ["0%", "-10%"])
-  
-  return (
-    <motion.div style={{ y }} className="relative z-10 min-h-screen">
-      {children}
-    </motion.div>
   )
 }
 
@@ -281,7 +241,6 @@ function WhatsAppLink({ fullWidth = false }) {
 function StatItem({ value, label, align = "left", delay = 0 }) {
   return (
     <motion.div
-      custom={delay}
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, delay: 1.1 + delay * 0.08 }}
@@ -292,7 +251,8 @@ function StatItem({ value, label, align = "left", delay = 0 }) {
         style={{
           fontFamily: "Georgia, serif",
           fontWeight: 300,
-          fontSize: align === "right" ? "clamp(1.8rem, 3.5vw, 2.5rem)" : "24px",
+          fontSize:
+            align === "right" ? "clamp(1.8rem, 3.5vw, 2.5rem)" : "24px",
         }}
       >
         {value}
@@ -308,21 +268,22 @@ function StatItem({ value, label, align = "left", delay = 0 }) {
 }
 
 // ── Headline Block ─────────────────────────────────────────
-function HeadlineBlock({ size = "mobile" }) {
-  const ref = useRef(null)
-  const { scrollYProgress } = useScroll()
-  
-  // Headline fades and moves up slightly on scroll
-  const opacity = useTransform(scrollYProgress, [0, 0.2], [1, 0.3])
-  const y = useTransform(scrollYProgress, [0, 0.3], [0, -30])
+function HeadlineBlock({ size = "mobile", sectionRef }) {
+  const { scrollYProgress } = useScroll({
+    target: sectionRef,
+    offset: ["start start", "end start"],
+  })
 
-  const fontSize = size === "desktop"
-    ? "clamp(4.5rem, 9vw, 9rem)"
-    : "clamp(2.8rem, 10vw, 4.5rem)"
+  const opacity = useTransform(scrollYProgress, [0, 0.25], [1, 0])
+  const y = useTransform(scrollYProgress, [0, 0.3], [0, -50])
+
+  const fontSize =
+    size === "desktop"
+      ? "clamp(4.5rem, 9vw, 9rem)"
+      : "clamp(2.8rem, 10vw, 4.5rem)"
 
   return (
-    <motion.div 
-      ref={ref} 
+    <motion.div
       style={{ opacity, y }}
       className={size === "desktop" ? "mb-12 lg:mb-16" : "mb-6"}
     >
@@ -360,7 +321,6 @@ function ServiceLink({ service, index }) {
   return (
     <motion.a
       href="/Services"
-      custom={index}
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay: 1.3 + index * 0.05 }}
@@ -379,23 +339,26 @@ function ServiceLink({ service, index }) {
 
 // ── Main Component ─────────────────────────────────────────
 export default function Hero() {
+  const sectionRef = useRef(null)
+
   return (
     <section
+      ref={sectionRef}
       className="relative w-full min-h-screen overflow-hidden bg-neutral-950"
       aria-label="Hero section"
     >
       {/* ── Parallax Background Image ── */}
-      <ParallaxBackground />
+      <ParallaxBackground sectionRef={sectionRef} />
 
-      {/* ── Gradient Overlays with Scroll Effect ── */}
-      <ParallaxGradients />
+      {/* ── Gradient Overlays ── */}
+      <GradientOverlays />
 
       {/* ── Left Accent Line (Desktop) ── */}
       <motion.div
         initial="hidden"
         animate="visible"
         variants={accentLine}
-        className="absolute left-0 top-0 w-px h-full origin-top hidden md:block z-10"
+        className="absolute left-0 top-0 w-px h-full origin-top hidden md:block z-[2]"
         style={{
           background:
             "linear-gradient(to bottom, transparent 5%, rgba(255,255,255,0.1) 20%, rgba(255,255,255,0.1) 80%, transparent 95%)",
@@ -422,181 +385,182 @@ export default function Hero() {
       {/* ═══════════════════════════════════
           MOBILE LAYOUT
       ═══════════════════════════════════ */}
-      <ParallaxContent>
-        <div className="min-h-screen flex flex-col md:hidden px-5 py-6">
-          {/* Top bar */}
-          <header className="flex items-center justify-between mb-auto">
-            <motion.span
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-              className="tracking-[0.3em] uppercase text-white/45"
-              style={{ fontFamily: "Georgia, serif", fontSize: "9px" }}
+      <div className="relative z-10 min-h-screen flex flex-col md:hidden px-5 py-6">
+        {/* Top bar */}
+        <header className="flex items-center justify-between mb-auto">
+          <motion.span
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="tracking-[0.3em] uppercase text-white/45"
+            style={{ fontFamily: "Georgia, serif", fontSize: "9px" }}
+          >
+            Duliajan
+          </motion.span>
+          <StatusBadge label="Open · 9–5" />
+        </header>
+
+        {/* Content — bottom aligned */}
+        <div className="mt-auto">
+          <HeadlineBlock size="mobile" sectionRef={sectionRef} />
+
+          {/* Description + CTAs */}
+          <motion.div
+            variants={fadeInUp}
+            initial="hidden"
+            animate="visible"
+            className="mb-7"
+          >
+            <p
+              className="text-white/35 leading-[1.8] mb-7 max-w-[290px]"
+              style={{ fontSize: "13px", letterSpacing: "0.02em" }}
             >
-              Duliajan
-            </motion.span>
-            <StatusBadge label="Open · 9–5" />
-          </header>
+              Professional car &amp; home cleaning at your doorstep — fast,
+              safe &amp; hassle-free.
+            </p>
 
-          {/* Content — bottom aligned */}
-          <div className="mt-auto">
-            <HeadlineBlock size="mobile" />
+            <div className="flex flex-col gap-3">
+              <BookButton fullWidth />
+              <WhatsAppLink fullWidth />
+            </div>
+          </motion.div>
 
-            {/* Description + CTAs */}
-            <motion.div variants={fadeInUp} initial="hidden" animate="visible" className="mb-7">
-              <p
-                className="text-white/35 leading-[1.8] mb-7 max-w-[290px]"
-                style={{ fontSize: "13px", letterSpacing: "0.02em" }}
-              >
-                Professional car &amp; home cleaning at your doorstep —
-                fast, safe &amp; hassle-free.
-              </p>
-
-              <div className="flex flex-col gap-3">
-                <BookButton fullWidth />
-                <WhatsAppLink fullWidth />
-              </div>
-            </motion.div>
-
-            {/* Stats */}
-            <motion.div
-              variants={staggerContainer}
-              initial="hidden"
-              animate="visible"
-              className="mt-8 pt-6 border-t border-white/[0.08]"
-            >
-              <div className="flex justify-between">
-                {STATS.map((stat, i) => (
-                  <StatItem key={i} value={stat.value} label={stat.label} delay={i} />
-                ))}
-              </div>
-            </motion.div>
-          </div>
-        </div>
-
-        {/* ═══════════════════════════════════
-            DESKTOP LAYOUT
-        ═══════════════════════════════════ */}
-        <div className="min-h-screen hidden md:flex flex-col px-10 lg:px-16 xl:px-24 py-8 lg:py-10">
-          {/* Top bar */}
-          <header className="flex items-center justify-between">
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.7, delay: 0.2 }}
-              className="flex items-center gap-4"
-            >
-              <span className="w-8 h-px bg-white/20" aria-hidden="true" />
-              <span
-                className="tracking-[0.3em] uppercase text-white/40"
-                style={{ fontFamily: "Georgia, serif", fontSize: "11px" }}
-              >
-                Doorstep Car Care · Duliajan
-              </span>
-            </motion.div>
-            <StatusBadge label="Open · 9AM – 5PM" />
-          </header>
-
-          {/* Main content — vertically centered with better spacing */}
-          <div className="flex-1 flex items-center">
-            <div className="w-full max-w-[1600px] mx-auto">
-              <HeadlineBlock size="desktop" />
-
-              {/* Bottom row */}
-              <motion.div
-                variants={fadeInUp}
-                initial="hidden"
-                animate="visible"
-                className="flex flex-col lg:flex-row lg:items-end lg:justify-between lg:gap-12"
-              >
-                {/* Left: description + CTAs */}
-                <div className="flex items-end gap-8 lg:gap-10">
-                  {/* Vertical line */}
-                  <div
-                    className="w-px h-20 bg-gradient-to-b from-white/12 to-transparent shrink-0 hidden sm:block"
-                    aria-hidden="true"
-                  />
-                  <div>
-                    <p
-                      className="tracking-[0.12em] text-white/35 leading-[1.9] mb-7 max-w-md"
-                      style={{ fontSize: "12px" }}
-                    >
-                      Professional car &amp; home cleaning at your doorstep —
-                      fast, safe &amp; hassle-free.
-                    </p>
-                    <div className="flex flex-wrap items-center gap-5">
-                      <BookButton />
-                      <WhatsAppLink />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right: stats */}
-                <motion.div
-                  variants={staggerContainer}
-                  initial="hidden"
-                  animate="visible"
-                  className="flex items-end gap-8 lg:gap-12 mt-10 lg:mt-0"
-                >
-                  {STATS.map((stat, i) => (
-                    <StatItem
-                      key={i}
-                      value={stat.value}
-                      label={stat.label}
-                      align="right"
-                      delay={i}
-                    />
-                  ))}
-                </motion.div>
-              </motion.div>
+          {/* Stats */}
+          <div className="mt-8 pt-6 border-t border-white/[0.08]">
+            <div className="flex justify-between">
+              {STATS.map((stat, i) => (
+                <StatItem
+                  key={i}
+                  value={stat.value}
+                  label={stat.label}
+                  delay={i}
+                />
+              ))}
             </div>
           </div>
+        </div>
+      </div>
 
-          {/* Bottom bar */}
-          <footer className="mt-auto pt-6">
-            <motion.div
-              initial="hidden"
-              animate="visible"
-              variants={scaleX}
-              className="w-full h-px bg-white/[0.06] mb-5 origin-left"
-              aria-hidden="true"
-            />
-            <motion.div
-              variants={fadeIn}
-              initial="hidden"
-              animate="visible"
-              className="flex flex-wrap items-center justify-between gap-4"
+      {/* ═══════════════════════════════════
+          DESKTOP LAYOUT
+      ═══════════════════════════════════ */}
+      <div className="relative z-10 min-h-screen hidden md:flex flex-col px-10 lg:px-16 xl:px-24 py-8 lg:py-10">
+        {/* Top bar */}
+        <header className="flex items-center justify-between">
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.7, delay: 0.2 }}
+            className="flex items-center gap-4"
+          >
+            <span className="w-8 h-px bg-white/20" aria-hidden="true" />
+            <span
+              className="tracking-[0.3em] uppercase text-white/40"
+              style={{ fontFamily: "Georgia, serif", fontSize: "11px" }}
             >
-              {/* Service links */}
-              <nav className="flex items-center gap-6 lg:gap-8" aria-label="Quick service links">
-                {SERVICES.map((service, i) => (
-                  <ServiceLink key={i} service={service} index={i} />
-                ))}
-              </nav>
+              Doorstep Car Care · Duliajan
+            </span>
+          </motion.div>
+          <StatusBadge label="Open · 9AM – 5PM" />
+        </header>
 
-              {/* All Services link */}
-              <motion.a
-                href="/Services"
-                whileHover={{ gap: 8 }}
-                className="flex items-center gap-3 text-white/25 hover:text-white/60
-                           transition-colors duration-300 group"
-              >
-                <span
-                  className="tracking-[0.25em] uppercase"
-                  style={{ fontSize: "9px" }}
-                >
-                  All Services
-                </span>
-                <span
-                  className="h-px bg-current w-5 group-hover:w-10
-                             transition-all duration-300"
+        {/* Main content — vertically centered */}
+        <div className="flex-1 flex items-center">
+          <div className="w-full max-w-[1600px] mx-auto">
+            <HeadlineBlock size="desktop" sectionRef={sectionRef} />
+
+            {/* Bottom row */}
+            <motion.div
+              variants={fadeInUp}
+              initial="hidden"
+              animate="visible"
+              className="flex flex-col lg:flex-row lg:items-end lg:justify-between lg:gap-12"
+            >
+              {/* Left: description + CTAs */}
+              <div className="flex items-end gap-8 lg:gap-10">
+                {/* Vertical line */}
+                <div
+                  className="w-px h-20 shrink-0 hidden sm:block bg-gradient-to-b from-white/[0.12] to-transparent"
                   aria-hidden="true"
                 />
-              </motion.a>
+                <div>
+                  <p
+                    className="tracking-[0.12em] text-white/35 leading-[1.9] mb-7 max-w-md"
+                    style={{ fontSize: "12px" }}
+                  >
+                    Professional car &amp; home cleaning at your doorstep —
+                    fast, safe &amp; hassle-free.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-5">
+                    <BookButton />
+                    <WhatsAppLink />
+                  </div>
+                </div>
+              </div>
+
+              {/* Right: stats */}
+              <div className="flex items-end gap-8 lg:gap-12 mt-10 lg:mt-0">
+                {STATS.map((stat, i) => (
+                  <StatItem
+                    key={i}
+                    value={stat.value}
+                    label={stat.label}
+                    align="right"
+                    delay={i}
+                  />
+                ))}
+              </div>
             </motion.div>
-          </footer>
+          </div>
         </div>
-      </ParallaxContent>
+
+        {/* Bottom bar */}
+        <footer className="mt-auto pt-6">
+          <motion.div
+            initial="hidden"
+            animate="visible"
+            variants={scaleXVariant}
+            className="w-full h-px bg-white/[0.06] mb-5 origin-left"
+            aria-hidden="true"
+          />
+          <motion.div
+            variants={fadeIn}
+            initial="hidden"
+            animate="visible"
+            className="flex flex-wrap items-center justify-between gap-4"
+          >
+            {/* Service links */}
+            <nav
+              className="flex items-center gap-6 lg:gap-8"
+              aria-label="Quick service links"
+            >
+              {SERVICES.map((service, i) => (
+                <ServiceLink key={i} service={service} index={i} />
+              ))}
+            </nav>
+
+            {/* All Services link */}
+            <motion.a
+              href="/Services"
+              whileHover={{ gap: 8 }}
+              className="flex items-center gap-3 text-white/25 hover:text-white/60
+                         transition-colors duration-300 group"
+            >
+              <span
+                className="tracking-[0.25em] uppercase"
+                style={{ fontSize: "9px" }}
+              >
+                All Services
+              </span>
+              <span
+                className="h-px bg-current w-5 group-hover:w-10
+                           transition-all duration-300"
+                aria-hidden="true"
+              />
+            </motion.a>
+          </motion.div>
+        </footer>
+      </div>
     </section>
   )
 }
