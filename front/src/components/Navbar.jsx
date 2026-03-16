@@ -4,11 +4,11 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { Phone, ChevronDown } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useAuth } from "@/context/AuthContext"
+import { useNavigate } from "@/hooks/useNavigate"
 import TopBar from "./TopBar"
 import MobileDrawer from "./MobileDrawer"
 import AuthModal from "./AuthModal"
 
-// ── Constants ──────────────────────────────────────────────
 const NAV_LINKS = [
   { label: "Home", href: "/" },
   { label: "About", href: "/About" },
@@ -25,7 +25,6 @@ const DROPDOWN_ITEMS = [
 const SANS = "'Helvetica Neue', Helvetica, Arial, sans-serif"
 const SERIF = 'Georgia, "Times New Roman", serif'
 
-// ── Animation variants ─────────────────────────────────────
 const dropdownVariants = {
   hidden: {
     opacity: 0,
@@ -44,12 +43,10 @@ const dropdownVariants = {
 const navbarVariants = {
   top: { boxShadow: "0 0 0 rgba(0,0,0,0)" },
   scrolled: {
-    boxShadow:
-      "0 1px 0 rgba(0,0,0,0.06), 0 4px 20px rgba(0,0,0,0.05)",
+    boxShadow: "0 1px 0 rgba(0,0,0,0.06), 0 4px 20px rgba(0,0,0,0.05)",
   },
 }
 
-// ── LoadingSpinner ─────────────────────────────────────────
 function LoadingSpinner({ size = 16 }) {
   return (
     <div
@@ -61,7 +58,6 @@ function LoadingSpinner({ size = 16 }) {
   )
 }
 
-// ── UserAvatar ─────────────────────────────────────────────
 function UserAvatar({ name, size = "sm", onClick }) {
   const dimensions = size === "sm" ? "w-8 h-8" : "w-10 h-10"
   const fontSize = size === "sm" ? "12px" : "14px"
@@ -71,9 +67,7 @@ function UserAvatar({ name, size = "sm", onClick }) {
     <Tag
       onClick={onClick}
       whileTap={onClick ? { scale: 0.88 } : undefined}
-      className={`${dimensions} rounded-full bg-black flex items-center
-                  justify-center shrink-0 cursor-pointer
-                  focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2`}
+      className={`${dimensions} rounded-full bg-black flex items-center justify-center shrink-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2`}
       aria-label={onClick ? "Open menu" : undefined}
     >
       <span
@@ -86,14 +80,12 @@ function UserAvatar({ name, size = "sm", onClick }) {
   )
 }
 
-// ── MobileMenuButton ───────────────────────────────────────
 function MobileMenuButton({ onClick }) {
   return (
     <motion.button
       onClick={onClick}
       whileTap={{ scale: 0.88 }}
-      className="w-10 h-10 flex items-center justify-center rounded-lg
-                 focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2"
+      className="w-10 h-10 flex items-center justify-center rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2"
       aria-label="Open navigation menu"
     >
       <div className="space-y-[5px]">
@@ -104,21 +96,23 @@ function MobileMenuButton({ onClick }) {
   )
 }
 
-// ── NavLink ────────────────────────────────────────────────
 function NavLink({ link, onProtectedClick }) {
+  const navigate = useNavigate()
+
+  const handleClick = (e) => {
+    e.preventDefault()
+    if (link.protected) {
+      const blocked = onProtectedClick(link)
+      if (blocked) return
+    }
+    navigate(link.href)
+  }
+
   return (
-    <a
-      href={link.href}
-      onClick={(e) => onProtectedClick(e, link)}
-      className="relative px-4 xl:px-5 py-2 tracking-[0.18em] uppercase text-gray-400
-                 hover:text-black transition-colors duration-300 no-underline group
-                 focus:outline-none focus:text-black"
-      style={{ fontSize: "10px", fontWeight: 500 }}
-    >
+    <a href={link.href} onClick={handleClick} className="relative px-4 xl:px-5 py-2 tracking-[0.18em] uppercase text-gray-400 hover:text-black transition-colors duration-300 no-underline group focus:outline-none focus:text-black" style={{ fontSize: "10px", fontWeight: 500 }}>
       {link.label}
       <motion.span
-        className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1
-                   rounded-full bg-black"
+        className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-black"
         initial={{ scale: 0 }}
         whileHover={{ scale: 1 }}
         transition={{ duration: 0.2 }}
@@ -128,16 +122,20 @@ function NavLink({ link, onProtectedClick }) {
   )
 }
 
-// ── UserDropdown ───────────────────────────────────────────
 function UserDropdown({ user, isOpen, onToggle, onClose, onLogout, dropdownRef }) {
+  const navigate = useNavigate()
+
+  const handleItemClick = (href) => {
+    onClose()
+    navigate(href)
+  }
+
   return (
     <div ref={dropdownRef} className="relative">
       <motion.button
         onClick={onToggle}
         whileTap={{ scale: 0.94 }}
-        className="flex items-center gap-2 py-1.5 px-2
-                   hover:bg-gray-50 rounded-full transition-colors duration-200
-                   focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2"
+        className="flex items-center gap-2 py-1.5 px-2 hover:bg-gray-50 rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2"
         aria-expanded={isOpen}
         aria-haspopup="true"
         aria-label="Account menu"
@@ -159,17 +157,11 @@ function UserDropdown({ user, isOpen, onToggle, onClose, onLogout, dropdownRef }
             initial="hidden"
             animate="visible"
             exit="hidden"
-            className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl
-                       border border-gray-100 z-50 overflow-hidden
-                       shadow-[0_10px_40px_rgba(0,0,0,0.1),0_2px_10px_rgba(0,0,0,0.05)]"
+            className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl border border-gray-100 z-50 overflow-hidden shadow-[0_10px_40px_rgba(0,0,0,0.1),0_2px_10px_rgba(0,0,0,0.05)]"
             role="menu"
           >
-            {/* User info header */}
             <div className="p-4 bg-black text-white">
-              <p
-                className="truncate"
-                style={{ fontFamily: SERIF, fontSize: "14px", fontWeight: 400, letterSpacing: "-0.01em" }}
-              >
+              <p className="truncate" style={{ fontFamily: SERIF, fontSize: "14px", fontWeight: 400, letterSpacing: "-0.01em" }}>
                 {user.firstName} {user.lastName}
               </p>
               {user.email && (
@@ -179,22 +171,17 @@ function UserDropdown({ user, isOpen, onToggle, onClose, onLogout, dropdownRef }
               )}
             </div>
 
-            {/* Links */}
             <div className="py-1" role="none">
               {DROPDOWN_ITEMS.map((item) => (
-                <a
+                <button
                   key={item.label}
-                  href={item.href}
-                  className="flex items-center px-4 py-2.5 tracking-[0.12em] uppercase
-                             text-gray-500 hover:text-black hover:bg-gray-50
-                             transition-all duration-200 no-underline
-                             focus:outline-none focus:bg-gray-50 focus:text-black"
+                  onClick={() => handleItemClick(item.href)}
+                  className="w-full text-left flex items-center px-4 py-2.5 tracking-[0.12em] uppercase text-gray-500 hover:text-black hover:bg-gray-50 transition-all duration-200 focus:outline-none focus:bg-gray-50 focus:text-black"
                   style={{ fontSize: "10px" }}
-                  onClick={onClose}
                   role="menuitem"
                 >
                   {item.label}
-                </a>
+                </button>
               ))}
             </div>
 
@@ -204,9 +191,7 @@ function UserDropdown({ user, isOpen, onToggle, onClose, onLogout, dropdownRef }
               <motion.button
                 whileTap={{ scale: 0.97 }}
                 onClick={onLogout}
-                className="w-full py-2 tracking-[0.12em] uppercase text-red-500
-                           hover:bg-red-50 transition-colors duration-200 rounded-lg
-                           focus:outline-none focus:bg-red-50"
+                className="w-full py-2 tracking-[0.12em] uppercase text-red-500 hover:bg-red-50 transition-colors duration-200 rounded-lg focus:outline-none focus:bg-red-50"
                 style={{ fontSize: "10px" }}
                 role="menuitem"
               >
@@ -220,12 +205,12 @@ function UserDropdown({ user, isOpen, onToggle, onClose, onLogout, dropdownRef }
   )
 }
 
-// ── Main Component ─────────────────────────────────────────
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const { user, loading, openModal, logout } = useAuth()
+  const navigate = useNavigate()
   const dropdownRef = useRef(null)
 
   useEffect(() => {
@@ -246,17 +231,20 @@ export default function Navbar() {
 
   useEffect(() => {
     if (!dropdownOpen) return
-    const handleKey = (e) => { if (e.key === "Escape") setDropdownOpen(false) }
+    const handleKey = (e) => {
+      if (e.key === "Escape") setDropdownOpen(false)
+    }
     document.addEventListener("keydown", handleKey)
     return () => document.removeEventListener("keydown", handleKey)
   }, [dropdownOpen])
 
   const handleProtectedClick = useCallback(
-    (e, link) => {
+    (link) => {
       if (link.protected && !user) {
-        e.preventDefault()
         openModal("login")
+        return true
       }
+      return false
     },
     [user, openModal]
   )
@@ -278,26 +266,20 @@ export default function Navbar() {
         role="navigation"
         aria-label="Main navigation"
       >
-        {/* ═══ MOBILE ═══ */}
+        {/* MOBILE */}
         <div className="lg:hidden">
           <div className="flex items-center justify-between px-4 h-14">
 
-            {/* Left: menu trigger */}
             <div className="w-24 flex justify-start">
               <MobileMenuButton onClick={() => setMobileOpen(true)} />
             </div>
 
-            {/* Center: logo */}
-            <a href="/" className="no-underline shrink-0" aria-label="Wash2Door — Home">
-              <span
-                className="text-black tracking-[0.3em]"
-                style={{ fontFamily: SERIF, fontWeight: 400, fontSize: "15px" }}
-              >
+            <a href="/" onClick={(e) => { e.preventDefault(); navigate("/") }} className="no-underline shrink-0" aria-label="Wash2Door Home">
+              <span className="text-black tracking-[0.3em]" style={{ fontFamily: SERIF, fontWeight: 400, fontSize: "15px" }}>
                 W2D
               </span>
             </a>
 
-            {/* Right: auth */}
             <div className="w-24 flex justify-end">
               {loading ? (
                 <div className="w-10 h-10 flex items-center justify-center">
@@ -309,35 +291,27 @@ export default function Navbar() {
                 <motion.button
                   whileTap={{ scale: 0.93 }}
                   onClick={() => openModal("login")}
-                  className="h-8 px-4 bg-black text-white rounded-full
-                             tracking-[0.15em] uppercase
-                             focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2"
+                  className="h-8 px-4 bg-black text-white rounded-full tracking-[0.15em] uppercase focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2"
                   style={{ fontSize: "9px", fontWeight: 500 }}
                 >
                   Sign In
                 </motion.button>
               )}
             </div>
+
           </div>
         </div>
 
-        {/* ═══ DESKTOP ═══ */}
+        {/* DESKTOP */}
         <div className="hidden lg:block">
           <div className="max-w-[1400px] mx-auto">
             <div className="flex items-center h-16 xl:h-[72px] px-8 xl:px-12">
 
-              {/* Left: logo */}
-              <a href="/" className="no-underline group shrink-0" aria-label="Wash2Door — Home">
+              <a href="/" onClick={(e) => { e.preventDefault(); navigate("/") }} className="no-underline group shrink-0" aria-label="Wash2Door Home">
                 <div className="flex items-baseline gap-2.5">
                   <motion.span
                     className="text-black"
-                    style={{
-                      fontFamily: SERIF,
-                      fontWeight: 400,
-                      fontSize: "clamp(18px, 1.5vw, 22px)",
-                      letterSpacing: "0.3em",
-                      display: "inline-block",
-                    }}
+                    style={{ fontFamily: SERIF, fontWeight: 400, fontSize: "clamp(18px, 1.5vw, 22px)", letterSpacing: "0.3em", display: "inline-block" }}
                     whileHover={{ letterSpacing: "0.45em" }}
                     transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
                   >
@@ -352,33 +326,18 @@ export default function Navbar() {
                 </div>
               </a>
 
-              {/* Center: nav links */}
               <div className="flex-1 flex items-center justify-center">
                 <div className="flex items-center gap-0.5 xl:gap-1">
                   {NAV_LINKS.map((link) => (
-                    <NavLink
-                      key={link.label}
-                      link={link}
-                      onProtectedClick={handleProtectedClick}
-                    />
+                    <NavLink key={link.label} link={link} onProtectedClick={handleProtectedClick} />
                   ))}
                 </div>
               </div>
 
-              {/* Right: phone + auth */}
               <div className="flex items-center gap-3 xl:gap-4 shrink-0">
-                <a
-                  href="tel:6900706456"
-                  className="flex items-center gap-2 text-gray-400 hover:text-black
-                             transition-colors duration-300 no-underline p-2 -m-2
-                             focus:outline-none focus:text-black"
-                  aria-label="Call us"
-                >
+                <a href="tel:6900706456" className="flex items-center gap-2 text-gray-400 hover:text-black transition-colors duration-300 no-underline p-2 -m-2 focus:outline-none focus:text-black" aria-label="Call us">
                   <Phone size={14} strokeWidth={1.5} />
-                  <span
-                    className="tracking-[0.15em] uppercase hidden xl:inline"
-                    style={{ fontSize: "10px" }}
-                  >
+                  <span className="tracking-[0.15em] uppercase hidden xl:inline" style={{ fontSize: "10px" }}>
                     Call Us
                   </span>
                 </a>
@@ -402,16 +361,14 @@ export default function Navbar() {
                   <motion.button
                     whileTap={{ scale: 0.94 }}
                     onClick={() => openModal("login")}
-                    className="h-9 px-5 bg-black text-white rounded-full
-                               tracking-[0.15em] uppercase hover:bg-gray-800
-                               transition-colors duration-200
-                               focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2"
+                    className="h-9 px-5 bg-black text-white rounded-full tracking-[0.15em] uppercase hover:bg-gray-800 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2"
                     style={{ fontSize: "10px", fontWeight: 500 }}
                   >
                     Sign In
                   </motion.button>
                 )}
               </div>
+
             </div>
           </div>
         </div>
