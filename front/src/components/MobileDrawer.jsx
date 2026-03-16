@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useCallback } from "react"
+import { useEffect, useCallback } from "react"
 import {
   X,
   Phone,
@@ -10,6 +10,7 @@ import {
   ArrowUpRight,
   ChevronRight,
 } from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
 import { useAuth } from "@/context/AuthContext"
 
 // ── Constants ──────────────────────────────────────────────
@@ -21,108 +22,152 @@ const NAV_LINKS = [
   { label: "Contact", href: "/Contact" },
 ]
 
-// ── Subcomponents ──────────────────────────────────────────
+const SANS = "'Helvetica Neue', Helvetica, Arial, sans-serif"
+const SERIF = 'Georgia, "Times New Roman", serif'
 
+// ── Animation variants ─────────────────────────────────────
+const backdropVariants = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { duration: 0.3 } },
+  exit: { opacity: 0, transition: { duration: 0.25, delay: 0.05 } },
+}
+
+const panelVariants = {
+  hidden: { opacity: 0, scale: 0.96, y: 16 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    y: 0,
+    transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] },
+  },
+  exit: {
+    opacity: 0,
+    scale: 0.97,
+    y: 10,
+    transition: { duration: 0.25, ease: "easeIn" },
+  },
+}
+
+const linkContainerVariants = {
+  hidden: {},
+  visible: {
+    transition: { staggerChildren: 0.05, delayChildren: 0.2 },
+  },
+}
+
+const linkVariants = {
+  hidden: { opacity: 0, x: -16 },
+  visible: {
+    opacity: 1,
+    x: 0,
+    transition: { duration: 0.35, ease: [0.16, 1, 0.3, 1] },
+  },
+}
+
+const sectionVariants = {
+  hidden: { opacity: 0, y: 12 },
+  visible: (i = 0) => ({
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.4, delay: 0.32 + i * 0.07, ease: [0.16, 1, 0.3, 1] },
+  }),
+}
+
+// ── UserCard ───────────────────────────────────────────────
 function UserCard({ user, onClose, onLogout }) {
   return (
-    <div data-section className="mx-5 mt-5 mb-1">
-      {/* User info */}
-      <div className="flex items-center gap-3.5 mb-4">
-        <div
-          className="w-11 h-11 rounded-full bg-black flex items-center
-                     justify-center shrink-0"
-        >
-          <span
-            className="text-white"
-            style={{
-              fontFamily: "Georgia, serif",
-              fontSize: "14px",
-              fontWeight: 300,
-            }}
-          >
-            {user.firstName?.charAt(0)?.toUpperCase()}
-          </span>
-        </div>
-        <div className="min-w-0">
-          <p
-            className="text-black truncate"
-            style={{
-              fontFamily: "Georgia, serif",
-              fontSize: "14px",
-              fontWeight: 400,
-              letterSpacing: "-0.01em",
-            }}
-          >
-            {user.firstName} {user.lastName}
-          </p>
-          {user.email && (
-            <p
-              className="text-gray-400 truncate mt-0.5"
-              style={{ fontSize: "10px", letterSpacing: "0.02em" }}
-            >
-              {user.email}
+    <motion.div
+      custom={0}
+      variants={sectionVariants}
+      initial="hidden"
+      animate="visible"
+      className="mx-4 mt-4 mb-1"
+    >
+      <div className="bg-gray-50 rounded-xl p-4 mb-1">
+        <div className="flex items-center gap-3 mb-4">
+          {/* Avatar */}
+          <div className="w-11 h-11 rounded-full bg-black flex items-center justify-center shrink-0">
+            <span className="text-white" style={{ fontFamily: SERIF, fontSize: "14px", fontWeight: 300 }}>
+              {user.firstName?.charAt(0)?.toUpperCase()}
+            </span>
+          </div>
+          <div className="min-w-0">
+            <p className="text-black truncate" style={{ fontFamily: SERIF, fontSize: "14px", fontWeight: 400, letterSpacing: "-0.01em" }}>
+              {user.firstName} {user.lastName}
             </p>
-          )}
+            {user.email && (
+              <p className="text-gray-400 truncate mt-0.5" style={{ fontSize: "10px" }}>
+                {user.email}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Quick actions */}
+        <div className="flex gap-2">
+          <motion.a
+            whileTap={{ scale: 0.96 }}
+            href="/profile"
+            onClick={onClose}
+            className="flex-1 flex items-center justify-center py-2.5
+                       tracking-[0.15em] uppercase text-black
+                       border border-gray-200 bg-white rounded-lg
+                       no-underline transition-colors duration-200 min-h-[40px]
+                       hover:border-black"
+            style={{ fontSize: "9px", fontWeight: 500 }}
+          >
+            Profile
+          </motion.a>
+          <motion.button
+            whileTap={{ scale: 0.96 }}
+            onClick={onLogout}
+            className="flex items-center justify-center gap-1.5 px-4 py-2.5
+                       tracking-[0.15em] uppercase text-red-500
+                       border border-gray-200 bg-white rounded-lg
+                       transition-colors duration-200 min-h-[40px]
+                       hover:border-red-200 hover:bg-red-50"
+            style={{ fontSize: "9px", fontWeight: 500 }}
+            aria-label="Sign out"
+          >
+            <LogOut size={11} strokeWidth={1.5} />
+            Out
+          </motion.button>
         </div>
       </div>
 
-      {/* Quick actions */}
-      <div className="flex gap-2">
-        <a
-          href="/profile"
-          onClick={onClose}
-          className="flex-1 flex items-center justify-center py-2.5
-                     tracking-[0.15em] uppercase text-black
-                     border border-gray-200 rounded-[4px]
-                     no-underline active:bg-gray-100
-                     transition-colors duration-200 min-h-[40px]"
-          style={{ fontSize: "9px", fontWeight: 500 }}
-        >
-          Profile
-        </a>
-        <button
-          onClick={onLogout}
-          className="flex items-center justify-center gap-1.5 px-4 py-2.5
-                     tracking-[0.15em] uppercase text-red-500
-                     border border-gray-200 rounded-[4px]
-                     active:bg-red-50 transition-colors duration-200
-                     min-h-[40px]"
-          style={{ fontSize: "9px", fontWeight: 500 }}
-          aria-label="Sign out"
-        >
-          <LogOut size={11} strokeWidth={1.5} />
-          Out
-        </button>
-      </div>
-
-      <div className="h-px bg-gray-100 mt-5" aria-hidden="true" />
-    </div>
+      <div className="h-px bg-gray-100 mt-3" aria-hidden="true" />
+    </motion.div>
   )
 }
 
-function DrawerNavLink({ link, isProtected, onClick }) {
+// ── DrawerNavLink ──────────────────────────────────────────
+function DrawerNavLink({ link, index, isProtected, onClick }) {
   return (
-    <a
-      data-nav-link
+    <motion.a
+      variants={linkVariants}
       href={isProtected ? "#" : link.href}
       onClick={(e) => {
         if (isProtected) e.preventDefault()
         onClick(link)
       }}
-      className="opacity-0 group flex items-center justify-between
-                 py-[14px] px-2 border-b border-gray-50 last:border-0
-                 no-underline active:bg-gray-50 rounded-[4px]
-                 transition-colors duration-200"
+      whileTap={{ x: 4 }}
+      className="group flex items-center justify-between
+                 py-[13px] px-2 border-b border-gray-50 last:border-0
+                 no-underline rounded-lg transition-colors duration-200
+                 hover:bg-gray-50 active:bg-gray-50"
     >
       <div className="flex items-center gap-3">
+        {/* Index number */}
+        <span
+          className="text-gray-200 tabular-nums w-5 text-right shrink-0"
+          style={{ fontFamily: SERIF, fontSize: "11px" }}
+        >
+          {String(index + 1).padStart(2, "0")}
+        </span>
+
         <span
           className="text-black"
-          style={{
-            fontFamily: 'Georgia, "Times New Roman", serif',
-            fontWeight: 400,
-            fontSize: "15px",
-            letterSpacing: "-0.01em",
-          }}
+          style={{ fontFamily: SERIF, fontWeight: 400, fontSize: "15px", letterSpacing: "-0.01em" }}
         >
           {link.label}
         </span>
@@ -130,7 +175,7 @@ function DrawerNavLink({ link, isProtected, onClick }) {
         {isProtected && (
           <span
             className="tracking-[0.1em] uppercase text-gray-300
-                       border border-gray-200 px-2 py-0.5 rounded-[3px]"
+                       border border-gray-200 px-2 py-0.5 rounded"
             style={{ fontSize: "7px" }}
           >
             Login
@@ -139,215 +184,135 @@ function DrawerNavLink({ link, isProtected, onClick }) {
       </div>
 
       <ChevronRight
-        size={14}
+        size={13}
         strokeWidth={1.5}
-        className="text-gray-200 group-active:translate-x-0.5
-                   transition-transform duration-200"
+        className="text-gray-200 group-hover:text-gray-400 group-hover:translate-x-0.5
+                   transition-all duration-200"
         aria-hidden="true"
       />
-    </a>
+    </motion.a>
   )
 }
 
+// ── ContactBar ─────────────────────────────────────────────
 function ContactBar({ onClose }) {
   return (
-    <div data-section className="px-5 pt-4 pb-4 border-t border-gray-100">
+    <motion.div
+      custom={1}
+      variants={sectionVariants}
+      initial="hidden"
+      animate="visible"
+      className="px-4 pt-3.5 pb-3.5 border-t border-gray-100"
+    >
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-5">
-          <a
+        <div className="flex items-center gap-4">
+          <motion.a
+            whileTap={{ scale: 0.95 }}
             href="tel:6900706456"
             onClick={onClose}
-            className="flex items-center gap-2 no-underline
-                       active:opacity-60 transition-opacity duration-200"
+            className="flex items-center gap-2 no-underline"
             aria-label="Call 6900706456"
           >
-            <div
-              className="w-7 h-7 rounded-full border border-gray-200
-                         flex items-center justify-center shrink-0"
-            >
+            <div className="w-7 h-7 rounded-full border border-gray-200 flex items-center justify-center shrink-0">
               <Phone size={11} strokeWidth={1.5} className="text-gray-400" />
             </div>
-            <span
-              className="text-black"
-              style={{
-                fontFamily: "Georgia, serif",
-                fontSize: "12px",
-                fontWeight: 400,
-              }}
-            >
+            <span className="text-black" style={{ fontFamily: SERIF, fontSize: "12px", fontWeight: 400 }}>
               6900706456
             </span>
-          </a>
+          </motion.a>
 
           <div className="flex items-center gap-2">
-            <div
-              className="w-7 h-7 rounded-full border border-gray-200
-                         flex items-center justify-center shrink-0"
-            >
+            <div className="w-7 h-7 rounded-full border border-gray-200 flex items-center justify-center shrink-0">
               <MapPin size={11} strokeWidth={1.5} className="text-gray-400" />
             </div>
-            <span className="text-gray-400" style={{ fontSize: "11px" }}>
-              Duliajan
-            </span>
+            <span className="text-gray-400" style={{ fontSize: "11px" }}>Duliajan</span>
           </div>
         </div>
 
-        <span
-          className="tracking-[0.1em] uppercase text-gray-300"
-          style={{ fontSize: "8px" }}
-        >
-          9–5 PM
-        </span>
+        {/* Live availability dot */}
+        <div className="flex items-center gap-1.5">
+          <span className="relative flex h-1.5 w-1.5">
+            <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" style={{ animationDuration: "2s" }} />
+            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400" />
+          </span>
+          <span className="text-gray-300 tracking-[0.08em] uppercase" style={{ fontSize: "8px" }}>
+            9–5 PM
+          </span>
+        </div>
       </div>
-    </div>
+    </motion.div>
   )
 }
 
+// ── BottomCTA ──────────────────────────────────────────────
 function BottomCTA({ user, onClose, onSignIn }) {
   if (user) {
     return (
-      <a
+      <motion.a
+        whileTap={{ scale: 0.97 }}
         href="/my-bookings"
         onClick={onClose}
-        className="relative flex items-center justify-center gap-2.5
+        className="flex items-center justify-center gap-2.5
                    w-full py-4 bg-black text-white no-underline
-                   rounded-[5px] overflow-hidden group min-h-[52px]
-                   active:scale-[0.98] transition-all duration-200"
+                   rounded-xl min-h-[52px] hover:bg-gray-900
+                   transition-colors duration-200"
       >
-        <span
-          className="absolute inset-0 bg-white origin-bottom scale-y-0
-                     group-active:scale-y-100 transition-transform
-                     duration-500 ease-out"
-          aria-hidden="true"
-        />
-        <Calendar
-          size={14}
-          strokeWidth={1.5}
-          className="relative z-10 group-active:text-black
-                     transition-colors duration-500"
-        />
-        <span
-          className="relative z-10 tracking-[0.22em] uppercase
-                     group-active:text-black transition-colors duration-500"
-          style={{ fontSize: "10px", fontWeight: 500 }}
-        >
+        <Calendar size={14} strokeWidth={1.5} />
+        <span className="tracking-[0.22em] uppercase" style={{ fontSize: "10px", fontWeight: 500 }}>
           My Bookings
         </span>
-      </a>
+      </motion.a>
     )
   }
 
   return (
-    <div className="flex gap-3">
-      <a
+    <div className="flex gap-2.5">
+      <motion.a
+        whileTap={{ scale: 0.97 }}
         href="/bookings"
         onClick={onClose}
-        className="relative flex-1 flex items-center justify-center
-                   gap-2.5 py-4 bg-black text-white no-underline
-                   rounded-[5px] overflow-hidden group min-h-[52px]
-                   active:scale-[0.98] transition-all duration-200"
+        className="flex-1 flex items-center justify-center gap-2
+                   py-4 bg-black text-white no-underline
+                   rounded-xl min-h-[52px] hover:bg-gray-900
+                   transition-colors duration-200"
       >
-        <span
-          className="absolute inset-0 bg-white origin-bottom scale-y-0
-                     group-active:scale-y-100 transition-transform
-                     duration-500 ease-out"
-          aria-hidden="true"
-        />
-        <span
-          className="relative z-10 tracking-[0.22em] uppercase
-                     group-active:text-black transition-colors duration-500"
-          style={{ fontSize: "10px", fontWeight: 500 }}
-        >
+        <span className="tracking-[0.22em] uppercase" style={{ fontSize: "10px", fontWeight: 500 }}>
           Book Now
         </span>
-        <ArrowUpRight
-          size={13}
-          strokeWidth={1.5}
-          className="relative z-10 group-active:text-black
-                     transition-colors duration-500"
-        />
-      </a>
+        <ArrowUpRight size={13} strokeWidth={1.5} />
+      </motion.a>
 
-      <button
+      <motion.button
+        whileTap={{ scale: 0.97 }}
         onClick={onSignIn}
         className="px-5 py-4 tracking-[0.22em] uppercase text-black
-                   border border-gray-200 rounded-[5px] min-h-[52px]
-                   active:bg-gray-100 transition-colors duration-200 shrink-0"
+                   border border-gray-200 rounded-xl min-h-[52px]
+                   hover:border-black transition-colors duration-200 shrink-0"
         style={{ fontSize: "10px", fontWeight: 500 }}
       >
         Sign In
-      </button>
+      </motion.button>
     </div>
   )
 }
 
 // ── Main Component ─────────────────────────────────────────
-
 export default function MobileDrawer({ isOpen, onClose }) {
   const { user, openModal, logout } = useAuth()
-  const panelRef = useRef(null)
 
   // Lock body scroll
   useEffect(() => {
     document.body.style.overflow = isOpen ? "hidden" : ""
-    return () => {
-      document.body.style.overflow = ""
-    }
+    return () => { document.body.style.overflow = "" }
   }, [isOpen])
 
   // Close on Escape
   useEffect(() => {
     if (!isOpen) return
-    const handleKey = (e) => {
-      if (e.key === "Escape") onClose()
-    }
+    const handleKey = (e) => { if (e.key === "Escape") onClose() }
     document.addEventListener("keydown", handleKey)
     return () => document.removeEventListener("keydown", handleKey)
   }, [isOpen, onClose])
-
-  // Animate in
-  useEffect(() => {
-    if (!isOpen) return
-    let ctx
-
-    const init = async () => {
-      const { default: gsap } = await import("gsap")
-      if (!panelRef.current) return
-
-      const links = panelRef.current.querySelectorAll("[data-nav-link]")
-      const sections = panelRef.current.querySelectorAll("[data-section]")
-
-      ctx = gsap.context(() => {
-        gsap.fromTo(
-          links,
-          { opacity: 0, x: -20 },
-          {
-            opacity: 1,
-            x: 0,
-            duration: 0.4,
-            stagger: 0.05,
-            ease: "power3.out",
-            delay: 0.25,
-          }
-        )
-        gsap.fromTo(
-          sections,
-          { opacity: 0, y: 15 },
-          {
-            opacity: 1,
-            y: 0,
-            duration: 0.5,
-            stagger: 0.08,
-            ease: "power3.out",
-            delay: 0.35,
-          }
-        )
-      })
-    }
-
-    init()
-    return () => ctx?.revert()
-  }, [isOpen])
 
   const handleLogout = useCallback(() => {
     logout()
@@ -372,101 +337,110 @@ export default function MobileDrawer({ isOpen, onClose }) {
   }, [openModal, onClose])
 
   return (
-    <div
-      className={`fixed inset-0 z-[9999] ${
-        isOpen ? "pointer-events-auto" : "pointer-events-none"
-      }`}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Navigation menu"
-      aria-hidden={!isOpen}
-    >
-      {/* Backdrop */}
-      <div
-        onClick={onClose}
-        className={`absolute inset-0 transition-all duration-500 ${
-          isOpen
-            ? "opacity-100 bg-black/60 backdrop-blur-sm"
-            : "opacity-0 bg-black/0"
-        }`}
-        aria-hidden="true"
-      />
-
-      {/* Panel */}
-      <div
-        ref={panelRef}
-        className={`absolute top-3 left-3 right-3 bottom-3
-                    bg-white flex flex-col rounded-lg overflow-hidden
-                    will-change-transform shadow-2xl
-                    transition-all duration-500
-                    ease-[cubic-bezier(0.16,1,0.3,1)]
-                    ${
-                      isOpen
-                        ? "translate-y-0 opacity-100 scale-100"
-                        : "translate-y-4 opacity-0 scale-[0.97]"
-                    }`}
-        style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
-      >
-        {/* ── Header ── */}
-        <div className="flex items-center justify-between px-5 h-[52px] shrink-0">
-          <a href="/" onClick={onClose} className="no-underline">
-            <span
-              className="tracking-[0.35em] uppercase text-black"
-              style={{
-                fontFamily: 'Georgia, "Times New Roman", serif',
-                fontWeight: 300,
-                fontSize: "13px",
-              }}
-            >
-              WASH2DOOR
-            </span>
-          </a>
-
-          <button
+    <AnimatePresence>
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-[9999]"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Navigation menu"
+        >
+          {/* Backdrop */}
+          <motion.div
+            key="backdrop"
+            variants={backdropVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
             onClick={onClose}
-            className="w-9 h-9 flex items-center justify-center
-                       active:bg-gray-100 rounded-full
-                       transition-colors duration-200 -mr-1"
-            aria-label="Close navigation menu"
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            aria-hidden="true"
+          />
+
+          {/* Panel */}
+          <motion.div
+            key="panel"
+            variants={panelVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            className="absolute top-3 left-3 right-3 bottom-3
+                       bg-white flex flex-col rounded-2xl overflow-hidden
+                       shadow-2xl"
+            style={{ fontFamily: SANS }}
           >
-            <X size={18} strokeWidth={1.3} className="text-black" />
-          </button>
+            {/* ── Header ── */}
+            <div className="flex items-center justify-between px-5 h-[54px] shrink-0">
+              <a href="/" onClick={onClose} className="no-underline">
+                <span
+                  className="tracking-[0.35em] uppercase text-black"
+                  style={{ fontFamily: SERIF, fontWeight: 300, fontSize: "13px" }}
+                >
+                  WASH2DOOR
+                </span>
+              </a>
+
+              <motion.button
+                whileTap={{ scale: 0.88, rotate: 90 }}
+                transition={{ duration: 0.2 }}
+                onClick={onClose}
+                className="w-9 h-9 flex items-center justify-center
+                           hover:bg-gray-100 rounded-full
+                           transition-colors duration-200 -mr-1"
+                aria-label="Close navigation menu"
+              >
+                <X size={17} strokeWidth={1.3} className="text-black" />
+              </motion.button>
+            </div>
+
+            <div className="h-px bg-gray-100 mx-5" aria-hidden="true" />
+
+            {/* ── Scrollable Content ── */}
+            <div className="flex-1 overflow-y-auto overscroll-contain">
+              {/* User card */}
+              {user && (
+                <UserCard user={user} onClose={onClose} onLogout={handleLogout} />
+              )}
+
+              {/* Nav links */}
+              <nav className="flex flex-col mt-2 px-3" aria-label="Mobile navigation">
+                <motion.div
+                  variants={linkContainerVariants}
+                  initial="hidden"
+                  animate="visible"
+                >
+                  {NAV_LINKS.map((link, i) => (
+                    <DrawerNavLink
+                      key={link.label}
+                      link={link}
+                      index={i}
+                      isProtected={link.protected && !user}
+                      onClick={handleLinkClick}
+                    />
+                  ))}
+                </motion.div>
+              </nav>
+            </div>
+
+            {/* ── Bottom ── */}
+            <div className="shrink-0">
+              <ContactBar onClose={onClose} />
+
+              <motion.div
+                custom={2}
+                variants={sectionVariants}
+                initial="hidden"
+                animate="visible"
+                className="px-4 pb-4"
+              >
+                <BottomCTA user={user} onClose={onClose} onSignIn={handleSignIn} />
+              </motion.div>
+
+              <div className="h-[env(safe-area-inset-bottom)]" />
+            </div>
+          </motion.div>
         </div>
-
-        <div className="h-px bg-gray-100 mx-5" aria-hidden="true" />
-
-        {/* ── Scrollable Content ── */}
-        <div className="flex-1 overflow-y-auto overscroll-contain">
-          {/* User card */}
-          {user && (
-            <UserCard user={user} onClose={onClose} onLogout={handleLogout} />
-          )}
-
-          {/* Navigation links */}
-          <nav className="flex flex-col mt-3 px-3" aria-label="Mobile navigation">
-            {NAV_LINKS.map((link) => (
-              <DrawerNavLink
-                key={link.label}
-                link={link}
-                isProtected={link.protected && !user}
-                onClick={handleLinkClick}
-              />
-            ))}
-          </nav>
-        </div>
-
-        {/* ── Bottom Section (fixed) ── */}
-        <div className="shrink-0">
-          <ContactBar onClose={onClose} />
-
-          <div data-section className="px-5 pb-5">
-            <BottomCTA user={user} onClose={onClose} onSignIn={handleSignIn} />
-          </div>
-
-          {/* iOS safe area */}
-          <div className="h-[env(safe-area-inset-bottom)]" />
-        </div>
-      </div>
-    </div>
+      )}
+    </AnimatePresence>
   )
 }
