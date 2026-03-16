@@ -1,759 +1,556 @@
 "use client"
 
-import { useEffect, useState, useCallback, memo } from "react"
+import { useEffect, useState, useCallback, memo, useRef } from "react"
 import { motion, useInView, AnimatePresence } from "framer-motion"
-import { useRef } from "react"
-import { ArrowUpRight, ArrowRight, Shield, Clock, Sparkles } from "lucide-react"
+import { ArrowUpRight, ArrowRight, Shield, Clock, Sparkles, RotateCcw } from "lucide-react"
 import { getCategories } from "@/lib/services.api"
 
 // ── Constants ──────────────────────────────────────────────
 const TRUST_ITEMS = [
-  { icon: Shield, label: "Satisfaction", desc: "Guaranteed" },
-  { icon: Clock, label: "Same-Day", desc: "Service" },
-  { icon: Sparkles, label: "Eco-Friendly", desc: "Products" },
+  { icon: Shield,   label: "Satisfaction", desc: "Guaranteed"    },
+  { icon: Clock,    label: "Same-Day",     desc: "Service"       },
+  { icon: Sparkles, label: "Eco-Friendly", desc: "Products"      },
 ]
 
-const MAX_VISIBLE_SERVICES = 6
+const MAX_VISIBLE = 6
+const SERIF = 'Georgia, "Times New Roman", serif'
+const SANS  = "'Helvetica Neue', Helvetica, Arial, sans-serif"
 
-// ── Animation Variants ─────────────────────────────────────
-const fadeInUp = {
-  hidden: { opacity: 0, y: 40 },
-  visible: { 
-    opacity: 1, 
-    y: 0,
-    transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] }
-  }
-}
-
-const fadeInLeft = {
-  hidden: { opacity: 0, x: -30 },
-  visible: { 
-    opacity: 1, 
-    x: 0,
-    transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] }
-  }
-}
-
-const scaleIn = {
-  hidden: { opacity: 0, scale: 0.95, y: 30 },
-  visible: { 
-    opacity: 1, 
-    scale: 1,
-    y: 0,
-    transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] }
-  }
-}
-
-const staggerContainer = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1,
-      delayChildren: 0.1
-    }
-  }
-}
-
-// ── Desktop Layout Config ──────────────────────────────────
-// Dynamic grid positions based on number of items
-const getDesktopLayout = (index, total) => {
-  // For 3 items: Featured left (2x2), stacked right (2x1 each)
+// ── Grid layout helpers ────────────────────────────────────
+// Returns Tailwind col/row span classes for the bento grid
+function desktopLayout(index, total) {
+  // ≤3: big left + stacked right column
   if (total <= 3) {
-    if (index === 0) return { colSpan: 2, rowSpan: 2, variant: "featured" }
-    if (index === 1) return { colSpan: 2, rowSpan: 1, variant: "wide" }
-    if (index === 2) return { colSpan: 2, rowSpan: 1, variant: "wide" }
+    if (index === 0) return { col: "md:col-span-2 md:row-span-2", variant: "featured" }
+    return                  { col: "md:col-span-2 md:row-span-1", variant: "wide" }
   }
-  
-  // For 4 items: Featured (2x2), one tall (1x2), two small (1x1)
+  // 4: big left + tall right + 2 small
   if (total === 4) {
-    if (index === 0) return { colSpan: 2, rowSpan: 2, variant: "featured" }
-    if (index === 1) return { colSpan: 1, rowSpan: 2, variant: "tall" }
-    if (index === 2) return { colSpan: 1, rowSpan: 1, variant: "default" }
-    if (index === 3) return { colSpan: 1, rowSpan: 1, variant: "default" }
+    if (index === 0) return { col: "md:col-span-2 md:row-span-2", variant: "featured" }
+    if (index === 1) return { col: "md:col-span-1 md:row-span-2", variant: "tall" }
+    return                  { col: "md:col-span-1 md:row-span-1", variant: "default" }
   }
-  
-  // For 5 items: Featured (2x2), tall (1x2), wide (2x1), two small
-  if (total === 5) {
-    if (index === 0) return { colSpan: 2, rowSpan: 2, variant: "featured" }
-    if (index === 1) return { colSpan: 1, rowSpan: 2, variant: "tall" }
-    if (index === 2) return { colSpan: 1, rowSpan: 1, variant: "default" }
-    if (index === 3) return { colSpan: 1, rowSpan: 1, variant: "default" }
-    if (index === 4) return { colSpan: 1, rowSpan: 1, variant: "default" }
-  }
-  
-  // For 6 items: Optimized bento layout
-  if (total >= 6) {
-    if (index === 0) return { colSpan: 2, rowSpan: 2, variant: "featured" }
-    if (index === 1) return { colSpan: 1, rowSpan: 1, variant: "default" }
-    if (index === 2) return { colSpan: 1, rowSpan: 1, variant: "default" }
-    if (index === 3) return { colSpan: 1, rowSpan: 1, variant: "default" }
-    if (index === 4) return { colSpan: 1, rowSpan: 1, variant: "default" }
-    if (index === 5) return { colSpan: 2, rowSpan: 1, variant: "wide" }
-  }
-  
-  return { colSpan: 1, rowSpan: 1, variant: "default" }
+  // 5+: big left + 4 small + 1 wide footer
+  if (index === 0) return { col: "md:col-span-2 md:row-span-2", variant: "featured" }
+  if (index === 5) return { col: "md:col-span-2 md:row-span-1", variant: "wide" }
+  return                  { col: "md:col-span-1 md:row-span-1", variant: "default" }
 }
 
-const getMobileLayout = (index, total) => {
-  if (index === 0) return "large"
-  if (index === 3 && total > 4) return "tall"
-  if (index === 4 && total > 5) return "wide"
-  return "default"
+function mobileLayout(index, total) {
+  if (index === 0) return "col-span-2 row-span-2"
+  if (index === 3 && total > 4) return "row-span-2"
+  if (index === 4 && total > 5) return "col-span-2"
+  return ""
 }
 
-const getMobileClasses = (variant) => {
-  switch (variant) {
-    case "large": return "col-span-2 row-span-2"
-    case "tall": return "row-span-2"
-    case "wide": return "col-span-2"
-    default: return ""
+// ── Animation variants ─────────────────────────────────────
+const EASE = [0.22, 1, 0.36, 1]
+
+const stagger = {
+  hidden:  {},
+  visible: { transition: { staggerChildren: 0.08, delayChildren: 0.05 } },
+}
+
+const fadeUp = {
+  hidden:  { opacity: 0, y: 28 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.65, ease: EASE } },
+}
+
+const fadeLeft = {
+  hidden:  { opacity: 0, x: -24 },
+  visible: { opacity: 1, x: 0,  transition: { duration: 0.55, ease: EASE } },
+}
+
+const cardReveal = {
+  hidden:  { opacity: 0, y: 20, scale: 0.98 },
+  visible: { opacity: 1, y: 0,  scale: 1,
+    transition: { duration: 0.6, ease: EASE } },
+}
+
+// ── CardImage ──────────────────────────────────────────────
+const CardImage = memo(function CardImage({ src, alt, icon, animateHover }) {
+  const [err, setErr] = useState(false)
+
+  if (src && !err) {
+    return (
+      <img
+        src={src}
+        alt={alt}
+        className={`w-full h-full object-cover object-center
+                    ${animateHover
+                      ? "transition-transform duration-[900ms] ease-out group-hover:scale-[1.07]"
+                      : ""}`}
+        loading="lazy"
+        decoding="async"
+        onError={() => setErr(true)}
+      />
+    )
   }
-}
-
-// ── Subcomponents ──────────────────────────────────────────
-
-const ServiceBadge = memo(function ServiceBadge({ count, size = "sm" }) {
-  if (!count || count <= 0) return null
-
-  const sizeClasses = size === "lg" ? "h-7 px-3" : "px-2.5 py-1"
 
   return (
-    <span
-      className={`inline-flex items-center ${sizeClasses} rounded-full
-                  bg-white/10 backdrop-blur-md border border-white/10`}
-    >
-      <span
-        className="text-white/70 tracking-wider uppercase"
-        style={{ fontSize: "9px", fontWeight: 500 }}
-      >
-        {count} {size === "lg" ? "services" : ""}
+    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
+      <span className="text-5xl">{icon || "🚗"}</span>
+    </div>
+  )
+})
+
+// ── ArrowCircle ────────────────────────────────────────────
+const ArrowCircle = memo(function ArrowCircle({ size = "sm" }) {
+  const dim = size === "lg" ? "w-11 h-11" : size === "md" ? "w-9 h-9" : "w-8 h-8"
+  const ico = size === "lg" ? 17 : size === "md" ? 14 : 13
+
+  return (
+    <div className={`${dim} rounded-full border border-white/20 bg-white/10 backdrop-blur-sm
+                     flex items-center justify-center shrink-0
+                     group-hover:bg-white group-hover:border-white
+                     transition-all duration-400`}>
+      <ArrowUpRight
+        size={ico}
+        strokeWidth={1.5}
+        className="text-white group-hover:text-black
+                   group-hover:translate-x-0.5 group-hover:-translate-y-0.5
+                   transition-all duration-400"
+      />
+    </div>
+  )
+})
+
+// ── ServiceCount badge ─────────────────────────────────────
+const CountBadge = memo(function CountBadge({ count, large }) {
+  if (!count || count <= 0) return null
+  return (
+    <span className={`inline-flex items-center rounded-full border border-white/15
+                      bg-white/10 backdrop-blur-sm
+                      ${large ? "px-3 py-1.5" : "px-2.5 py-1"}`}>
+      <span className="text-white/70 tracking-wider uppercase"
+        style={{ fontSize: "9px", fontWeight: 500 }}>
+        {count}{large ? " services" : ""}
       </span>
     </span>
   )
 })
 
-const ArrowButton = memo(function ArrowButton({ size = "sm", animated = false }) {
-  const dimensions = size === "lg" ? "w-12 h-12" : size === "md" ? "w-10 h-10" : "w-9 h-9"
-  const iconSize = size === "lg" ? 18 : size === "md" ? 16 : 14
-
+// ── Desktop card overlay gradient ─────────────────────────
+function Overlay({ featured }) {
   return (
     <div
-      className={`${dimensions} rounded-full bg-white/10 backdrop-blur-md
-                  border border-white/10 flex items-center justify-center
-                  ${animated
-                    ? "group-hover:bg-white group-hover:border-white group-hover:scale-110 transition-all duration-500"
-                    : ""
-                  }`}
-    >
-      <ArrowUpRight
-        size={iconSize}
-        strokeWidth={1.5}
-        className={`text-white ${animated
-          ? "group-hover:text-black group-hover:rotate-45 transition-all duration-500"
-          : ""
-        }`}
-      />
-    </div>
+      className={`absolute inset-0 transition-opacity duration-700
+                  ${featured
+                    ? "bg-gradient-to-t from-black/88 via-black/35 to-black/5 group-hover:from-black/92"
+                    : "bg-gradient-to-t from-black/82 via-black/25 to-transparent group-hover:from-black/88"}`}
+      aria-hidden="true"
+    />
   )
-})
+}
 
-const CardImage = memo(function CardImage({ src, alt, icon, size = "md", animated = false }) {
-  const [hasError, setHasError] = useState(false)
+// ── Desktop card ───────────────────────────────────────────
+const DesktopCard = memo(function DesktopCard({ category, index, total }) {
+  const { col, variant } = desktopLayout(index, total)
+  const featured = variant === "featured"
+  const wide     = variant === "wide"
+  const tall     = variant === "tall"
 
-  if (src && !hasError) {
-    return (
-      <img
-        src={src}
-        alt={alt}
-        className={`w-full h-full object-cover ${animated
-          ? "transition-transform duration-[800ms] ease-out group-hover:scale-110"
-          : ""
-        }`}
-        loading="lazy"
-        decoding="async"
-        onError={() => setHasError(true)}
-      />
-    )
-  }
-
-  const iconSize = size === "lg" ? "text-8xl" : size === "md" ? "text-6xl" : "text-4xl"
-
-  return (
-    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
-      <span className={iconSize}>{icon || "🚗"}</span>
-    </div>
-  )
-})
-
-// ── Mobile Service Card ────────────────────────────────────
-
-const MobileServiceCard = memo(function MobileServiceCard({ category, index, variant = "default" }) {
-  const image = category.image?.url
-
-  const isLarge = variant === "large"
-  const isTall = variant === "tall"
-  const isWide = variant === "wide"
-  const isExpanded = isLarge || isTall || isWide
+  const pad    = featured ? "p-8 lg:p-10" : wide ? "p-6 lg:p-8" : "p-5"
+  const fsize  = featured ? "clamp(26px,3vw,38px)" : wide ? "clamp(20px,2.5vw,26px)" : tall ? "clamp(18px,2vw,22px)" : "clamp(16px,1.8vw,20px)"
+  const radius = featured ? "rounded-[2rem]" : "rounded-[1.5rem]"
 
   return (
     <motion.a
+      variants={cardReveal}
       href={`/services?category=${category._id}`}
-      variants={scaleIn}
-      className={`group block relative overflow-hidden rounded-2xl
-                  active:scale-[0.98] transition-transform duration-200
-                  no-underline will-change-transform
-                  ${getMobileClasses(variant)}`}
-      style={{ WebkitTapHighlightColor: "transparent" }}
-    >
-      <div className="absolute inset-0 bg-gray-100">
-        <CardImage
-          src={image}
-          alt={category.name}
-          icon={category.icon}
-          size={isLarge ? "lg" : "md"}
-        />
-      </div>
-
-      <div
-        className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"
-        aria-hidden="true"
-      />
-
-      <div
-        className={`relative z-10 h-full flex flex-col justify-between
-                    ${isLarge ? "p-5" : isTall ? "p-4" : "p-3.5"}`}
-      >
-        <div className="flex items-start justify-between">
-          <ServiceBadge count={category.totalServices} />
-          <div className="ml-auto">
-            <ArrowButton size={isExpanded ? "md" : "sm"} />
-          </div>
-        </div>
-
-        <div>
-          {category.icon && (
-            <span
-              className={`block mb-1 ${isLarge ? "text-xl" : "text-base"}`}
-              aria-hidden="true"
-            >
-              {category.icon}
-            </span>
-          )}
-
-          <h3
-            className="text-white"
-            style={{
-              fontFamily: 'Georgia, "Times New Roman", serif',
-              fontWeight: 400,
-              fontSize: isLarge ? "22px" : isTall ? "18px" : "15px",
-              lineHeight: 1.2,
-              letterSpacing: "-0.02em",
-            }}
-          >
-            {category.name}
-          </h3>
-
-          {isExpanded && category.description && (
-            <p
-              className="text-white/45 line-clamp-2 mt-1.5 leading-relaxed"
-              style={{ fontSize: "11px" }}
-            >
-              {category.description}
-            </p>
-          )}
-        </div>
-      </div>
-    </motion.a>
-  )
-})
-
-// ── Desktop Service Card ───────────────────────────────────
-
-const DesktopServiceCard = memo(function DesktopServiceCard({ category, index, layout }) {
-  const image = category.image?.url
-  const { colSpan, rowSpan, variant } = layout
-  
-  const isFeatured = variant === "featured"
-  const isWide = variant === "wide"
-  const isTall = variant === "tall"
-
-  const gridClasses = `col-span-${colSpan} row-span-${rowSpan}`
-  
-  // Determine content sizing based on variant
-  const getPadding = () => {
-    if (isFeatured) return "p-8 lg:p-10"
-    if (isWide) return "p-6 lg:p-8"
-    if (isTall) return "p-6"
-    return "p-5 lg:p-6"
-  }
-
-  const getTitleSize = () => {
-    if (isFeatured) return "clamp(28px, 3vw, 40px)"
-    if (isWide) return "clamp(22px, 2.5vw, 28px)"
-    if (isTall) return "clamp(20px, 2vw, 26px)"
-    return "clamp(18px, 1.8vw, 22px)"
-  }
-
-  return (
-    <motion.a
-      href={`/services?category=${category._id}`}
-      variants={scaleIn}
+      whileHover={{ y: -3 }}
+      transition={{ duration: 0.25 }}
       className={`group block relative overflow-hidden no-underline will-change-transform
-                  ${isFeatured ? "rounded-[2rem]" : "rounded-3xl"}
-                  ${colSpan === 2 ? "col-span-2" : "col-span-1"}
-                  ${rowSpan === 2 ? "row-span-2" : "row-span-1"}`}
-      style={{ perspective: "1000px" }}
-      whileHover={{ y: -4 }}
-      transition={{ duration: 0.3 }}
+                  ${radius} ${col}`}
     >
       {/* Image */}
-      <div className="absolute inset-0 bg-gray-100 overflow-hidden">
+      <div className="absolute inset-0 overflow-hidden bg-gray-100">
         <CardImage
-          src={image}
+          src={category.image?.url}
           alt={category.name}
           icon={category.icon}
-          size={isFeatured ? "lg" : "md"}
-          animated
+          animateHover
         />
       </div>
 
-      {/* Gradient overlay */}
-      <div
-        className={`absolute inset-0 transition-all duration-700
-                    ${isFeatured 
-                      ? "bg-gradient-to-t from-black/85 via-black/30 to-black/5 group-hover:from-black/90 group-hover:via-black/40" 
-                      : "bg-gradient-to-t from-black/80 via-black/25 to-transparent group-hover:from-black/85"
-                    }`}
-        aria-hidden="true"
-      />
+      <Overlay featured={featured} />
 
-      {/* Shine effect */}
-      <div 
-        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700
-                   bg-gradient-to-tr from-transparent via-white/5 to-transparent"
-        aria-hidden="true"
-      />
+      {/* Inset border on hover */}
+      <div className="absolute inset-0 rounded-[inherit] opacity-0 group-hover:opacity-100
+                      transition-opacity duration-500 pointer-events-none
+                      shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]"
+        aria-hidden="true" />
 
       {/* Content */}
-      <div className={`relative z-10 h-full flex flex-col justify-between ${getPadding()}`}>
-        
-        {/* Top Row */}
-        <div className="flex items-start justify-between gap-3">
+      <div className={`relative z-10 h-full flex flex-col justify-between ${pad}`}>
+        {/* Top */}
+        <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2 flex-wrap">
-            <ServiceBadge count={category.totalServices} size={isFeatured ? "lg" : "sm"} />
-            {isFeatured && (
-              <span 
-                className="px-3 py-1 rounded-full bg-white/20 backdrop-blur-md
-                           text-white/80 tracking-wider uppercase hidden sm:inline-flex"
-                style={{ fontSize: "9px", fontWeight: 500 }}
-              >
+            <CountBadge count={category.totalServices} large={featured} />
+            {featured && (
+              <span className="hidden sm:inline-flex px-3 py-1 rounded-full
+                               bg-white/15 backdrop-blur-sm border border-white/10
+                               text-white/70 tracking-wider uppercase"
+                style={{ fontSize: "8px", fontWeight: 500 }}>
                 Popular
               </span>
             )}
           </div>
-          <ArrowButton size={isFeatured ? "lg" : "md"} animated />
+          <ArrowCircle size={featured ? "lg" : "md"} />
         </div>
 
-        {/* Bottom Content */}
-        <div className={isFeatured ? "max-w-lg" : ""}>
-          {/* Category icon */}
+        {/* Bottom */}
+        <div>
           {category.icon && (
-            <span 
+            <span
               className={`block mb-2 transition-transform duration-500 group-hover:scale-110 origin-left
-                          ${isFeatured ? "text-3xl" : isWide || isTall ? "text-2xl" : "text-xl"}`}
+                          ${featured ? "text-3xl" : wide || tall ? "text-2xl" : "text-xl"}`}
               aria-hidden="true"
             >
               {category.icon}
             </span>
           )}
 
-          {/* Title */}
           <h3
-            className="text-white mb-1.5 transition-transform duration-500 group-hover:translate-x-1"
-            style={{
-              fontFamily: 'Georgia, "Times New Roman", serif',
-              fontWeight: 400,
-              fontSize: getTitleSize(),
-              letterSpacing: "-0.02em",
-              lineHeight: 1.15,
-            }}
+            className="text-white mb-1.5 leading-tight"
+            style={{ fontFamily: SERIF, fontWeight: 400, fontSize: fsize, letterSpacing: "-0.02em" }}
           >
             {category.name}
           </h3>
 
-          {/* Description - show more lines for larger cards */}
           {category.description && (
-            <p
-              className={`text-white/50 leading-relaxed transition-all duration-500
-                          group-hover:text-white/70
-                          ${isFeatured ? "line-clamp-3 text-sm lg:text-base" : 
-                            isWide ? "line-clamp-2 text-sm" : 
-                            isTall ? "line-clamp-3 text-sm" : "line-clamp-2 text-xs"}`}
-            >
+            <p className={`text-white/50 leading-relaxed group-hover:text-white/65
+                           transition-colors duration-500
+                           ${featured ? "line-clamp-3 text-sm" : wide ? "line-clamp-2 text-[13px]" : "line-clamp-2 text-xs"}`}>
               {category.description}
             </p>
           )}
 
-          {/* CTA hint - for featured and wide */}
-          {(isFeatured || isWide) && (
-            <div className="mt-4 flex items-center gap-2 text-white/40 group-hover:text-white/70 transition-colors duration-500">
-              <span className="text-xs tracking-wider uppercase">Explore services</span>
-              <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform duration-300" />
+          {(featured || wide) && (
+            <div className="mt-4 flex items-center gap-2 text-white/35 group-hover:text-white/65
+                            transition-colors duration-400">
+              <span style={{ fontSize: "10px", letterSpacing: "0.15em" }}
+                className="uppercase tracking-wider">Explore</span>
+              <ArrowRight size={12}
+                className="group-hover:translate-x-1 transition-transform duration-300" />
             </div>
           )}
         </div>
       </div>
-
-      {/* Border glow on hover */}
-      <div 
-        className="absolute inset-0 rounded-[inherit] opacity-0 group-hover:opacity-100 
-                   transition-opacity duration-500 pointer-events-none
-                   shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)]"
-        aria-hidden="true"
-      />
     </motion.a>
   )
 })
 
-// ── Skeleton Loaders ───────────────────────────────────────
-
-const SkeletonCard = memo(function SkeletonCard({ colSpan = 1, rowSpan = 1, mobile = false }) {
-  const baseClasses = "bg-gradient-to-br from-gray-100 to-gray-50 animate-pulse"
-
-  if (mobile) {
-    return <div className={`${baseClasses} rounded-2xl`} />
-  }
+// ── Mobile card ────────────────────────────────────────────
+const MobileCard = memo(function MobileCard({ category, index, total }) {
+  const span    = mobileLayout(index, total)
+  const isLarge = index === 0
+  const isTall  = span.includes("row-span-2")
 
   return (
-    <div 
-      className={`${baseClasses} rounded-3xl
-                  ${colSpan === 2 ? "col-span-2" : "col-span-1"}
-                  ${rowSpan === 2 ? "row-span-2" : "row-span-1"}`} 
-    />
+    <motion.a
+      variants={cardReveal}
+      href={`/services?category=${category._id}`}
+      className={`group block relative overflow-hidden rounded-2xl
+                  active:scale-[0.97] transition-transform duration-200
+                  no-underline will-change-transform ${span}`}
+      style={{ WebkitTapHighlightColor: "transparent" }}
+    >
+      <div className="absolute inset-0 bg-gray-100">
+        <CardImage
+          src={category.image?.url}
+          alt={category.name}
+          icon={category.icon}
+        />
+      </div>
+
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"
+        aria-hidden="true" />
+
+      <div className={`relative z-10 h-full flex flex-col justify-between
+                       ${isLarge ? "p-4" : "p-3.5"}`}>
+        <div className="flex items-start justify-between">
+          <CountBadge count={category.totalServices} />
+          <ArrowCircle size={isLarge ? "md" : "sm"} />
+        </div>
+
+        <div>
+          {category.icon && (
+            <span className={`block mb-1 ${isLarge ? "text-xl" : "text-base"}`} aria-hidden="true">
+              {category.icon}
+            </span>
+          )}
+          <h3
+            className="text-white leading-tight"
+            style={{
+              fontFamily: SERIF, fontWeight: 400, letterSpacing: "-0.02em",
+              fontSize: isLarge ? "20px" : isTall ? "17px" : "14px",
+            }}
+          >
+            {category.name}
+          </h3>
+          {isLarge && category.description && (
+            <p className="text-white/45 line-clamp-2 mt-1 leading-relaxed"
+              style={{ fontSize: "11px" }}>
+              {category.description}
+            </p>
+          )}
+        </div>
+      </div>
+    </motion.a>
   )
 })
 
-const LoadingGrid = memo(function LoadingGrid() {
+// ── Skeleton ───────────────────────────────────────────────
+function Skeleton() {
   return (
     <>
       {/* Mobile */}
       <div className="md:hidden grid grid-cols-2 gap-3 auto-rows-[140px]">
-        <div className="col-span-2 row-span-2 bg-gradient-to-br from-gray-100 to-gray-50 animate-pulse rounded-2xl" />
-        <div className="bg-gradient-to-br from-gray-100 to-gray-50 animate-pulse rounded-2xl" />
-        <div className="bg-gradient-to-br from-gray-100 to-gray-50 animate-pulse rounded-2xl" />
+        {[...Array(4)].map((_, i) => (
+          <div key={i}
+            className={`bg-gray-100 animate-pulse rounded-2xl
+                        ${i === 0 ? "col-span-2 row-span-2" : ""}`} />
+        ))}
       </div>
-
       {/* Desktop */}
       <div className="hidden md:grid md:grid-cols-4 gap-5 lg:gap-6 auto-rows-[180px] lg:auto-rows-[200px]">
-        <SkeletonCard colSpan={2} rowSpan={2} />
-        <SkeletonCard colSpan={2} rowSpan={1} />
-        <SkeletonCard colSpan={2} rowSpan={1} />
+        {[
+          "md:col-span-2 md:row-span-2",
+          "md:col-span-1 md:row-span-1",
+          "md:col-span-1 md:row-span-1",
+          "md:col-span-1 md:row-span-1",
+          "md:col-span-1 md:row-span-1",
+        ].map((cls, i) => (
+          <div key={i} className={`bg-gray-100 animate-pulse rounded-[1.5rem] ${cls}`} />
+        ))}
       </div>
     </>
   )
-})
+}
 
-// ── Trust Bar ──────────────────────────────────────────────
-
-const TrustItem = memo(function TrustItem({ icon: Icon, label, desc, index }) {
+// ── Empty / Error ──────────────────────────────────────────
+function StateMessage({ type, onRetry }) {
   return (
     <motion.div
-      variants={fadeInUp}
-      className="flex flex-col items-center text-center p-3 sm:p-4
-                 rounded-2xl bg-gray-50/80 hover:bg-gray-100/80
-                 sm:flex-row sm:items-center sm:text-left sm:gap-3
-                 transition-colors duration-300"
-    >
-      <div
-        className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white shadow-sm
-                   flex items-center justify-center shrink-0 mb-2 sm:mb-0"
-      >
-        <Icon size={18} strokeWidth={1.3} className="text-gray-400" />
-      </div>
-      <div>
-        <p
-          className="text-black text-xs sm:text-sm leading-tight"
-          style={{ fontFamily: "Georgia, serif", fontWeight: 400 }}
-        >
-          {label}
-        </p>
-        <p className="text-gray-400 text-[10px] sm:text-xs leading-tight">
-          {desc}
-        </p>
-      </div>
-    </motion.div>
-  )
-})
-
-const TrustBar = memo(function TrustBar() {
-  const ref = useRef(null)
-  const isInView = useInView(ref, { once: true, margin: "-50px" })
-
-  return (
-    <motion.div
-      ref={ref}
-      initial="hidden"
-      animate={isInView ? "visible" : "hidden"}
-      variants={staggerContainer}
-      className="grid grid-cols-3 gap-2 sm:gap-5 mt-10 md:mt-20 pt-8 md:pt-12
-                 border-t border-gray-100"
-    >
-      {TRUST_ITEMS.map((item, i) => (
-        <TrustItem key={i} index={i} {...item} />
-      ))}
-    </motion.div>
-  )
-})
-
-// ── Empty / Error States ───────────────────────────────────
-
-const EmptyState = memo(function EmptyState({ type = "empty", onRetry }) {
-  const isError = type === "error"
-
-  return (
-    <motion.div 
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="text-center py-16 md:py-24"
+      className="text-center py-20"
     >
-      <div
-        className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-gray-50
-                   flex items-center justify-center"
-      >
-        <span className="text-2xl">{isError ? "⚠️" : "🧹"}</span>
+      <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-gray-50 flex items-center justify-center">
+        <span className="text-3xl">{type === "error" ? "⚠️" : "🧹"}</span>
       </div>
-
-      <h3
-        className="text-black mb-2"
-        style={{ fontFamily: "Georgia, serif", fontSize: "18px", fontWeight: 400 }}
-      >
-        {isError ? "Something went wrong" : "No services yet"}
+      <h3 className="text-black mb-2" style={{ fontFamily: SERIF, fontSize: "18px", fontWeight: 400 }}>
+        {type === "error" ? "Something went wrong" : "No services yet"}
       </h3>
-
-      <p className="text-gray-400 mb-6" style={{ fontSize: "14px" }}>
-        {isError ? "Unable to load services" : "Check back soon!"}
+      <p className="text-gray-400 mb-7" style={{ fontSize: "14px" }}>
+        {type === "error" ? "Unable to load services." : "Check back soon!"}
       </p>
-
-      {isError && onRetry && (
+      {type === "error" && onRetry && (
         <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.97 }}
+          whileTap={{ scale: 0.96 }}
           onClick={onRetry}
-          className="h-12 px-8 bg-black text-white rounded-full
-                     tracking-wider uppercase hover:bg-gray-800
+          className="inline-flex items-center gap-2 h-12 px-7 bg-black text-white
+                     rounded-full tracking-wider uppercase hover:bg-gray-800
                      transition-colors duration-300"
-          style={{ fontSize: "11px", fontWeight: 500 }}
+          style={{ fontSize: "10px", fontWeight: 500 }}
         >
+          <RotateCcw size={13} strokeWidth={1.5} />
           Try Again
         </motion.button>
       )}
     </motion.div>
   )
-})
+}
 
-// ── Section Header ─────────────────────────────────────────
-
+// ── Section header ─────────────────────────────────────────
 const SectionHeader = memo(function SectionHeader() {
   const ref = useRef(null)
-  const isInView = useInView(ref, { once: true, margin: "-100px" })
+  const inView = useInView(ref, { once: true, margin: "-80px" })
 
   return (
-    <motion.header 
+    <motion.header
       ref={ref}
+      variants={stagger}
       initial="hidden"
-      animate={isInView ? "visible" : "hidden"}
-      variants={staggerContainer}
+      animate={inView ? "visible" : "hidden"}
       className="mb-10 md:mb-16 lg:mb-20"
     >
-      <motion.div
-        variants={fadeInLeft}
-        className="flex items-center gap-4 mb-4 md:mb-6"
-      >
+      <motion.div variants={fadeLeft} className="flex items-center gap-4 mb-5">
         <span className="block w-10 h-px bg-black" aria-hidden="true" />
-        <span
-          className="tracking-[0.4em] uppercase text-gray-400"
-          style={{ fontFamily: "Georgia, serif", fontSize: "10px" }}
-        >
+        <span className="tracking-[0.4em] uppercase text-gray-400"
+          style={{ fontFamily: SERIF, fontSize: "10px" }}>
           Our Services
         </span>
       </motion.div>
 
-      <div className="md:flex md:items-end md:justify-between md:gap-8">
+      <div className="md:flex md:items-end md:justify-between md:gap-10">
         <motion.h2
-          variants={fadeInUp}
+          variants={fadeUp}
           id="services-heading"
           className="text-black mb-4 md:mb-0"
           style={{
-            fontFamily: 'Georgia, "Times New Roman", serif',
-            fontWeight: 300,
-            fontSize: "clamp(32px, 7vw, 60px)",
-            lineHeight: 1.05,
-            letterSpacing: "-0.03em",
+            fontFamily: SERIF, fontWeight: 300,
+            fontSize: "clamp(2rem, 7vw, 3.75rem)",
+            lineHeight: 1.05, letterSpacing: "-0.03em",
           }}
         >
           What We<br className="hidden sm:block" /> Offer
         </motion.h2>
 
         <motion.p
-          variants={fadeInUp}
-          className="text-gray-400 max-w-sm leading-relaxed md:text-right"
-          style={{ fontSize: "15px" }}
+          variants={fadeUp}
+          className="text-gray-400 max-w-xs leading-relaxed md:text-right"
+          style={{ fontSize: "14px" }}
         >
-          Premium car care solutions crafted for perfection, delivered right to your doorstep.
+          Premium cleaning solutions delivered right to your doorstep — fast, safe &amp; hassle-free.
         </motion.p>
       </div>
     </motion.header>
   )
 })
 
-// ── View All Button ────────────────────────────────────────
-
-const ViewAllButton = memo(function ViewAllButton() {
+// ── Trust bar ──────────────────────────────────────────────
+const TrustBar = memo(function TrustBar() {
   const ref = useRef(null)
-  const isInView = useInView(ref, { once: true, margin: "-50px" })
+  const inView = useInView(ref, { once: true, margin: "-40px" })
 
   return (
-    <motion.div 
+    <motion.div
       ref={ref}
-      initial={{ opacity: 0, y: 20 }}
-      animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-      transition={{ duration: 0.6, delay: 0.2 }}
-      className="flex justify-center mt-10 md:mt-16"
+      variants={stagger}
+      initial="hidden"
+      animate={inView ? "visible" : "hidden"}
+      className="grid grid-cols-3 gap-2 sm:gap-4 mt-10 md:mt-16
+                 pt-8 md:pt-10 border-t border-gray-100"
+    >
+      {TRUST_ITEMS.map(({ icon: Icon, label, desc }, i) => (
+        <motion.div
+          key={i}
+          variants={fadeUp}
+          className="flex flex-col sm:flex-row items-center sm:items-center gap-2 sm:gap-3
+                     p-3 sm:p-4 rounded-2xl bg-gray-50 hover:bg-gray-100
+                     transition-colors duration-300 text-center sm:text-left"
+        >
+          <div className="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center shrink-0">
+            <Icon size={17} strokeWidth={1.3} className="text-gray-400" />
+          </div>
+          <div>
+            <p className="text-black leading-tight" style={{ fontFamily: SERIF, fontSize: "13px" }}>
+              {label}
+            </p>
+            <p className="text-gray-400 leading-tight" style={{ fontSize: "11px" }}>
+              {desc}
+            </p>
+          </div>
+        </motion.div>
+      ))}
+    </motion.div>
+  )
+})
+
+// ── View all CTA ───────────────────────────────────────────
+const ViewAll = memo(function ViewAll() {
+  const ref = useRef(null)
+  const inView = useInView(ref, { once: true, margin: "-40px" })
+
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, y: 16 }}
+      animate={inView ? { opacity: 1, y: 0 } : {}}
+      transition={{ duration: 0.55, delay: 0.15 }}
+      className="flex justify-center mt-10 md:mt-14"
     >
       <motion.a
         href="/services"
         whileHover={{ scale: 1.02, y: -2 }}
-        whileTap={{ scale: 0.98 }}
-        className="group relative flex items-center justify-center gap-3
-                   w-full sm:w-auto h-14 sm:h-16 px-10
-                   bg-black text-white rounded-full overflow-hidden
-                   hover:shadow-xl hover:shadow-black/10
-                   transition-shadow duration-500 no-underline"
+        whileTap={{ scale: 0.97 }}
+        className="group relative inline-flex items-center justify-center gap-3
+                   w-full sm:w-auto h-14 px-10 bg-black text-white
+                   rounded-full overflow-hidden no-underline
+                   hover:shadow-xl hover:shadow-black/10 transition-shadow duration-500"
       >
-        {/* Hover background sweep */}
-        <div 
-          className="absolute inset-0 bg-gradient-to-r from-gray-800 to-gray-900 
-                     translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-500"
-          aria-hidden="true"
-        />
-        
-        <span
-          className="relative z-10 tracking-wider uppercase"
-          style={{ fontSize: "11px", fontWeight: 500, letterSpacing: "0.15em" }}
-        >
+        {/* Sweep */}
+        <div className="absolute inset-0 bg-gradient-to-r from-gray-800 to-gray-900
+                        -translate-x-full group-hover:translate-x-0
+                        transition-transform duration-500"
+          aria-hidden="true" />
+        <span className="relative z-10 tracking-wider uppercase"
+          style={{ fontSize: "11px", fontWeight: 500, letterSpacing: "0.14em" }}>
           View All Services
         </span>
-        <ArrowRight
-          size={16}
-          strokeWidth={1.5}
-          className="relative z-10 group-hover:translate-x-1 transition-transform duration-300"
-        />
+        <ArrowRight size={15} strokeWidth={1.5}
+          className="relative z-10 group-hover:translate-x-1 transition-transform duration-300" />
       </motion.a>
     </motion.div>
   )
 })
 
-// ── Services Grid ──────────────────────────────────────────
-
+// ── Services grid ──────────────────────────────────────────
 const ServicesGrid = memo(function ServicesGrid({ categories }) {
   const ref = useRef(null)
-  const isInView = useInView(ref, { once: true, margin: "-50px" })
+  const inView = useInView(ref, { once: true, margin: "-40px" })
 
   return (
     <motion.div
       ref={ref}
+      variants={stagger}
       initial="hidden"
-      animate={isInView ? "visible" : "hidden"}
-      variants={staggerContainer}
+      animate={inView ? "visible" : "hidden"}
     >
-      {/* Mobile Grid */}
+      {/* Mobile */}
       <div className="md:hidden grid grid-cols-2 gap-3 auto-rows-[140px]">
-        {categories.map((category, i) => (
-          <MobileServiceCard
-            key={category._id}
-            category={category}
-            index={i}
-            variant={getMobileLayout(i, categories.length)}
-          />
+        {categories.map((cat, i) => (
+          <MobileCard key={cat._id} category={cat} index={i} total={categories.length} />
         ))}
       </div>
 
-      {/* Desktop Grid - Optimized Bento Layout */}
-      <div className="hidden md:grid md:grid-cols-4 gap-5 lg:gap-6 auto-rows-[180px] lg:auto-rows-[200px]">
-        {categories.map((category, i) => (
-          <DesktopServiceCard
-            key={category._id}
-            category={category}
-            index={i}
-            layout={getDesktopLayout(i, categories.length)}
-          />
+      {/* Desktop */}
+      <div className="hidden md:grid md:grid-cols-4 gap-5 lg:gap-6
+                      auto-rows-[180px] lg:auto-rows-[200px]">
+        {categories.map((cat, i) => (
+          <DesktopCard key={cat._id} category={cat} index={i} total={categories.length} />
         ))}
       </div>
     </motion.div>
   )
 })
 
-// ── Main Component ─────────────────────────────────────────
-
+// ── Main ───────────────────────────────────────────────────
 export default function Services() {
   const [categories, setCategories] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
+  const [loading, setLoading]       = useState(true)
+  const [error, setError]           = useState(false)
 
-  const fetchCategories = useCallback(async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     setError(false)
-
     try {
       const data = await getCategories()
-      setCategories(Array.isArray(data) ? data : [])
-    } catch (err) {
-      if (process.env.NODE_ENV === "development") {
-        console.error("Failed to fetch categories:", err)
-      }
+      setCategories(Array.isArray(data) ? data.slice(0, MAX_VISIBLE) : [])
+    } catch (e) {
+      if (process.env.NODE_ENV === "development") console.error(e)
       setError(true)
-      setCategories([])
     } finally {
       setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    let isMounted = true
-    
-    const load = async () => {
-      try {
-        const data = await getCategories()
-        if (isMounted) {
-          setCategories(Array.isArray(data) ? data : [])
-          setLoading(false)
-        }
-      } catch (err) {
-        if (isMounted) {
-          if (process.env.NODE_ENV === "development") {
-            console.error("Failed to fetch categories:", err)
-          }
-          setError(true)
-          setLoading(false)
-        }
-      }
-    }
-
-    load()
-    
-    return () => {
-      isMounted = false
-    }
+    let alive = true
+    getCategories()
+      .then(data => { if (alive) setCategories(Array.isArray(data) ? data.slice(0, MAX_VISIBLE) : []) })
+      .catch(()  => { if (alive) setError(true) })
+      .finally(() => { if (alive) setLoading(false) })
+    return () => { alive = false }
   }, [])
-
-  const visibleCategories = categories.slice(0, MAX_VISIBLE_SERVICES)
 
   return (
     <section
       className="w-full bg-white py-16 md:py-28 lg:py-36"
-      style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
+      style={{ fontFamily: SANS }}
       aria-labelledby="services-heading"
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-8 md:px-12 lg:px-16">
@@ -761,41 +558,21 @@ export default function Services() {
 
         <AnimatePresence mode="wait">
           {loading ? (
-            <motion.div
-              key="loading"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-            >
-              <LoadingGrid />
+            <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <Skeleton />
             </motion.div>
           ) : error ? (
-            <motion.div
-              key="error"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-            >
-              <EmptyState type="error" onRetry={fetchCategories} />
+            <motion.div key="error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <StateMessage type="error" onRetry={load} />
             </motion.div>
           ) : categories.length === 0 ? (
-            <motion.div
-              key="empty"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-            >
-              <EmptyState type="empty" />
+            <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <StateMessage type="empty" />
             </motion.div>
           ) : (
-            <motion.div
-              key="content"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-            >
-              <ServicesGrid categories={visibleCategories} />
-              <ViewAllButton />
+            <motion.div key="content" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <ServicesGrid categories={categories} />
+              <ViewAll />
               <TrustBar />
             </motion.div>
           )}
