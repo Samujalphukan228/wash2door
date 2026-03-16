@@ -1,102 +1,159 @@
-// lib/services.api.js
+// src/lib/booking.api.js
 
-import api from './api'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
 
-export const getPublicServices = async (params = {}) => {
-    try {
-        console.log('📡 getPublicServices params:', params)
-        const res = await api.get('/public/services', { params })
-        console.log('📡 getPublicServices response:', res.data)
+/**
+ * Create a new booking
+ */
+export async function createBooking(bookingData) {
+  const token = localStorage.getItem("token")
+  
+  const response = await fetch(`${API_URL}/bookings`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
+    body: JSON.stringify(bookingData),
+  })
 
-        if (res.data?.success && Array.isArray(res.data?.data)) {
-            return res.data.data
-        }
+  const data = await response.json()
 
-        return []
-    } catch (error) {
-        console.error('📡 getPublicServices error:', error.message)
-        throw error
-    }
+  if (!response.ok) {
+    throw new Error(data.message || "Failed to create booking")
+  }
+
+  return data
 }
 
-export const getServicesByCategory = async (categoryId) => {
-    try {
-        const res = await api.get('/public/services', {
-            params: { category: categoryId }
-        })
+/**
+ * Get all bookings for the current user
+ */
+export async function getUserBookings() {
+  const token = localStorage.getItem("token")
 
-        if (res.data?.success && Array.isArray(res.data?.data)) {
-            return res.data.data
-        }
+  if (!token) {
+    throw new Error("Authentication required")
+  }
 
-        return []
-    } catch (error) {
-        console.error('📡 getServicesByCategory error:', error.message)
-        throw error
-    }
+  const response = await fetch(`${API_URL}/bookings/my-bookings`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data.message || "Failed to fetch bookings")
+  }
+
+  return data
 }
 
-export const getServiceDetails = async (serviceId) => {
-    try {
-        const res = await api.get(`/public/services/${serviceId}`)
+/**
+ * Get a single booking by ID
+ */
+export async function getBookingById(bookingId) {
+  const token = localStorage.getItem("token")
 
-        if (res.data?.success) {
-            return res.data.data
-        }
+  if (!token) {
+    throw new Error("Authentication required")
+  }
 
-        return res.data?.data || res.data
-    } catch (error) {
-        console.error('📡 getServiceDetails error:', error.message)
-        throw error
-    }
+  const response = await fetch(`${API_URL}/bookings/${bookingId}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data.message || "Failed to fetch booking")
+  }
+
+  return data
 }
 
-export const getCategories = async () => {
-    try {
-        const res = await api.get('/public/categories')
-        console.log('📡 getCategories response:', res.data)
+/**
+ * Cancel a booking
+ */
+export async function cancelBooking(bookingId) {
+  const token = localStorage.getItem("token")
 
-        if (res.data?.success && Array.isArray(res.data?.data)) {
-            return res.data.data
-        }
+  if (!token) {
+    throw new Error("Authentication required")
+  }
 
-        return []
-    } catch (error) {
-        console.error('📡 getCategories error:', error.message)
-        throw error
-    }
+  const response = await fetch(`${API_URL}/bookings/${bookingId}/cancel`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data.message || "Failed to cancel booking")
+  }
+
+  return data
 }
 
-export const getFeaturedServices = async () => {
-    try {
-        const res = await api.get('/public/services', {
-            params: { featured: true }
-        })
+/**
+ * Reschedule a booking
+ */
+export async function rescheduleBooking(bookingId, newDate, newTime) {
+  const token = localStorage.getItem("token")
 
-        if (res.data?.success && Array.isArray(res.data?.data)) {
-            return res.data.data
-        }
+  if (!token) {
+    throw new Error("Authentication required")
+  }
 
-        return []
-    } catch (error) {
-        console.error('📡 getFeaturedServices error:', error.message)
-        throw error
-    }
+  const response = await fetch(`${API_URL}/bookings/${bookingId}/reschedule`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ date: newDate, time: newTime }),
+  })
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data.message || "Failed to reschedule booking")
+  }
+
+  return data
 }
 
-export const checkAvailability = async (serviceId, date) => {
-    try {
-        const res = await api.get('/public/availability', {
-            params: { serviceId, date }
-        })
-
-        if (res.data?.success) {
-            return res.data.data
-        }
-
-        return res.data?.data || res.data
-    } catch (error) {
-        console.error('📡 checkAvailability error:', error.message)
-        throw error
+/**
+ * Get available time slots for a specific date
+ */
+export async function getAvailableSlots(date, serviceId) {
+  const response = await fetch(
+    `${API_URL}/bookings/available-slots?date=${date}&serviceId=${serviceId}`,
+    {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
     }
+  )
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data.message || "Failed to fetch available slots")
+  }
+
+  return data
 }
