@@ -1,7 +1,7 @@
 // components/booking/DateTimeStep.jsx
 "use client"
 
-import { useEffect, useRef, useState, memo } from "react"
+import { useEffect, useState } from "react"
 import { Loader2, Calendar, Clock, AlertCircle, ChevronLeft, ChevronRight } from "lucide-react"
 import { checkAvailability } from "@/lib/booking.api"
 
@@ -17,10 +17,10 @@ export default function DateTimeStep({ data, onUpdate, onNext, onBack }) {
     const [closedMessage, setClosedMessage] = useState("")
 
     useEffect(() => {
-        if (selectedDate && data.serviceId) {
+        if (selectedDate) {
             fetchAvailability()
         }
-    }, [selectedDate, data.serviceId])
+    }, [selectedDate])
 
     const fetchAvailability = async () => {
         try {
@@ -29,16 +29,27 @@ export default function DateTimeStep({ data, onUpdate, onNext, onBack }) {
             setClosedMessage("")
 
             const dateStr = selectedDate.toISOString().split('T')[0]
-            const result = await checkAvailability(data.serviceId, dateStr)
+            
+            // ✅ FIXED: Only pass date, no serviceId needed
+            const result = await checkAvailability(dateStr)
 
-            if (!result.isAvailable) {
-                setClosedMessage(result.message || "Not available on this day")
+            console.log('📅 Availability result:', result)
+
+            // ✅ FIXED: Handle response structure correctly
+            const availabilityData = result.data || result
+
+            if (availabilityData.isClosed) {
+                setClosedMessage(availabilityData.message || "We are closed on this day")
+                setSlots([])
+            } else if (!availabilityData.isAvailable) {
+                setClosedMessage("No available slots for this day")
                 setSlots([])
             } else {
-                setSlots(result.slots || [])
+                setSlots(availabilityData.slots || [])
             }
         } catch (err) {
-            setError(err.message)
+            console.error('❌ Availability error:', err)
+            setError(err.message || "Failed to check availability")
         } finally {
             setLoading(false)
         }
@@ -180,6 +191,11 @@ export default function DateTimeStep({ data, onUpdate, onNext, onBack }) {
                         <div className="text-center py-16">
                             <AlertCircle size={32} className="mx-auto text-amber-300 mb-4" />
                             <p className="text-amber-600 text-xs">{closedMessage}</p>
+                        </div>
+                    ) : slots.length === 0 ? (
+                        <div className="text-center py-16">
+                            <Clock size={32} className="mx-auto text-gray-200 mb-4" />
+                            <p className="text-gray-400 text-xs">No slots available</p>
                         </div>
                     ) : (
                         <div className="grid grid-cols-2 gap-3">

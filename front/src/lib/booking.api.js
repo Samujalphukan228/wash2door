@@ -126,12 +126,12 @@ export async function getAvailableSlots(date, serviceId) {
 }
 
 /**
- * Check availability for a service on a date
+ * Check availability for a date (GLOBAL - no serviceId needed)
  */
-export async function checkAvailability(serviceId, date) {
+export async function checkAvailability(date) {
   try {
     const response = await api.get('/bookings/availability', {
-      params: { serviceId, date }
+      params: { date }
     })
     
     if (response.data?.success) {
