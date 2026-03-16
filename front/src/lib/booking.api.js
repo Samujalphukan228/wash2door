@@ -9,7 +9,7 @@ export async function createBooking(bookingData) {
     const response = await api.post('/bookings', bookingData)
     
     if (response.data?.success) {
-      return response.data
+      return response.data.data  // ← FIXED
     }
     
     throw new Error(response.data?.message || 'Failed to create booking')
@@ -33,7 +33,7 @@ export async function getUserBookings(statusFilter = "", page = 1, limit = 10) {
     const response = await api.get(`/bookings/my-bookings?${params.toString()}`)
     
     if (response.data?.success) {
-      return response.data
+      return response.data.data  // ← FIXED: Returns { bookings: [], total, pages }
     }
     
     throw new Error(response.data?.message || 'Failed to fetch bookings')
@@ -52,7 +52,7 @@ export async function getBookingById(bookingId) {
     const response = await api.get(`/bookings/${bookingId}`)
     
     if (response.data?.success) {
-      return response.data
+      return response.data.data  // ← FIXED
     }
     
     throw new Error(response.data?.message || 'Failed to fetch booking')
@@ -68,10 +68,10 @@ export async function getBookingById(bookingId) {
  */
 export async function cancelBooking(bookingId, reason = "") {
   try {
-    const response = await api.patch(`/bookings/${bookingId}/cancel`, { reason })
+    const response = await api.put(`/bookings/${bookingId}/cancel`, { reason })  // ← FIXED: PUT not PATCH
     
     if (response.data?.success) {
-      return response.data
+      return response.data.data  // ← FIXED
     }
     
     throw new Error(response.data?.message || 'Failed to cancel booking')
@@ -85,15 +85,15 @@ export async function cancelBooking(bookingId, reason = "") {
 /**
  * Reschedule a booking
  */
-export async function rescheduleBooking(bookingId, newDate, newTime) {
+export async function rescheduleBooking(bookingId, newDate, newTimeSlot) {
   try {
-    const response = await api.patch(`/bookings/${bookingId}/reschedule`, {
-      date: newDate,
-      time: newTime
+    const response = await api.put(`/bookings/${bookingId}/reschedule`, {  // ← FIXED: PUT not PATCH
+      newDate,
+      newTimeSlot
     })
     
     if (response.data?.success) {
-      return response.data
+      return response.data.data  // ← FIXED
     }
     
     throw new Error(response.data?.message || 'Failed to reschedule booking')
@@ -114,10 +114,10 @@ export async function getAvailableSlots(date, serviceId) {
     })
     
     if (response.data?.success) {
-      return response.data.data || response.data || []
+      return response.data.data || []
     }
     
-    return response.data || []
+    return []
   } catch (error) {
     throw new Error(
       error.response?.data?.message || error.message || 'Failed to fetch available slots'

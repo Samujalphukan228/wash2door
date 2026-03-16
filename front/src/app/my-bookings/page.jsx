@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, useEffect, useRef, memo, useCallback } from "react"
+import { useState, useEffect, memo, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/context/AuthContext"
+import { motion, AnimatePresence } from "framer-motion"
 import {
   Calendar,
   Clock,
@@ -16,7 +17,6 @@ import {
   CheckCircle,
   XCircle,
   RotateCcw,
-  Star,
   X,
   Phone,
   ArrowRight,
@@ -65,34 +65,10 @@ const FILTER_OPTIONS = [
   { value: "cancelled", label: "Cancelled" },
 ]
 
-// ── GSAP Loader (cached) ──────────────────────────────────
-let cachedGsap = null
-
-async function loadGsap() {
-  if (!cachedGsap) {
-    const { default: gsap } = await import("gsap")
-    cachedGsap = gsap
-  }
-  return cachedGsap
-}
-
-// ── Scrollbar Hide Styles ─────────────────────────────────
-const SCROLLBAR_HIDE_CLASS = "bookings-hide-scrollbar"
-let scrollbarStyleInjected = false
-
-function injectScrollbarStyles() {
-  if (scrollbarStyleInjected || typeof document === "undefined") return
-  const style = document.createElement("style")
-  style.textContent = `.${SCROLLBAR_HIDE_CLASS}::-webkit-scrollbar { display: none; }`
-  document.head.appendChild(style)
-  scrollbarStyleInjected = true
-}
-
 // ── Scroll Lock Hook ──────────────────────────────────────
 function useScrollLock(isLocked) {
   useEffect(() => {
     if (!isLocked) return
-
     const scrollY = window.scrollY
     document.body.style.position = "fixed"
     document.body.style.top = `-${scrollY}px`
@@ -100,7 +76,6 @@ function useScrollLock(isLocked) {
     document.body.style.right = "0"
     document.body.style.overflow = "hidden"
     document.body.style.width = "100%"
-
     return () => {
       document.body.style.position = ""
       document.body.style.top = ""
@@ -113,25 +88,50 @@ function useScrollLock(isLocked) {
   }, [isLocked])
 }
 
-// ── Visibility helper ─────────────────────────────────────
-function makeFallbackVisible(element) {
-  if (!element) return
-  element.style.opacity = "1"
-  element.style.transform = "none"
-  element.classList.remove("opacity-0")
+// ── Format Date Helper ────────────────────────────────────
+function formatDate(date) {
+  const d = new Date(date)
+  const today = new Date()
+  const tomorrow = new Date(today)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  if (d.toDateString() === today.toDateString()) return "Today"
+  if (d.toDateString() === tomorrow.toDateString()) return "Tomorrow"
+  return d.toLocaleDateString("en-IN", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  })
+}
+
+// ── Animation Variants ────────────────────────────────────
+const fadeUp = {
+  hidden: { opacity: 0, y: 24 },
+  visible: (i = 0) => ({
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.5, delay: i * 0.08, ease: [0.16, 1, 0.3, 1] },
+  }),
+}
+
+const overlayVariants = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { duration: 0.2 } },
+  exit: { opacity: 0, transition: { duration: 0.2 } },
+}
+
+const modalVariants = {
+  hidden: { opacity: 0, y: 60 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: [0.16, 1, 0.3, 1] } },
+  exit: { opacity: 0, y: 40, transition: { duration: 0.2 } },
 }
 
 // ── Status Badge ──────────────────────────────────────────
 const StatusBadge = memo(function StatusBadge({ status }) {
   const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.pending
-
   return (
     <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-50 border border-gray-100 rounded-full">
       <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
-      <span
-        className="text-gray-600 tracking-wider uppercase"
-        style={{ fontSize: "9px", fontWeight: 500 }}
-      >
+      <span className="text-gray-600 tracking-wider uppercase" style={{ fontSize: "9px", fontWeight: 500 }}>
         {cfg.label}
       </span>
     </span>
@@ -141,89 +141,35 @@ const StatusBadge = memo(function StatusBadge({ status }) {
 // ── Info Pill ─────────────────────────────────────────────
 const InfoPill = memo(function InfoPill({ icon: Icon, children }) {
   return (
-    <div className="inline-flex items-center gap-2 px-3 py-2 border border-gray-100 rounded-lg">
-      <Icon size={13} strokeWidth={1.5} className="text-gray-400" />
-      <span className="text-black" style={{ fontSize: "11px" }}>
+    <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 border border-gray-100 rounded-lg">
+      <Icon size={11} strokeWidth={1.5} className="text-gray-400 shrink-0" />
+      <span className="text-black truncate" style={{ fontSize: "11px" }}>
         {children}
       </span>
     </div>
   )
 })
 
-// ── Format Date Helper ────────────────────────────────────
-function formatDate(date) {
-  const d = new Date(date)
-  const today = new Date()
-  const tomorrow = new Date(today)
-  tomorrow.setDate(tomorrow.getDate() + 1)
-
-  if (d.toDateString() === today.toDateString()) return "Today"
-  if (d.toDateString() === tomorrow.toDateString()) return "Tomorrow"
-
-  return d.toLocaleDateString("en-IN", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-  })
-}
-
 // ── Booking Card ──────────────────────────────────────────
-const BookingCard = memo(function BookingCard({
-  booking,
-  index,
-  onViewDetails,
-  onCancel,
-}) {
-  const cardRef = useRef(null)
+const BookingCard = memo(function BookingCard({ booking, index, onViewDetails, onCancel }) {
   const bookingDate = new Date(booking.bookingDate)
   const isUpcoming =
-    bookingDate > new Date() &&
-    !["cancelled", "completed"].includes(booking.status)
-  const canBeCancelled =
-    ["pending", "confirmed"].includes(booking.status) && isUpcoming
-
-  // Animate on mount
-  useEffect(() => {
-    let mounted = true
-
-    const animate = async () => {
-      try {
-        const gsap = await loadGsap()
-        if (!mounted || !cardRef.current) return
-
-        gsap.fromTo(
-          cardRef.current,
-          { opacity: 0, y: 30 },
-          {
-            opacity: 1,
-            y: 0,
-            duration: 0.6,
-            delay: index * 0.08,
-            ease: "power3.out",
-          }
-        )
-      } catch {
-        if (mounted) makeFallbackVisible(cardRef.current)
-      }
-    }
-
-    animate()
-
-    return () => {
-      mounted = false
-    }
-  }, [index])
+    bookingDate > new Date() && !["cancelled", "completed"].includes(booking.status)
+  const canBeCancelled = ["pending", "confirmed"].includes(booking.status) && isUpcoming
 
   return (
-    <div
-      ref={cardRef}
-      className="opacity-0 group relative bg-white border border-gray-200 rounded-2xl overflow-hidden
-                 hover:border-black hover:shadow-lg
-                 transition-all duration-300"
+    <motion.div
+      custom={index}
+      variants={fadeUp}
+      initial="hidden"
+      animate="visible"
+      layout
+      className="group relative bg-white border border-gray-200 rounded-2xl overflow-hidden
+                 hover:border-gray-400 hover:shadow-md transition-all duration-300"
     >
-      {/* Upcoming indicator */}
+      {/* Upcoming pulse */}
       {isUpcoming && booking.status !== "cancelled" && (
-        <div className="absolute top-5 right-5 z-10">
+        <div className="absolute top-4 right-4 z-10">
           <span className="relative flex h-2.5 w-2.5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
             <span className="relative inline-flex rounded-full h-full w-full bg-emerald-500" />
@@ -231,48 +177,40 @@ const BookingCard = memo(function BookingCard({
         </div>
       )}
 
-      {/* Content */}
-      <div className="p-5 sm:p-6">
+      <div className="p-4 sm:p-5">
         {/* Top Row */}
-        <div className="flex items-center justify-between gap-3 mb-5">
+        <div className="flex items-center justify-between gap-2 mb-4">
           <StatusBadge status={booking.status} />
-          <span
-            className="text-gray-300 font-mono uppercase"
-            style={{ fontSize: "10px", letterSpacing: "0.1em" }}
-          >
+          <span className="text-gray-300 font-mono uppercase truncate max-w-[120px]"
+            style={{ fontSize: "10px", letterSpacing: "0.08em" }}>
             {booking.bookingCode}
           </span>
         </div>
 
         {/* Service Info */}
-        <div className="flex items-start justify-between gap-4 mb-6">
+        <div className="flex items-start justify-between gap-3 mb-4">
           <div className="flex-1 min-w-0">
             <h3
-              className="text-black truncate mb-1"
+              className="text-black truncate mb-0.5"
               style={{
                 fontFamily: 'Georgia, "Times New Roman", serif',
                 fontWeight: 400,
-                fontSize: "clamp(18px, 3vw, 22px)",
+                fontSize: "clamp(16px, 4vw, 20px)",
               }}
             >
               {booking.serviceName}
             </h3>
-            <p
-              className="text-gray-400 tracking-wider uppercase"
-              style={{ fontSize: "10px" }}
-            >
+            <p className="text-gray-400 tracking-wider uppercase" style={{ fontSize: "9px" }}>
               {booking.vehicleTypeName}
             </p>
           </div>
-
-          {/* Price */}
           <div className="text-right shrink-0">
             <p
               className="text-black leading-none"
               style={{
                 fontFamily: 'Georgia, "Times New Roman", serif',
                 fontWeight: 300,
-                fontSize: "clamp(24px, 4vw, 32px)",
+                fontSize: "clamp(20px, 5vw, 28px)",
               }}
             >
               ₹{booking.price?.toLocaleString("en-IN")}
@@ -280,211 +218,148 @@ const BookingCard = memo(function BookingCard({
           </div>
         </div>
 
-        {/* Info Pills */}
-        <div className="flex flex-wrap gap-2 mb-6">
-          <InfoPill icon={Calendar}>{formatDate(bookingDate)}</InfoPill>
-          <InfoPill icon={Clock}>{booking.timeSlot}</InfoPill>
-          <InfoPill icon={Timer}>{booking.duration} min</InfoPill>
-          {booking.location?.city && (
-            <InfoPill icon={MapPin}>{booking.location.city}</InfoPill>
-          )}
+        {/* Info Pills — horizontal scroll on mobile */}
+        <div className="flex gap-1.5 mb-4 overflow-x-auto pb-0.5"
+          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
+          <style>{`.no-scroll::-webkit-scrollbar{display:none}`}</style>
+          <div className="flex gap-1.5 no-scroll">
+            <InfoPill icon={Calendar}>{formatDate(bookingDate)}</InfoPill>
+            <InfoPill icon={Clock}>{booking.timeSlot}</InfoPill>
+            <InfoPill icon={Timer}>{booking.duration}m</InfoPill>
+            {booking.location?.city && (
+              <InfoPill icon={MapPin}>{booking.location.city}</InfoPill>
+            )}
+          </div>
         </div>
 
         {/* Divider */}
-        <div className="h-px bg-gray-100 mb-5" />
+        <div className="h-px bg-gray-100 mb-4" />
 
         {/* Actions */}
-        <div className="flex items-center gap-3 flex-wrap">
-          {/* View Details */}
-          <button
+        <div className="flex items-center gap-2 flex-wrap">
+          <motion.button
+            whileTap={{ scale: 0.96 }}
             onClick={() => onViewDetails(booking)}
-            className="group/btn inline-flex items-center gap-2 h-10 px-5
+            className="inline-flex items-center gap-1.5 h-9 px-4
                        bg-black text-white rounded-full
-                       hover:bg-gray-800 active:scale-[0.97]
-                       transition-all duration-300"
+                       hover:bg-gray-800 transition-colors duration-200"
           >
-            <span
-              className="tracking-wider uppercase"
-              style={{ fontSize: "10px", fontWeight: 500 }}
-            >
+            <span className="tracking-wider uppercase" style={{ fontSize: "10px", fontWeight: 500 }}>
               Details
             </span>
-            <ChevronRight
-              size={14}
-              strokeWidth={2}
-              className="group-hover/btn:translate-x-0.5 transition-transform duration-300"
-            />
-          </button>
+            <ChevronRight size={12} strokeWidth={2} />
+          </motion.button>
 
-          {/* Completed Badge (instead of Review button) */}
           {booking.status === "completed" && (
-            <span className="inline-flex items-center gap-2 h-10 px-5
+            <span className="inline-flex items-center gap-1.5 h-9 px-4
                            border border-emerald-200 text-emerald-600 rounded-full">
-              <CheckCircle size={13} strokeWidth={2} />
-              <span
-                className="tracking-wider uppercase"
-                style={{ fontSize: "10px", fontWeight: 500 }}
-              >
-                Completed
+              <CheckCircle size={11} strokeWidth={2} />
+              <span className="tracking-wider uppercase" style={{ fontSize: "10px", fontWeight: 500 }}>
+                Done
               </span>
             </span>
           )}
 
-          {/* Cancel Button */}
           {canBeCancelled && (
-            <button
+            <motion.button
+              whileTap={{ scale: 0.96 }}
               onClick={() => onCancel(booking)}
-              className="inline-flex items-center gap-2 h-10 px-5 ml-auto
+              className="inline-flex items-center gap-1.5 h-9 px-4 ml-auto
                          text-red-500 hover:bg-red-50 rounded-full
-                         active:scale-[0.97] transition-all duration-300"
+                         transition-colors duration-200"
             >
-              <XCircle size={13} strokeWidth={2} />
-              <span
-                className="tracking-wider uppercase"
-                style={{ fontSize: "10px", fontWeight: 500 }}
-              >
+              <XCircle size={11} strokeWidth={2} />
+              <span className="tracking-wider uppercase" style={{ fontSize: "10px", fontWeight: 500 }}>
                 Cancel
               </span>
-            </button>
+            </motion.button>
           )}
         </div>
       </div>
-    </div>
+    </motion.div>
   )
 })
 
 // ── Modal Wrapper ─────────────────────────────────────────
 const ModalWrapper = memo(function ModalWrapper({ isOpen, onClose, children }) {
-  const overlayRef = useRef(null)
-  const contentRef = useRef(null)
-
   useScrollLock(isOpen)
 
-  useEffect(() => {
-    if (!isOpen) return
-
-    let mounted = true
-
-    const animate = async () => {
-      try {
-        const gsap = await loadGsap()
-        if (!mounted) return
-
-        if (overlayRef.current) {
-          gsap.fromTo(
-            overlayRef.current,
-            { opacity: 0 },
-            { opacity: 1, duration: 0.2 }
-          )
-        }
-
-        if (contentRef.current) {
-          gsap.fromTo(
-            contentRef.current,
-            { opacity: 0, y: 50 },
-            { opacity: 1, y: 0, duration: 0.3, ease: "power3.out" }
-          )
-        }
-      } catch {
-        if (overlayRef.current) overlayRef.current.style.opacity = "1"
-        if (contentRef.current) {
-          contentRef.current.style.opacity = "1"
-          contentRef.current.style.transform = "none"
-        }
-      }
-    }
-
-    animate()
-
-    return () => {
-      mounted = false
-    }
-  }, [isOpen])
-
-  if (!isOpen) return null
-
   return (
-    <div
-      ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center
-                 bg-black/60 backdrop-blur-sm"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <div
-        ref={contentRef}
-        className="relative w-full sm:max-w-lg bg-white sm:rounded-2xl rounded-t-2xl
-                   max-h-[92vh] overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Mobile handle */}
-        <div className="sm:hidden flex justify-center pt-3 pb-1">
-          <div className="w-10 h-1 bg-gray-200 rounded-full" />
-        </div>
-
-        <div className="max-h-[85vh] overflow-y-auto">{children}</div>
-      </div>
-    </div>
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          key="overlay"
+          variants={overlayVariants}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center
+                     bg-black/60 backdrop-blur-sm px-0 sm:px-4"
+          onClick={(e) => e.target === e.currentTarget && onClose()}
+        >
+          <motion.div
+            key="modal"
+            variants={modalVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            className="relative w-full sm:max-w-lg bg-white sm:rounded-2xl rounded-t-3xl
+                       max-h-[92dvh] overflow-hidden shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Mobile drag handle */}
+            <div className="sm:hidden flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 bg-gray-200 rounded-full" />
+            </div>
+            <div className="overflow-y-auto max-h-[88dvh]">{children}</div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   )
 })
 
 // ── Details Modal ─────────────────────────────────────────
-const BookingDetailsModal = memo(function BookingDetailsModal({
-  booking,
-  isOpen,
-  onClose,
-}) {
+const BookingDetailsModal = memo(function BookingDetailsModal({ booking, isOpen, onClose }) {
   if (!booking) return null
 
   return (
     <ModalWrapper isOpen={isOpen} onClose={onClose}>
       {/* Header */}
-      <div className="px-6 pt-6 pb-5 border-b border-gray-100">
-        <div className="flex items-start justify-between gap-4">
-          <div>
+      <div className="px-5 pt-5 pb-4 border-b border-gray-100">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
             <StatusBadge status={booking.status} />
             <h2
-              className="text-black mt-4"
+              className="text-black mt-3 leading-tight"
               style={{
                 fontFamily: 'Georgia, "Times New Roman", serif',
                 fontWeight: 300,
-                fontSize: "clamp(22px, 4vw, 28px)",
+                fontSize: "clamp(20px, 5vw, 26px)",
               }}
             >
               {booking.serviceName}
             </h2>
-            <p
-              className="text-gray-400 tracking-wider uppercase mt-1"
-              style={{ fontSize: "10px" }}
-            >
+            <p className="text-gray-400 tracking-wider uppercase mt-1" style={{ fontSize: "9px" }}>
               {booking.bookingCode}
             </p>
           </div>
-
-          <button
+          <motion.button
+            whileTap={{ scale: 0.92 }}
             onClick={onClose}
-            className="w-10 h-10 flex items-center justify-center shrink-0
+            className="w-9 h-9 flex items-center justify-center shrink-0
                        border border-gray-200 hover:border-black hover:bg-black hover:text-white
-                       rounded-full transition-all duration-300"
+                       rounded-full transition-all duration-200"
           >
-            <X size={18} strokeWidth={1.5} />
-          </button>
+            <X size={16} strokeWidth={1.5} />
+          </motion.button>
         </div>
 
-        {/* Price */}
-        <div className="mt-5 flex items-baseline gap-2">
-          <span
-            className="text-gray-400 tracking-wider uppercase"
-            style={{ fontSize: "10px" }}
-          >
-            Total
-          </span>
+        <div className="mt-4 flex items-baseline gap-2">
+          <span className="text-gray-400 tracking-wider uppercase" style={{ fontSize: "9px" }}>Total</span>
           <span
             className="text-black"
-            style={{
-              fontFamily: 'Georgia, "Times New Roman", serif',
-              fontWeight: 300,
-              fontSize: "32px",
-            }}
+            style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontWeight: 300, fontSize: "30px" }}
           >
             ₹{booking.price?.toLocaleString("en-IN")}
           </span>
@@ -492,39 +367,22 @@ const BookingDetailsModal = memo(function BookingDetailsModal({
       </div>
 
       {/* Content */}
-      <div className="px-6 py-6 space-y-5">
+      <div className="px-5 py-5 space-y-3">
         {/* Schedule */}
         <div className="border border-gray-100 rounded-xl p-4">
-          <p
-            className="text-gray-400 tracking-wider uppercase mb-3"
-            style={{ fontSize: "9px" }}
-          >
-            Schedule
-          </p>
-          <div className="flex items-center gap-4">
-            <div className="w-11 h-11 border border-gray-200 rounded-xl flex items-center justify-center">
-              <Calendar size={18} strokeWidth={1.5} className="text-gray-400" />
+          <p className="text-gray-400 tracking-wider uppercase mb-3" style={{ fontSize: "9px" }}>Schedule</p>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 border border-gray-200 rounded-xl flex items-center justify-center shrink-0">
+              <Calendar size={16} strokeWidth={1.5} className="text-gray-400" />
             </div>
             <div>
-              <p
-                className="text-black"
-                style={{
-                  fontFamily: 'Georgia, "Times New Roman", serif',
-                  fontSize: "14px",
-                }}
-              >
+              <p className="text-black" style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontSize: "13px" }}>
                 {new Date(booking.bookingDate).toLocaleDateString("en-IN", {
-                  weekday: "long",
-                  day: "numeric",
-                  month: "long",
-                  year: "numeric",
+                  weekday: "long", day: "numeric", month: "long", year: "numeric",
                 })}
               </p>
-              <p
-                className="text-gray-500 mt-0.5 flex items-center gap-1.5"
-                style={{ fontSize: "12px" }}
-              >
-                <Clock size={11} strokeWidth={2} />
+              <p className="text-gray-500 mt-0.5 flex items-center gap-1.5" style={{ fontSize: "11px" }}>
+                <Clock size={10} strokeWidth={2} />
                 {booking.timeSlot} · {booking.duration} minutes
               </p>
             </div>
@@ -533,35 +391,22 @@ const BookingDetailsModal = memo(function BookingDetailsModal({
 
         {/* Location */}
         <div className="border border-gray-100 rounded-xl p-4">
-          <p
-            className="text-gray-400 tracking-wider uppercase mb-3"
-            style={{ fontSize: "9px" }}
-          >
-            Location
-          </p>
-          <div className="flex items-start gap-4">
-            <div className="w-11 h-11 border border-gray-200 rounded-xl flex items-center justify-center shrink-0">
-              <MapPin size={18} strokeWidth={1.5} className="text-gray-400" />
+          <p className="text-gray-400 tracking-wider uppercase mb-3" style={{ fontSize: "9px" }}>Location</p>
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 border border-gray-200 rounded-xl flex items-center justify-center shrink-0">
+              <MapPin size={16} strokeWidth={1.5} className="text-gray-400" />
             </div>
-            <div>
-              <p
-                className="text-black"
-                style={{
-                  fontFamily: 'Georgia, "Times New Roman", serif',
-                  fontSize: "14px",
-                }}
-              >
+            <div className="min-w-0">
+              <p className="text-black" style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontSize: "13px" }}>
                 {booking.location?.address || "Address not provided"}
               </p>
               {booking.location?.landmark && (
-                <p className="text-gray-500 mt-0.5" style={{ fontSize: "12px" }}>
+                <p className="text-gray-500 mt-0.5" style={{ fontSize: "11px" }}>
                   Near {booking.location.landmark}
                 </p>
               )}
-              <p className="text-gray-500" style={{ fontSize: "12px" }}>
-                {[booking.location?.city, booking.location?.state]
-                  .filter(Boolean)
-                  .join(", ")}
+              <p className="text-gray-500" style={{ fontSize: "11px" }}>
+                {[booking.location?.city, booking.location?.state].filter(Boolean).join(", ")}
               </p>
             </div>
           </div>
@@ -570,45 +415,24 @@ const BookingDetailsModal = memo(function BookingDetailsModal({
         {/* Vehicle */}
         {(booking.vehicleDetails?.brand || booking.vehicleDetails?.type) && (
           <div className="border border-gray-100 rounded-xl p-4">
-            <p
-              className="text-gray-400 tracking-wider uppercase mb-3"
-              style={{ fontSize: "9px" }}
-            >
-              Vehicle
-            </p>
-            <div className="flex items-start gap-4">
-              <div className="w-11 h-11 border border-gray-200 rounded-xl flex items-center justify-center shrink-0">
-                <Car size={18} strokeWidth={1.5} className="text-gray-400" />
+            <p className="text-gray-400 tracking-wider uppercase mb-3" style={{ fontSize: "9px" }}>Vehicle</p>
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 border border-gray-200 rounded-xl flex items-center justify-center shrink-0">
+                <Car size={16} strokeWidth={1.5} className="text-gray-400" />
               </div>
               <div>
-                <p
-                  className="text-black"
-                  style={{
-                    fontFamily: 'Georgia, "Times New Roman", serif',
-                    fontSize: "14px",
-                  }}
-                >
+                <p className="text-black" style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontSize: "13px" }}>
                   {booking.vehicleTypeName}
                 </p>
                 {booking.vehicleDetails?.brand && (
-                  <p
-                    className="text-gray-500 mt-0.5"
-                    style={{ fontSize: "12px" }}
-                  >
+                  <p className="text-gray-500 mt-0.5" style={{ fontSize: "11px" }}>
                     {booking.vehicleDetails.brand} {booking.vehicleDetails.model}
                   </p>
                 )}
-                <div
-                  className="flex items-center gap-3 mt-1 text-gray-400"
-                  style={{ fontSize: "11px" }}
-                >
-                  {booking.vehicleDetails?.color && (
-                    <span>{booking.vehicleDetails.color}</span>
-                  )}
+                <div className="flex items-center gap-3 mt-1 text-gray-400" style={{ fontSize: "10px" }}>
+                  {booking.vehicleDetails?.color && <span>{booking.vehicleDetails.color}</span>}
                   {booking.vehicleDetails?.plateNumber && (
-                    <span className="font-mono uppercase">
-                      {booking.vehicleDetails.plateNumber}
-                    </span>
+                    <span className="font-mono uppercase">{booking.vehicleDetails.plateNumber}</span>
                   )}
                 </div>
               </div>
@@ -619,28 +443,19 @@ const BookingDetailsModal = memo(function BookingDetailsModal({
         {/* Special Notes */}
         {booking.specialNotes && (
           <div className="border border-gray-200 bg-gray-50 rounded-xl p-4">
-            <p
-              className="text-gray-500 tracking-wider uppercase mb-2"
-              style={{ fontSize: "9px" }}
-            >
+            <p className="text-gray-500 tracking-wider uppercase mb-2" style={{ fontSize: "9px" }}>
               Special Instructions
             </p>
-            <p
-              className="text-gray-600 leading-relaxed"
-              style={{ fontSize: "12px" }}
-            >
+            <p className="text-gray-600 leading-relaxed" style={{ fontSize: "12px" }}>
               {booking.specialNotes}
             </p>
           </div>
         )}
 
-        {/* Cancellation Info */}
+        {/* Cancellation */}
         {booking.status === "cancelled" && (
           <div className="border border-red-200 bg-red-50 rounded-xl p-4">
-            <p
-              className="text-red-500 tracking-wider uppercase mb-2"
-              style={{ fontSize: "9px" }}
-            >
+            <p className="text-red-500 tracking-wider uppercase mb-2" style={{ fontSize: "9px" }}>
               Cancellation Details
             </p>
             <p className="text-red-600" style={{ fontSize: "12px" }}>
@@ -655,53 +470,38 @@ const BookingDetailsModal = memo(function BookingDetailsModal({
         )}
 
         {/* Payment */}
-        <div className="flex items-center justify-between py-4 border-t border-gray-100">
+        <div className="flex items-center justify-between py-3 border-t border-gray-100">
           <div>
             <p className="text-black" style={{ fontSize: "12px" }}>
-              {booking.paymentMethod === "cash"
-                ? "Cash on Service"
-                : booking.paymentMethod}
+              {booking.paymentMethod === "cash" ? "Cash on Service" : booking.paymentMethod}
             </p>
             <p
-              className={`mt-0.5 ${
-                booking.paymentStatus === "completed"
-                  ? "text-emerald-600"
-                  : "text-yellow-600"
-              }`}
+              className={`mt-0.5 ${booking.paymentStatus === "completed" ? "text-emerald-600" : "text-yellow-600"}`}
               style={{ fontSize: "11px" }}
             >
-              {booking.paymentStatus === "completed"
-                ? "✓ Paid"
-                : "○ Payment Pending"}
+              {booking.paymentStatus === "completed" ? "✓ Paid" : "○ Payment Pending"}
             </p>
           </div>
         </div>
       </div>
 
       {/* Footer */}
-      <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-4">
+      <div className="px-5 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-3">
         <a
           href={`tel:${PHONE_NUMBER}`}
           className="inline-flex items-center gap-2 text-gray-400 hover:text-black transition-colors"
-          style={{ fontSize: "11px", letterSpacing: "0.1em" }}
+          style={{ fontSize: "11px", letterSpacing: "0.08em" }}
         >
-          <Phone size={14} strokeWidth={1.5} />
+          <Phone size={13} strokeWidth={1.5} />
           <span className="uppercase">Need Help?</span>
         </a>
-
-        <button
+        <motion.button
+          whileTap={{ scale: 0.96 }}
           onClick={onClose}
-          className="h-10 px-6 bg-black text-white rounded-full
-                     hover:bg-gray-800 active:scale-[0.97]
-                     transition-all duration-300"
+          className="h-10 px-6 bg-black text-white rounded-full hover:bg-gray-800 transition-colors duration-200"
         >
-          <span
-            className="tracking-wider uppercase"
-            style={{ fontSize: "10px", fontWeight: 500 }}
-          >
-            Close
-          </span>
-        </button>
+          <span className="tracking-wider uppercase" style={{ fontSize: "10px", fontWeight: 500 }}>Close</span>
+        </motion.button>
       </div>
     </ModalWrapper>
   )
@@ -709,61 +509,36 @@ const BookingDetailsModal = memo(function BookingDetailsModal({
 
 // ── Cancel Modal ──────────────────────────────────────────
 const CancelBookingModal = memo(function CancelBookingModal({
-  booking,
-  isOpen,
-  onClose,
-  onConfirm,
-  loading,
+  booking, isOpen, onClose, onConfirm, loading,
 }) {
   const [reason, setReason] = useState("")
-
   if (!booking) return null
 
   return (
     <ModalWrapper isOpen={isOpen} onClose={onClose}>
-      <div className="p-6">
-        {/* Icon */}
-        <div className="w-14 h-14 border border-red-200 bg-red-50 rounded-full flex items-center justify-center mb-5">
-          <AlertCircle size={24} className="text-red-500" strokeWidth={1.5} />
+      <div className="p-5">
+        <div className="w-12 h-12 border border-red-200 bg-red-50 rounded-full flex items-center justify-center mb-4">
+          <AlertCircle size={20} className="text-red-500" strokeWidth={1.5} />
         </div>
 
-        {/* Title */}
         <h2
           className="text-black mb-2"
-          style={{
-            fontFamily: 'Georgia, "Times New Roman", serif',
-            fontWeight: 300,
-            fontSize: "22px",
-          }}
+          style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontWeight: 300, fontSize: "20px" }}
         >
           Cancel Booking?
         </h2>
 
-        {/* Booking Summary */}
-        <div className="border border-gray-100 rounded-xl p-4 mb-6">
-          <p
-            className="text-black"
-            style={{
-              fontFamily: 'Georgia, "Times New Roman", serif',
-              fontSize: "15px",
-            }}
-          >
+        <div className="border border-gray-100 rounded-xl p-4 mb-5">
+          <p className="text-black" style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontSize: "14px" }}>
             {booking.serviceName}
           </p>
-          <p
-            className="text-gray-400 tracking-wider uppercase mt-1"
-            style={{ fontSize: "10px" }}
-          >
+          <p className="text-gray-400 tracking-wider uppercase mt-1" style={{ fontSize: "9px" }}>
             {formatDate(new Date(booking.bookingDate))} at {booking.timeSlot}
           </p>
         </div>
 
-        {/* Reason Input */}
-        <div className="mb-6">
-          <label
-            className="block text-gray-400 tracking-wider uppercase mb-2"
-            style={{ fontSize: "9px" }}
-          >
+        <div className="mb-5">
+          <label className="block text-gray-400 tracking-wider uppercase mb-2" style={{ fontSize: "9px" }}>
             Reason (optional)
           </label>
           <textarea
@@ -774,47 +549,45 @@ const CancelBookingModal = memo(function CancelBookingModal({
             className="w-full px-4 py-3 border border-gray-200 rounded-xl
                        text-black placeholder-gray-300
                        focus:outline-none focus:border-black
-                       transition-colors duration-300 resize-none"
+                       transition-colors duration-200 resize-none"
             style={{ fontSize: "13px" }}
           />
         </div>
 
-        {/* Actions */}
         <div className="flex gap-3">
-          <button
+          <motion.button
+            whileTap={{ scale: 0.96 }}
             onClick={onClose}
             disabled={loading}
             className="flex-1 h-12 border border-gray-200 rounded-full
                        text-black tracking-wider uppercase
-                       hover:border-black transition-colors duration-300
+                       hover:border-black transition-colors duration-200
                        disabled:opacity-50"
             style={{ fontSize: "10px", fontWeight: 500 }}
           >
-            Keep Booking
-          </button>
+            Keep
+          </motion.button>
 
-          <button
+          <motion.button
+            whileTap={{ scale: 0.96 }}
             onClick={() => onConfirm(booking._id, reason)}
             disabled={loading}
             className="flex-1 flex items-center justify-center gap-2 h-12
                        bg-red-600 text-white rounded-full
-                       hover:bg-red-700 transition-colors duration-300
+                       hover:bg-red-700 transition-colors duration-200
                        disabled:opacity-50"
           >
             {loading ? (
               <Loader2 size={16} className="animate-spin" />
             ) : (
               <>
-                <XCircle size={14} strokeWidth={2} />
-                <span
-                  className="tracking-wider uppercase"
-                  style={{ fontSize: "10px", fontWeight: 500 }}
-                >
+                <XCircle size={13} strokeWidth={2} />
+                <span className="tracking-wider uppercase" style={{ fontSize: "10px", fontWeight: 500 }}>
                   Cancel
                 </span>
               </>
             )}
-          </button>
+          </motion.button>
         </div>
       </div>
     </ModalWrapper>
@@ -823,141 +596,46 @@ const CancelBookingModal = memo(function CancelBookingModal({
 
 // ── Empty State ───────────────────────────────────────────
 const EmptyState = memo(function EmptyState({ hasFilters }) {
-  const containerRef = useRef(null)
-
-  useEffect(() => {
-    let mounted = true
-
-    const animate = async () => {
-      try {
-        const gsap = await loadGsap()
-        if (!mounted || !containerRef.current) return
-
-        gsap.fromTo(
-          containerRef.current,
-          { opacity: 0, y: 30 },
-          { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }
-        )
-      } catch {
-        if (mounted) makeFallbackVisible(containerRef.current)
-      }
-    }
-
-    animate()
-
-    return () => {
-      mounted = false
-    }
-  }, [])
-
   return (
-    <div
-      ref={containerRef}
-      className="opacity-0 flex flex-col items-center justify-center py-20 md:py-32 text-center"
+    <motion.div
+      variants={fadeUp}
+      initial="hidden"
+      animate="visible"
+      className="flex flex-col items-center justify-center py-20 text-center"
     >
-      <div className="w-20 h-20 bg-gray-50 rounded-2xl flex items-center justify-center mb-6">
-        <Car size={32} strokeWidth={1} className="text-gray-300" />
+      <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mb-5">
+        <Car size={28} strokeWidth={1} className="text-gray-300" />
       </div>
-
       <h3
-        className="text-black mb-3"
-        style={{
-          fontFamily: 'Georgia, "Times New Roman", serif',
-          fontWeight: 300,
-          fontSize: "20px",
-        }}
+        className="text-black mb-2"
+        style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontWeight: 300, fontSize: "18px" }}
       >
         {hasFilters ? "No bookings found" : "No bookings yet"}
       </h3>
-
-      <p
-        className="text-gray-400 mb-8 max-w-xs leading-relaxed"
-        style={{ fontSize: "14px" }}
-      >
-        {hasFilters
-          ? "Try adjusting your search or filters"
-          : "Book your first service today"}
+      <p className="text-gray-400 mb-7 max-w-xs leading-relaxed" style={{ fontSize: "13px" }}>
+        {hasFilters ? "Try adjusting your filters" : "Book your first service today"}
       </p>
-
       {!hasFilters && (
-        <a
+        <motion.a
+          whileTap={{ scale: 0.96 }}
           href="/bookings"
-          className="group inline-flex items-center gap-2 h-12 px-6
-                     bg-black text-white rounded-full
-                     hover:bg-gray-800 active:scale-[0.97]
-                     transition-all duration-300"
+          className="inline-flex items-center gap-2 h-11 px-6 bg-black text-white rounded-full hover:bg-gray-800 transition-colors"
         >
-          <span
-            className="tracking-wider uppercase"
-            style={{ fontSize: "11px", fontWeight: 500 }}
-          >
+          <span className="tracking-wider uppercase" style={{ fontSize: "11px", fontWeight: 500 }}>
             Book Now
           </span>
-          <ArrowRight
-            size={14}
-            className="group-hover:translate-x-0.5 transition-transform duration-300"
-          />
-        </a>
+          <ArrowRight size={13} />
+        </motion.a>
       )}
-    </div>
+    </motion.div>
   )
 })
 
 // ── Hero Section ──────────────────────────────────────────
 const HeroSection = memo(function HeroSection({ total }) {
-  const heroRef = useRef(null)
-
-  useEffect(() => {
-    let mounted = true
-    let fallbackTimer
-
-    const animate = async () => {
-      if (!heroRef.current) return
-
-      fallbackTimer = setTimeout(() => {
-        if (mounted && heroRef.current) {
-          const elements = heroRef.current.querySelectorAll("[data-animate]")
-          elements.forEach((el) => makeFallbackVisible(el))
-        }
-      }, 3000)
-
-      try {
-        const gsap = await loadGsap()
-        if (!mounted || !heroRef.current) return
-        clearTimeout(fallbackTimer)
-
-        const elements = heroRef.current.querySelectorAll("[data-animate]")
-        gsap.fromTo(
-          elements,
-          { opacity: 0, y: 30 },
-          {
-            opacity: 1,
-            y: 0,
-            duration: 0.8,
-            stagger: 0.1,
-            ease: "power4.out",
-          }
-        )
-      } catch {
-        clearTimeout(fallbackTimer)
-        if (mounted && heroRef.current) {
-          const elements = heroRef.current.querySelectorAll("[data-animate]")
-          elements.forEach((el) => makeFallbackVisible(el))
-        }
-      }
-    }
-
-    animate()
-
-    return () => {
-      mounted = false
-      if (fallbackTimer) clearTimeout(fallbackTimer)
-    }
-  }, [])
-
   return (
-    <section className="relative bg-black pt-24 pb-12 md:pt-32 md:pb-16 overflow-hidden">
-      {/* Background */}
+    <section className="relative bg-black pt-20 pb-10 md:pt-28 md:pb-14 overflow-hidden">
+      {/* Background grid */}
       <div className="absolute inset-0" aria-hidden="true">
         <div
           className="absolute inset-0 opacity-[0.03]"
@@ -970,7 +648,7 @@ const HeroSection = memo(function HeroSection({ total }) {
           }}
         />
         <div
-          className="absolute top-0 right-0 w-[500px] h-[500px] rounded-full opacity-[0.05]"
+          className="absolute top-0 right-0 w-[400px] h-[400px] rounded-full opacity-[0.05]"
           style={{
             background: "radial-gradient(circle, white 0%, transparent 70%)",
             transform: "translate(30%, -30%)",
@@ -978,70 +656,70 @@ const HeroSection = memo(function HeroSection({ total }) {
         />
       </div>
 
-      <div
-        ref={heroRef}
-        className="relative z-10 max-w-6xl mx-auto px-5 sm:px-8 md:px-12"
-      >
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+      <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-8 md:px-12">
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5">
           <div>
-            {/* Eyebrow */}
-            <div data-animate className="flex items-center gap-3 mb-5 opacity-0">
-              <span className="w-10 h-px bg-white/30" aria-hidden="true" />
-              <span
-                className="tracking-[0.35em] uppercase text-white/50"
-                style={{ fontFamily: "Georgia, serif", fontSize: "10px" }}
-              >
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+              className="flex items-center gap-3 mb-4"
+            >
+              <span className="w-8 h-px bg-white/30" aria-hidden="true" />
+              <span className="tracking-[0.3em] uppercase text-white/50"
+                style={{ fontFamily: "Georgia, serif", fontSize: "9px" }}>
                 Account
               </span>
-            </div>
+            </motion.div>
 
-            {/* Title */}
-            <h1
-              data-animate
-              className="opacity-0 text-white mb-3"
+            <motion.h1
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+              className="text-white mb-2"
               style={{
                 fontFamily: 'Georgia, "Times New Roman", serif',
                 fontWeight: 300,
-                fontSize: "clamp(2rem, 5vw, 3.5rem)",
+                fontSize: "clamp(1.8rem, 6vw, 3.2rem)",
                 lineHeight: 1.1,
                 letterSpacing: "-0.02em",
               }}
             >
               My Bookings
-            </h1>
+            </motion.h1>
 
-            {/* Subtitle */}
-            <p
-              data-animate
-              className="opacity-0 text-white/40"
-              style={{ fontSize: "14px" }}
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+              className="text-white/40"
+              style={{ fontSize: "13px" }}
             >
               {total} booking{total !== 1 ? "s" : ""} total
-            </p>
+            </motion.p>
           </div>
 
-          {/* Book New Button */}
-          <div data-animate className="opacity-0 hidden sm:block">
-            <a
+          {/* Book New — hidden on mobile (shown in bottom bar) */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            className="hidden sm:block"
+          >
+            <motion.a
+              whileTap={{ scale: 0.96 }}
               href="/bookings"
-              className="group inline-flex items-center gap-2 h-12 px-6
+              className="group inline-flex items-center gap-2 h-11 px-5
                          bg-white text-black rounded-full
-                         hover:bg-gray-100 active:scale-[0.97]
-                         transition-all duration-300"
+                         hover:bg-gray-100 transition-colors duration-200"
             >
-              <Sparkles size={14} />
-              <span
-                className="tracking-wider uppercase"
-                style={{ fontSize: "11px", fontWeight: 500 }}
-              >
+              <Sparkles size={13} />
+              <span className="tracking-wider uppercase" style={{ fontSize: "10px", fontWeight: 500 }}>
                 Book New
               </span>
-              <ArrowRight
-                size={14}
-                className="group-hover:translate-x-0.5 transition-transform duration-300"
-              />
-            </a>
-          </div>
+              <ArrowRight size={13} />
+            </motion.a>
+          </motion.div>
         </div>
       </div>
     </section>
@@ -1049,61 +727,45 @@ const HeroSection = memo(function HeroSection({ total }) {
 })
 
 // ── Filter Bar ────────────────────────────────────────────
-const FilterBar = memo(function FilterBar({
-  searchQuery,
-  onSearchChange,
-  statusFilter,
-  onStatusChange,
-}) {
-  useEffect(() => {
-    injectScrollbarStyles()
-  }, [])
-
+const FilterBar = memo(function FilterBar({ searchQuery, onSearchChange, statusFilter, onStatusChange }) {
   return (
-    <div className="sticky top-0 z-30 bg-white border-b border-gray-100">
-      <div className="max-w-6xl mx-auto px-5 sm:px-8 md:px-12 py-4">
-        <div className="flex flex-col sm:flex-row gap-3">
+    <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-sm border-b border-gray-100">
+      <div className="max-w-6xl mx-auto px-4 sm:px-8 md:px-12 py-3">
+        <div className="flex flex-col gap-2.5">
           {/* Search */}
-          <div className="relative flex-1">
-            <Search
-              size={16}
-              strokeWidth={1.5}
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300"
-            />
+          <div className="relative">
+            <Search size={15} strokeWidth={1.5} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="Search bookings..."
-              className="w-full pl-11 pr-4 h-12 border border-gray-200 rounded-full
+              className="w-full pl-10 pr-4 h-11 border border-gray-200 rounded-full
                          text-black placeholder-gray-300
                          focus:outline-none focus:border-black
-                         transition-colors duration-300"
+                         transition-colors duration-200"
               style={{ fontSize: "13px" }}
             />
           </div>
 
-          {/* Filter Pills */}
-          <div
-            className={`flex gap-2 overflow-x-auto pb-1 sm:pb-0 ${SCROLLBAR_HIDE_CLASS}`}
-            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-          >
+          {/* Filter Pills — horizontal scroll */}
+          <div className="flex gap-2 overflow-x-auto pb-0.5"
+            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
             {FILTER_OPTIONS.map((opt) => (
-              <button
+              <motion.button
                 key={opt.value}
+                whileTap={{ scale: 0.94 }}
                 onClick={() => onStatusChange(opt.value)}
-                className={`shrink-0 h-10 px-4 rounded-full
-                           tracking-wider uppercase
-                           transition-all duration-300
-                           ${
-                             statusFilter === opt.value
-                               ? "bg-black text-white"
-                               : "border border-gray-200 text-gray-500 hover:border-black hover:text-black"
-                           }`}
-                style={{ fontSize: "10px", fontWeight: 500 }}
+                className={`shrink-0 h-8 px-3.5 rounded-full tracking-wider uppercase
+                           transition-all duration-200
+                           ${statusFilter === opt.value
+                    ? "bg-black text-white"
+                    : "border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-black"
+                  }`}
+                style={{ fontSize: "9px", fontWeight: 500 }}
               >
                 {opt.label}
-              </button>
+              </motion.button>
             ))}
           </div>
         </div>
@@ -1113,84 +775,77 @@ const FilterBar = memo(function FilterBar({
 })
 
 // ── Pagination ────────────────────────────────────────────
-const Pagination = memo(function Pagination({
-  currentPage,
-  totalPages,
-  onPageChange,
-}) {
+const Pagination = memo(function Pagination({ currentPage, totalPages, onPageChange }) {
   if (totalPages <= 1) return null
 
   return (
-    <div className="flex items-center justify-center gap-2 mt-12">
-      <button
+    <div className="flex items-center justify-center gap-2 mt-10 flex-wrap">
+      <motion.button
+        whileTap={{ scale: 0.94 }}
         onClick={() => onPageChange(Math.max(1, currentPage - 1))}
         disabled={currentPage === 1}
-        className="inline-flex items-center gap-2 h-10 px-5
-                   border border-gray-200 rounded-full
-                   text-black tracking-wider uppercase
+        className="inline-flex items-center gap-1.5 h-10 px-4
+                   border border-gray-200 rounded-full text-black tracking-wider uppercase
                    hover:border-black disabled:opacity-30 disabled:cursor-not-allowed
-                   transition-colors duration-300"
+                   transition-colors duration-200"
         style={{ fontSize: "10px", fontWeight: 500 }}
       >
-        <ChevronLeft size={14} />
+        <ChevronLeft size={13} />
         Prev
-      </button>
+      </motion.button>
 
-      <div className="flex gap-1">
+      <div className="flex gap-1 flex-wrap justify-center">
         {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-          <button
+          <motion.button
             key={p}
+            whileTap={{ scale: 0.9 }}
             onClick={() => onPageChange(p)}
-            className={`w-10 h-10 rounded-full
-                       transition-all duration-300
-                       ${
-                         currentPage === p
-                           ? "bg-black text-white"
-                           : "border border-gray-200 text-black hover:border-black"
-                       }`}
+            className={`w-10 h-10 rounded-full transition-all duration-200
+                       ${currentPage === p
+                ? "bg-black text-white"
+                : "border border-gray-200 text-black hover:border-black"
+              }`}
             style={{ fontSize: "12px" }}
           >
             {p}
-          </button>
+          </motion.button>
         ))}
       </div>
 
-      <button
+      <motion.button
+        whileTap={{ scale: 0.94 }}
         onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
         disabled={currentPage === totalPages}
-        className="inline-flex items-center gap-2 h-10 px-5
-                   border border-gray-200 rounded-full
-                   text-black tracking-wider uppercase
+        className="inline-flex items-center gap-1.5 h-10 px-4
+                   border border-gray-200 rounded-full text-black tracking-wider uppercase
                    hover:border-black disabled:opacity-30 disabled:cursor-not-allowed
-                   transition-colors duration-300"
+                   transition-colors duration-200"
         style={{ fontSize: "10px", fontWeight: 500 }}
       >
         Next
-        <ChevronRight size={14} />
-      </button>
+        <ChevronRight size={13} />
+      </motion.button>
     </div>
   )
 })
 
-// ── Mobile CTA ────────────────────────────────────────────
+// ── Mobile Bottom CTA ─────────────────────────────────────
 const MobileCTA = memo(function MobileCTA() {
   return (
-    <div className="sm:hidden fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-gray-100 p-4 pb-safe">
-      <a
+    <div className="sm:hidden fixed bottom-0 left-0 right-0 z-20
+                    bg-white/95 backdrop-blur-sm border-t border-gray-100 p-3 pb-safe">
+      <motion.a
+        whileTap={{ scale: 0.97 }}
         href="/bookings"
         className="flex items-center justify-center gap-2 w-full h-12
-                   bg-black text-white rounded-full
-                   active:scale-[0.98] transition-transform duration-200"
+                   bg-black text-white rounded-full transition-colors"
       >
-        <Sparkles size={14} />
-        <span
-          className="tracking-wider uppercase"
-          style={{ fontSize: "11px", fontWeight: 500 }}
-        >
+        <Sparkles size={13} />
+        <span className="tracking-wider uppercase" style={{ fontSize: "11px", fontWeight: 500 }}>
           Book New Service
         </span>
-        <ArrowRight size={14} />
-      </a>
+        <ArrowRight size={13} />
+      </motion.a>
     </div>
   )
 })
@@ -1209,13 +864,11 @@ export default function MyBookingsPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [total, setTotal] = useState(0)
 
-  // Modal states
   const [selectedBooking, setSelectedBooking] = useState(null)
   const [showDetailsModal, setShowDetailsModal] = useState(false)
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
 
-  // Auth redirect
   useEffect(() => {
     if (!authLoading && !user) {
       openModal("login")
@@ -1223,10 +876,8 @@ export default function MyBookingsPage() {
     }
   }, [user, authLoading, openModal, router])
 
-  // Fetch bookings
   useEffect(() => {
     if (!user) return
-
     const fetchBookings = async () => {
       try {
         setLoading(true)
@@ -1236,15 +887,12 @@ export default function MyBookingsPage() {
         setTotalPages(result.pages || 1)
         setTotal(result.total || 0)
       } catch (err) {
-        if (process.env.NODE_ENV === "development") {
-          console.error("Fetch failed:", err.message)
-        }
+        if (process.env.NODE_ENV === "development") console.error("Fetch failed:", err.message)
         setError(err.message)
       } finally {
         setLoading(false)
       }
     }
-
     fetchBookings()
   }, [user, statusFilter, currentPage])
 
@@ -1260,7 +908,6 @@ export default function MyBookingsPage() {
         setActionLoading(true)
         await cancelBooking(bookingId, reason)
         closeModals()
-        // Refetch
         const result = await getUserBookings(statusFilter, currentPage, 10)
         setBookings(result.bookings || [])
         setTotalPages(result.pages || 1)
@@ -1279,7 +926,6 @@ export default function MyBookingsPage() {
     setCurrentPage(1)
   }, [])
 
-  // Filter bookings by search
   const filtered = bookings.filter((b) => {
     if (!searchQuery) return true
     const q = searchQuery.toLowerCase()
@@ -1290,11 +936,10 @@ export default function MyBookingsPage() {
     )
   })
 
-  // Loading state
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
-        <Loader2 size={28} className="animate-spin text-gray-300" />
+        <Loader2 size={26} className="animate-spin text-gray-300" />
       </div>
     )
   }
@@ -1303,10 +948,8 @@ export default function MyBookingsPage() {
 
   return (
     <main style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
-      {/* Hero */}
       <HeroSection total={total} />
 
-      {/* Filter Bar */}
       <FilterBar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
@@ -1314,30 +957,33 @@ export default function MyBookingsPage() {
         onStatusChange={handleStatusChange}
       />
 
-      {/* Content */}
       <section className="w-full bg-white">
-        <div className="max-w-6xl mx-auto px-5 sm:px-8 md:px-12 py-8 pb-28 sm:pb-12">
+        <div className="max-w-6xl mx-auto px-4 sm:px-8 md:px-12 py-6 pb-28 sm:pb-12">
           {/* Error */}
-          {error && (
-            <div className="mb-6 flex items-center gap-3 p-4 border border-red-200 bg-red-50 rounded-xl">
-              <AlertCircle size={16} className="text-red-500 shrink-0" />
-              <p className="text-red-600" style={{ fontSize: "13px" }}>
-                {error}
-              </p>
-            </div>
-          )}
+          <AnimatePresence>
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="mb-5 flex items-center gap-3 p-4 border border-red-200 bg-red-50 rounded-xl"
+              >
+                <AlertCircle size={15} className="text-red-500 shrink-0" />
+                <p className="text-red-600" style={{ fontSize: "13px" }}>{error}</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Loading */}
           {loading ? (
             <div className="flex items-center justify-center py-24">
-              <Loader2 size={28} className="animate-spin text-gray-300" />
+              <Loader2 size={26} className="animate-spin text-gray-300" />
             </div>
           ) : filtered.length === 0 ? (
             <EmptyState hasFilters={!!(searchQuery || statusFilter)} />
           ) : (
             <>
-              {/* Booking Cards */}
-              <div className="space-y-4">
+              <motion.div layout className="space-y-3">
                 {filtered.map((booking, i) => (
                   <BookingCard
                     key={booking._id}
@@ -1353,9 +999,8 @@ export default function MyBookingsPage() {
                     }}
                   />
                 ))}
-              </div>
+              </motion.div>
 
-              {/* Pagination */}
               <Pagination
                 currentPage={currentPage}
                 totalPages={totalPages}
@@ -1366,10 +1011,8 @@ export default function MyBookingsPage() {
         </div>
       </section>
 
-      {/* Mobile CTA */}
       <MobileCTA />
 
-      {/* Modals */}
       <BookingDetailsModal
         booking={selectedBooking}
         isOpen={showDetailsModal}

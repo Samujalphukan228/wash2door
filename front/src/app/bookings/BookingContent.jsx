@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import ServiceStep from '@/components/booking/ServiceStep'
+import VariantStep from '@/components/booking/VariantStep'  // ← NEW
 import DateTimeStep from '@/components/booking/DateTimeStep'
 import DetailsStep from '@/components/booking/DetailsStep'
 import ConfirmStep from '@/components/booking/ConfirmStep'
@@ -18,14 +19,16 @@ const INITIAL_DATA = {
     timeSlot: '',
     location: { address: '', city: '', landmark: '' },
     specialNotes: '',
-    _ui: { serviceName: '', serviceImage: '', price: 0 }
+    _ui: { serviceName: '', serviceImage: '', price: 0, variantName: '', duration: 0 }
 }
 
+// ← UPDATED: 5 steps now
 const STEPS = [
     { number: 1, label: 'Service' },
-    { number: 2, label: 'Date & Time' },
-    { number: 3, label: 'Location' },
-    { number: 4, label: 'Confirm' },
+    { number: 2, label: 'Package' },      // ← NEW
+    { number: 3, label: 'Date & Time' },
+    { number: 4, label: 'Location' },
+    { number: 5, label: 'Confirm' },
 ]
 
 function StepIndicator({ current }) {
@@ -40,10 +43,10 @@ function StepIndicator({ current }) {
                                 <path d="M1 5l3.5 3.5L11 1" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
                         ) : (
-                            <span className={`${current === step.number ? 'text-white' : 'text-white/30'}`}>{step.number}</span>
+                            <span className={`text-sm ${current === step.number ? 'text-white' : 'text-white/30'}`}>{step.number}</span>
                         )}
                     </div>
-                    {i < STEPS.length - 1 && <div className={`h-px w-16 xl:w-24 mx-2 mb-6 ${current > step.number ? 'bg-white/60' : 'bg-white/10'}`} />}
+                    {i < STEPS.length - 1 && <div className={`h-px w-12 xl:w-16 mx-2 ${current > step.number ? 'bg-white/60' : 'bg-white/10'}`} />}
                 </div>
             ))}
         </div>
@@ -104,6 +107,7 @@ export default function BookingContent() {
             {/* Content */}
             <div className="bg-white">
                 <div className="max-w-5xl mx-auto px-5 md:px-16 py-10 md:py-14">
+                    {/* Step 1: Select Service */}
                     {currentStep === 1 && (
                         <ServiceStep
                             data={bookingData}
@@ -112,26 +116,43 @@ export default function BookingContent() {
                             onNext={() => goToStep(2)}
                         />
                     )}
+
+                    {/* Step 2: Select Variant/Package - NEW */}
                     {currentStep === 2 && (
-                        <DateTimeStep
+                        <VariantStep
                             data={bookingData}
                             onUpdate={updateData}
+                            onUpdateUI={updateUI}
                             onNext={() => goToStep(3)}
                             onBack={() => goToStep(1)}
                         />
                     )}
+
+                    {/* Step 3: Date & Time */}
                     {currentStep === 3 && (
-                        <DetailsStep
+                        <DateTimeStep
                             data={bookingData}
                             onUpdate={updateData}
                             onNext={() => goToStep(4)}
                             onBack={() => goToStep(2)}
                         />
                     )}
+
+                    {/* Step 4: Location Details */}
                     {currentStep === 4 && (
+                        <DetailsStep
+                            data={bookingData}
+                            onUpdate={updateData}
+                            onNext={() => goToStep(5)}
+                            onBack={() => goToStep(3)}
+                        />
+                    )}
+
+                    {/* Step 5: Confirm */}
+                    {currentStep === 5 && (
                         <ConfirmStep
                             data={bookingData}
-                            onBack={() => goToStep(3)}
+                            onBack={() => goToStep(4)}
                             onSuccess={() => router.push('/my-bookings')}
                         />
                     )}

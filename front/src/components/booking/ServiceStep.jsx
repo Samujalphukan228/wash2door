@@ -1,7 +1,7 @@
 // components/booking/ServiceStep.jsx
 "use client"
 
-import { useEffect, useRef, useState, memo } from "react"
+import { useEffect, useState, memo } from "react"
 import { Loader2, Star, ChevronRight } from "lucide-react"
 import { getServices } from "@/lib/booking.api"
 
@@ -91,15 +91,21 @@ export default function ServiceStep({ data, onUpdate, onUpdateUI, onNext }) {
     }, [])
 
     const handleSelect = (service) => {
-        onUpdate({ serviceId: service._id })
+        // Reset variantId when service changes
+        onUpdate({ 
+            serviceId: service._id,
+            variantId: ''  // ← Reset variant
+        })
         onUpdateUI({
             serviceName: service.name,
             serviceImage: service.primaryImage || service.images?.[0]?.url,
             serviceTier: service.tier,
             categoryName: service.category?.name || "",
             price: service.startingPrice,
+            variantName: '',  // ← Reset
+            duration: 0,      // ← Reset
         })
-        onNext()
+        onNext()  // ← Go to variant step
     }
 
     if (loading) {
