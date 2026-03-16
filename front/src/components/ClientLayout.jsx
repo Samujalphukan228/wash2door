@@ -5,8 +5,6 @@ import { motion, AnimatePresence } from "framer-motion"
 import Navbar from "@/components/Navbar"
 import Footer from "@/components/Footer"
 import { AuthProvider } from "@/context/AuthContext"
-import { TransitionProvider } from "@/context/TransitionContext"
-import PageTransition from "@/components/PageTransition"
 
 const ease = [0.76, 0, 0.24, 1]
 
@@ -36,87 +34,76 @@ export default function ClientLayout({ children }) {
   if (!checked) {
     return (
       <AuthProvider>
-        <TransitionProvider>
-          <Navbar />
-          {children}
-          <Footer />
-        </TransitionProvider>
+        <Navbar />
+        {children}
+        <Footer />
       </AuthProvider>
     )
   }
 
   return (
     <AuthProvider>
-      <TransitionProvider>
-
-        {/* ── Intro overlay (first visit this session only) ── */}
-        <AnimatePresence>
-          {!done && (
+      <AnimatePresence>
+        {!done && (
+          <motion.div
+            key="overlay"
+            className="fixed inset-0 z-[9999] pointer-events-none flex flex-col"
+          >
             <motion.div
-              key="overlay"
-              className="fixed inset-0 z-[9999] pointer-events-none flex flex-col"
+              className="flex-1 bg-[#080808]"
+              initial={{ y: 0 }}
+              exit={{ y: "-100%" }}
+              transition={{ duration: 1.1, ease }}
+            />
+
+            <motion.div
+              className="absolute inset-0 flex flex-col items-center justify-center gap-3"
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
             >
-              <motion.div
-                className="flex-1 bg-[#080808]"
-                initial={{ y: 0 }}
-                exit={{ y: "-100%" }}
-                transition={{ duration: 1.1, ease }}
-              />
-
-              <motion.div
-                className="absolute inset-0 flex flex-col items-center justify-center gap-3"
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
+              <motion.p
+                className="text-white font-light uppercase tracking-[0.5em] pl-[0.5em]"
+                style={{ fontFamily: "Georgia, serif", fontSize: "clamp(18px, 3vw, 28px)" }}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3, duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
               >
-                <motion.p
-                  className="text-white font-light uppercase tracking-[0.5em] pl-[0.5em]"
-                  style={{ fontFamily: "Georgia, serif", fontSize: "clamp(18px, 3vw, 28px)" }}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3, duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-                >
-                  Wash2Door
-                </motion.p>
-
-                <motion.div
-                  className="h-px bg-white/20"
-                  initial={{ width: 0 }}
-                  animate={{ width: 48 }}
-                  transition={{ delay: 0.5, duration: 0.6, ease: "easeOut" }}
-                />
-
-                <motion.p
-                  className="text-white/30 uppercase font-light tracking-[0.55em] pl-[0.55em]"
-                  style={{ fontSize: 9 }}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.8, duration: 0.6 }}
-                >
-                  Doorstep Luxury
-                </motion.p>
-              </motion.div>
+                Wash2Door
+              </motion.p>
 
               <motion.div
-                className="flex-1 bg-[#080808]"
-                initial={{ y: 0 }}
-                exit={{ y: "100%" }}
-                transition={{ duration: 1.1, ease }}
+                className="h-px bg-white/20"
+                initial={{ width: 0 }}
+                animate={{ width: 48 }}
+                transition={{ delay: 0.5, duration: 0.6, ease: "easeOut" }}
               />
+
+              <motion.p
+                className="text-white/30 uppercase font-light tracking-[0.55em] pl-[0.55em]"
+                style={{ fontSize: 9 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.8, duration: 0.6 }}
+              >
+                Doorstep Luxury
+              </motion.p>
             </motion.div>
-          )}
-        </AnimatePresence>
 
-        {/* ── Page wipe (every route change, never on first load) ── */}
-        <PageTransition />
+            <motion.div
+              className="flex-1 bg-[#080808]"
+              initial={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ duration: 1.1, ease }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-        {/* ── App shell ── */}
-        <div>
-          <Navbar />
-          {children}
-          <Footer />
-        </div>
-
-      </TransitionProvider>
+      <div>
+        <Navbar />
+        {children}
+        <Footer />
+      </div>
     </AuthProvider>
   )
 }
