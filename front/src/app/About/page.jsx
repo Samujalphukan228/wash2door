@@ -1,6 +1,8 @@
 "use client"
 
-import { useEffect, useRef, memo } from "react"
+import { memo } from "react"
+import { motion, useInView } from "framer-motion"
+import { useRef } from "react"
 import {
   ArrowUpRight,
   ArrowRight,
@@ -57,90 +59,77 @@ const SERVICES_LIST = [
   { name: "Water Tank Cleaning", price: "₹599" },
 ]
 
-const ANIMATION_CONFIG = {
-  duration: 0.8,
-  stagger: 0.1,
-  ease: "power4.out",
+// ── Shared font stack ──────────────────────────────────────
+const SANS = "'Helvetica Neue', Helvetica, Arial, sans-serif"
+const SERIF = 'Georgia, "Times New Roman", serif'
+
+// ── Reusable animation variants ───────────────────────────
+const fadeUp = {
+  hidden: { opacity: 0, y: 32 },
+  visible: (i = 0) => ({
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.7, delay: i * 0.1, ease: [0.16, 1, 0.3, 1] },
+  }),
 }
 
-// ── Custom Hook: Scroll Animation ──────────────────────────
-function useScrollAnimation(ref, config, deps = []) {
-  useEffect(() => {
-    if (!ref.current) return
-
-    let ctx
-    let observer
-
-    const init = async () => {
-      observer = new IntersectionObserver(
-        async (entries) => {
-          if (entries[0].isIntersecting) {
-            observer.disconnect()
-
-            const { default: gsap } = await import("gsap")
-            const { ScrollTrigger } = await import("gsap/ScrollTrigger")
-            gsap.registerPlugin(ScrollTrigger)
-
-            ctx = gsap.context(() => {
-              config(gsap, ScrollTrigger)
-            })
-          }
-        },
-        { rootMargin: "50px" }
-      )
-
-      observer.observe(ref.current)
-    }
-
-    init()
-
-    return () => {
-      observer?.disconnect()
-      ctx?.revert()
-    }
-  }, deps)
+const fadeLeft = {
+  hidden: { opacity: 0, x: -40 },
+  visible: {
+    opacity: 1,
+    x: 0,
+    transition: { duration: 0.9, ease: [0.16, 1, 0.3, 1] },
+  },
 }
 
-// ── Hero Section ───────────────────────────────────────────
+const fadeRight = {
+  hidden: { opacity: 0, x: 40 },
+  visible: {
+    opacity: 1,
+    x: 0,
+    transition: { duration: 0.9, ease: [0.16, 1, 0.3, 1] },
+  },
+}
+
+// ── Eyebrow label ──────────────────────────────────────────
+function Eyebrow({ children, light = false }) {
+  return (
+    <div className="flex items-center gap-3 mb-6">
+      <span className={`w-10 h-px ${light ? "bg-white/30" : "bg-black"}`} />
+      <span
+        className={`tracking-[0.4em] uppercase ${light ? "text-white/50" : "text-gray-400"}`}
+        style={{ fontSize: "10px", fontFamily: SANS }}
+      >
+        {children}
+      </span>
+    </div>
+  )
+}
+
+// ── Section heading ────────────────────────────────────────
+function SectionHeading({ children, light = false, className = "" }) {
+  return (
+    <h2
+      className={`${light ? "text-white" : "text-black"} ${className}`}
+      style={{
+        fontFamily: SERIF,
+        fontWeight: 300,
+        fontSize: "clamp(1.9rem, 4vw, 3rem)",
+        lineHeight: 1.12,
+        letterSpacing: "-0.02em",
+      }}
+    >
+      {children}
+    </h2>
+  )
+}
+
+// ── Hero ───────────────────────────────────────────────────
 const Hero = memo(function Hero() {
-  const sectionRef = useRef(null)
-  const contentRef = useRef(null)
-
-  useEffect(() => {
-    let ctx
-
-    const init = async () => {
-      const { default: gsap } = await import("gsap")
-
-      if (!sectionRef.current) return
-
-      ctx = gsap.context(() => {
-        const elements = contentRef.current.querySelectorAll("[data-animate]")
-
-        gsap.fromTo(
-          elements,
-          { opacity: 0, y: 40 },
-          {
-            opacity: 1,
-            y: 0,
-            duration: ANIMATION_CONFIG.duration,
-            stagger: ANIMATION_CONFIG.stagger,
-            ease: ANIMATION_CONFIG.ease,
-          }
-        )
-      })
-    }
-
-    init()
-
-    return () => ctx?.revert()
-  }, [])
-
   return (
     <section
-      ref={sectionRef}
-      className="relative min-h-[90vh] md:min-h-screen bg-black overflow-hidden"
-      style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
+      className="relative min-h-[90dvh] md:min-h-screen bg-black overflow-hidden"
+      style={{ fontFamily: SANS }}
     >
       {/* Background image */}
       <div className="absolute inset-0">
@@ -156,29 +145,32 @@ const Hero = memo(function Hero() {
 
       {/* Content */}
       <div
-        ref={contentRef}
         className="relative z-10 max-w-7xl mx-auto px-5 sm:px-8 md:px-12 lg:px-16
-                   min-h-[90vh] md:min-h-screen flex flex-col justify-end pb-16 md:pb-24"
+                   min-h-[90dvh] md:min-h-screen flex flex-col justify-end pb-14 md:pb-24"
       >
         {/* Eyebrow */}
-        <div data-animate className="flex items-center gap-3 mb-6 opacity-0">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          className="flex items-center gap-3 mb-6"
+        >
           <span className="w-10 h-px bg-white/40" />
-          <span
-            className="tracking-[0.4em] uppercase text-white/60"
-            style={{ fontSize: "10px" }}
-          >
+          <span className="tracking-[0.4em] uppercase text-white/60" style={{ fontSize: "10px" }}>
             About Us
           </span>
-        </div>
+        </motion.div>
 
-        {/* Main heading */}
-        <h1
-          data-animate
-          className="opacity-0 text-white mb-6 max-w-4xl"
+        {/* Heading */}
+        <motion.h1
+          initial={{ opacity: 0, y: 32 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+          className="text-white mb-6 max-w-4xl"
           style={{
-            fontFamily: 'Georgia, "Times New Roman", serif',
+            fontFamily: SERIF,
             fontWeight: 300,
-            fontSize: "clamp(2.5rem, 7vw, 5.5rem)",
+            fontSize: "clamp(2.4rem, 7vw, 5.5rem)",
             lineHeight: 1.05,
             letterSpacing: "-0.02em",
           }}
@@ -186,81 +178,78 @@ const Hero = memo(function Hero() {
           We Bring the
           <br />
           <span className="italic text-white/50">Clean to You</span>
-        </h1>
+        </motion.h1>
 
         {/* Subtitle */}
-        <p
-          data-animate
-          className="opacity-0 text-white/50 max-w-lg mb-10 leading-relaxed"
+        <motion.p
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+          className="text-white/50 max-w-lg mb-10 leading-relaxed"
           style={{ fontSize: "16px" }}
         >
           Professional doorstep cleaning services in Duliajan. Car wash, sofa
           cleaning, water tank cleaning — all delivered with care.
-        </p>
+        </motion.p>
 
         {/* CTA row */}
-        <div data-animate className="opacity-0 flex flex-wrap items-center gap-4 mb-12">
-          <a
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
+          className="flex flex-wrap items-center gap-4 mb-12"
+        >
+          <motion.a
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.96 }}
             href="/bookings"
             className="group flex items-center gap-3 h-14 px-8 bg-white text-black
-                       rounded-full no-underline hover:bg-gray-100
-                       active:scale-[0.97] transition-all duration-300"
+                       rounded-full no-underline hover:bg-gray-100 transition-colors duration-300"
           >
-            <span
-              className="tracking-wider uppercase"
-              style={{ fontSize: "11px", fontWeight: 500 }}
-            >
+            <span className="tracking-wider uppercase" style={{ fontSize: "11px", fontWeight: 500 }}>
               Book a Service
             </span>
-            <ArrowRight
-              size={16}
-              className="group-hover:translate-x-0.5 transition-transform duration-300"
-            />
-          </a>
+            <ArrowRight size={16} className="group-hover:translate-x-0.5 transition-transform duration-300" />
+          </motion.a>
 
           <a
             href="#story"
-            className="group flex items-center gap-3 h-14 px-6 text-white
-                       no-underline hover:text-white/70 transition-colors duration-300"
+            className="group flex items-center gap-3 h-14 px-2 text-white
+                       no-underline hover:text-white/60 transition-colors duration-300"
           >
-            <span
-              className="tracking-wider uppercase"
-              style={{ fontSize: "11px" }}
-            >
+            <span className="tracking-wider uppercase" style={{ fontSize: "11px" }}>
               Our Story
             </span>
             <div className="w-8 h-px bg-current" />
           </a>
-        </div>
+        </motion.div>
 
         {/* Stats row */}
-        <div
-          data-animate
-          className="opacity-0 grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-10
-                     pt-8 border-t border-white/10"
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
+          className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-10 pt-8 border-t border-white/10"
         >
           {STATS.map((stat, i) => (
             <div key={i}>
               <p
                 className="text-white mb-1"
                 style={{
-                  fontFamily: 'Georgia, "Times New Roman", serif',
-                  fontSize: "clamp(28px, 4vw, 40px)",
+                  fontFamily: SERIF,
+                  fontSize: "clamp(26px, 4vw, 40px)",
                   fontWeight: 300,
                   letterSpacing: "-0.02em",
                 }}
               >
                 {stat.value}
               </p>
-              <p
-                className="text-white/30 tracking-wider uppercase"
-                style={{ fontSize: "10px" }}
-              >
+              <p className="text-white/30 tracking-wider uppercase" style={{ fontSize: "10px" }}>
                 {stat.label}
               </p>
             </div>
           ))}
-        </div>
+        </motion.div>
       </div>
 
       {/* Scroll indicator */}
@@ -274,62 +263,28 @@ const Hero = memo(function Hero() {
   )
 })
 
-// ── Story Section ──────────────────────────────────────────
+// ── Story ──────────────────────────────────────────────────
 const Story = memo(function Story() {
-  const sectionRef = useRef(null)
-  const leftRef = useRef(null)
-  const rightRef = useRef(null)
-
-  useScrollAnimation(
-    sectionRef,
-    (gsap, ScrollTrigger) => {
-      gsap.fromTo(
-        leftRef.current,
-        { opacity: 0, x: -40 },
-        {
-          opacity: 1,
-          x: 0,
-          duration: 1,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: sectionRef.current,
-            start: "top 75%",
-            once: true,
-          },
-        }
-      )
-
-      gsap.fromTo(
-        rightRef.current,
-        { opacity: 0, x: 40 },
-        {
-          opacity: 1,
-          x: 0,
-          duration: 1,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: sectionRef.current,
-            start: "top 75%",
-            once: true,
-          },
-        }
-      )
-    },
-    []
-  )
+  const ref = useRef(null)
+  const inView = useInView(ref, { once: true, margin: "-80px" })
 
   return (
     <section
-      ref={sectionRef}
+      ref={ref}
       id="story"
       className="w-full bg-white py-20 md:py-32 lg:py-40"
-      style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
+      style={{ fontFamily: SANS }}
     >
       <div className="max-w-7xl mx-auto px-5 sm:px-8 md:px-12 lg:px-16">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
-          {/* Left: Image composition */}
-          <div ref={leftRef} className="relative opacity-0">
-            {/* Main image */}
+
+          {/* Left: image */}
+          <motion.div
+            variants={fadeLeft}
+            initial="hidden"
+            animate={inView ? "visible" : "hidden"}
+            className="relative"
+          >
             <div className="relative aspect-[4/5] rounded-2xl overflow-hidden bg-gray-100">
               <img
                 src="https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?q=80&w=1000&auto=format&fit=crop"
@@ -339,102 +294,71 @@ const Story = memo(function Story() {
               />
             </div>
 
-            {/* Floating card */}
+            {/* Floating stat card */}
             <div
-              className="absolute -bottom-6 -right-6 md:bottom-8 md:-right-8 bg-black text-white
-                         p-6 rounded-2xl shadow-2xl max-w-[200px]"
+              className="absolute -bottom-6 -right-4 md:-bottom-0 md:-right-8 bg-black text-white
+                         p-5 rounded-2xl shadow-2xl max-w-[180px]"
             >
               <p
-                className="mb-2"
-                style={{
-                  fontFamily: 'Georgia, "Times New Roman", serif',
-                  fontSize: "36px",
-                  fontWeight: 300,
-                  lineHeight: 1,
-                }}
+                className="mb-1.5"
+                style={{ fontFamily: SERIF, fontSize: "36px", fontWeight: 300, lineHeight: 1 }}
               >
                 3+
               </p>
-              <p className="text-white/50 leading-snug" style={{ fontSize: "13px" }}>
+              <p className="text-white/50 leading-snug" style={{ fontSize: "12px" }}>
                 Years serving Duliajan with quality cleaning
               </p>
             </div>
 
-            {/* Decorative element */}
+            {/* Decorative corner */}
             <div
-              className="absolute -top-4 -left-4 w-24 h-24 border border-black/10 rounded-2xl -z-10"
+              className="absolute -top-4 -left-4 w-20 h-20 border border-black/10 rounded-2xl -z-10"
               aria-hidden="true"
             />
-          </div>
+          </motion.div>
 
-          {/* Right: Content */}
-          <div ref={rightRef} className="opacity-0">
-            <div className="flex items-center gap-3 mb-6">
-              <span className="w-10 h-px bg-black" />
-              <span
-                className="tracking-[0.4em] uppercase text-gray-400"
-                style={{ fontSize: "10px" }}
-              >
-                Our Story
-              </span>
-            </div>
+          {/* Right: content */}
+          <motion.div
+            variants={fadeRight}
+            initial="hidden"
+            animate={inView ? "visible" : "hidden"}
+          >
+            <Eyebrow>Our Story</Eyebrow>
 
-            <h2
-              className="text-black mb-8"
-              style={{
-                fontFamily: 'Georgia, "Times New Roman", serif',
-                fontWeight: 300,
-                fontSize: "clamp(2rem, 4vw, 3rem)",
-                lineHeight: 1.15,
-                letterSpacing: "-0.02em",
-              }}
-            >
+            <SectionHeading className="mb-8">
               Built on a Simple
               <br />
               <span className="text-gray-300">Idea</span>
-            </h2>
+            </SectionHeading>
 
             <div className="space-y-5 mb-10">
               <p className="text-gray-500 leading-relaxed" style={{ fontSize: "15px" }}>
                 <span className="text-black font-medium">Your time is valuable.</span>{" "}
-                That's the belief that started Wash2Door. We saw people spending
-                hours at car washes, waiting in queues, dealing with inconsistent
-                results.
+                That's the belief that started Wash2Door. We saw people spending hours at car
+                washes, waiting in queues, dealing with inconsistent results.
               </p>
-
               <p className="text-gray-500 leading-relaxed" style={{ fontSize: "15px" }}>
-                We thought — what if we brought the car wash to you? What if
-                cleaning your car was as simple as booking a slot on your phone?
+                We thought — what if we brought the car wash to you? What if cleaning your car
+                was as simple as booking a slot on your phone?
               </p>
-
               <p className="text-gray-500 leading-relaxed" style={{ fontSize: "15px" }}>
-                Today, we serve 100+ happy customers in Duliajan. From car washing
-                to sofa cleaning to water tank maintenance — we handle it all at
-                your doorstep.
+                Today, we serve 100+ happy customers in Duliajan. From car washing to sofa
+                cleaning to water tank maintenance — we handle it all at your doorstep.
               </p>
             </div>
 
-            {/* Quote */}
             <blockquote className="relative pl-6 py-4 border-l-2 border-black mb-10">
               <p
                 className="text-black italic"
-                style={{
-                  fontFamily: 'Georgia, "Times New Roman", serif',
-                  fontSize: "20px",
-                  lineHeight: 1.5,
-                }}
+                style={{ fontFamily: SERIF, fontSize: "19px", lineHeight: 1.5 }}
               >
                 "You book. We clean. You enjoy."
               </p>
-              <cite
-                className="text-gray-400 not-italic mt-3 block"
-                style={{ fontSize: "13px" }}
-              >
+              <cite className="text-gray-400 not-italic mt-2 block" style={{ fontSize: "12px" }}>
                 — The Wash2Door Promise
               </cite>
             </blockquote>
 
-            {/* CTA */}
             <a
               href="/services"
               className="group inline-flex items-center gap-3 text-black no-underline"
@@ -448,163 +372,100 @@ const Story = memo(function Story() {
               </span>
               <ArrowUpRight
                 size={14}
-                className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5
-                           transition-transform duration-300"
+                className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform duration-300"
               />
             </a>
-          </div>
+          </motion.div>
         </div>
       </div>
     </section>
   )
 })
 
-// ── Features Section ───────────────────────────────────────
+// ── Features ───────────────────────────────────────────────
 const Features = memo(function Features() {
-  const sectionRef = useRef(null)
   const headerRef = useRef(null)
   const gridRef = useRef(null)
-
-  useScrollAnimation(
-    sectionRef,
-    (gsap, ScrollTrigger) => {
-      gsap.fromTo(
-        headerRef.current,
-        { opacity: 0, y: 30 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.8,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: sectionRef.current,
-            start: "top 80%",
-            once: true,
-          },
-        }
-      )
-
-      const cards = gridRef.current.querySelectorAll("[data-feature]")
-      gsap.fromTo(
-        cards,
-        { opacity: 0, y: 40 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.8,
-          stagger: 0.1,
-          ease: "power4.out",
-          scrollTrigger: {
-            trigger: gridRef.current,
-            start: "top 80%",
-            once: true,
-          },
-        }
-      )
-    },
-    []
-  )
+  const headerInView = useInView(headerRef, { once: true, margin: "-60px" })
+  const gridInView = useInView(gridRef, { once: true, margin: "-60px" })
 
   return (
     <section
-      ref={sectionRef}
       className="w-full bg-gray-50 py-20 md:py-28 lg:py-32"
-      style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
+      style={{ fontFamily: SANS }}
     >
       <div className="max-w-7xl mx-auto px-5 sm:px-8 md:px-12 lg:px-16">
+
         {/* Header */}
-        <div ref={headerRef} className="text-center mb-16 md:mb-20 opacity-0">
+        <motion.div
+          ref={headerRef}
+          variants={fadeUp}
+          initial="hidden"
+          animate={headerInView ? "visible" : "hidden"}
+          className="text-center mb-14 md:mb-20"
+        >
           <div className="flex items-center justify-center gap-3 mb-6">
             <span className="w-10 h-px bg-black" />
-            <span
-              className="tracking-[0.4em] uppercase text-gray-400"
-              style={{ fontSize: "10px" }}
-            >
+            <span className="tracking-[0.4em] uppercase text-gray-400" style={{ fontSize: "10px" }}>
               Why Us
             </span>
             <span className="w-10 h-px bg-black" />
           </div>
-
-          <h2
-            className="text-black mb-5"
-            style={{
-              fontFamily: 'Georgia, "Times New Roman", serif',
-              fontWeight: 300,
-              fontSize: "clamp(2rem, 4vw, 3rem)",
-              lineHeight: 1.15,
-              letterSpacing: "-0.02em",
-            }}
-          >
-            What Makes Us Different
-          </h2>
-
-          <p
-            className="text-gray-400 max-w-lg mx-auto leading-relaxed"
-            style={{ fontSize: "15px" }}
-          >
-            We're not just another cleaning service. Here's why customers
-            choose Wash2Door.
+          <SectionHeading className="mb-5">What Makes Us Different</SectionHeading>
+          <p className="text-gray-400 max-w-lg mx-auto leading-relaxed" style={{ fontSize: "15px" }}>
+            We're not just another cleaning service. Here's why customers choose Wash2Door.
           </p>
-        </div>
+        </motion.div>
 
-        {/* Features grid */}
+        {/* Grid */}
         <div
           ref={gridRef}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
         >
           {FEATURES.map((feature, i) => {
             const Icon = feature.icon
-
             return (
-              <div
+              <motion.div
                 key={i}
-                data-feature
-                className="group relative bg-white p-8 rounded-2xl opacity-0
+                custom={i}
+                variants={fadeUp}
+                initial="hidden"
+                animate={gridInView ? "visible" : "hidden"}
+                className="group relative bg-white p-7 rounded-2xl
                            border border-transparent hover:border-black
-                           transition-all duration-500"
+                           transition-all duration-500 cursor-default"
               >
-                {/* Number */}
+                {/* Background number */}
                 <span
-                  className="absolute top-6 right-6 text-gray-100 group-hover:text-gray-200
-                             transition-colors duration-500"
-                  style={{
-                    fontFamily: 'Georgia, "Times New Roman", serif',
-                    fontSize: "48px",
-                    fontWeight: 300,
-                    lineHeight: 1,
-                  }}
+                  className="absolute top-5 right-5 text-gray-100 group-hover:text-gray-200
+                             transition-colors duration-500 select-none"
+                  style={{ fontFamily: SERIF, fontSize: "44px", fontWeight: 300, lineHeight: 1 }}
                 >
                   {String(i + 1).padStart(2, "0")}
                 </span>
 
                 {/* Icon */}
                 <div
-                  className="w-14 h-14 rounded-full bg-gray-50 flex items-center justify-center
-                             mb-6 group-hover:bg-black transition-colors duration-500"
+                  className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center
+                             mb-5 group-hover:bg-black transition-colors duration-500"
                 >
                   <Icon
-                    size={22}
+                    size={20}
                     strokeWidth={1.3}
                     className="text-gray-400 group-hover:text-white transition-colors duration-500"
                   />
                 </div>
 
-                {/* Content */}
                 <h3
-                  className="text-black mb-3"
-                  style={{
-                    fontFamily: 'Georgia, "Times New Roman", serif',
-                    fontWeight: 400,
-                    fontSize: "18px",
-                  }}
+                  className="text-black mb-2.5"
+                  style={{ fontFamily: SERIF, fontWeight: 400, fontSize: "17px" }}
                 >
                   {feature.title}
                 </h3>
-
-                <p className="text-gray-400 leading-relaxed" style={{ fontSize: "14px" }}>
+                <p className="text-gray-400 leading-relaxed" style={{ fontSize: "13px" }}>
                   {feature.desc}
                 </p>
-              </div>
+              </motion.div>
             )
           })}
         </div>
@@ -613,173 +474,119 @@ const Features = memo(function Features() {
   )
 })
 
-// ── Process Section ────────────────────────────────────────
+// ── Process ────────────────────────────────────────────────
 const Process = memo(function Process() {
-  const sectionRef = useRef(null)
   const headerRef = useRef(null)
   const stepsRef = useRef(null)
-
-  useScrollAnimation(
-    sectionRef,
-    (gsap, ScrollTrigger) => {
-      gsap.fromTo(
-        headerRef.current,
-        { opacity: 0, y: 30 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.8,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: sectionRef.current,
-            start: "top 80%",
-            once: true,
-          },
-        }
-      )
-
-      const steps = stepsRef.current.querySelectorAll("[data-step]")
-      gsap.fromTo(
-        steps,
-        { opacity: 0, y: 30 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.7,
-          stagger: 0.15,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: stepsRef.current,
-            start: "top 80%",
-            once: true,
-          },
-        }
-      )
-    },
-    []
-  )
+  const headerInView = useInView(headerRef, { once: true, margin: "-60px" })
+  const stepsInView = useInView(stepsRef, { once: true, margin: "-60px" })
 
   return (
     <section
-      ref={sectionRef}
       className="w-full bg-black py-20 md:py-28 lg:py-32 relative overflow-hidden"
-      style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
+      style={{ fontFamily: SANS }}
     >
-      {/* Background decoration */}
-      <div className="absolute inset-0" aria-hidden="true">
-        <div
-          className="absolute inset-0 opacity-[0.02]"
-          style={{
-            backgroundImage: `
-              linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)
-            `,
-            backgroundSize: "80px 80px",
-          }}
-        />
-      </div>
+      {/* Background grid texture */}
+      <div
+        className="absolute inset-0 opacity-[0.025]"
+        style={{
+          backgroundImage: `
+            linear-gradient(rgba(255,255,255,0.15) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,0.15) 1px, transparent 1px)
+          `,
+          backgroundSize: "80px 80px",
+        }}
+        aria-hidden="true"
+      />
 
       <div className="max-w-7xl mx-auto px-5 sm:px-8 md:px-12 lg:px-16 relative z-10">
+
         {/* Header */}
-        <div ref={headerRef} className="text-center mb-16 md:mb-20 opacity-0">
+        <motion.div
+          ref={headerRef}
+          variants={fadeUp}
+          initial="hidden"
+          animate={headerInView ? "visible" : "hidden"}
+          className="text-center mb-14 md:mb-20"
+        >
           <div className="flex items-center justify-center gap-3 mb-6">
             <span className="w-10 h-px bg-white/30" />
-            <span
-              className="tracking-[0.4em] uppercase text-white/50"
-              style={{ fontSize: "10px" }}
-            >
+            <span className="tracking-[0.4em] uppercase text-white/50" style={{ fontSize: "10px" }}>
               How It Works
             </span>
             <span className="w-10 h-px bg-white/30" />
           </div>
-
-          <h2
-            className="text-white mb-5"
-            style={{
-              fontFamily: 'Georgia, "Times New Roman", serif',
-              fontWeight: 300,
-              fontSize: "clamp(2rem, 4vw, 3rem)",
-              lineHeight: 1.15,
-              letterSpacing: "-0.02em",
-            }}
-          >
-            Simple as <span className="italic text-white/50">1-2-3-4</span>
-          </h2>
-        </div>
+          <SectionHeading light>
+            Simple as{" "}
+            <span className="italic text-white/40">1-2-3-4</span>
+          </SectionHeading>
+        </motion.div>
 
         {/* Steps */}
-        <div ref={stepsRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div
+          ref={stepsRef}
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6"
+        >
           {PROCESS_STEPS.map((step, i) => (
-            <div
+            <motion.div
               key={i}
-              data-step
-              className="relative opacity-0 group"
+              custom={i}
+              variants={fadeUp}
+              initial="hidden"
+              animate={stepsInView ? "visible" : "hidden"}
+              className="relative group"
             >
-              {/* Connector line */}
+              {/* Connector line (desktop only) */}
               {i < PROCESS_STEPS.length - 1 && (
                 <div
-                  className="hidden lg:block absolute top-10 left-full w-full h-px bg-white/10"
-                  style={{ width: "calc(100% - 2rem)" }}
+                  className="hidden lg:block absolute top-9 left-[calc(100%+12px)] right-[-12px]
+                             h-px bg-white/10 z-10"
                   aria-hidden="true"
                 />
               )}
 
-              {/* Card */}
-              <div className="relative bg-white/[0.03] border border-white/10 rounded-2xl p-6
-                              hover:bg-white/[0.06] hover:border-white/20
-                              transition-all duration-500">
-                {/* Number */}
+              <div
+                className="bg-white/[0.03] border border-white/10 rounded-2xl p-6
+                           hover:bg-white/[0.07] hover:border-white/25
+                           transition-all duration-500"
+              >
                 <span
-                  className="text-white/10 block mb-4 group-hover:text-white/20
-                             transition-colors duration-500"
-                  style={{
-                    fontFamily: 'Georgia, "Times New Roman", serif',
-                    fontSize: "56px",
-                    fontWeight: 300,
-                    lineHeight: 1,
-                  }}
+                  className="text-white/10 block mb-4 group-hover:text-white/20 transition-colors duration-500"
+                  style={{ fontFamily: SERIF, fontSize: "52px", fontWeight: 300, lineHeight: 1 }}
                 >
                   {step.number}
                 </span>
-
                 <h3
                   className="text-white mb-2"
-                  style={{
-                    fontFamily: 'Georgia, "Times New Roman", serif',
-                    fontWeight: 400,
-                    fontSize: "18px",
-                  }}
+                  style={{ fontFamily: SERIF, fontWeight: 400, fontSize: "17px" }}
                 >
                   {step.title}
                 </h3>
-
-                <p className="text-white/40 leading-relaxed" style={{ fontSize: "14px" }}>
+                <p className="text-white/40 leading-relaxed" style={{ fontSize: "13px" }}>
                   {step.desc}
                 </p>
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
 
         {/* CTA */}
         <div className="text-center mt-12 md:mt-16">
-          <a
+          <motion.a
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.96 }}
             href="/bookings"
             className="group inline-flex items-center gap-3 h-14 px-8 bg-white text-black
-                       rounded-full no-underline hover:bg-gray-100
-                       active:scale-[0.97] transition-all duration-300"
+                       rounded-full no-underline hover:bg-gray-100 transition-colors duration-300"
           >
-            <span
-              className="tracking-wider uppercase"
-              style={{ fontSize: "11px", fontWeight: 500 }}
-            >
+            <span className="tracking-wider uppercase" style={{ fontSize: "11px", fontWeight: 500 }}>
               Start Booking
             </span>
             <ArrowRight
-              size={16}
+              size={15}
               className="group-hover:translate-x-0.5 transition-transform duration-300"
             />
-          </a>
+          </motion.a>
         </div>
       </div>
     </section>
@@ -788,135 +595,93 @@ const Process = memo(function Process() {
 
 // ── Services Preview ───────────────────────────────────────
 const ServicesPreview = memo(function ServicesPreview() {
-  const sectionRef = useRef(null)
-  const contentRef = useRef(null)
-
-  useScrollAnimation(
-    sectionRef,
-    (gsap, ScrollTrigger) => {
-      const elements = contentRef.current.querySelectorAll("[data-animate]")
-      gsap.fromTo(
-        elements,
-        { opacity: 0, y: 30 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.8,
-          stagger: 0.1,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: sectionRef.current,
-            start: "top 75%",
-            once: true,
-          },
-        }
-      )
-    },
-    []
-  )
+  const leftRef = useRef(null)
+  const rightRef = useRef(null)
+  const leftInView = useInView(leftRef, { once: true, margin: "-60px" })
+  const rightInView = useInView(rightRef, { once: true, margin: "-60px" })
 
   return (
     <section
-      ref={sectionRef}
       className="w-full bg-white py-20 md:py-28 lg:py-32"
-      style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
+      style={{ fontFamily: SANS }}
     >
       <div className="max-w-7xl mx-auto px-5 sm:px-8 md:px-12 lg:px-16">
-        <div
-          ref={contentRef}
-          className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center"
-        >
-          {/* Left: Content */}
-          <div>
-            <div data-animate className="flex items-center gap-3 mb-6 opacity-0">
-              <span className="w-10 h-px bg-black" />
-              <span
-                className="tracking-[0.4em] uppercase text-gray-400"
-                style={{ fontSize: "10px" }}
-              >
-                Our Services
-              </span>
-            </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
 
-            <h2
-              data-animate
-              className="opacity-0 text-black mb-6"
-              style={{
-                fontFamily: 'Georgia, "Times New Roman", serif',
-                fontWeight: 300,
-                fontSize: "clamp(2rem, 4vw, 3rem)",
-                lineHeight: 1.15,
-                letterSpacing: "-0.02em",
-              }}
-            >
+          {/* Left: content */}
+          <motion.div
+            ref={leftRef}
+            variants={fadeLeft}
+            initial="hidden"
+            animate={leftInView ? "visible" : "hidden"}
+          >
+            <Eyebrow>Our Services</Eyebrow>
+
+            <SectionHeading className="mb-6">
               What We
               <br />
               <span className="text-gray-300">Clean</span>
-            </h2>
+            </SectionHeading>
 
-            <p
-              data-animate
-              className="opacity-0 text-gray-500 leading-relaxed mb-10 max-w-md"
-              style={{ fontSize: "15px" }}
-            >
-              From cars to sofas to water tanks — we've got your cleaning needs
-              covered. All services delivered at your doorstep.
+            <p className="text-gray-500 leading-relaxed mb-10 max-w-md" style={{ fontSize: "15px" }}>
+              From cars to sofas to water tanks — we've got your cleaning needs covered.
+              All services delivered at your doorstep.
             </p>
 
             {/* Services list */}
-            <div data-animate className="space-y-0 mb-10 opacity-0">
+            <div className="mb-10 border-t border-gray-100">
               {SERVICES_LIST.map((service, i) => (
-                <div
+                <motion.div
                   key={i}
+                  custom={i}
+                  variants={fadeUp}
+                  initial="hidden"
+                  animate={leftInView ? "visible" : "hidden"}
                   className="flex items-center justify-between py-4 border-b border-gray-100
                              group hover:pl-2 transition-all duration-300"
                 >
                   <div className="flex items-center gap-3">
-                    <Check size={14} className="text-gray-300" />
+                    <Check size={13} className="text-gray-300 shrink-0" />
                     <span
-                      className="text-black group-hover:text-gray-500
-                                 transition-colors duration-300"
-                      style={{ fontSize: "15px" }}
+                      className="text-black group-hover:text-gray-500 transition-colors duration-300"
+                      style={{ fontSize: "14px" }}
                     >
                       {service.name}
                     </span>
                   </div>
-                  <span
-                    className="text-gray-400"
-                    style={{
-                      fontFamily: 'Georgia, "Times New Roman", serif',
-                      fontSize: "15px",
-                    }}
-                  >
+                  <span className="text-gray-400 tabular-nums" style={{ fontFamily: SERIF, fontSize: "14px" }}>
                     {service.price}
                   </span>
-                </div>
+                </motion.div>
               ))}
             </div>
 
-            <a
-              data-animate
+            <motion.a
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.96 }}
               href="/services"
-              className="opacity-0 group inline-flex items-center gap-3 h-13 px-7
+              className="inline-flex items-center gap-3 h-12 px-7
                          bg-black text-white rounded-full no-underline
-                         hover:bg-gray-800 active:scale-[0.97]
-                         transition-all duration-300"
+                         hover:bg-gray-800 transition-colors duration-300 group"
             >
-              <span
-                className="tracking-wider uppercase"
-                style={{ fontSize: "11px", fontWeight: 500 }}
-              >
+              <span className="tracking-wider uppercase" style={{ fontSize: "11px", fontWeight: 500 }}>
                 View All Services
               </span>
               <ArrowRight
-                size={15}
+                size={14}
                 className="group-hover:translate-x-0.5 transition-transform duration-300"
               />
-            </a>
-          </div>
+            </motion.a>
+          </motion.div>
 
-          {/* Right: Image */}
-          <div data-animate className="relative opacity-0">
+          {/* Right: image */}
+          <motion.div
+            ref={rightRef}
+            variants={fadeRight}
+            initial="hidden"
+            animate={rightInView ? "visible" : "hidden"}
+            className="relative"
+          >
             <div className="relative aspect-square rounded-2xl overflow-hidden bg-gray-100">
               <img
                 src="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=80&w=1000&auto=format&fit=crop"
@@ -925,37 +690,35 @@ const ServicesPreview = memo(function ServicesPreview() {
                 loading="lazy"
               />
 
-              {/* Overlay card */}
-              <div className="absolute bottom-6 left-6 right-6 bg-white/95 backdrop-blur-sm
-                              p-5 rounded-xl">
-                <div className="flex items-center gap-3 mb-2">
+              {/* Overlay social proof card */}
+              <div className="absolute bottom-5 left-5 right-5 bg-white/95 backdrop-blur-sm p-4 rounded-xl shadow-lg">
+                <div className="flex items-center gap-3 mb-1.5">
                   <div className="flex -space-x-2">
-                    {[1, 2, 3].map((_, i) => (
+                    {[...Array(3)].map((_, i) => (
                       <div
                         key={i}
                         className="w-8 h-8 rounded-full bg-gray-200 border-2 border-white"
                       />
                     ))}
                   </div>
-                  <div className="flex items-center gap-1">
-                    {[1, 2, 3, 4, 5].map((_, i) => (
-                      <Star key={i} size={12} fill="#000" strokeWidth={0} />
+                  <div className="flex items-center gap-0.5">
+                    {[...Array(5)].map((_, i) => (
+                      <Star key={i} size={11} fill="#000" strokeWidth={0} />
                     ))}
                   </div>
                 </div>
-                <p className="text-gray-500" style={{ fontSize: "13px" }}>
+                <p className="text-gray-500" style={{ fontSize: "12px" }}>
                   <span className="text-black font-medium">100+ customers</span> trust us
                 </p>
               </div>
             </div>
 
-            {/* Decorative */}
+            {/* Decorative corner */}
             <div
-              className="absolute -bottom-4 -right-4 w-32 h-32 border border-black/10
-                         rounded-2xl -z-10"
+              className="absolute -bottom-4 -right-4 w-28 h-28 border border-black/10 rounded-2xl -z-10"
               aria-hidden="true"
             />
-          </div>
+          </motion.div>
         </div>
       </div>
     </section>

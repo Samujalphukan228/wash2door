@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useRef, memo, useState } from "react"
+import { memo, useState, useRef } from "react"
+import { motion, AnimatePresence, useInView } from "framer-motion"
 import {
   ArrowUpRight,
   ArrowRight,
@@ -10,7 +11,6 @@ import {
   Clock,
   Instagram,
   Facebook,
-  MessageCircle,
   Sparkles,
   Check,
   Plus,
@@ -22,7 +22,6 @@ const CONTACT_METHODS = [
   {
     id: "whatsapp",
     label: "WhatsApp",
-    value: "Quick Chat",
     description: "Fastest way to reach us",
     href: "https://wa.me/916900706456?text=Hi%2C%20I%20want%20to%20book%20a%20service",
     available: "24/7",
@@ -86,52 +85,73 @@ const SOCIALS = [
   },
 ]
 
-// Using reliable image sources
-const HERO_IMAGE = "https://images.unsplash.com/photo-1607860108855-64acf2078ed9?w=1920&q=80"
-const MAP_IMAGE = "https://images.unsplash.com/photo-1569336415962-a4bd9f69cd83?w=800&q=80"
+const HERO_IMAGE =
+  "https://images.unsplash.com/photo-1607860108855-64acf2078ed9?w=1920&q=80"
+const MAP_IMAGE =
+  "https://images.unsplash.com/photo-1569336415962-a4bd9f69cd83?w=800&q=80"
 
-const ANIMATION_CONFIG = {
-  duration: 0.8,
-  stagger: 0.1,
-  ease: "power4.out",
+// ── Shared tokens ──────────────────────────────────────────
+const SANS = "'Helvetica Neue', Helvetica, Arial, sans-serif"
+const SERIF = 'Georgia, "Times New Roman", serif'
+
+// ── Animation variants ─────────────────────────────────────
+const fadeUp = {
+  hidden: { opacity: 0, y: 28 },
+  visible: (i = 0) => ({
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.65, delay: i * 0.08, ease: [0.16, 1, 0.3, 1] },
+  }),
 }
 
-// ── Custom Hook: Scroll Animation ──────────────────────────
-function useScrollAnimation(ref, config, deps = []) {
-  useEffect(() => {
-    if (!ref.current) return
+const fadeLeft = {
+  hidden: { opacity: 0, x: -36 },
+  visible: {
+    opacity: 1,
+    x: 0,
+    transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] },
+  },
+}
 
-    let ctx
-    let observer
+const fadeRight = {
+  hidden: { opacity: 0, x: 36 },
+  visible: {
+    opacity: 1,
+    x: 0,
+    transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] },
+  },
+}
 
-    const init = async () => {
-      observer = new IntersectionObserver(
-        async (entries) => {
-          if (entries[0].isIntersecting) {
-            observer.disconnect()
+// ── Shared UI helpers ──────────────────────────────────────
+function Eyebrow({ children, light = false }) {
+  return (
+    <div className="flex items-center gap-3 mb-5">
+      <span className={`w-8 h-px ${light ? "bg-white/30" : "bg-black"}`} />
+      <span
+        className={`tracking-[0.35em] uppercase ${light ? "text-white/50" : "text-gray-400"}`}
+        style={{ fontSize: "10px", fontFamily: SANS }}
+      >
+        {children}
+      </span>
+    </div>
+  )
+}
 
-            const { default: gsap } = await import("gsap")
-            const { ScrollTrigger } = await import("gsap/ScrollTrigger")
-            gsap.registerPlugin(ScrollTrigger)
-
-            ctx = gsap.context(() => {
-              config(gsap, ScrollTrigger)
-            })
-          }
-        },
-        { rootMargin: "50px" }
-      )
-
-      observer.observe(ref.current)
-    }
-
-    init()
-
-    return () => {
-      observer?.disconnect()
-      ctx?.revert()
-    }
-  }, deps)
+function SectionHeading({ children, light = false, className = "" }) {
+  return (
+    <h2
+      className={`${light ? "text-white" : "text-black"} ${className}`}
+      style={{
+        fontFamily: SERIF,
+        fontWeight: 300,
+        fontSize: "clamp(1.75rem, 4vw, 2.75rem)",
+        lineHeight: 1.15,
+        letterSpacing: "-0.02em",
+      }}
+    >
+      {children}
+    </h2>
+  )
 }
 
 // ── WhatsApp Icon ──────────────────────────────────────────
@@ -150,62 +170,27 @@ const WhatsAppIcon = memo(function WhatsAppIcon({ className = "", size = 24 }) {
   )
 })
 
-// ── Hero Section ───────────────────────────────────────────
+// ── Hero ───────────────────────────────────────────────────
 const Hero = memo(function Hero() {
-  const sectionRef = useRef(null)
-  const contentRef = useRef(null)
-
-  useEffect(() => {
-    let ctx
-
-    const init = async () => {
-      const { default: gsap } = await import("gsap")
-
-      if (!sectionRef.current) return
-
-      ctx = gsap.context(() => {
-        const elements = contentRef.current.querySelectorAll("[data-animate]")
-
-        gsap.fromTo(
-          elements,
-          { opacity: 0, y: 40 },
-          {
-            opacity: 1,
-            y: 0,
-            duration: ANIMATION_CONFIG.duration,
-            stagger: ANIMATION_CONFIG.stagger,
-            ease: ANIMATION_CONFIG.ease,
-          }
-        )
-      })
-    }
-
-    init()
-
-    return () => ctx?.revert()
-  }, [])
-
   return (
     <section
-      ref={sectionRef}
-      className="relative min-h-[80vh] md:min-h-[85vh] bg-black overflow-hidden flex items-end"
-      style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
+      className="relative min-h-[80dvh] md:min-h-[85vh] bg-black overflow-hidden flex items-end"
+      style={{ fontFamily: SANS }}
     >
-      {/* Background Image */}
+      {/* Background */}
       <div className="absolute inset-0">
         <img
           src={HERO_IMAGE}
           alt=""
-          className="absolute inset-0 w-full h-full object-cover"
-          style={{ opacity: 0.4 }}
+          role="presentation"
+          className="absolute inset-0 w-full h-full object-cover opacity-40"
           loading="eager"
         />
-        {/* Overlay gradients */}
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-black/30" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent" />
       </div>
 
-      {/* Grid pattern overlay */}
+      {/* Grid texture */}
       <div
         className="absolute inset-0 opacity-[0.03]"
         style={{
@@ -219,299 +204,210 @@ const Hero = memo(function Hero() {
       />
 
       {/* Content */}
-      <div
-        ref={contentRef}
-        className="relative z-10 w-full max-w-6xl mx-auto px-5 sm:px-8 md:px-12 pb-16 md:pb-20"
-      >
-        {/* Eyebrow */}
-        <div data-animate className="flex items-center gap-3 mb-6 opacity-0">
-          <span className="w-10 h-px bg-white/30" aria-hidden="true" />
-          <span
-            className="tracking-[0.35em] uppercase text-white/50"
-            style={{ fontSize: "11px" }}
-          >
+      <div className="relative z-10 w-full max-w-6xl mx-auto px-5 sm:px-8 md:px-12 pb-14 md:pb-20">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          className="flex items-center gap-3 mb-6"
+        >
+          <span className="w-10 h-px bg-white/30" />
+          <span className="tracking-[0.35em] uppercase text-white/50" style={{ fontSize: "11px" }}>
             Contact Us
           </span>
-        </div>
+        </motion.div>
 
-        {/* Main heading */}
-        <h1
-          data-animate
-          className="opacity-0 text-white mb-6"
+        <motion.h1
+          initial={{ opacity: 0, y: 32 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.75, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+          className="text-white mb-5"
           style={{
-            fontFamily: 'Georgia, "Times New Roman", serif',
+            fontFamily: SERIF,
             fontWeight: 300,
-            fontSize: "clamp(2.5rem, 6vw, 5rem)",
-            lineHeight: 1.1,
+            fontSize: "clamp(2.4rem, 6vw, 5rem)",
+            lineHeight: 1.08,
             letterSpacing: "-0.02em",
             maxWidth: "600px",
           }}
         >
           Let's Start a{" "}
           <span className="italic text-white/50">Conversation</span>
-        </h1>
+        </motion.h1>
 
-        {/* Subtitle */}
-        <p
-          data-animate
-          className="opacity-0 text-white/40 max-w-md mb-10 leading-relaxed"
-          style={{ fontSize: "16px" }}
+        <motion.p
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.65, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+          className="text-white/40 max-w-md mb-9 leading-relaxed"
+          style={{ fontSize: "15px" }}
         >
           Have a question? Want to book a service? We're here to help. Reach out
           through any channel that works for you.
-        </p>
+        </motion.p>
 
         {/* CTA buttons */}
-        <div data-animate className="opacity-0 flex flex-wrap items-center gap-3 mb-10">
-          <a
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.28, ease: [0.16, 1, 0.3, 1] }}
+          className="flex flex-wrap items-center gap-3 mb-9"
+        >
+          <motion.a
+            whileTap={{ scale: 0.96 }}
             href="https://wa.me/916900706456?text=Hi%2C%20I%20want%20to%20book%20a%20service"
             target="_blank"
             rel="noopener noreferrer"
-            className="group inline-flex items-center gap-3 h-12 sm:h-14 px-6 sm:px-8
+            className="group inline-flex items-center gap-3 h-12 sm:h-14 px-5 sm:px-8
                        bg-white text-black rounded-full no-underline
-                       hover:bg-gray-100 active:scale-[0.97]
-                       transition-all duration-300"
+                       hover:bg-gray-100 transition-colors duration-300"
           >
-            <WhatsAppIcon size={18} />
-            <span
-              className="tracking-wider uppercase"
-              style={{ fontSize: "11px", fontWeight: 500 }}
-            >
+            <WhatsAppIcon size={17} />
+            <span className="tracking-wider uppercase" style={{ fontSize: "11px", fontWeight: 500 }}>
               Message Us
             </span>
-            <ArrowRight
-              size={16}
-              className="hidden sm:block group-hover:translate-x-0.5 transition-transform duration-300"
-            />
-          </a>
+            <ArrowRight size={15} className="group-hover:translate-x-0.5 transition-transform duration-300" />
+          </motion.a>
 
-          <a
+          <motion.a
+            whileTap={{ scale: 0.96 }}
             href="tel:6900706456"
-            className="group inline-flex items-center gap-3 h-12 sm:h-14 px-6 sm:px-8
+            className="group inline-flex items-center gap-2.5 h-12 sm:h-14 px-5 sm:px-8
                        border border-white/20 text-white rounded-full no-underline
-                       hover:bg-white/5 active:scale-[0.97]
-                       transition-all duration-300"
+                       hover:bg-white/5 transition-colors duration-300"
           >
-            <Phone size={16} strokeWidth={1.5} />
-            <span
-              className="tracking-wider uppercase"
-              style={{ fontSize: "11px" }}
-            >
+            <Phone size={15} strokeWidth={1.5} />
+            <span className="tracking-wider uppercase" style={{ fontSize: "11px" }}>
               Call Now
             </span>
-          </a>
-        </div>
+          </motion.a>
+        </motion.div>
 
-        {/* Availability indicator */}
-        <div data-animate className="opacity-0 flex items-center gap-4">
+        {/* Live availability indicator */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5, delay: 0.4 }}
+          className="flex items-center gap-4"
+        >
           <div className="flex items-center gap-2">
             <span className="relative flex h-2.5 w-2.5">
-              <span
-                className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping"
-                style={{ animationDuration: "2s" }}
-              />
+              <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" style={{ animationDuration: "2s" }} />
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400" />
             </span>
-            <span className="text-white/60" style={{ fontSize: "13px" }}>
-              Available now
-            </span>
+            <span className="text-white/60" style={{ fontSize: "13px" }}>Available now</span>
           </div>
           <span className="text-white/20">·</span>
-          <span className="text-white/40" style={{ fontSize: "13px" }}>
-            Responds in minutes
-          </span>
-        </div>
+          <span className="text-white/40" style={{ fontSize: "13px" }}>Responds in minutes</span>
+        </motion.div>
       </div>
     </section>
   )
 })
 
-// ── Contact Methods Section ────────────────────────────────
+// ── Contact Methods ────────────────────────────────────────
 const ContactMethods = memo(function ContactMethods() {
-  const sectionRef = useRef(null)
-  const leftRef = useRef(null)
-  const rightRef = useRef(null)
-
-  useScrollAnimation(
-    sectionRef,
-    (gsap, ScrollTrigger) => {
-      gsap.fromTo(
-        leftRef.current,
-        { opacity: 0, x: -30 },
-        {
-          opacity: 1,
-          x: 0,
-          duration: 0.9,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: sectionRef.current,
-            start: "top 75%",
-            once: true,
-          },
-        }
-      )
-
-      gsap.fromTo(
-        rightRef.current,
-        { opacity: 0, x: 30 },
-        {
-          opacity: 1,
-          x: 0,
-          duration: 0.9,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: sectionRef.current,
-            start: "top 75%",
-            once: true,
-          },
-        }
-      )
-    },
-    []
-  )
+  const ref = useRef(null)
+  const inView = useInView(ref, { once: true, margin: "-60px" })
 
   return (
-    <section
-      ref={sectionRef}
-      className="w-full bg-white py-16 md:py-24 lg:py-32"
-      style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
-    >
+    <section ref={ref} className="w-full bg-white py-16 md:py-24 lg:py-32" style={{ fontFamily: SANS }}>
       <div className="max-w-6xl mx-auto px-5 sm:px-8 md:px-12">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">
-          {/* Left: Header */}
-          <div ref={leftRef} className="opacity-0">
-            <div className="flex items-center gap-3 mb-5">
-              <span className="w-8 h-px bg-black" aria-hidden="true" />
-              <span
-                className="tracking-[0.35em] uppercase text-gray-400"
-                style={{ fontSize: "10px" }}
-              >
-                Get In Touch
-              </span>
-            </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16">
 
-            <h2
-              className="text-black mb-5"
-              style={{
-                fontFamily: 'Georgia, "Times New Roman", serif',
-                fontWeight: 300,
-                fontSize: "clamp(1.75rem, 4vw, 2.75rem)",
-                lineHeight: 1.15,
-                letterSpacing: "-0.02em",
-              }}
-            >
+          {/* Left */}
+          <motion.div
+            variants={fadeLeft}
+            initial="hidden"
+            animate={inView ? "visible" : "hidden"}
+          >
+            <Eyebrow>Get In Touch</Eyebrow>
+            <SectionHeading className="mb-5">
               Choose Your{" "}
               <span className="text-gray-300">Preferred Channel</span>
-            </h2>
-
-            <p
-              className="text-gray-500 leading-relaxed mb-8 max-w-sm"
-              style={{ fontSize: "15px" }}
-            >
+            </SectionHeading>
+            <p className="text-gray-500 leading-relaxed mb-8 max-w-sm" style={{ fontSize: "15px" }}>
               We're available on multiple platforms. Pick whatever works best —
               we respond quickly on all channels.
             </p>
 
-            {/* Stats */}
             <div className="flex gap-8 pt-6 border-t border-gray-100">
               {[
                 { value: "< 5 min", label: "Avg Response" },
                 { value: "7 Days", label: "Availability" },
               ].map((stat, i) => (
                 <div key={i}>
-                  <p
-                    className="text-black mb-1"
-                    style={{
-                      fontFamily: 'Georgia, "Times New Roman", serif',
-                      fontSize: "24px",
-                      fontWeight: 300,
-                    }}
-                  >
+                  <p className="text-black mb-1" style={{ fontFamily: SERIF, fontSize: "24px", fontWeight: 300 }}>
                     {stat.value}
                   </p>
-                  <p
-                    className="text-gray-400 tracking-wider uppercase"
-                    style={{ fontSize: "9px" }}
-                  >
+                  <p className="text-gray-400 tracking-wider uppercase" style={{ fontSize: "9px" }}>
                     {stat.label}
                   </p>
                 </div>
               ))}
             </div>
-          </div>
+          </motion.div>
 
-          {/* Right: Contact cards */}
-          <div ref={rightRef} className="opacity-0 space-y-3">
-            {CONTACT_METHODS.map((method) => {
+          {/* Right: cards */}
+          <motion.div
+            variants={fadeRight}
+            initial="hidden"
+            animate={inView ? "visible" : "hidden"}
+            className="space-y-3"
+          >
+            {CONTACT_METHODS.map((method, i) => {
               const Icon = method.icon
               const isWhatsApp = method.id === "whatsapp"
 
               return (
-                <a
+                <motion.a
                   key={method.id}
+                  custom={i}
+                  variants={fadeUp}
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.98 }}
                   href={method.href}
                   target={method.href.startsWith("http") ? "_blank" : undefined}
-                  rel={
-                    method.href.startsWith("http")
-                      ? "noopener noreferrer"
-                      : undefined
-                  }
-                  className={`group flex items-center gap-4 p-5 rounded-xl border
-                              transition-all duration-300 no-underline
-                              ${
-                                method.featured
-                                  ? "bg-black border-black hover:bg-gray-900"
-                                  : "bg-white border-gray-200 hover:border-black"
-                              }`}
+                  rel={method.href.startsWith("http") ? "noopener noreferrer" : undefined}
+                  className={`group flex items-center gap-4 p-4 sm:p-5 rounded-xl border
+                              transition-colors duration-300 no-underline
+                              ${method.featured
+                      ? "bg-black border-black hover:bg-gray-900"
+                      : "bg-white border-gray-200 hover:border-black"
+                    }`}
                 >
-                  {/* Icon */}
+                  {/* Icon container */}
                   <div
-                    className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0
+                    className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0
                                 transition-colors duration-300
-                                ${
-                                  method.featured
-                                    ? "bg-white/10"
-                                    : "bg-gray-100 group-hover:bg-black"
-                                }`}
+                                ${method.featured ? "bg-white/10" : "bg-gray-100 group-hover:bg-black"}`}
                   >
                     {isWhatsApp ? (
                       <WhatsAppIcon
-                        size={22}
-                        className={
-                          method.featured
-                            ? "text-white"
-                            : "text-gray-500 group-hover:text-white"
-                        }
+                        size={20}
+                        className={method.featured ? "text-white" : "text-gray-500 group-hover:text-white"}
                       />
                     ) : (
                       <Icon
-                        size={20}
+                        size={18}
                         strokeWidth={1.5}
-                        className={`transition-colors duration-300 ${
-                          method.featured
-                            ? "text-white"
-                            : "text-gray-500 group-hover:text-white"
-                        }`}
+                        className={`transition-colors duration-300 ${method.featured ? "text-white" : "text-gray-500 group-hover:text-white"}`}
                       />
                     )}
                   </div>
 
-                  {/* Content */}
+                  {/* Text */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
                       <p
                         className={method.featured ? "text-white" : "text-black"}
-                        style={{
-                          fontFamily: 'Georgia, "Times New Roman", serif',
-                          fontSize: "16px",
-                          fontWeight: 400,
-                        }}
+                        style={{ fontFamily: SERIF, fontSize: "15px", fontWeight: 400 }}
                       >
                         {method.label}
                       </p>
                       {method.featured && (
                         <span
-                          className="px-2 py-0.5 bg-white/20 rounded text-white/70 uppercase tracking-wider"
+                          className="px-1.5 py-0.5 bg-white/20 rounded text-white/70 uppercase tracking-wider"
                           style={{ fontSize: "8px" }}
                         >
                           Fast
@@ -519,10 +415,8 @@ const ContactMethods = memo(function ContactMethods() {
                       )}
                     </div>
                     <p
-                      className={`${
-                        method.featured ? "text-white/50" : "text-gray-400"
-                      }`}
-                      style={{ fontSize: "13px" }}
+                      className={`truncate ${method.featured ? "text-white/50" : "text-gray-400"}`}
+                      style={{ fontSize: "12px" }}
                     >
                       {method.description}
                     </p>
@@ -530,29 +424,20 @@ const ContactMethods = memo(function ContactMethods() {
 
                   {/* Arrow */}
                   <div
-                    className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0
+                    className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0
                                 transition-colors duration-300
-                                ${
-                                  method.featured
-                                    ? "bg-white/10"
-                                    : "bg-gray-100 group-hover:bg-black"
-                                }`}
+                                ${method.featured ? "bg-white/10" : "bg-gray-100 group-hover:bg-black"}`}
                   >
                     <ArrowUpRight
-                      size={14}
-                      className={`transition-all duration-300
-                                  group-hover:translate-x-0.5 group-hover:-translate-y-0.5
-                                  ${
-                                    method.featured
-                                      ? "text-white"
-                                      : "text-gray-400 group-hover:text-white"
-                                  }`}
+                      size={13}
+                      className={`transition-all duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5
+                                  ${method.featured ? "text-white" : "text-gray-400 group-hover:text-white"}`}
                     />
                   </div>
-                </a>
+                </motion.a>
               )
             })}
-          </div>
+          </motion.div>
         </div>
       </div>
     </section>
@@ -565,124 +450,71 @@ const FAQItem = memo(function FAQItem({ faq, isOpen, onToggle }) {
     <div className="border-b border-gray-100 last:border-0">
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between py-5 text-left
-                   group transition-colors duration-200"
+        className="w-full flex items-center justify-between py-5 text-left group"
         aria-expanded={isOpen}
       >
         <span
-          className="text-black pr-4 group-hover:text-gray-600 transition-colors duration-200"
-          style={{
-            fontFamily: 'Georgia, "Times New Roman", serif',
-            fontSize: "15px",
-            fontWeight: 400,
-            lineHeight: 1.4,
-          }}
+          className="text-black pr-4 group-hover:text-gray-600 transition-colors duration-200 leading-snug"
+          style={{ fontFamily: SERIF, fontSize: "15px", fontWeight: 400 }}
         >
           {faq.question}
         </span>
-
-        <div
-          className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0
-                      transition-all duration-300
-                      ${isOpen ? "bg-black" : "bg-gray-100 group-hover:bg-gray-200"}`}
+        <motion.div
+          animate={{ backgroundColor: isOpen ? "#000" : "#f3f4f6" }}
+          transition={{ duration: 0.2 }}
+          className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
         >
-          {isOpen ? (
-            <X size={14} className="text-white" />
-          ) : (
-            <Plus size={14} className="text-gray-500" />
-          )}
-        </div>
+          <motion.div animate={{ rotate: isOpen ? 45 : 0 }} transition={{ duration: 0.25 }}>
+            <Plus size={14} className={isOpen ? "text-white" : "text-gray-500"} />
+          </motion.div>
+        </motion.div>
       </button>
 
-      {/* Answer */}
-      <div
-        className={`grid transition-all duration-300 ease-out
-                    ${isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}
-      >
-        <div className="overflow-hidden">
-          <p
-            className="pb-5 text-gray-500 leading-relaxed pr-12"
-            style={{ fontSize: "14px" }}
+      <AnimatePresence initial={false}>
+        {isOpen && (
+          <motion.div
+            key="answer"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            style={{ overflow: "hidden" }}
           >
-            {faq.answer}
-          </p>
-        </div>
-      </div>
+            <p className="pb-5 text-gray-500 leading-relaxed pr-10" style={{ fontSize: "14px" }}>
+              {faq.answer}
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 })
 
 // ── FAQ Section ────────────────────────────────────────────
 const FAQ = memo(function FAQ() {
-  const sectionRef = useRef(null)
-  const contentRef = useRef(null)
+  const ref = useRef(null)
+  const inView = useInView(ref, { once: true, margin: "-60px" })
   const [openIndex, setOpenIndex] = useState(0)
 
-  useScrollAnimation(
-    sectionRef,
-    (gsap, ScrollTrigger) => {
-      gsap.fromTo(
-        contentRef.current,
-        { opacity: 0, y: 40 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.8,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: sectionRef.current,
-            start: "top 75%",
-            once: true,
-          },
-        }
-      )
-    },
-    []
-  )
-
   return (
-    <section
-      ref={sectionRef}
-      className="w-full bg-gray-50 py-16 md:py-24 lg:py-32"
-      style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
-    >
+    <section ref={ref} className="w-full bg-gray-50 py-16 md:py-24 lg:py-32" style={{ fontFamily: SANS }}>
       <div className="max-w-6xl mx-auto px-5 sm:px-8 md:px-12">
-        <div
-          ref={contentRef}
-          className="opacity-0 grid grid-cols-1 lg:grid-cols-5 gap-10 lg:gap-16"
-        >
-          {/* Left: Header */}
-          <div className="lg:col-span-2">
-            <div className="flex items-center gap-3 mb-5">
-              <span className="w-8 h-px bg-black" aria-hidden="true" />
-              <span
-                className="tracking-[0.35em] uppercase text-gray-400"
-                style={{ fontSize: "10px" }}
-              >
-                FAQ
-              </span>
-            </div>
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-10 lg:gap-16">
 
-            <h2
-              className="text-black mb-5"
-              style={{
-                fontFamily: 'Georgia, "Times New Roman", serif',
-                fontWeight: 300,
-                fontSize: "clamp(1.75rem, 4vw, 2.5rem)",
-                lineHeight: 1.15,
-                letterSpacing: "-0.02em",
-              }}
-            >
+          {/* Left */}
+          <motion.div
+            variants={fadeLeft}
+            initial="hidden"
+            animate={inView ? "visible" : "hidden"}
+            className="lg:col-span-2"
+          >
+            <Eyebrow>FAQ</Eyebrow>
+            <SectionHeading className="mb-5">
               Common <span className="text-gray-300">Questions</span>
-            </h2>
-
-            <p
-              className="text-gray-500 leading-relaxed mb-6"
-              style={{ fontSize: "15px" }}
-            >
+            </SectionHeading>
+            <p className="text-gray-500 leading-relaxed mb-6" style={{ fontSize: "14px" }}>
               Quick answers to questions you might have.
             </p>
-
             <a
               href="https://wa.me/916900706456?text=Hi%2C%20I%20have%20a%20question"
               target="_blank"
@@ -690,22 +522,25 @@ const FAQ = memo(function FAQ() {
               className="group inline-flex items-center gap-2 text-black no-underline"
             >
               <span
-                className="tracking-wider uppercase border-b border-black pb-0.5
-                           group-hover:border-gray-400 transition-colors duration-300"
+                className="tracking-wider uppercase border-b border-black pb-0.5 group-hover:border-gray-400 transition-colors duration-300"
                 style={{ fontSize: "11px", fontWeight: 500 }}
               >
                 Ask a Question
               </span>
               <ArrowUpRight
                 size={12}
-                className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5
-                           transition-transform duration-300"
+                className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform duration-300"
               />
             </a>
-          </div>
+          </motion.div>
 
           {/* Right: FAQ list */}
-          <div className="lg:col-span-3 bg-white rounded-2xl p-6 sm:p-8">
+          <motion.div
+            variants={fadeRight}
+            initial="hidden"
+            animate={inView ? "visible" : "hidden"}
+            className="lg:col-span-3 bg-white rounded-2xl p-5 sm:p-7"
+          >
             {FAQS.map((faq, i) => (
               <FAQItem
                 key={i}
@@ -714,323 +549,194 @@ const FAQ = memo(function FAQ() {
                 onToggle={() => setOpenIndex(openIndex === i ? -1 : i)}
               />
             ))}
-          </div>
+          </motion.div>
         </div>
       </div>
     </section>
   )
 })
 
-// ── Location Section ───────────────────────────────────────
+// ── Location ───────────────────────────────────────────────
 const Location = memo(function Location() {
-  const sectionRef = useRef(null)
-  const contentRef = useRef(null)
-
-  useScrollAnimation(
-    sectionRef,
-    (gsap, ScrollTrigger) => {
-      gsap.fromTo(
-        contentRef.current,
-        { opacity: 0, y: 40 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.8,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: sectionRef.current,
-            start: "top 75%",
-            once: true,
-          },
-        }
-      )
-    },
-    []
-  )
+  const ref = useRef(null)
+  const inView = useInView(ref, { once: true, margin: "-60px" })
 
   return (
-    <section
-      ref={sectionRef}
-      className="w-full bg-white py-16 md:py-24 lg:py-32"
-      style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
-    >
+    <section ref={ref} className="w-full bg-white py-16 md:py-24 lg:py-32" style={{ fontFamily: SANS }}>
       <div className="max-w-6xl mx-auto px-5 sm:px-8 md:px-12">
-        <div
-          ref={contentRef}
-          className="opacity-0 grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center"
-        >
-          {/* Left: Map Image */}
-          <div className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-gray-100 order-2 lg:order-1">
-            {/* Actual Map Image */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
+
+          {/* Map image */}
+          <motion.div
+            variants={fadeLeft}
+            initial="hidden"
+            animate={inView ? "visible" : "hidden"}
+            className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-gray-100 order-2 lg:order-1"
+          >
             <img
               src={MAP_IMAGE}
               alt="Duliajan, Assam location"
               className="absolute inset-0 w-full h-full object-cover"
               loading="lazy"
             />
-            
-            {/* Overlay for better contrast */}
             <div className="absolute inset-0 bg-black/20" />
 
-            {/* Location marker */}
+            {/* Pin */}
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="relative">
-                {/* Pulse ring */}
-                <div
+                <span
                   className="absolute -inset-4 bg-white/30 rounded-full animate-ping"
                   style={{ animationDuration: "2s" }}
                 />
-                {/* Pin */}
-                <div className="relative w-14 h-14 bg-black rounded-full flex items-center justify-center shadow-2xl">
-                  <MapPin size={22} className="text-white" />
+                <div className="relative w-13 h-13 w-12 h-12 bg-black rounded-full flex items-center justify-center shadow-2xl">
+                  <MapPin size={20} className="text-white" />
                 </div>
               </div>
             </div>
 
-            {/* Open in maps button */}
+            {/* Maps button */}
             <a
               href="https://maps.google.com/?q=Duliajan,Assam"
               target="_blank"
               rel="noopener noreferrer"
               className="absolute bottom-4 left-4 right-4 flex items-center justify-center gap-2
-                         h-12 bg-white text-black rounded-xl no-underline
-                         hover:bg-gray-50 active:scale-[0.98]
-                         transition-all duration-300 shadow-lg"
+                         h-11 bg-white text-black rounded-xl no-underline
+                         hover:bg-gray-50 active:scale-[0.98] transition-all duration-300 shadow-lg"
             >
-              <span
-                className="tracking-wider uppercase"
-                style={{ fontSize: "10px", fontWeight: 500 }}
-              >
+              <span className="tracking-wider uppercase" style={{ fontSize: "10px", fontWeight: 500 }}>
                 Open in Google Maps
               </span>
-              <ArrowUpRight size={14} />
+              <ArrowUpRight size={13} />
             </a>
-          </div>
+          </motion.div>
 
-          {/* Right: Details */}
-          <div className="order-1 lg:order-2">
-            <div className="flex items-center gap-3 mb-5">
-              <span className="w-8 h-px bg-black" aria-hidden="true" />
-              <span
-                className="tracking-[0.35em] uppercase text-gray-400"
-                style={{ fontSize: "10px" }}
-              >
-                Location
-              </span>
-            </div>
-
-            <h2
-              className="text-black mb-5"
-              style={{
-                fontFamily: 'Georgia, "Times New Roman", serif',
-                fontWeight: 300,
-                fontSize: "clamp(1.75rem, 4vw, 2.5rem)",
-                lineHeight: 1.15,
-                letterSpacing: "-0.02em",
-              }}
-            >
+          {/* Details */}
+          <motion.div
+            variants={fadeRight}
+            initial="hidden"
+            animate={inView ? "visible" : "hidden"}
+            className="order-1 lg:order-2"
+          >
+            <Eyebrow>Location</Eyebrow>
+            <SectionHeading className="mb-5">
               Based in <span className="text-gray-300">Duliajan</span>
-            </h2>
-
-            <p
-              className="text-gray-500 leading-relaxed mb-8"
-              style={{ fontSize: "15px" }}
-            >
+            </SectionHeading>
+            <p className="text-gray-500 leading-relaxed mb-7" style={{ fontSize: "15px" }}>
               We're located in Duliajan, Assam. But remember — we come to you!
               Just share your location and we'll be there.
             </p>
 
-            {/* Address card */}
-            <div className="bg-gray-50 rounded-xl p-5 mb-6">
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-lg bg-black flex items-center justify-center shrink-0">
-                  <MapPin size={16} className="text-white" />
+            <div className="space-y-3 mb-6">
+              {[
+                {
+                  icon: MapPin,
+                  label: "Address",
+                  value: "Near Sonapur Namghar, Duliajan, Assam",
+                },
+                {
+                  icon: Clock,
+                  label: "Working Hours",
+                  value: "Monday – Sunday, 9:00 AM – 5:00 PM",
+                },
+              ].map(({ icon: Icon, label, value }) => (
+                <div key={label} className="bg-gray-50 rounded-xl p-4">
+                  <div className="flex items-start gap-4">
+                    <div className="w-9 h-9 rounded-lg bg-black flex items-center justify-center shrink-0">
+                      <Icon size={15} className="text-white" />
+                    </div>
+                    <div>
+                      <p className="text-gray-400 mb-1 uppercase tracking-wider" style={{ fontSize: "9px" }}>
+                        {label}
+                      </p>
+                      <p className="text-black leading-snug" style={{ fontFamily: SERIF, fontSize: "14px" }}>
+                        {value}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <p
-                    className="text-gray-400 mb-1 uppercase tracking-wider"
-                    style={{ fontSize: "10px" }}
-                  >
-                    Address
-                  </p>
-                  <p
-                    className="text-black leading-relaxed"
-                    style={{
-                      fontFamily: 'Georgia, "Times New Roman", serif',
-                      fontSize: "15px",
-                      fontWeight: 400,
-                    }}
-                  >
-                    Near Sonapur Namghar, Duliajan, Assam
-                  </p>
-                </div>
-              </div>
+              ))}
             </div>
 
-            {/* Working hours */}
-            <div className="bg-gray-50 rounded-xl p-5 mb-6">
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-lg bg-black flex items-center justify-center shrink-0">
-                  <Clock size={16} className="text-white" />
-                </div>
-                <div>
-                  <p
-                    className="text-gray-400 mb-1 uppercase tracking-wider"
-                    style={{ fontSize: "10px" }}
-                  >
-                    Working Hours
-                  </p>
-                  <p
-                    className="text-black leading-relaxed"
-                    style={{
-                      fontFamily: 'Georgia, "Times New Roman", serif',
-                      fontSize: "15px",
-                      fontWeight: 400,
-                    }}
-                  >
-                    Monday – Sunday, 9:00 AM – 5:00 PM
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Trust indicator */}
             <div className="flex items-center gap-2">
-              <Check size={16} className="text-emerald-500 shrink-0" />
-              <span className="text-gray-500" style={{ fontSize: "14px" }}>
+              <Check size={15} className="text-emerald-500 shrink-0" />
+              <span className="text-gray-500" style={{ fontSize: "13px" }}>
                 Doorstep service across all of Duliajan
               </span>
             </div>
-          </div>
+          </motion.div>
         </div>
       </div>
     </section>
   )
 })
 
-// ── Social + CTA Section ───────────────────────────────────
+// ── Bottom CTA ─────────────────────────────────────────────
 const BottomCTA = memo(function BottomCTA() {
-  const sectionRef = useRef(null)
-  const contentRef = useRef(null)
-
-  useScrollAnimation(
-    sectionRef,
-    (gsap, ScrollTrigger) => {
-      gsap.fromTo(
-        contentRef.current,
-        { opacity: 0, y: 40 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.8,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: sectionRef.current,
-            start: "top 80%",
-            once: true,
-          },
-        }
-      )
-    },
-    []
-  )
+  const ref = useRef(null)
+  const inView = useInView(ref, { once: true, margin: "-60px" })
 
   return (
-    <section
-      ref={sectionRef}
-      className="w-full bg-black py-16 md:py-24"
-      style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
-    >
+    <section ref={ref} className="w-full bg-black py-16 md:py-24" style={{ fontFamily: SANS }}>
       <div className="max-w-6xl mx-auto px-5 sm:px-8 md:px-12">
-        <div ref={contentRef} className="opacity-0">
+        <motion.div
+          variants={fadeUp}
+          initial="hidden"
+          animate={inView ? "visible" : "hidden"}
+        >
           {/* Main CTA */}
-          <div className="text-center mb-16">
-            <div className="flex items-center justify-center gap-2 mb-5">
-              <Sparkles size={14} className="text-white/30" />
-              <span
-                className="text-white/40 tracking-wider uppercase"
-                style={{ fontSize: "10px" }}
-              >
+          <div className="text-center mb-14">
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <Sparkles size={13} className="text-white/30" />
+              <span className="text-white/40 tracking-wider uppercase" style={{ fontSize: "10px" }}>
                 Ready to get started?
               </span>
             </div>
 
-            <h2
-              className="text-white mb-5"
-              style={{
-                fontFamily: 'Georgia, "Times New Roman", serif',
-                fontWeight: 300,
-                fontSize: "clamp(1.75rem, 4vw, 2.75rem)",
-                lineHeight: 1.15,
-                letterSpacing: "-0.02em",
-              }}
-            >
+            <SectionHeading light className="mb-5">
               Book Your First Service{" "}
               <span className="italic text-white/40">Today</span>
-            </h2>
+            </SectionHeading>
 
-            <p
-              className="text-white/40 max-w-md mx-auto mb-8 leading-relaxed"
-              style={{ fontSize: "15px" }}
-            >
-              Join 100+ happy customers in Duliajan who trust us with their
-              cleaning needs.
+            <p className="text-white/40 max-w-md mx-auto mb-8 leading-relaxed" style={{ fontSize: "14px" }}>
+              Join 100+ happy customers in Duliajan who trust us with their cleaning needs.
             </p>
 
             <div className="flex flex-wrap items-center justify-center gap-3">
-              <a
+              <motion.a
+                whileTap={{ scale: 0.96 }}
                 href="/bookings"
-                className="group inline-flex items-center gap-3 h-12 sm:h-14 px-6 sm:px-8
+                className="group inline-flex items-center gap-2.5 h-12 sm:h-14 px-6 sm:px-8
                            bg-white text-black rounded-full no-underline
-                           hover:bg-gray-100 active:scale-[0.97]
-                           transition-all duration-300"
+                           hover:bg-gray-100 transition-colors duration-300"
               >
-                <span
-                  className="tracking-wider uppercase"
-                  style={{ fontSize: "11px", fontWeight: 500 }}
-                >
+                <span className="tracking-wider uppercase" style={{ fontSize: "11px", fontWeight: 500 }}>
                   Book Now
                 </span>
-                <ArrowRight
-                  size={16}
-                  className="group-hover:translate-x-0.5 transition-transform duration-300"
-                />
-              </a>
+                <ArrowRight size={15} className="group-hover:translate-x-0.5 transition-transform duration-300" />
+              </motion.a>
 
-              <a
+              <motion.a
+                whileTap={{ scale: 0.96 }}
                 href="/services"
-                className="inline-flex items-center gap-3 h-12 sm:h-14 px-6 sm:px-8
+                className="inline-flex items-center gap-2.5 h-12 sm:h-14 px-6 sm:px-8
                            border border-white/20 text-white rounded-full no-underline
-                           hover:bg-white/5 active:scale-[0.97]
-                           transition-all duration-300"
+                           hover:bg-white/5 transition-colors duration-300"
               >
-                <span
-                  className="tracking-wider uppercase"
-                  style={{ fontSize: "11px" }}
-                >
-                  View Services
-                </span>
-              </a>
+                <span className="tracking-wider uppercase" style={{ fontSize: "11px" }}>View Services</span>
+              </motion.a>
             </div>
           </div>
 
           {/* Divider */}
-          <div className="w-full h-px bg-white/10 mb-12" />
+          <div className="w-full h-px bg-white/10 mb-10" />
 
           {/* Social links */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
             <div>
-              <p
-                className="text-white mb-1"
-                style={{
-                  fontFamily: 'Georgia, "Times New Roman", serif',
-                  fontSize: "18px",
-                  fontWeight: 400,
-                }}
-              >
+              <p className="text-white mb-1" style={{ fontFamily: SERIF, fontSize: "17px", fontWeight: 400 }}>
                 Follow Our Journey
               </p>
-              <p className="text-white/40" style={{ fontSize: "14px" }}>
+              <p className="text-white/40" style={{ fontSize: "13px" }}>
                 Stay updated with our latest work
               </p>
             </div>
@@ -1038,28 +744,28 @@ const BottomCTA = memo(function BottomCTA() {
             <div className="flex gap-3">
               {SOCIALS.map((social) => {
                 const Icon = social.icon
-
                 return (
-                  <a
+                  <motion.a
                     key={social.label}
+                    whileTap={{ scale: 0.94 }}
                     href={social.href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="group flex items-center gap-3 px-5 py-3 border border-white/10
+                    className="flex items-center gap-2.5 px-4 py-2.5 border border-white/10
                                rounded-xl hover:bg-white/5 hover:border-white/20
                                transition-all duration-300 no-underline"
                     aria-label={social.label}
                   >
-                    <Icon size={18} strokeWidth={1.5} className="text-white/60" />
-                    <span className="hidden sm:block text-white/60" style={{ fontSize: "13px" }}>
+                    <Icon size={16} strokeWidth={1.5} className="text-white/60" />
+                    <span className="text-white/60 hidden sm:block" style={{ fontSize: "12px" }}>
                       {social.handle}
                     </span>
-                  </a>
+                  </motion.a>
                 )
               })}
             </div>
           </div>
-        </div>
+        </motion.div>
       </div>
     </section>
   )
