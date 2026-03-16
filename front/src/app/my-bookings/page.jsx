@@ -24,7 +24,6 @@ import {
   Sparkles,
 } from "lucide-react"
 import { getUserBookings, cancelBooking } from "@/lib/booking.api"
-import { createReview } from "@/lib/review.api"
 
 // ── Constants ──────────────────────────────────────────────
 const PHONE_NUMBER = "6900706456"
@@ -174,7 +173,6 @@ const BookingCard = memo(function BookingCard({
   index,
   onViewDetails,
   onCancel,
-  onReview,
 }) {
   const cardRef = useRef(null)
   const bookingDate = new Date(booking.bookingDate)
@@ -318,23 +316,18 @@ const BookingCard = memo(function BookingCard({
             />
           </button>
 
-          {/* Review Button */}
-          {booking.status === "completed" && !booking.isReviewed && (
-            <button
-              onClick={() => onReview(booking)}
-              className="inline-flex items-center gap-2 h-10 px-5
-                         border border-gray-200 text-black rounded-full
-                         hover:border-black active:scale-[0.97]
-                         transition-all duration-300"
-            >
-              <Star size={13} strokeWidth={2} />
+          {/* Completed Badge (instead of Review button) */}
+          {booking.status === "completed" && (
+            <span className="inline-flex items-center gap-2 h-10 px-5
+                           border border-emerald-200 text-emerald-600 rounded-full">
+              <CheckCircle size={13} strokeWidth={2} />
               <span
                 className="tracking-wider uppercase"
                 style={{ fontSize: "10px", fontWeight: 500 }}
               >
-                Review
+                Completed
               </span>
-            </button>
+            </span>
           )}
 
           {/* Cancel Button */}
@@ -828,171 +821,6 @@ const CancelBookingModal = memo(function CancelBookingModal({
   )
 })
 
-// ── Review Modal ──────────────────────────────────────────
-const ReviewModal = memo(function ReviewModal({
-  booking,
-  isOpen,
-  onClose,
-  onSubmit,
-  loading,
-}) {
-  const [rating, setRating] = useState(0)
-  const [hover, setHover] = useState(0)
-  const [comment, setComment] = useState("")
-  const [error, setError] = useState("")
-
-  if (!booking) return null
-
-  const labels = ["", "Poor", "Fair", "Good", "Very Good", "Excellent"]
-
-  const handleSubmit = () => {
-    if (!rating) {
-      setError("Please select a rating")
-      return
-    }
-    onSubmit(booking._id, rating, comment)
-  }
-
-  return (
-    <ModalWrapper isOpen={isOpen} onClose={onClose}>
-      <div className="p-6">
-        {/* Header */}
-        <div className="text-center mb-6">
-          <div className="w-14 h-14 border border-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Star size={28} strokeWidth={1.5} className="text-black" />
-          </div>
-          <h2
-            className="text-black"
-            style={{
-              fontFamily: 'Georgia, "Times New Roman", serif',
-              fontWeight: 300,
-              fontSize: "22px",
-            }}
-          >
-            Rate Your Experience
-          </h2>
-          <p
-            className="text-gray-400 tracking-wider uppercase mt-1"
-            style={{ fontSize: "10px" }}
-          >
-            {booking.serviceName}
-          </p>
-        </div>
-
-        {/* Error */}
-        {error && (
-          <p
-            className="text-red-500 tracking-wider uppercase mb-4 text-center"
-            style={{ fontSize: "10px" }}
-          >
-            {error}
-          </p>
-        )}
-
-        {/* Star Rating */}
-        <div className="text-center mb-6">
-          <div className="flex justify-center gap-2 mb-3">
-            {[1, 2, 3, 4, 5].map((s) => (
-              <button
-                key={s}
-                onClick={() => {
-                  setRating(s)
-                  setError("")
-                }}
-                onMouseEnter={() => setHover(s)}
-                onMouseLeave={() => setHover(0)}
-                className="p-1 active:scale-90 transition-transform duration-150"
-              >
-                <Star
-                  size={36}
-                  strokeWidth={1.2}
-                  fill={(hover || rating) >= s ? "#000" : "none"}
-                  stroke={(hover || rating) >= s ? "#000" : "#D1D5DB"}
-                  className="transition-colors duration-150"
-                />
-              </button>
-            ))}
-          </div>
-
-          {/* Rating Label */}
-          <p
-            className="text-gray-400 tracking-wider uppercase h-5"
-            style={{ fontSize: "10px" }}
-          >
-            {labels[hover || rating]}
-          </p>
-        </div>
-
-        {/* Comment */}
-        <div className="mb-6">
-          <label
-            className="block text-gray-400 tracking-wider uppercase mb-2"
-            style={{ fontSize: "9px" }}
-          >
-            Review (optional)
-          </label>
-          <textarea
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            placeholder="Share your experience..."
-            rows={3}
-            maxLength={500}
-            className="w-full px-4 py-3 border border-gray-200 rounded-xl
-                       text-black placeholder-gray-300
-                       focus:outline-none focus:border-black
-                       transition-colors duration-300 resize-none"
-            style={{ fontSize: "13px" }}
-          />
-          <p
-            className="text-right text-gray-300 mt-1"
-            style={{ fontSize: "10px" }}
-          >
-            {comment.length}/500
-          </p>
-        </div>
-
-        {/* Actions */}
-        <div className="flex gap-3">
-          <button
-            onClick={onClose}
-            disabled={loading}
-            className="flex-1 h-12 border border-gray-200 rounded-full
-                       text-black tracking-wider uppercase
-                       hover:border-black transition-colors duration-300
-                       disabled:opacity-50"
-            style={{ fontSize: "10px", fontWeight: 500 }}
-          >
-            Cancel
-          </button>
-
-          <button
-            onClick={handleSubmit}
-            disabled={loading || !rating}
-            className="flex-1 flex items-center justify-center gap-2 h-12
-                       bg-black text-white rounded-full
-                       hover:bg-gray-800 transition-colors duration-300
-                       disabled:opacity-50"
-          >
-            {loading ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <>
-                <Star size={14} strokeWidth={2} />
-                <span
-                  className="tracking-wider uppercase"
-                  style={{ fontSize: "10px", fontWeight: 500 }}
-                >
-                  Submit
-                </span>
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-    </ModalWrapper>
-  )
-})
-
 // ── Empty State ───────────────────────────────────────────
 const EmptyState = memo(function EmptyState({ hasFilters }) {
   const containerRef = useRef(null)
@@ -1385,7 +1213,6 @@ export default function MyBookingsPage() {
   const [selectedBooking, setSelectedBooking] = useState(null)
   const [showDetailsModal, setShowDetailsModal] = useState(false)
   const [showCancelModal, setShowCancelModal] = useState(false)
-  const [showReviewModal, setShowReviewModal] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
 
   // Auth redirect
@@ -1424,7 +1251,6 @@ export default function MyBookingsPage() {
   const closeModals = useCallback(() => {
     setShowDetailsModal(false)
     setShowCancelModal(false)
-    setShowReviewModal(false)
     setSelectedBooking(null)
   }, [])
 
@@ -1433,26 +1259,6 @@ export default function MyBookingsPage() {
       try {
         setActionLoading(true)
         await cancelBooking(bookingId, reason)
-        closeModals()
-        // Refetch
-        const result = await getUserBookings(statusFilter, currentPage, 10)
-        setBookings(result.bookings || [])
-        setTotalPages(result.pages || 1)
-        setTotal(result.total || 0)
-      } catch (err) {
-        setError(err.message)
-      } finally {
-        setActionLoading(false)
-      }
-    },
-    [statusFilter, currentPage, closeModals]
-  )
-
-  const handleReviewSubmit = useCallback(
-    async (bookingId, rating, comment) => {
-      try {
-        setActionLoading(true)
-        await createReview(bookingId, rating, comment)
         closeModals()
         // Refetch
         const result = await getUserBookings(statusFilter, currentPage, 10)
@@ -1545,10 +1351,6 @@ export default function MyBookingsPage() {
                       setSelectedBooking(b)
                       setShowCancelModal(true)
                     }}
-                    onReview={(b) => {
-                      setSelectedBooking(b)
-                      setShowReviewModal(true)
-                    }}
                   />
                 ))}
               </div>
@@ -1579,14 +1381,6 @@ export default function MyBookingsPage() {
         isOpen={showCancelModal}
         onClose={closeModals}
         onConfirm={handleCancelConfirm}
-        loading={actionLoading}
-      />
-
-      <ReviewModal
-        booking={selectedBooking}
-        isOpen={showReviewModal}
-        onClose={closeModals}
-        onSubmit={handleReviewSubmit}
         loading={actionLoading}
       />
     </main>
