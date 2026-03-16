@@ -1,3 +1,4 @@
+// src/components/admin/services/CreateServiceModal.jsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -41,11 +42,14 @@ export default function CreateServiceModal({ onClose, onSuccess }) {
         const fetchCategories = async () => {
             try {
                 const response = await categoryService.getAll({ limit: 100 });
-                if (response.success) {
-                    setCategories(response.data);
-                }
+                console.log('📦 Categories response:', response);
+                
+                const cats = response.data?.categories || response.data || [];
+                setCategories(Array.isArray(cats) ? cats : []);
             } catch (error) {
+                console.error('❌ Failed to load categories:', error);
                 toast.error('Failed to load categories');
+                setCategories([]);
             } finally {
                 setLoadingCategories(false);
             }
@@ -64,18 +68,44 @@ export default function CreateServiceModal({ onClose, onSuccess }) {
         const fetchSubcategories = async () => {
             try {
                 setLoadingSubcategories(true);
+                console.log('🔄 Fetching subcategories for category:', category);
+                
                 const response = await subcategoryService.getByCategory(category);
-                if (response.success) {
-                    setSubcategories(response.data);
-                    setSubcategory('');
+                
+                console.log('📦 Subcategories response:', response);
+
+                // Handle the response structure correctly
+                let subs = [];
+                
+                // Check if response.data has subcategories property
+                if (response.data?.subcategories && Array.isArray(response.data.subcategories)) {
+                    subs = response.data.subcategories;
                 }
+                // Check if response.data itself is an array
+                else if (Array.isArray(response.data)) {
+                    subs = response.data;
+                }
+                // Fallback: check if entire response is array
+                else if (Array.isArray(response)) {
+                    subs = response;
+                }
+
+                console.log('✅ Subcategories loaded:', {
+                    count: subs.length,
+                    items: subs.map(s => ({ id: s._id, name: s.name }))
+                });
+
+                setSubcategories(Array.isArray(subs) ? subs : []);
+                setSubcategory('');
             } catch (error) {
+                console.error('❌ Failed to load subcategories:', error);
                 toast.error('Failed to load subcategories');
                 setSubcategories([]);
             } finally {
                 setLoadingSubcategories(false);
             }
         };
+        
         fetchSubcategories();
     }, [category]);
 
@@ -120,6 +150,7 @@ export default function CreateServiceModal({ onClose, onSuccess }) {
             setLoading(true);
 
             const selectedSub = subcategories.find(s => s._id === subcategory);
+            const selectedCat = categories.find(c => c._id === category);
 
             const formData = new FormData();
             formData.append('category', category);
@@ -127,10 +158,10 @@ export default function CreateServiceModal({ onClose, onSuccess }) {
             formData.append('tier', tier);
             
             // Auto-generate name
-            const serviceName = `${selectedSub.name} - ${tier.charAt(0).toUpperCase() + tier.slice(1)}`;
-            formData.append('name', serviceName);
-            formData.append('description', serviceName);
-            formData.append('shortDescription', serviceName);
+            const serviceName = `${selectedCat?.icon || ''} ${selectedSub?.name || 'Service'} - ${tier.charAt(0).toUpperCase() + tier.slice(1)}`;
+            formData.append('name', serviceName.trim());
+            formData.append('description', serviceName.trim());
+            formData.append('shortDescription', serviceName.trim());
             
             // Single variant with pricing
             const variant = {
@@ -153,6 +184,7 @@ export default function CreateServiceModal({ onClose, onSuccess }) {
             onClose();
             onSuccess();
         } catch (error) {
+            console.error('❌ Create service error:', error);
             toast.error(error.response?.data?.message || 'Failed to create service');
         } finally {
             setLoading(false);
@@ -217,11 +249,15 @@ export default function CreateServiceModal({ onClose, onSuccess }) {
                                     className={inputCls}
                                 >
                                     <option value="">Select category</option>
-                                    {categories.map(cat => (
-                                        <option key={cat._id} value={cat._id}>
-                                            {cat.icon} {cat.name}
-                                        </option>
-                                    ))}
+                                    {categories.length > 0 ? (
+                                        categories.map(cat => (
+                                            <option key={cat._id} value={cat._id}>
+                                                {cat.icon} {cat.name}
+                                            </option>
+                                        ))
+                                    ) : (
+                                        <option disabled>No categories available</option>
+                                    )}
                                 </select>
                             )}
                         </div>
@@ -234,8 +270,12 @@ export default function CreateServiceModal({ onClose, onSuccess }) {
                                     <p className="text-xs text-white/30">Select a category first</p>
                                 </div>
                             ) : loadingSubcategories ? (
-                                <div className="h-10 bg-white/[0.04] animate-pulse rounded-lg" />
-                            ) : (
+                                <div className="space-y-2">
+                                    {[...Array(3)].map((_, i) => (
+                                        <div key={i} className="h-10 bg-white/[0.04] animate-pulse rounded-lg" />
+                                    ))}
+                                </div>
+                            ) : subcategories.length > 0 ? (
                                 <select 
                                     value={subcategory} 
                                     onChange={(e) => setSubcategory(e.target.value)} 
@@ -249,6 +289,10 @@ export default function CreateServiceModal({ onClose, onSuccess }) {
                                         </option>
                                     ))}
                                 </select>
+                            ) : (
+                                <div className="p-4 rounded-lg border border-white/[0.07] bg-white/[0.02] text-center">
+                                    <p className="text-xs text-white/30">No subcategories available</p>
+                                </div>
                             )}
                         </div>
 

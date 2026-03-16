@@ -1,4 +1,4 @@
-// src/app/admin/subcategories/page.jsx
+// src/app/(dashboard)/admin/subcategories/page.jsx
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -33,59 +33,82 @@ export default function SubcategoriesPage() {
     const fetchCategories = useCallback(async () => {
         try {
             const response = await categoryService.getAll({ limit: 100 });
-            if (response.success) {
-                const cats = response.data?.categories || response.data || [];
-                setCategories(cats);
-                if (cats.length > 0 && !selectedCategory) {
-                    setSelectedCategory(cats[0]._id);
-                }
+            const cats = response.data?.categories || response.data || [];
+            setCategories(cats);
+            
+            // Set first category as default
+            if (cats.length > 0 && !selectedCategory) {
+                setSelectedCategory(cats[0]._id);
             }
+            
+            return cats;
         } catch (error) {
+            console.error('❌ Fetch categories error:', error);
             toast.error('Failed to fetch categories');
+            return [];
         }
     }, [selectedCategory]);
 
-    // Fetch subcategories - FIXED: fetch ALL (active + inactive)
+    // Fetch subcategories - FIXED VERSION WITH includeInactive
     const fetchSubcategories = useCallback(async (isRefresh = false) => {
-        if (!selectedCategory) return;
+        if (!selectedCategory) {
+            setSubcategories([]);
+            return;
+        }
+
         try {
             isRefresh ? setRefreshing(true) : setLoading(true);
 
-            // Try admin endpoint first, fallback to regular
-            let response;
-            try {
-                response = await subcategoryService.getByCategory(selectedCategory, { includeInactive: true });
-            } catch {
-                response = await subcategoryService.getByCategory(selectedCategory);
-            }
+            console.log('🔄 Fetching subcategories for category:', selectedCategory);
 
-            if (response.success) {
-                const subs = response.data?.subcategories || response.data || [];
+            const response = await subcategoryService.getByCategory(selectedCategory, {
+                includeInactive: 'true'  // ← IMPORTANT: Get both active and inactive
+            });
 
-                // Debug log
-                console.log('📦 Subcategories fetched:', subs.length, subs.map(s => ({
+            console.log('✅ Fetch response:', {
+                success: response.success,
+                count: response.data?.subcategories?.length,
+                subcategories: response.data?.subcategories?.map(s => ({
+                    id: s._id,
                     name: s.name,
-                    isActive: s.isActive
-                })));
+                    isActive: s.isActive,
+                    icon: s.icon
+                }))
+            });
 
+            if (response.success && Array.isArray(response.data?.subcategories)) {
+                const subs = response.data.subcategories
+                    .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+                
                 setSubcategories(subs);
+            } else {
+                setSubcategories([]);
             }
         } catch (error) {
-            console.error('Fetch subcategories error:', error);
+            console.error('❌ fetchSubcategories error:', error);
             toast.error('Failed to fetch subcategories');
+            setSubcategories([]);
         } finally {
             setLoading(false);
             setRefreshing(false);
         }
     }, [selectedCategory]);
 
+    // Initial load
     useEffect(() => {
-        fetchCategories();
-    }, [fetchCategories]);
+        const init = async () => {
+            const cats = await fetchCategories();
+            if (cats.length > 0) {
+                setSelectedCategory(cats[0]._id);
+            }
+        };
+        init();
+    }, []);
 
+    // Fetch subcategories when category changes
     useEffect(() => {
         if (selectedCategory) {
-            fetchSubcategories();
+            fetchSubcategories(false);
         }
     }, [selectedCategory, fetchSubcategories]);
 
@@ -104,7 +127,9 @@ export default function SubcategoriesPage() {
     };
 
     const handleDelete = async (subcategoryId) => {
-        if (!confirm('Delete this subcategory? Services inside must be moved or deleted first.')) return;
+        if (!confirm('Delete this subcategory? Services inside must be moved or deleted first.')) {
+            return;
+        }
         try {
             await subcategoryService.delete(subcategoryId);
             toast.success('Subcategory deleted');
@@ -118,15 +143,17 @@ export default function SubcategoriesPage() {
         const currentStatus = subcategory.isActive !== undefined ? subcategory.isActive : true;
         try {
             await subcategoryService.toggleStatus(subcategory._id);
-            toast.success(`Subcategory ${currentStatus ? 'deactivated' : 'activated'}`);
+            toast.success(`Subcategory ${currentStatus ? 'disabled' : 'enabled'}`);
+            await new Promise(resolve => setTimeout(resolve, 300));
             fetchSubcategories(true);
         } catch (error) {
-            toast.error('Failed to update subcategory');
+            console.error('Error:', error);
+            toast.error('Failed to update subcategory status');
         }
     };
 
-    const handleRefresh = () => {
-        fetchSubcategories(true);
+    const handleRefresh = async () => {
+        await fetchSubcategories(true);
         toast.success('Refreshed', { duration: 1200 });
     };
 
@@ -233,19 +260,6 @@ export default function SubcategoriesPage() {
                         />
                     </div>
 
-                    {/* Debug Info - Remove after fixing */}
-                    {!loading && subcategories.length > 0 && (
-                        <div className="px-3 sm:px-4 md:px-6">
-                            <div className="p-2 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-                                <p className="text-[10px] text-yellow-400 font-mono">
-                                    Debug: {subcategories.map(s =>
-                                        `${s.name}(${s.isActive === true ? '✅' : s.isActive === false ? '❌' : '❓' + String(s.isActive)})`
-                                    ).join(' | ')}
-                                </p>
-                            </div>
-                        </div>
-                    )}
-
                     {/* Grid */}
                     <div className="px-3 sm:px-4 md:px-6 pb-6">
                         {loading ? (
@@ -346,8 +360,7 @@ export default function SubcategoriesPage() {
     );
 }
 
-// === INLINE STAT CARD ===
-
+// === STAT CARD ===
 function StatCard({ icon: Icon, label, value, loading, highlight }) {
     return (
         <div className={`

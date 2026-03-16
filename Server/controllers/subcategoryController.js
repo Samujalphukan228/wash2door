@@ -92,6 +92,13 @@ export const getAllSubcategories = async (req, res) => {
 export const getSubcategoriesByCategory = async (req, res) => {
     try {
         const { categoryId } = req.params;
+        const { includeInactive } = req.query;
+
+        console.log('📦 getSubcategoriesByCategory:', {
+            categoryId,
+            includeInactive,
+            query: req.query
+        });
 
         if (!isValidObjectId(categoryId)) {
             return res.status(400).json({
@@ -100,13 +107,29 @@ export const getSubcategoriesByCategory = async (req, res) => {
             });
         }
 
-        const subcategories = await Subcategory.find({
-            category: categoryId,
-            isActive: true
-        })
-            .select('name slug icon image totalServices')
+        // Build query
+        const query = { category: categoryId };
+
+        // Only filter by active if includeInactive is NOT true
+        if (includeInactive !== 'true') {
+            query.isActive = true;
+        }
+
+        console.log('📦 Query:', query);
+
+        const subcategories = await Subcategory.find(query)
+            .select('name slug icon image totalServices isActive displayOrder')
             .sort({ displayOrder: 1 })
             .lean();
+
+        console.log('✅ Found subcategories:', {
+            total: subcategories.length,
+            items: subcategories.map(s => ({
+                id: s._id,
+                name: s.name,
+                isActive: s.isActive
+            }))
+        });
 
         res.status(200).json({
             success: true,
@@ -118,11 +141,11 @@ export const getSubcategoriesByCategory = async (req, res) => {
         console.error('getSubcategoriesByCategory ERROR:', error.message);
         res.status(500).json({
             success: false,
-            message: 'Error fetching subcategories'
+            message: 'Error fetching subcategories',
+            error: error.message
         });
     }
 };
-
 // ============================================
 // GET SINGLE SUBCATEGORY
 // ============================================
