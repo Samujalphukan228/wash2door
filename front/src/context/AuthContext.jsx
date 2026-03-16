@@ -14,12 +14,8 @@ export function AuthProvider({ children }) {
   const [modalView, setModalView] = useState('login')
   const [authEmail, setAuthEmail] = useState('')
 
-  // Check auth on mount
-  useEffect(() => {
-    checkAuth()
-  }, [])
-
-  const checkAuth = async () => {
+  // ✅ FIX 1: Memoize checkAuth with useCallback
+  const checkAuth = useCallback(async () => {
     try {
       const token = localStorage.getItem('accessToken')
       
@@ -48,7 +44,24 @@ export function AuthProvider({ children }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, []) // ✅ Empty deps is OK now because function is stable
+
+  // ✅ FIX 2: Only run checkAuth ONCE on mount
+  useEffect(() => {
+    let isMounted = true
+
+    async function initAuth() {
+      if (isMounted) {
+        await checkAuth()
+      }
+    }
+
+    initAuth()
+
+    return () => {
+      isMounted = false
+    }
+  }, [checkAuth]) // ✅ checkAuth is now stable, so this won't re-run
 
   // Modal controls
   const openModal = useCallback((view = 'login') => {
@@ -71,14 +84,10 @@ export function AuthProvider({ children }) {
     setModalView(view)
   }, [])
 
-  // ✅ IMPROVED: loginSuccess now just needs user data
   const loginSuccess = useCallback((userData) => {
     console.log('✅ Login success, updating user state:', userData)
     setUser(userData)
     closeModal()
-    
-    // Optional: Reload to ensure fresh state
-    // setTimeout(() => window.location.reload(), 100)
   }, [closeModal])
 
   const logout = useCallback(async () => {
@@ -91,7 +100,9 @@ export function AuthProvider({ children }) {
       localStorage.removeItem('accessToken')
       setUser(null)
       
-      if (typeof window !== 'undefined') {
+      // ✅ FIX 3: Prevent reload loop on logout
+      if (typeof window !== 'undefined' && 
+          !window.location.pathname.includes('/')) {
         window.location.href = '/'
       }
     }
@@ -114,6 +125,18 @@ export function AuthProvider({ children }) {
     loginSuccess,
     logout,
     checkAuth
+  }
+
+  // ✅ FIX 4: Show loading state to prevent flash
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
