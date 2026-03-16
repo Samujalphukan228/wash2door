@@ -1,128 +1,141 @@
 // src/lib/services.api.js
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
+import api from './api'
 
 /**
  * Get all categories
  */
 export async function getCategories() {
-  const response = await fetch(`${API_URL}/categories`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  })
-
-  const data = await response.json()
-
-  if (!response.ok) {
-    throw new Error(data.message || "Failed to fetch categories")
+  try {
+    const response = await api.get('/categories')
+    
+    // Handle different response structures
+    return response.data?.data || response.data?.categories || response.data || []
+  } catch (error) {
+    throw new Error(
+      error.response?.data?.message || error.message || 'Failed to fetch categories'
+    )
   }
-
-  // Handle different response structures
-  return data.data || data.categories || data || []
 }
 
 /**
  * Get public services (optionally filtered by category)
  */
 export async function getPublicServices(filters = {}) {
-  const params = new URLSearchParams()
-  
-  if (filters.category) {
-    params.append("category", filters.category)
+  try {
+    const params = {}
+    
+    if (filters.category) {
+      params.category = filters.category
+    }
+    if (filters.limit) {
+      params.limit = filters.limit
+    }
+
+    const response = await api.get('/public/services', { params })
+    
+    // Handle different response structures
+    return response.data?.data || response.data?.services || response.data || []
+  } catch (error) {
+    throw new Error(
+      error.response?.data?.message || error.message || 'Failed to fetch services'
+    )
   }
-  if (filters.limit) {
-    params.append("limit", filters.limit.toString())
-  }
-
-  const url = params.toString() 
-    ? `${API_URL}/public/services?${params.toString()}`
-    : `${API_URL}/public/services`
-
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  })
-
-  const data = await response.json()
-
-  if (!response.ok) {
-    throw new Error(data.message || "Failed to fetch services")
-  }
-
-  // Handle different response structures
-  return data.data || data.services || data || []
 }
 
 /**
  * Get available slots for booking
  */
 export async function getAvailableSlots(date, serviceId) {
-  const response = await fetch(
-    `${API_URL}/bookings/available-slots?date=${date}&serviceId=${serviceId}`,
-    {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    }
-  )
-
-  const data = await response.json()
-
-  if (!response.ok) {
-    throw new Error(data.message || "Failed to fetch available slots")
+  try {
+    const response = await api.get('/bookings/available-slots', {
+      params: { date, serviceId }
+    })
+    
+    return response.data?.data || response.data || []
+  } catch (error) {
+    throw new Error(
+      error.response?.data?.message || error.message || 'Failed to fetch available slots'
+    )
   }
-
-  return data.data || data || []
 }
 
 /**
  * Get single service by ID
  */
 export async function getServiceById(serviceId) {
-  const response = await fetch(`${API_URL}/public/services/${serviceId}`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  })
-
-  const data = await response.json()
-
-  if (!response.ok) {
-    throw new Error(data.message || "Failed to fetch service")
+  try {
+    const response = await api.get(`/public/services/${serviceId}`)
+    
+    return response.data?.data || response.data || null
+  } catch (error) {
+    throw new Error(
+      error.response?.data?.message || error.message || 'Failed to fetch service'
+    )
   }
-
-  return data.data || data || null
 }
 
 /**
  * Get user bookings (for services page if needed)
  */
 export async function getUserBookings() {
-  const token = localStorage.getItem("token")
-
-  if (!token) {
-    throw new Error("Authentication required")
+  try {
+    const response = await api.get('/bookings/my-bookings')
+    
+    if (response.data?.success) {
+      return response.data
+    }
+    
+    throw new Error(response.data?.message || 'Failed to fetch bookings')
+  } catch (error) {
+    throw new Error(
+      error.response?.data?.message || error.message || 'Failed to fetch bookings'
+    )
   }
+}
 
-  const response = await fetch(`${API_URL}/bookings/my-bookings`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  })
-
-  const data = await response.json()
-
-  if (!response.ok) {
-    throw new Error(data.message || "Failed to fetch bookings")
+/**
+ * Get subcategories by category ID
+ */
+export async function getSubcategoriesByCategoryId(categoryId) {
+  try {
+    const response = await api.get(`/categories/${categoryId}/subcategories`)
+    
+    return response.data?.data || response.data?.subcategories || response.data || []
+  } catch (error) {
+    throw new Error(
+      error.response?.data?.message || error.message || 'Failed to fetch subcategories'
+    )
   }
+}
 
-  return data
+/**
+ * Get services by subcategory ID
+ */
+export async function getServicesBySubcategoryId(subcategoryId) {
+  try {
+    const response = await api.get(`/subcategories/${subcategoryId}/services`)
+    
+    return response.data?.data || response.data?.services || response.data || []
+  } catch (error) {
+    throw new Error(
+      error.response?.data?.message || error.message || 'Failed to fetch services by subcategory'
+    )
+  }
+}
+
+/**
+ * Search services
+ */
+export async function searchServices(query) {
+  try {
+    const response = await api.get('/public/services/search', {
+      params: { q: query }
+    })
+    
+    return response.data?.data || response.data?.services || response.data || []
+  } catch (error) {
+    throw new Error(
+      error.response?.data?.message || error.message || 'Failed to search services'
+    )
+  }
 }
