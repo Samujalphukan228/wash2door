@@ -35,7 +35,7 @@ export function TransitionProvider({ children }) {
         readyRef.current = true
         setStage("out")
       }
-    }, 250)
+    }, 300)
   }, [])
 
   const signalReady = useCallback(() => {
