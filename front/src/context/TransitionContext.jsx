@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useRef, useState } from "react"
+import { createContext, useContext, useRef, useState, useCallback } from "react"
 
 const TransitionContext = createContext(null)
 
@@ -8,26 +8,52 @@ export function TransitionProvider({ children }) {
   const [visible, setVisible] = useState(false)
   const [stage, setStage] = useState("idle")
   const callbackRef = useRef(null)
+  const readyRef = useRef(false)
+  const coveredRef = useRef(false)
 
-  const startTransition = (callback) => {
+  const startTransition = useCallback((callback) => {
     callbackRef.current = callback
+    readyRef.current = false
+    coveredRef.current = false
     setVisible(true)
     setStage("in")
-  }
+  }, [])
 
-  const onCoverDone = () => {
+  const onCoverDone = useCallback(() => {
+    coveredRef.current = true
     callbackRef.current?.()
     callbackRef.current = null
-    setStage("out")
-  }
+    // If page already signalled ready, reveal immediately
+    if (readyRef.current) {
+      setStage("out")
+      return
+    }
+    setStage("holding")
+    // Safety net — never hold longer than 2s no matter what
+    setTimeout(() => {
+      if (coveredRef.current && !readyRef.current) {
+        readyRef.current = true
+        setStage("out")
+      }
+    }, 250)
+  }, [])
 
-  const onRevealDone = () => {
+  const signalReady = useCallback(() => {
+    readyRef.current = true
+    if (coveredRef.current) {
+      setStage("out")
+    }
+  }, [])
+
+  const onRevealDone = useCallback(() => {
     setVisible(false)
     setStage("idle")
-  }
+    readyRef.current = false
+    coveredRef.current = false
+  }, [])
 
   return (
-    <TransitionContext.Provider value={{ visible, stage, startTransition, onCoverDone, onRevealDone }}>
+    <TransitionContext.Provider value={{ visible, stage, startTransition, onCoverDone, signalReady, onRevealDone }}>
       {children}
     </TransitionContext.Provider>
   )
