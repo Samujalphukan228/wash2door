@@ -40,7 +40,7 @@ function UserAvatar({ name, size = "sm", onClick }) {
 
   const Tag = onClick ? "button" : "div"
   const interactiveClasses = onClick
-    ? "active:scale-90 transition-transform duration-150 cursor-pointer"
+    ? "active:scale-90 transition-transform duration-150 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2"
     : ""
 
   return (
@@ -51,10 +51,10 @@ function UserAvatar({ name, size = "sm", onClick }) {
       aria-label={onClick ? "Open menu" : undefined}
     >
       <span
-        className="text-white"
+        className="text-white select-none"
         style={{ fontFamily: "Georgia, serif", fontSize, fontWeight: 300 }}
       >
-        {name?.charAt(0)?.toUpperCase()}
+        {name?.charAt(0)?.toUpperCase() || "?"}
       </span>
     </Tag>
   )
@@ -64,8 +64,10 @@ function MobileMenuButton({ onClick }) {
   return (
     <button
       onClick={onClick}
-      className="relative w-10 h-10 flex items-center justify-center -ml-2
-                 active:scale-90 transition-transform duration-150"
+      className="relative w-10 h-10 flex items-center justify-center
+                 active:scale-90 transition-transform duration-150
+                 focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2
+                 rounded-lg"
       aria-label="Open navigation menu"
     >
       <div className="space-y-1.5">
@@ -81,8 +83,9 @@ function NavLink({ link, onProtectedClick }) {
     <a
       href={link.href}
       onClick={(e) => onProtectedClick(e, link)}
-      className="relative px-5 py-2 tracking-[0.18em] uppercase text-gray-400
-                 hover:text-black transition-colors duration-300 no-underline group"
+      className="relative px-4 xl:px-5 py-2 tracking-[0.18em] uppercase text-gray-400
+                 hover:text-black transition-colors duration-300 no-underline group
+                 focus:outline-none focus:text-black"
       style={{ fontSize: "10px", fontWeight: 500 }}
     >
       {link.label}
@@ -101,8 +104,9 @@ function UserDropdown({ user, isOpen, onToggle, onClose, onLogout, dropdownRef }
     <div ref={dropdownRef} className="relative">
       <button
         onClick={onToggle}
-        className="flex items-center gap-2.5 py-1.5 px-2 -mr-2
-                   hover:bg-gray-50 rounded-full transition-colors duration-200"
+        className="flex items-center gap-2 py-1.5 px-2
+                   hover:bg-gray-50 rounded-full transition-colors duration-200
+                   focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2"
         aria-expanded={isOpen}
         aria-haspopup="true"
         aria-label="Account menu"
@@ -118,23 +122,24 @@ function UserDropdown({ user, isOpen, onToggle, onClose, onLogout, dropdownRef }
 
       {/* Dropdown panel */}
       <div
-        className={`absolute right-0 top-full mt-3 w-60 bg-white rounded-2xl
+        className={`absolute right-0 top-full mt-2 w-56 bg-white rounded-xl
                     border border-gray-100
-                    shadow-[0_20px_60px_rgba(0,0,0,0.08),0_4px_16px_rgba(0,0,0,0.04)]
-                    transition-all duration-300 z-50 overflow-hidden
+                    shadow-[0_10px_40px_rgba(0,0,0,0.1),0_2px_10px_rgba(0,0,0,0.05)]
+                    transition-all duration-200 z-50 overflow-hidden
                     ${
                       isOpen
-                        ? "opacity-100 visible translate-y-0 scale-100"
-                        : "opacity-0 invisible -translate-y-2 scale-[0.97] pointer-events-none"
+                        ? "opacity-100 visible translate-y-0"
+                        : "opacity-0 invisible -translate-y-1 pointer-events-none"
                     }`}
         role="menu"
       >
         {/* User info header */}
-        <div className="p-5 bg-black text-white">
+        <div className="p-4 bg-black text-white">
           <p
+            className="truncate"
             style={{
               fontFamily: "Georgia, serif",
-              fontSize: "15px",
+              fontSize: "14px",
               fontWeight: 400,
               letterSpacing: "-0.01em",
             }}
@@ -143,7 +148,7 @@ function UserDropdown({ user, isOpen, onToggle, onClose, onLogout, dropdownRef }
           </p>
           {user.email && (
             <p
-              className="text-white/50 mt-1 truncate"
+              className="text-white/50 mt-0.5 truncate"
               style={{ fontSize: "11px" }}
             >
               {user.email}
@@ -152,14 +157,15 @@ function UserDropdown({ user, isOpen, onToggle, onClose, onLogout, dropdownRef }
         </div>
 
         {/* Links */}
-        <div className="py-2" role="none">
+        <div className="py-1" role="none">
           {DROPDOWN_ITEMS.map((item) => (
             <a
               key={item.label}
               href={item.href}
-              className="flex items-center px-5 py-3 tracking-[0.15em] uppercase
+              className="flex items-center px-4 py-2.5 tracking-[0.12em] uppercase
                          text-gray-500 hover:text-black hover:bg-gray-50
-                         transition-all duration-200 no-underline"
+                         transition-all duration-200 no-underline
+                         focus:outline-none focus:bg-gray-50 focus:text-black"
               style={{ fontSize: "10px" }}
               onClick={onClose}
               role="menuitem"
@@ -169,13 +175,16 @@ function UserDropdown({ user, isOpen, onToggle, onClose, onLogout, dropdownRef }
           ))}
         </div>
 
+        {/* Divider */}
+        <div className="h-px bg-gray-100 mx-3" aria-hidden="true" />
+
         {/* Sign out */}
-        <div className="p-3 pt-0">
+        <div className="p-2">
           <button
             onClick={onLogout}
-            className="w-full py-2.5 tracking-[0.15em] uppercase text-red-500
-                       hover:bg-red-50 transition-colors duration-200 rounded-xl
-                       border border-red-100"
+            className="w-full py-2 tracking-[0.12em] uppercase text-red-500
+                       hover:bg-red-50 transition-colors duration-200 rounded-lg
+                       focus:outline-none focus:bg-red-50"
             style={{ fontSize: "10px" }}
             role="menuitem"
           >
@@ -245,9 +254,9 @@ export default function Navbar() {
       <TopBar />
 
       <nav
-        className={`bg-white sticky top-0 z-50 transition-shadow duration-500 ${
+        className={`bg-white sticky top-0 z-50 transition-shadow duration-300 ${
           scrolled
-            ? "shadow-[0_1px_0_rgba(0,0,0,0.06),0_4px_20px_rgba(0,0,0,0.03)]"
+            ? "shadow-[0_1px_0_rgba(0,0,0,0.06),0_4px_20px_rgba(0,0,0,0.04)]"
             : ""
         }`}
         role="navigation"
@@ -255,14 +264,16 @@ export default function Navbar() {
       >
         {/* ═══ MOBILE ═══ */}
         <div className="lg:hidden">
-          <div className="flex items-center justify-between px-5 h-16">
+          <div className="flex items-center justify-between px-4 h-14">
             {/* Left: Menu trigger */}
-            <MobileMenuButton onClick={() => setMobileOpen(true)} />
+            <div className="w-24 flex justify-start">
+              <MobileMenuButton onClick={() => setMobileOpen(true)} />
+            </div>
 
             {/* Center: Logo */}
             <a
               href="/"
-              className="absolute left-1/2 -translate-x-1/2 no-underline"
+              className="no-underline flex-shrink-0"
               aria-label="Wash2Door — Home"
             >
               <span
@@ -270,7 +281,7 @@ export default function Navbar() {
                 style={{
                   fontFamily: 'Georgia, "Times New Roman", serif',
                   fontWeight: 400,
-                  fontSize: "16px",
+                  fontSize: "15px",
                 }}
               >
                 W2D
@@ -278,24 +289,23 @@ export default function Navbar() {
             </a>
 
             {/* Right: Auth */}
-            <div className="flex items-center gap-1 -mr-2">
+            <div className="w-24 flex justify-end">
               {loading ? (
                 <div className="w-10 h-10 flex items-center justify-center">
                   <LoadingSpinner />
                 </div>
               ) : user ? (
-                <div className="w-10 h-10 flex items-center justify-center">
-                  <UserAvatar
-                    name={user.firstName}
-                    onClick={() => setMobileOpen(true)}
-                  />
-                </div>
+                <UserAvatar
+                  name={user.firstName}
+                  onClick={() => setMobileOpen(true)}
+                />
               ) : (
                 <button
                   onClick={() => openModal("login")}
                   className="h-8 px-4 bg-black text-white rounded-full
                              tracking-[0.15em] uppercase active:scale-95
-                             transition-transform duration-150"
+                             transition-transform duration-150
+                             focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2"
                   style={{ fontSize: "9px", fontWeight: 500 }}
                 >
                   Sign In
@@ -308,46 +318,54 @@ export default function Navbar() {
         {/* ═══ DESKTOP ═══ */}
         <div className="hidden lg:block">
           <div className="max-w-[1400px] mx-auto">
-            <div className="flex items-center h-20 px-10 xl:px-16">
+            <div className="flex items-center h-16 xl:h-18 px-8 xl:px-12">
               {/* Left: Logo */}
-              <a href="/" className="no-underline group mr-16" aria-label="Wash2Door — Home">
-                <div className="flex items-baseline gap-3">
+              <a 
+                href="/" 
+                className="no-underline group shrink-0" 
+                aria-label="Wash2Door — Home"
+              >
+                <div className="flex items-baseline gap-2.5">
                   <span
-                    className="text-black tracking-[0.35em] group-hover:tracking-[0.5em]
+                    className="text-black tracking-[0.3em] xl:tracking-[0.35em] 
+                               group-hover:tracking-[0.4em] xl:group-hover:tracking-[0.45em]
                                transition-all duration-500"
                     style={{
                       fontFamily: 'Georgia, "Times New Roman", serif',
                       fontWeight: 400,
-                      fontSize: "22px",
+                      fontSize: "clamp(18px, 1.5vw, 22px)",
                     }}
                   >
                     WASH2DOOR
                   </span>
                   <span
-                    className="w-1.5 h-1.5 rounded-full bg-black/20 group-hover:bg-black
-                               transition-colors duration-300"
+                    className="w-1 h-1 xl:w-1.5 xl:h-1.5 rounded-full bg-black/20 
+                               group-hover:bg-black transition-colors duration-300"
                     aria-hidden="true"
                   />
                 </div>
               </a>
 
               {/* Center: Nav links */}
-              <div className="flex-1 flex items-center justify-center gap-1">
-                {NAV_LINKS.map((link) => (
-                  <NavLink
-                    key={link.label}
-                    link={link}
-                    onProtectedClick={handleProtectedClick}
-                  />
-                ))}
+              <div className="flex-1 flex items-center justify-center">
+                <div className="flex items-center gap-0.5 xl:gap-1">
+                  {NAV_LINKS.map((link) => (
+                    <NavLink
+                      key={link.label}
+                      link={link}
+                      onProtectedClick={handleProtectedClick}
+                    />
+                  ))}
+                </div>
               </div>
 
               {/* Right: Phone + Auth */}
-              <div className="flex items-center gap-4 ml-16">
+              <div className="flex items-center gap-3 xl:gap-4 shrink-0">
                 <a
                   href="tel:6900706456"
                   className="flex items-center gap-2 text-gray-400 hover:text-black
-                             transition-colors duration-300 no-underline"
+                             transition-colors duration-300 no-underline p-2 -m-2
+                             focus:outline-none focus:text-black"
                   aria-label="Call us"
                 >
                   <Phone size={14} strokeWidth={1.5} />
@@ -362,7 +380,7 @@ export default function Navbar() {
                 <div className="w-px h-4 bg-gray-200" aria-hidden="true" />
 
                 {loading ? (
-                  <div className="w-8 h-8 flex items-center justify-center">
+                  <div className="w-10 h-10 flex items-center justify-center">
                     <LoadingSpinner />
                   </div>
                 ) : user ? (
@@ -377,9 +395,10 @@ export default function Navbar() {
                 ) : (
                   <button
                     onClick={() => openModal("login")}
-                    className="h-10 px-6 bg-black text-white rounded-full
-                               tracking-[0.18em] uppercase hover:bg-gray-800
-                               active:scale-95 transition-all duration-300"
+                    className="h-9 px-5 bg-black text-white rounded-full
+                               tracking-[0.15em] uppercase hover:bg-gray-800
+                               active:scale-95 transition-all duration-200
+                               focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2"
                     style={{ fontSize: "10px", fontWeight: 500 }}
                   >
                     Sign In
