@@ -73,7 +73,7 @@ api.interceptors.response.use(
         console.log('🔄 Access token expired, attempting refresh...')
         
         const refreshResponse = await axios.post(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/auth/refresh`,
+          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/auth/refresh-token`,
           {},
           { withCredentials: true }
         )

@@ -2,13 +2,12 @@
 import api from './api'
 
 /**
- * Get all categories
+ * Get all categories (PUBLIC - no auth needed)
  */
 export async function getCategories() {
   try {
-    const response = await api.get('/categories')
-    
-    // Handle different response structures
+    const response = await api.get('/public/categories')
+
     return response.data?.data || response.data?.categories || response.data || []
   } catch (error) {
     throw new Error(
@@ -23,7 +22,7 @@ export async function getCategories() {
 export async function getPublicServices(filters = {}) {
   try {
     const params = {}
-    
+
     if (filters.category) {
       params.category = filters.category
     }
@@ -32,8 +31,7 @@ export async function getPublicServices(filters = {}) {
     }
 
     const response = await api.get('/public/services', { params })
-    
-    // Handle different response structures
+
     return response.data?.data || response.data?.services || response.data || []
   } catch (error) {
     throw new Error(
@@ -50,7 +48,7 @@ export async function getAvailableSlots(date, serviceId) {
     const response = await api.get('/bookings/available-slots', {
       params: { date, serviceId }
     })
-    
+
     return response.data?.data || response.data || []
   } catch (error) {
     throw new Error(
@@ -65,7 +63,7 @@ export async function getAvailableSlots(date, serviceId) {
 export async function getServiceById(serviceId) {
   try {
     const response = await api.get(`/public/services/${serviceId}`)
-    
+
     return response.data?.data || response.data || null
   } catch (error) {
     throw new Error(
@@ -75,16 +73,16 @@ export async function getServiceById(serviceId) {
 }
 
 /**
- * Get user bookings (for services page if needed)
+ * Get user bookings
  */
 export async function getUserBookings() {
   try {
     const response = await api.get('/bookings/my-bookings')
-    
+
     if (response.data?.success) {
       return response.data
     }
-    
+
     throw new Error(response.data?.message || 'Failed to fetch bookings')
   } catch (error) {
     throw new Error(
@@ -98,8 +96,8 @@ export async function getUserBookings() {
  */
 export async function getSubcategoriesByCategoryId(categoryId) {
   try {
-    const response = await api.get(`/categories/${categoryId}/subcategories`)
-    
+    const response = await api.get(`/public/categories/${categoryId}/subcategories`)
+
     return response.data?.data || response.data?.subcategories || response.data || []
   } catch (error) {
     throw new Error(
@@ -113,8 +111,10 @@ export async function getSubcategoriesByCategoryId(categoryId) {
  */
 export async function getServicesBySubcategoryId(subcategoryId) {
   try {
-    const response = await api.get(`/subcategories/${subcategoryId}/services`)
-    
+    const response = await api.get('/public/services', {
+      params: { subcategory: subcategoryId }
+    })
+
     return response.data?.data || response.data?.services || response.data || []
   } catch (error) {
     throw new Error(
@@ -128,10 +128,10 @@ export async function getServicesBySubcategoryId(subcategoryId) {
  */
 export async function searchServices(query) {
   try {
-    const response = await api.get('/public/services/search', {
-      params: { q: query }
+    const response = await api.get('/public/services', {
+      params: { search: query }
     })
-    
+
     return response.data?.data || response.data?.services || response.data || []
   } catch (error) {
     throw new Error(
