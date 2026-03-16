@@ -685,14 +685,14 @@ function BookingsList({ bookings, loading, total, pages, currentPage, onPageChan
             {/* Bookings */}
             <div className="divide-y divide-white/[0.04]">
                 {bookings.map((booking, index) => (
-                    <BookingRow
-                        key={booking._id}
-                        booking={booking}
-                        isFirst={index === 0}
-                        onView={onView}
-                        onUpdateStatus={onUpdateStatus}
-                    />
-                ))}
+    <BookingRow
+        key={booking._id || `booking-${index}`}
+        booking={booking}
+        isFirst={index === 0}
+        onView={onView}
+        onUpdateStatus={onUpdateStatus}
+    />
+))}
             </div>
 
             {/* Pagination */}
