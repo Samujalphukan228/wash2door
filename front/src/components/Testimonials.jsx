@@ -1,8 +1,8 @@
 "use client"
 
-import { useRef, useState, memo } from "react"
+import { useRef, useState, useCallback, memo } from "react"
 import { motion, AnimatePresence, useInView } from "framer-motion"
-import { Star, Quote, ArrowLeft, ArrowRight, ChevronRight } from "lucide-react"
+import { Star, ArrowLeft, ArrowRight, Check } from "lucide-react"
 
 // ── Constants ──────────────────────────────────────────────
 const TESTIMONIALS = [
@@ -13,7 +13,7 @@ const TESTIMONIALS = [
     rating: 5,
     text: "Absolutely fantastic service! They arrived on time, were extremely professional, and my car looks brand new. Will definitely book again.",
     service: "Premium Wash",
-    avatar: "RS",
+    initials: "RS",
   },
   {
     id: 2,
@@ -22,7 +22,7 @@ const TESTIMONIALS = [
     rating: 5,
     text: "So convenient to have them come to my office parking. No more wasting weekends at the car wash. The quality is top-notch every single time.",
     service: "Standard Wash",
-    avatar: "PP",
+    initials: "PP",
   },
   {
     id: 3,
@@ -31,7 +31,7 @@ const TESTIMONIALS = [
     rating: 5,
     text: "I was skeptical at first, but these guys exceeded all my expectations. My SUV has never looked this clean. Highly recommend their premium package.",
     service: "Premium Wash",
-    avatar: "AK",
+    initials: "AK",
   },
   {
     id: 4,
@@ -40,7 +40,7 @@ const TESTIMONIALS = [
     rating: 5,
     text: "The booking process was so simple and the team was very courteous. They even cleaned spots I did not notice. Great attention to detail!",
     service: "Basic Wash",
-    avatar: "SR",
+    initials: "SR",
   },
   {
     id: 5,
@@ -49,510 +49,396 @@ const TESTIMONIALS = [
     rating: 5,
     text: "Finally a car wash service that respects your time. They came exactly when they said they would. My car is spotless. Five stars!",
     service: "Standard Wash",
-    avatar: "VS",
+    initials: "VS",
   },
 ]
 
-// ── Animation Variants ─────────────────────────────────────
-const fadeInUp = {
-  hidden: { opacity: 0, y: 40 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] },
-  },
+const FEATURES = ["Professional team", "Eco-friendly products", "100% satisfaction"]
+
+const STATS = [
+  { value: "5.0", label: "Rating"     },
+  { value: "500+", label: "Customers" },
+  { value: "98%",  label: "Satisfied" },
+]
+
+const SERIF = 'Georgia, "Times New Roman", serif'
+const EASE  = [0.22, 1, 0.36, 1]
+
+// ── Animation variants ─────────────────────────────────────
+const stagger = {
+  hidden:  {},
+  visible: { transition: { staggerChildren: 0.1, delayChildren: 0.1 } },
 }
 
-const scaleIn = {
-  hidden: { opacity: 0, scale: 0.95 },
-  visible: {
-    opacity: 1,
-    scale: 1,
-    transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] },
-  },
+const fadeUp = {
+  hidden:  { opacity: 0, y: 28 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.65, ease: EASE } },
 }
 
-const slideIn = {
-  enter: (direction) => ({
-    x: direction > 0 ? 100 : -100,
-    opacity: 0,
-  }),
-  center: {
-    x: 0,
-    opacity: 1,
-  },
-  exit: (direction) => ({
-    x: direction < 0 ? 100 : -100,
-    opacity: 0,
-  }),
+const fadeLeft = {
+  hidden:  { opacity: 0, x: -24 },
+  visible: { opacity: 1, x: 0,  transition: { duration: 0.55, ease: EASE } },
 }
 
-const staggerContainer = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1,
-      delayChildren: 0.2,
-    },
-  },
+// Directional slide — custom prop carries direction (+1 / -1)
+const slide = {
+  enter:  (d) => ({ x: d > 0 ? 80 : -80, opacity: 0 }),
+  center: { x: 0, opacity: 1, transition: { duration: 0.45, ease: EASE } },
+  exit:   (d) => ({ x: d > 0 ? -80 : 80, opacity: 0,
+    transition: { duration: 0.3, ease: "easeIn" } }),
 }
 
-// ── Section Header ─────────────────────────────────────────
-const SectionHeader = memo(function SectionHeader() {
-  const ref = useRef(null)
-  const isInView = useInView(ref, { once: true, margin: "-100px" })
-
-  return (
-    <motion.div
-      ref={ref}
-      initial="hidden"
-      animate={isInView ? "visible" : "hidden"}
-      variants={staggerContainer}
-      className="text-center mb-12 md:mb-20"
-    >
-      {/* Eyebrow */}
-      <motion.div
-        variants={fadeInUp}
-        className="inline-flex items-center gap-3 mb-6 px-5 py-2 rounded-full bg-gray-50"
-      >
-        <Quote size={14} className="text-gray-600" />
-        <span
-          className="tracking-[0.3em] uppercase text-gray-600"
-          style={{ fontFamily: "Georgia, serif", fontSize: "10px", fontWeight: 500 }}
-        >
-          Customer Reviews
-        </span>
-      </motion.div>
-
-      {/* Title */}
-      <motion.h2
-        variants={fadeInUp}
-        className="text-black mb-5 px-4"
-        style={{
-          fontFamily: 'Georgia, "Times New Roman", serif',
-          fontWeight: 300,
-          fontSize: "clamp(2rem, 7vw, 2.5rem)",
-          lineHeight: 1.15,
-          letterSpacing: "-0.02em",
-        }}
-      >
-        Real Stories, Real Shine
-      </motion.h2>
-
-      {/* Description */}
-      <motion.p
-        variants={fadeInUp}
-        className="text-gray-500 max-w-md mx-auto leading-relaxed px-6"
-        style={{ fontSize: "15px" }}
-      >
-        Trusted by hundreds of customers across Duliajan
-      </motion.p>
-
-      {/* Stats - Mobile optimized */}
-      <motion.div
-        variants={fadeInUp}
-        className="grid grid-cols-3 gap-3 max-w-sm mx-auto mt-8 px-4"
-      >
-        {[
-          { value: "5.0", label: "Rating" },
-          { value: "500+", label: "Customers" },
-          { value: "98%", label: "Satisfied" },
-        ].map((stat, i) => (
-          <div key={i} className="text-center bg-gray-50 rounded-2xl p-4">
-            <p
-              className="text-black mb-1"
-              style={{
-                fontFamily: "Georgia, serif",
-                fontSize: "clamp(1.25rem, 5vw, 1.5rem)",
-                fontWeight: 400,
-              }}
-            >
-              {stat.value}
-            </p>
-            <p className="text-gray-500 text-xs">{stat.label}</p>
-          </div>
-        ))}
-      </motion.div>
-    </motion.div>
-  )
-})
-
-// ── Star Rating Component ──────────────────────────────────
+// ── StarRating ─────────────────────────────────────────────
 const StarRating = memo(function StarRating({ rating = 5 }) {
   return (
-    <div className="flex gap-0.5">
-      {[...Array(5)].map((_, i) => (
-        <Star
-          key={i}
-          size={14}
-          className={i < rating ? "fill-yellow-400 text-yellow-400" : "fill-gray-200 text-gray-200"}
-        />
+    <div className="flex gap-0.5" aria-label={`${rating} out of 5 stars`}>
+      {Array.from({ length: 5 }).map((_, i) => (
+        <Star key={i} size={13}
+          className={i < rating ? "fill-yellow-400 text-yellow-400" : "fill-gray-200 text-gray-200"} />
       ))}
     </div>
   )
 })
 
-// ── Desktop Testimonial Card ───────────────────────────────
-const DesktopTestimonialCard = memo(function DesktopTestimonialCard({ testimonial, isActive }) {
-  if (!isActive) return null
+// ── Avatar ─────────────────────────────────────────────────
+function Avatar({ initials, size = "md", light = false }) {
+  const dim = size === "lg" ? "w-14 h-14" : "w-11 h-11"
+  const fsize = size === "lg" ? "17px" : "14px"
+  return (
+    <div className={`${dim} rounded-full flex items-center justify-center shrink-0
+                     ${light ? "bg-white" : "bg-black"}`}
+      style={light ? { boxShadow: "0 8px 24px -4px rgba(255,255,255,0.2)" } : {}}>
+      <span className={light ? "text-black" : "text-white"}
+        style={{ fontFamily: SERIF, fontSize: fsize, fontWeight: 400 }}>
+        {initials}
+      </span>
+    </div>
+  )
+}
+
+// ── DotNav ─────────────────────────────────────────────────
+function DotNav({ count, active, onSelect, light }) {
+  return (
+    <div className="flex items-center gap-2">
+      {Array.from({ length: count }).map((_, i) => (
+        <button key={i} onClick={() => onSelect(i)}
+          aria-label={`Testimonial ${i + 1}`}
+          className={`h-1.5 rounded-full transition-all duration-400
+                      ${i === active
+                        ? `w-8 ${light ? "bg-white" : "bg-black"}`
+                        : `w-1.5 ${light ? "bg-white/30 hover:bg-white/60" : "bg-gray-200 hover:bg-gray-400"}`}`} />
+      ))}
+    </div>
+  )
+}
+
+// ── NavButtons ─────────────────────────────────────────────
+function NavButtons({ onPrev, onNext }) {
+  return (
+    <>
+      <motion.button whileTap={{ scale: 0.9 }} onClick={onPrev}
+        aria-label="Previous testimonial"
+        className="w-11 h-11 rounded-full border-2 border-gray-200 flex items-center justify-center
+                   hover:border-black hover:bg-black hover:text-white transition-all duration-300">
+        <ArrowLeft size={17} strokeWidth={2} />
+      </motion.button>
+      <motion.button whileTap={{ scale: 0.9 }} onClick={onNext}
+        aria-label="Next testimonial"
+        className="w-11 h-11 rounded-full bg-black text-white flex items-center justify-center
+                   hover:bg-gray-800 hover:scale-105 transition-all duration-300">
+        <ArrowRight size={17} strokeWidth={2} />
+      </motion.button>
+    </>
+  )
+}
+
+// ── Section header ─────────────────────────────────────────
+const SectionHeader = memo(function SectionHeader() {
+  const ref    = useRef(null)
+  const inView = useInView(ref, { once: true, margin: "-80px" })
 
   return (
+    <motion.header
+      ref={ref}
+      variants={stagger}
+      initial="hidden"
+      animate={inView ? "visible" : "hidden"}
+      className="mb-12 md:mb-20"
+    >
+      <motion.div variants={fadeLeft} className="flex items-center gap-4 mb-5">
+        <span className="block w-10 h-px bg-black" aria-hidden="true" />
+        <span className="tracking-[0.4em] uppercase text-gray-400"
+          style={{ fontFamily: SERIF, fontSize: "10px" }}>
+          Customer Reviews
+        </span>
+      </motion.div>
+
+      <div className="md:flex md:items-end md:justify-between md:gap-10">
+        <motion.h2
+          variants={fadeUp}
+          id="testimonials-heading"
+          className="text-black mb-4 md:mb-0"
+          style={{
+            fontFamily: SERIF, fontWeight: 300,
+            fontSize: "clamp(2rem, 7vw, 3.5rem)",
+            lineHeight: 1.05, letterSpacing: "-0.03em",
+          }}
+        >
+          Real Stories,
+          <br className="hidden sm:block" />
+          <span className="text-gray-300">Real Shine</span>
+        </motion.h2>
+
+        {/* Stats — right-aligned on desktop, below heading on mobile */}
+        <motion.div
+          variants={fadeUp}
+          className="flex gap-6 md:gap-8"
+        >
+          {STATS.map(({ value, label }, i) => (
+            <div key={i} className="md:text-right">
+              <p className="text-black leading-none"
+                style={{ fontFamily: SERIF, fontSize: "clamp(1.3rem,3vw,1.8rem)", fontWeight: 300 }}>
+                {value}
+              </p>
+              <p className="text-gray-400 tracking-wider uppercase mt-1" style={{ fontSize: "9px" }}>
+                {label}
+              </p>
+            </div>
+          ))}
+        </motion.div>
+      </div>
+    </motion.header>
+  )
+})
+
+// ── Desktop testimonial card (black panel + info sidebar) ──
+function DesktopCard({ t, dir }) {
+  return (
     <motion.div
-      key={testimonial.id}
-      variants={slideIn}
+      key={t.id}
+      custom={dir}
+      variants={slide}
       initial="enter"
       animate="center"
       exit="exit"
-      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-      className="grid md:grid-cols-5 gap-8 lg:gap-12 items-center"
+      className="grid md:grid-cols-5 gap-8 lg:gap-12 items-stretch"
     >
-      {/* Left: Large Quote */}
+      {/* Left: black quote panel */}
       <div className="md:col-span-3">
-        <div className="relative bg-black rounded-3xl p-10 lg:p-14 overflow-hidden">
-          {/* Background decorations */}
-          <div className="absolute inset-0" aria-hidden="true">
-            <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl" />
-            <Quote
-              size={200}
-              strokeWidth={0.5}
-              className="absolute -bottom-10 -right-10 text-white/[0.03] rotate-180"
-            />
+        <div className="relative bg-black rounded-[2rem] p-8 lg:p-12 overflow-hidden h-full">
+          {/* Atmosphere */}
+          <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
+            <div className="absolute top-0 right-0 w-72 h-72 bg-white/5 rounded-full blur-3xl" />
+            <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full blur-3xl" />
           </div>
 
-          {/* Content */}
-          <div className="relative z-10">
-            {/* Rating */}
-            <div className="mb-6">
-              <StarRating rating={testimonial.rating} />
+          <div className="relative z-10 flex flex-col h-full">
+            <StarRating rating={t.rating} />
+
+            <blockquote
+              className="text-white/88 my-8 flex-1"
+              style={{
+                fontFamily: SERIF, fontWeight: 300,
+                fontSize: "clamp(1.3rem, 2.2vw, 1.75rem)",
+                lineHeight: 1.55, letterSpacing: "-0.01em",
+              }}
+            >
+              "{t.text}"
+            </blockquote>
+
+            <div className="flex items-center gap-4 pt-6 border-t border-white/10">
+              <Avatar initials={t.initials} size="lg" light />
+              <div>
+                <cite className="text-white not-italic block"
+                  style={{ fontFamily: SERIF, fontSize: "17px", fontWeight: 400 }}>
+                  {t.name}
+                </cite>
+                <p className="text-white/40" style={{ fontSize: "12px" }}>{t.location}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Right: info card */}
+      <motion.div
+        className="md:col-span-2"
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.5, delay: 0.18, ease: EASE }}
+      >
+        <div className="bg-gray-50 rounded-[2rem] p-8 h-full flex flex-col">
+          <p className="text-gray-400 tracking-wider uppercase mb-2"
+            style={{ fontSize: "9px" }}>
+            Service Booked
+          </p>
+          <h3 className="text-black mb-8"
+            style={{ fontFamily: SERIF, fontSize: "22px", fontWeight: 400 }}>
+            {t.service}
+          </h3>
+
+          <div className="space-y-3 flex-1">
+            {FEATURES.map((f, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <div className="w-5 h-5 rounded-full bg-black flex items-center justify-center shrink-0">
+                  <Check size={10} strokeWidth={2.5} className="text-white" />
+                </div>
+                <span className="text-gray-600" style={{ fontSize: "13px" }}>{f}</span>
+              </div>
+            ))}
+          </div>
+
+          <motion.a
+            whileHover={{ x: 3 }}
+            whileTap={{ scale: 0.97 }}
+            href="/bookings"
+            className="inline-flex items-center gap-2 mt-8 text-black no-underline group"
+          >
+            <span className="tracking-wider uppercase border-b border-black pb-0.5
+                             group-hover:border-gray-400 transition-colors duration-300"
+              style={{ fontSize: "10px", fontWeight: 500 }}>
+              Book this service
+            </span>
+            <ArrowRight size={13}
+              className="group-hover:translate-x-0.5 transition-transform duration-300" />
+          </motion.a>
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+// ── Desktop testimonials ───────────────────────────────────
+const DesktopTestimonials = memo(function DesktopTestimonials() {
+  const [[idx, dir], setSlide] = useState([0, 1])
+
+  const go = useCallback((next) => {
+    setSlide(([cur]) => [next, next > cur ? 1 : -1])
+  }, [])
+
+  const prev = useCallback(() => {
+    setSlide(([cur]) => [(cur - 1 + TESTIMONIALS.length) % TESTIMONIALS.length, -1])
+  }, [])
+
+  const next = useCallback(() => {
+    setSlide(([cur]) => [(cur + 1) % TESTIMONIALS.length, 1])
+  }, [])
+
+  return (
+    <div className="hidden md:block">
+      <AnimatePresence custom={dir} mode="wait">
+        <DesktopCard key={TESTIMONIALS[idx].id} t={TESTIMONIALS[idx]} dir={dir} />
+      </AnimatePresence>
+
+      <div className="flex items-center justify-center gap-5 mt-10">
+        <NavButtons onPrev={prev} onNext={next} />
+        <DotNav count={TESTIMONIALS.length} active={idx} onSelect={go} />
+      </div>
+    </div>
+  )
+})
+
+// ── Mobile testimonials ────────────────────────────────────
+const MobileTestimonials = memo(function MobileTestimonials() {
+  const [[idx, dir], setSlide] = useState([0, 1])
+
+  const go = useCallback((next) => {
+    setSlide(([cur]) => [next, next >= cur ? 1 : -1])
+  }, [])
+
+  const prev = useCallback(() => {
+    setSlide(([cur]) => [(cur - 1 + TESTIMONIALS.length) % TESTIMONIALS.length, -1])
+  }, [])
+
+  const next = useCallback(() => {
+    setSlide(([cur]) => [(cur + 1) % TESTIMONIALS.length, 1])
+  }, [])
+
+  const t = TESTIMONIALS[idx]
+
+  return (
+    <div className="md:hidden">
+      {/* Card */}
+      <div className="overflow-hidden mb-6">
+        <AnimatePresence custom={dir} mode="wait">
+          <motion.div
+            key={t.id}
+            custom={dir}
+            variants={slide}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            className="bg-white border border-gray-100 rounded-3xl p-5 shadow-sm"
+          >
+            {/* Header row */}
+            <div className="flex items-center gap-3 mb-4">
+              <Avatar initials={t.initials} />
+              <div className="flex-1 min-w-0">
+                <cite className="text-black block not-italic truncate"
+                  style={{ fontFamily: SERIF, fontSize: "15px", fontWeight: 400 }}>
+                  {t.name}
+                </cite>
+                <p className="text-gray-400" style={{ fontSize: "11px" }}>{t.location}</p>
+              </div>
+              <StarRating rating={t.rating} />
             </div>
 
             {/* Quote */}
             <blockquote
-              className="text-white/90 mb-8"
-              style={{
-                fontFamily: 'Georgia, "Times New Roman", serif',
-                fontWeight: 300,
-                fontSize: "clamp(1.5rem, 2.5vw, 2rem)",
-                lineHeight: 1.5,
-                letterSpacing: "-0.01em",
-              }}
+              className="text-gray-700 mb-5 leading-relaxed"
+              style={{ fontFamily: SERIF, fontWeight: 300, fontSize: "15px", lineHeight: 1.65 }}
             >
-              "{testimonial.text}"
+              "{t.text}"
             </blockquote>
 
-            {/* Author */}
-            <div className="flex items-center gap-4">
-              <div
-                className="w-14 h-14 rounded-full bg-white flex items-center justify-center"
-                style={{ boxShadow: "0 10px 30px -5px rgba(255,255,255,0.2)" }}
-              >
-                <span
-                  className="text-black"
-                  style={{
-                    fontFamily: 'Georgia, "Times New Roman", serif',
-                    fontSize: "18px",
-                    fontWeight: 400,
-                  }}
-                >
-                  {testimonial.avatar}
-                </span>
-              </div>
-              <div>
-                <cite
-                  className="text-white block not-italic"
-                  style={{
-                    fontFamily: 'Georgia, "Times New Roman", serif',
-                    fontSize: "18px",
-                    fontWeight: 400,
-                  }}
-                >
-                  {testimonial.name}
-                </cite>
-                <p className="text-white/40 text-sm">{testimonial.location}</p>
-              </div>
+            {/* Footer */}
+            <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+              <span className="px-3 py-1.5 rounded-full bg-gray-100 text-gray-500 tracking-wider uppercase"
+                style={{ fontSize: "9px" }}>
+                {t.service}
+              </span>
+              <span className="text-gray-300" style={{ fontSize: "11px" }}>
+                {idx + 1} / {TESTIMONIALS.length}
+              </span>
             </div>
-          </div>
-        </div>
+          </motion.div>
+        </AnimatePresence>
       </div>
 
-      {/* Right: Info Card */}
-      <div className="md:col-span-2">
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-          className="bg-gray-50 rounded-2xl p-8"
-        >
-          <p
-            className="text-gray-400 tracking-wider uppercase mb-4"
-            style={{ fontSize: "10px" }}
-          >
-            Service Booked
-          </p>
-          <h3
-            className="text-black mb-6"
-            style={{
-              fontFamily: 'Georgia, "Times New Roman", serif',
-              fontSize: "24px",
-              fontWeight: 400,
-            }}
-          >
-            {testimonial.service}
-          </h3>
-
-          {/* Service features */}
-          <div className="space-y-3">
-            {["Professional team", "Eco-friendly products", "100% satisfaction"].map((feature, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-black" />
-                <span className="text-gray-600 text-sm">{feature}</span>
-              </div>
-            ))}
-          </div>
-
-          <a
-            href="/bookings"
-            className="inline-flex items-center gap-2 mt-8 text-black hover:gap-3 transition-all duration-300"
-          >
-            <span className="text-sm font-medium">Book this service</span>
-            <ArrowRight size={16} />
-          </a>
-        </motion.div>
-      </div>
-    </motion.div>
-  )
-})
-
-// ── Desktop Navigation ─────────────────────────────────────
-const DesktopNavigation = memo(function DesktopNavigation({ total, current, onChange }) {
-  return (
-    <div className="flex items-center justify-center gap-8 mt-12">
-      <button
-        onClick={() => onChange((current - 1 + total) % total)}
-        className="w-12 h-12 rounded-full border-2 border-gray-200 flex items-center justify-center
-                   hover:border-black hover:bg-black hover:text-white transition-all duration-300"
-        aria-label="Previous testimonial"
-      >
-        <ArrowLeft size={20} strokeWidth={2} />
-      </button>
-
-      <div className="flex gap-2">
-        {[...Array(total)].map((_, i) => (
-          <button
-            key={i}
-            onClick={() => onChange(i)}
-            className={`h-2 rounded-full transition-all duration-500 ${
-              i === current ? "w-12 bg-black" : "w-2 bg-gray-200 hover:bg-gray-300"
-            }`}
-            aria-label={`Go to testimonial ${i + 1}`}
-          />
-        ))}
-      </div>
-
-      <button
-        onClick={() => onChange((current + 1) % total)}
-        className="w-12 h-12 rounded-full bg-black text-white flex items-center justify-center
-                   hover:bg-gray-800 transition-all duration-300"
-        aria-label="Next testimonial"
-      >
-        <ArrowRight size={20} strokeWidth={2} />
-      </button>
-    </div>
-  )
-})
-
-// ── Mobile Carousel (NEW CLEAN DESIGN) ─────────────────────
-const MobileTestimonials = memo(function MobileTestimonials() {
-  const [activeIndex, setActiveIndex] = useState(0)
-  const [[page, direction], setPage] = useState([0, 0])
-
-  const paginate = (newDirection) => {
-    const newIndex = (activeIndex + newDirection + TESTIMONIALS.length) % TESTIMONIALS.length
-    setPage([newIndex, newDirection])
-    setActiveIndex(newIndex)
-  }
-
-  const testimonial = TESTIMONIALS[activeIndex]
-
-  return (
-    <div className="md:hidden">
-      {/* Main carousel card */}
-      <div className="relative px-4 mb-8">
-        <div className="overflow-hidden">
-          <AnimatePresence initial={false} custom={direction} mode="wait">
-            <motion.div
-              key={page}
-              custom={direction}
-              variants={slideIn}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={{
-                x: { type: "spring", stiffness: 300, damping: 30 },
-                opacity: { duration: 0.3 },
-              }}
-              className="w-full"
-            >
-              {/* Clean white card */}
-              <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-lg">
-                {/* Header */}
-                <div className="flex items-center gap-3 mb-5">
-                  <div
-                    className="w-12 h-12 rounded-full bg-black flex items-center justify-center shrink-0"
-                  >
-                    <span
-                      className="text-white"
-                      style={{
-                        fontFamily: 'Georgia, "Times New Roman", serif',
-                        fontSize: "16px",
-                        fontWeight: 400,
-                      }}
-                    >
-                      {testimonial.avatar}
-                    </span>
-                  </div>
-                  <div className="flex-1">
-                    <cite
-                      className="text-black block not-italic"
-                      style={{
-                        fontFamily: 'Georgia, "Times New Roman", serif',
-                        fontSize: "16px",
-                        fontWeight: 400,
-                      }}
-                    >
-                      {testimonial.name}
-                    </cite>
-                    <p className="text-gray-500 text-sm">{testimonial.location}</p>
-                  </div>
-                  <div className="shrink-0">
-                    <StarRating rating={testimonial.rating} />
-                  </div>
-                </div>
-
-                {/* Quote */}
-                <blockquote
-                  className="text-gray-700 mb-5"
-                  style={{
-                    fontFamily: 'Georgia, "Times New Roman", serif',
-                    fontWeight: 300,
-                    fontSize: "16px",
-                    lineHeight: 1.6,
-                  }}
-                >
-                  "{testimonial.text}"
-                </blockquote>
-
-                {/* Service badge */}
-                <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                  <span className="px-3 py-1.5 rounded-full bg-gray-100 text-gray-600 text-xs tracking-wide">
-                    {testimonial.service}
-                  </span>
-                  <span className="text-gray-400 text-xs">
-                    {activeIndex + 1} of {TESTIMONIALS.length}
-                  </span>
-                </div>
-              </div>
-            </motion.div>
-          </AnimatePresence>
-        </div>
-
-        {/* Navigation arrows */}
-        <div className="flex items-center justify-center gap-4 mt-6">
-          <button
-            onClick={() => paginate(-1)}
-            className="w-12 h-12 rounded-full border-2 border-gray-200 flex items-center justify-center
-                     active:bg-gray-100 transition-all duration-200"
-            aria-label="Previous testimonial"
-          >
-            <ArrowLeft size={18} strokeWidth={2} className="text-gray-600" />
-          </button>
-
-          {/* Dots */}
-          <div className="flex gap-2">
-            {TESTIMONIALS.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => {
-                  const newDirection = i > activeIndex ? 1 : -1
-                  setPage([i, newDirection])
-                  setActiveIndex(i)
-                }}
-                className={`h-2 rounded-full transition-all duration-500 ${
-                  i === activeIndex ? "w-8 bg-black" : "w-2 bg-gray-300"
-                }`}
-                aria-label={`Go to testimonial ${i + 1}`}
-              />
-            ))}
-          </div>
-
-          <button
-            onClick={() => paginate(1)}
-            className="w-12 h-12 rounded-full bg-black text-white flex items-center justify-center
-                     active:bg-gray-800 transition-all duration-200"
-            aria-label="Next testimonial"
-          >
-            <ArrowRight size={18} strokeWidth={2} />
-          </button>
-        </div>
+      {/* Controls */}
+      <div className="flex items-center justify-center gap-4 mb-10">
+        <NavButtons onPrev={prev} onNext={next} />
+        <DotNav count={TESTIMONIALS.length} active={idx} onSelect={go} />
       </div>
 
       {/* CTA */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.3 }}
-        className="text-center px-4"
-      >
-        <a
+      <div className="flex justify-center">
+        <motion.a
+          whileTap={{ scale: 0.97 }}
           href="/bookings"
-          className="inline-flex items-center gap-3 h-14 px-8
-                     bg-black text-white rounded-full
-                     hover:shadow-xl hover:shadow-black/20
-                     active:scale-[0.97] transition-all duration-300"
+          className="inline-flex items-center gap-3 h-13 h-12 px-8
+                     bg-black text-white rounded-full no-underline
+                     hover:bg-gray-900 transition-colors duration-300 w-full justify-center sm:w-auto"
         >
-          <span className="tracking-wider uppercase" style={{ fontSize: "11px" }}>
+          <span className="tracking-wider uppercase" style={{ fontSize: "11px", fontWeight: 500 }}>
             Book Your First Wash
           </span>
-          <ArrowRight size={16} strokeWidth={2} />
-        </a>
-      </motion.div>
+          <ArrowRight size={14} strokeWidth={2} />
+        </motion.a>
+      </div>
     </div>
   )
 })
 
-// ── Desktop View ───────────────────────────────────────────
-const DesktopTestimonials = memo(function DesktopTestimonials() {
-  const [activeIndex, setActiveIndex] = useState(0)
-
-  return (
-    <div className="hidden md:block">
-      <AnimatePresence mode="wait">
-        <DesktopTestimonialCard
-          key={TESTIMONIALS[activeIndex].id}
-          testimonial={TESTIMONIALS[activeIndex]}
-          isActive={true}
-        />
-      </AnimatePresence>
-
-      <DesktopNavigation
-        total={TESTIMONIALS.length}
-        current={activeIndex}
-        onChange={setActiveIndex}
-      />
-    </div>
-  )
-})
-
-// ── Main Component ─────────────────────────────────────────
+// ── Main ───────────────────────────────────────────────────
 export default function Testimonials() {
   return (
     <section
-      className="w-full bg-white py-16 md:py-32 lg:py-40"
+      className="w-full bg-white py-16 md:py-28 lg:py-36"
       style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
       aria-labelledby="testimonials-heading"
     >
-      <div className="max-w-[1400px] mx-auto px-5 sm:px-8 md:px-12 lg:px-16">
+      <div className="max-w-6xl mx-auto px-4 sm:px-8 md:px-12 lg:px-16">
         <SectionHeader />
         <DesktopTestimonials />
         <MobileTestimonials />

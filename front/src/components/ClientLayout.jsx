@@ -9,20 +9,44 @@ import { AuthProvider } from "@/context/AuthContext"
 const ease = [0.76, 0, 0.24, 1]
 
 export default function ClientLayout({ children }) {
-  // If already seen this session, skip straight to done
-  const [done, setDone] = useState(() => {
-    if (typeof window === "undefined") return false
-    return sessionStorage.getItem("w2d_intro") === "1"
-  })
+  // Start as `true` (skip intro) until we confirm it's the first visit this session.
+  // This means: on tab switch / remount, content is always visible immediately.
+  const [done, setDone] = useState(true)
+  const [checked, setChecked] = useState(false)
 
   useEffect(() => {
-    if (done) return // already seen — don't run timer
+    // Only runs client-side, after hydration
+    const seen = sessionStorage.getItem("w2d_intro") === "1"
+
+    if (seen) {
+      // Already seen — stay done, just mark checked
+      setChecked(true)
+      return
+    }
+
+    // First visit this session — show the intro
+    setDone(false)
+    setChecked(true)
+
     const t = setTimeout(() => {
       sessionStorage.setItem("w2d_intro", "1")
       setDone(true)
     }, 2200)
+
     return () => clearTimeout(t)
   }, [])
+
+  // Until we've read sessionStorage, render content visible (no flash)
+  // The intro will only appear after the check confirms it's needed
+  if (!checked) {
+    return (
+      <AuthProvider>
+        <Navbar />
+        {children}
+        <Footer />
+      </AuthProvider>
+    )
+  }
 
   return (
     <AuthProvider>
@@ -85,16 +109,11 @@ export default function ClientLayout({ children }) {
         )}
       </AnimatePresence>
 
-      {/* Page content */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={done ? { opacity: 1 } : { opacity: 0 }}
-        transition={{ duration: 0.6, ease: "easeOut" }}
-      >
+      <div>
         <Navbar />
         {children}
         <Footer />
-      </motion.div>
+      </div>
     </AuthProvider>
   )
 }

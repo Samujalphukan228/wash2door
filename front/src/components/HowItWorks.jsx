@@ -1,13 +1,16 @@
 "use client"
 
-import { useRef, useState, useEffect, memo, useCallback } from "react"
+import { useRef, useState, useEffect, useCallback, memo } from "react"
 import { motion, useInView, AnimatePresence } from "framer-motion"
-import { ArrowRight, CalendarCheck, Car, MapPin, Sparkles, ChevronLeft, ChevronRight } from "lucide-react"
+import {
+  ArrowRight, CalendarCheck, Car, MapPin, Sparkles,
+  ChevronLeft, ChevronRight, Pause, Play,
+} from "lucide-react"
 
 // ── Constants ──────────────────────────────────────────────
 const STEPS = [
   {
-    id: "choose-service",
+    id: "choose",
     icon: Car,
     number: "01",
     title: "Choose Your Service",
@@ -15,15 +18,15 @@ const STEPS = [
     detail: "Browse our curated selection of premium services",
   },
   {
-    id: "share-location",
+    id: "location",
     icon: MapPin,
     number: "02",
     title: "Share Your Location",
-    description: "We come to you — home, office, parking lot. Anywhere in Duliajan.",
+    description: "We come to you — home, office, or anywhere in Duliajan.",
     detail: "Flexible doorstep service across the city",
   },
   {
-    id: "pick-time",
+    id: "time",
     icon: CalendarCheck,
     number: "03",
     title: "Pick a Time Slot",
@@ -31,440 +34,348 @@ const STEPS = [
     detail: "Book at your convenience, any day of the week",
   },
   {
-    id: "sit-relax",
+    id: "relax",
     icon: Sparkles,
     number: "04",
     title: "Sit Back & Relax",
-    description: "Our experts arrive on time with everything needed. Spotless results guaranteed.",
+    description: "Our experts arrive on time with everything needed. Results guaranteed.",
     detail: "Professional service with 100% satisfaction",
   },
 ]
 
 const STATS = [
-  { value: "2min", label: "To Book" },
-  { value: "2hrs", label: "Avg Service" },
+  { value: "2min", label: "To Book"      },
+  { value: "2hrs", label: "Avg Service"  },
   { value: "100%", label: "Satisfaction" },
 ]
 
-const AUTO_PLAY_INTERVAL = 4000 // 4 seconds per step
+const INTERVAL_MS  = 4000
+const PROGRESS_HZ  = 80   // ms between progress ticks
+const PROGRESS_STEP = (100 / INTERVAL_MS) * PROGRESS_HZ
 
-// ── Animation Variants ─────────────────────────────────────
-const fadeInUp = {
-  hidden: { opacity: 0, y: 40 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] },
-  },
+const SERIF = 'Georgia, "Times New Roman", serif'
+const EASE  = [0.22, 1, 0.36, 1]
+
+// ── useAutoPlay hook ───────────────────────────────────────
+// Single source of truth for the carousel timer logic.
+function useAutoPlay({ length, paused, onAdvance }) {
+  const [progress, setProgress] = useState(0)
+
+  useEffect(() => {
+    if (paused) return
+
+    setProgress(0)
+    const progId = setInterval(() => {
+      setProgress(p => Math.min(p + PROGRESS_STEP, 100))
+    }, PROGRESS_HZ)
+
+    const stepId = setInterval(() => {
+      onAdvance()
+      setProgress(0)
+    }, INTERVAL_MS)
+
+    return () => {
+      clearInterval(progId)
+      clearInterval(stepId)
+    }
+  }, [paused, onAdvance])
+
+  return progress
 }
 
-const slideIn = {
-  hidden: { opacity: 0, x: -60 },
-  visible: {
-    opacity: 1,
-    x: 0,
-    transition: { duration: 0.8, ease: [0.22, 1, 0.36, 1] },
-  },
-  exit: {
-    opacity: 0,
-    x: 60,
-    transition: { duration: 0.5 },
-  },
+// ── Animation variants ─────────────────────────────────────
+const stagger = {
+  hidden:  {},
+  visible: { transition: { staggerChildren: 0.1, delayChildren: 0.15 } },
 }
 
-const staggerContainer = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1,
-      delayChildren: 0.2,
-    },
-  },
+const fadeUp = {
+  hidden:  { opacity: 0, y: 32 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.7, ease: EASE } },
 }
 
-// ── Section Header ─────────────────────────────────────────
-const SectionHeader = memo(function SectionHeader() {
-  const ref = useRef(null)
-  const isInView = useInView(ref, { once: true, margin: "-100px" })
+const fadeLeft = {
+  hidden:  { opacity: 0, x: -24 },
+  visible: { opacity: 1, x: 0,  transition: { duration: 0.6, ease: EASE } },
+}
 
+const cardSlide = {
+  enter: (dir) => ({ x: dir > 0 ? 280 : -280, opacity: 0 }),
+  center:        { x: 0, opacity: 1, transition: { duration: 0.45, ease: EASE } },
+  exit:  (dir) => ({ x: dir > 0 ? -280 : 280, opacity: 0,
+    transition: { duration: 0.3, ease: "easeIn" } }),
+}
+
+const desktopSlide = {
+  hidden: { opacity: 0, x: -40 },
+  visible: { opacity: 1, x: 0, transition: { duration: 0.6, ease: EASE } },
+  exit:    { opacity: 0, x: 40, transition: { duration: 0.35, ease: "easeIn" } },
+}
+
+// ── ProgressRing ───────────────────────────────────────────
+const ProgressRing = memo(function ProgressRing({ progress, size = 44 }) {
+  const r = (size - 4) / 2
+  const circ = r * 2 * Math.PI
   return (
-    <motion.div
-      ref={ref}
-      initial="hidden"
-      animate={isInView ? "visible" : "hidden"}
-      variants={staggerContainer}
-      className="text-center mb-12 md:mb-24"
-    >
-      <motion.div variants={fadeInUp} className="inline-flex items-center gap-3 mb-5 px-5 py-2 rounded-full bg-gray-50">
-        <span className="w-2 h-2 rounded-full bg-black animate-pulse" />
-        <span
-          className="tracking-[0.3em] uppercase text-gray-600"
-          style={{ fontFamily: "Georgia, serif", fontSize: "10px", fontWeight: 500 }}
-        >
-          Simple Process
-        </span>
-      </motion.div>
-
-      <motion.h2
-        variants={fadeInUp}
-        className="text-black mb-4 px-4"
-        style={{
-          fontFamily: 'Georgia, "Times New Roman", serif',
-          fontWeight: 300,
-          fontSize: "clamp(2rem, 7vw, 2.5rem)",
-          lineHeight: 1.15,
-          letterSpacing: "-0.02em",
-        }}
-      >
-        How It Works
-      </motion.h2>
-
-      <motion.p
-        variants={fadeInUp}
-        className="text-gray-500 px-6 max-w-sm mx-auto leading-relaxed"
-        style={{ fontSize: "15px" }}
-      >
-        Four simple steps from booking to brilliance
-      </motion.p>
-    </motion.div>
-  )
-})
-
-// ── Progress Ring Component ────────────────────────────────
-const ProgressRing = memo(function ProgressRing({ progress, size = 48 }) {
-  const radius = (size - 4) / 2
-  const circumference = radius * 2 * Math.PI
-  const offset = circumference - (progress / 100) * circumference
-
-  return (
-    <svg width={size} height={size} className="transform -rotate-90">
-      <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={radius}
-        stroke="currentColor"
-        strokeWidth="2"
-        fill="none"
-        className="text-white/10"
-      />
-      <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={radius}
-        stroke="currentColor"
-        strokeWidth="2"
-        fill="none"
-        strokeDasharray={circumference}
-        strokeDashoffset={offset}
-        className="text-white transition-all duration-100 ease-linear"
-        strokeLinecap="round"
-      />
+    <svg width={size} height={size} className="-rotate-90" aria-hidden="true">
+      <circle cx={size / 2} cy={size / 2} r={r} strokeWidth={2}
+        fill="none" stroke="rgba(255,255,255,0.12)" />
+      <circle cx={size / 2} cy={size / 2} r={r} strokeWidth={2}
+        fill="none" stroke="white" strokeLinecap="round"
+        strokeDasharray={circ}
+        strokeDashoffset={circ - (progress / 100) * circ}
+        className="transition-[stroke-dashoffset] duration-75 ease-linear" />
     </svg>
   )
 })
 
-// ── Mobile Step Card Component ─────────────────────────────
-const MobileStepCard = memo(function MobileStepCard({ step, isActive, progress }) {
-  const Icon = step.icon
-
-  if (!isActive) return null
-
+// ── Dot nav ────────────────────────────────────────────────
+function DotNav({ count, active, onSelect, light }) {
   return (
-    <motion.div
-      key={step.id}
-      variants={{
-        enter: { x: 300, opacity: 0 },
-        center: { x: 0, opacity: 1 },
-        exit: { x: -300, opacity: 0 }
-      }}
-      initial="enter"
-      animate="center"
-      exit="exit"
-      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-      className="relative w-full"
-    >
-      {/* Main black card */}
-      <div className="relative bg-black rounded-[2rem] overflow-hidden aspect-[4/5]">
-        {/* Background patterns */}
-        <div className="absolute inset-0" aria-hidden="true">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full blur-3xl" />
-          <div
-            className="absolute inset-0 opacity-[0.03]"
-            style={{
-              backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 30px, rgba(255,255,255,0.1) 30px, rgba(255,255,255,0.1) 31px)`,
-            }}
-          />
-        </div>
+    <div className="flex items-center gap-2">
+      {Array.from({ length: count }).map((_, i) => (
+        <button
+          key={i}
+          onClick={() => onSelect(i)}
+          aria-label={`Go to step ${i + 1}`}
+          className={`h-1.5 rounded-full transition-all duration-400
+                      ${i === active
+                        ? `w-8 ${light ? "bg-white" : "bg-black"}`
+                        : `w-1.5 ${light ? "bg-white/30 hover:bg-white/50" : "bg-gray-200 hover:bg-gray-400"}`}`}
+        />
+      ))}
+    </div>
+  )
+}
 
-        {/* Progress indicator */}
-        <div className="absolute top-4 right-4 z-20">
+// ── StatCard ───────────────────────────────────────────────
+function StatCard({ value, label, dark }) {
+  return (
+    <div className={`rounded-2xl p-4 border text-center
+                     ${dark
+                       ? "bg-white/5 border-white/10"
+                       : "bg-gray-50 border-gray-100 hover:shadow-md hover:-translate-y-0.5 transition-all duration-300"}`}>
+      <p className={`mb-1 ${dark ? "text-white" : "text-black"}`}
+        style={{ fontFamily: SERIF, fontSize: "18px", fontWeight: 400 }}>
+        {value}
+      </p>
+      <p className={`tracking-wider uppercase ${dark ? "text-white/40" : "text-gray-400"}`}
+        style={{ fontSize: "9px" }}>
+        {label}
+      </p>
+    </div>
+  )
+}
+
+// ── Black showcase card (shared mobile + desktop) ──────────
+function ShowcaseCard({ step, progress, showProgress }) {
+  const Icon = step.icon
+  return (
+    <div className="relative bg-black rounded-[2rem] overflow-hidden w-full h-full">
+      {/* Atmosphere */}
+      <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full blur-3xl" />
+        <div className="absolute inset-0 opacity-[0.025]"
+          style={{
+            backgroundImage:
+              "repeating-linear-gradient(45deg,transparent,transparent 40px,rgba(255,255,255,0.1) 40px,rgba(255,255,255,0.1) 41px)",
+          }} />
+        <div className="absolute inset-0"
+          style={{ background: "radial-gradient(circle at 50% 35%,rgba(255,255,255,0.08),transparent 65%)" }} />
+      </div>
+
+      {/* Progress ring */}
+      {showProgress && (
+        <div className="absolute top-5 right-5 z-20">
           <div className="relative">
-            <ProgressRing progress={progress} size={40} />
+            <ProgressRing progress={progress} size={42} />
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-white text-xs font-medium">{step.number}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="relative z-10 h-full flex flex-col p-6">
-          {/* Top section */}
-          <div className="flex-1 flex flex-col items-center justify-center text-center">
-            <div
-              className="w-20 h-20 rounded-2xl bg-white flex items-center justify-center mb-6 shadow-2xl"
-              style={{ boxShadow: "0 25px 60px -15px rgba(255,255,255,0.25)" }}
-            >
-              <Icon size={32} strokeWidth={1.5} className="text-black" />
-            </div>
-
-            <span
-              className="text-white/[0.08] mb-4"
-              style={{
-                fontFamily: "Georgia, serif",
-                fontSize: "90px",
-                fontWeight: 300,
-                lineHeight: 0.85,
-              }}
-            >
-              {step.number}
-            </span>
-
-            <h3
-              className="text-white mb-3 px-2"
-              style={{
-                fontFamily: 'Georgia, "Times New Roman", serif',
-                fontSize: "26px",
-                fontWeight: 400,
-                letterSpacing: "-0.01em",
-                lineHeight: 1.2,
-              }}
-            >
-              {step.title}
-            </h3>
-
-            <p className="text-white/50 px-4 leading-relaxed" style={{ fontSize: "14px" }}>
-              {step.description}
-            </p>
-          </div>
-
-          {/* Bottom section */}
-          <div className="mt-auto">
-            <button className="w-full py-4 bg-white/10 backdrop-blur-sm rounded-2xl 
-                             text-white/60 text-sm tracking-wider uppercase
-                             hover:bg-white/20 active:bg-white/30 transition-colors duration-300">
-              Learn More
-            </button>
-
-            <div className="flex items-center justify-center gap-2 mt-4">
-              <span className="text-white/30 text-xs tracking-wider uppercase">
-                Swipe to explore
+              <span className="text-white font-medium" style={{ fontSize: "11px" }}>
+                {step.number}
               </span>
             </div>
           </div>
         </div>
+      )}
 
-        {/* Glow effect */}
-        <div
-          className="absolute inset-0 opacity-50 pointer-events-none"
-          style={{
-            background: "radial-gradient(circle at 50% 30%, rgba(255,255,255,0.1), transparent 60%)",
-          }}
+      {/* Content */}
+      <div className="relative z-10 h-full flex flex-col items-center justify-center p-8 text-center">
+        <motion.div
+          key={step.id + "-icon"}
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 0.4, delay: 0.15 }}
+          className="w-20 h-20 rounded-2xl bg-white flex items-center justify-center mb-6 shadow-2xl"
+          style={{ boxShadow: "0 24px 60px -12px rgba(255,255,255,0.25)" }}
+        >
+          <Icon size={34} strokeWidth={1.5} className="text-black" />
+        </motion.div>
+
+        <motion.span
+          key={step.id + "-num"}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.4, delay: 0.2 }}
+          className="text-white/[0.07] block mb-3 leading-none select-none"
+          style={{ fontFamily: SERIF, fontSize: "clamp(80px,16vw,110px)", fontWeight: 300 }}
           aria-hidden="true"
-        />
+        >
+          {step.number}
+        </motion.span>
+
+        <motion.h3
+          key={step.id + "-title"}
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, delay: 0.25 }}
+          className="text-white mb-3 px-2"
+          style={{ fontFamily: SERIF, fontWeight: 400, fontSize: "clamp(22px,4vw,28px)", letterSpacing: "-0.01em", lineHeight: 1.2 }}
+        >
+          {step.title}
+        </motion.h3>
+
+        <motion.p
+          key={step.id + "-desc"}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.4, delay: 0.35 }}
+          className="text-white/45 leading-relaxed max-w-xs"
+          style={{ fontSize: "13px" }}
+        >
+          {step.description}
+        </motion.p>
       </div>
-    </motion.div>
+    </div>
   )
-})
+}
 
-// ── Cool Mobile Carousel (FIXED) ───────────────────────────
-const MobileStepCarousel = memo(function MobileStepCarousel() {
-  const [activeIndex, setActiveIndex] = useState(0)
-  const [progress, setProgress] = useState(0)
-  const [touchStart, setTouchStart] = useState(0)
-  const [touchEnd, setTouchEnd] = useState(0)
-  const [isMounted, setIsMounted] = useState(false)
-  
-  const containerRef = useRef(null)
-  const intervalRef = useRef(null)
-  const progressRef = useRef(null)
+// ── Step pill (list item) ──────────────────────────────────
+function StepPill({ step, isActive, onClick, light }) {
+  const Icon = step.icon
+  return (
+    <motion.button
+      whileTap={{ scale: 0.97 }}
+      onClick={onClick}
+      className={`w-full p-4 rounded-2xl flex items-center gap-4 text-left
+                  transition-all duration-400
+                  ${isActive
+                    ? light
+                      ? "bg-white text-black shadow-lg"
+                      : "bg-black text-white shadow-lg scale-[1.02]"
+                    : light
+                      ? "bg-white/5 text-white hover:bg-white/10"
+                      : "bg-gray-50 text-gray-900 hover:bg-gray-100"}`}
+    >
+      <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0
+                       transition-colors duration-300
+                       ${isActive
+                         ? light ? "bg-black text-white" : "bg-white text-black"
+                         : light ? "bg-white/10 text-white" : "bg-white text-gray-700"}`}>
+        <Icon size={18} strokeWidth={1.5} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className={`leading-tight truncate ${isActive
+            ? light ? "text-black" : "text-white"
+            : light ? "text-white/80" : "text-gray-900"}`}
+          style={{ fontFamily: SERIF, fontSize: "14px", fontWeight: 400 }}>
+          {step.title}
+        </p>
+        <span className={`tracking-wider uppercase ${isActive
+            ? light ? "text-black/40" : "text-white/50"
+            : "text-gray-400"}`}
+          style={{ fontSize: "9px" }}>
+          Step {step.number}
+        </span>
+      </div>
+      {isActive && (
+        <ChevronRight size={15} strokeWidth={2}
+          className={light ? "text-black shrink-0" : "text-white shrink-0"} />
+      )}
+    </motion.button>
+  )
+}
 
-  // Ensure component is mounted
-  useEffect(() => {
-    setIsMounted(true)
-    return () => {
-      setIsMounted(false)
-      if (intervalRef.current) clearInterval(intervalRef.current)
-      if (progressRef.current) clearInterval(progressRef.current)
-    }
+// ── Mobile carousel ────────────────────────────────────────
+const MobileCarousel = memo(function MobileCarousel() {
+  const [index, setIndex]   = useState(0)
+  const [dir, setDir]       = useState(1)
+  const [paused, setPaused] = useState(false)
+
+  const advance = useCallback(() => {
+    setDir(1)
+    setIndex(i => (i + 1) % STEPS.length)
   }, [])
 
-  // Handle touch events
-  const handleTouchStart = useCallback((e) => {
-    setTouchStart(e.targetTouches[0].clientX)
-  }, [])
+  const progress = useAutoPlay({ length: STEPS.length, paused, onAdvance: advance })
 
-  const handleTouchMove = useCallback((e) => {
-    setTouchEnd(e.targetTouches[0].clientX)
-  }, [])
+  const go = useCallback((next) => {
+    setDir(next > index ? 1 : -1)
+    setIndex(next)
+  }, [index])
 
-  const handleTouchEnd = useCallback(() => {
-    if (!touchStart || !touchEnd) return
-    
-    const distance = touchStart - touchEnd
-    const isLeftSwipe = distance > 50
-    const isRightSwipe = distance < -50
-
-    if (isLeftSwipe && activeIndex < STEPS.length - 1) {
-      setActiveIndex(prev => prev + 1)
-      setProgress(0)
-    }
-    if (isRightSwipe && activeIndex > 0) {
-      setActiveIndex(prev => prev - 1)
-      setProgress(0)
-    }
-  }, [touchStart, touchEnd, activeIndex])
-
-  // Auto-play functionality - FIXED
-  useEffect(() => {
-    if (!isMounted) return
-
-    // Clear existing intervals
-    if (intervalRef.current) clearInterval(intervalRef.current)
-    if (progressRef.current) clearInterval(progressRef.current)
-
-    // Progress animation
-    progressRef.current = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 100) return 0
-        return prev + 2 // 2% every 80ms = 100% in 4 seconds
-      })
-    }, 80)
-
-    // Step change
-    intervalRef.current = setInterval(() => {
-      setActiveIndex(prev => (prev + 1) % STEPS.length)
-      setProgress(0)
-    }, AUTO_PLAY_INTERVAL)
-
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current)
-      if (progressRef.current) clearInterval(progressRef.current)
-    }
-  }, [activeIndex, isMounted])
-
-  // Handle manual navigation
-  const goToStep = useCallback((index) => {
-    setActiveIndex(index)
-    setProgress(0)
-  }, [])
-
-  if (!isMounted) return null
+  // Swipe support
+  const dragRef = useRef({ start: 0 })
+  const onTouchStart = useCallback(e => { dragRef.current.start = e.touches[0].clientX }, [])
+  const onTouchEnd   = useCallback(e => {
+    const dx = dragRef.current.start - e.changedTouches[0].clientX
+    if (Math.abs(dx) < 50) return
+    if (dx > 0 && index < STEPS.length - 1) go(index + 1)
+    if (dx < 0 && index > 0)                go(index - 1)
+  }, [index, go])
 
   return (
-    <div className="md:hidden" ref={containerRef}>
-      {/* Main Card Viewer */}
-      <div className="relative px-5 mb-8">
-        <div 
-          className="relative touch-pan-y"
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-        >
-          <AnimatePresence mode="wait">
-            <MobileStepCard
-              key={STEPS[activeIndex].id}
-              step={STEPS[activeIndex]}
-              isActive={true}
-              progress={progress}
-            />
-          </AnimatePresence>
-        </div>
-
-        {/* Swipe hint dots */}
-        <div className="absolute left-1/2 bottom-[-20px] -translate-x-1/2 flex gap-2">
-          {STEPS.map((_, i) => (
-            <button
-              key={`dot-${i}`}
-              onClick={() => goToStep(i)}
-              className={`h-1.5 rounded-full transition-all duration-500 ${
-                i === activeIndex ? "w-8 bg-black" : "w-1.5 bg-gray-300"
-              }`}
-              aria-label={`Go to step ${i + 1}`}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Compact step list below */}
-      <div className="px-5 space-y-3 mt-12">
-        {STEPS.map((step, i) => {
-          const Icon = step.icon
-          const isActive = i === activeIndex
-
-          return (
-            <motion.button
-              key={step.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: i * 0.1 }}
-              onClick={() => goToStep(i)}
-              className={`w-full p-4 rounded-2xl flex items-center gap-4 text-left
-                       transition-all duration-500 ${
-                         isActive
-                           ? "bg-black text-white shadow-lg scale-[1.02]"
-                           : "bg-gray-50 text-gray-900"
-                       }`}
-            >
-              <div
-                className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
-                  isActive ? "bg-white text-black" : "bg-white text-gray-900"
-                }`}
-              >
-                <Icon size={20} strokeWidth={1.5} />
-              </div>
-              <div className="flex-1">
-                <p
-                  className={`text-sm mb-0.5 ${isActive ? "text-white" : "text-gray-900"}`}
-                  style={{ fontFamily: "Georgia, serif", fontWeight: 400 }}
-                >
-                  {step.title}
-                </p>
-                <span
-                  className={`text-xs tracking-wider uppercase ${
-                    isActive ? "text-white/50" : "text-gray-400"
-                  }`}
-                >
-                  Step {step.number}
-                </span>
-              </div>
-              {isActive && (
-                <ChevronRight size={18} strokeWidth={2} className="text-white shrink-0" />
-              )}
-            </motion.button>
-          )
-        })}
-      </div>
-
-      {/* Stats grid */}
-      <div className="grid grid-cols-3 gap-3 mt-10 mx-5">
-        {STATS.map((stat, i) => (
+    <div className="md:hidden px-4">
+      {/* Showcase card */}
+      <div
+        className="relative aspect-[4/5] mb-10 touch-pan-y"
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+      >
+        <AnimatePresence custom={dir} mode="wait">
           <motion.div
-            key={`stat-${i}`}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5, delay: 0.8 + i * 0.1 }}
-            className="bg-gradient-to-br from-gray-50 to-white rounded-2xl p-4 
-                     border border-gray-100 text-center"
+            key={STEPS[index].id}
+            custom={dir}
+            variants={cardSlide}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            className="absolute inset-0"
           >
-            <p
-              className="text-black mb-1"
-              style={{ fontFamily: "Georgia, serif", fontSize: "20px", fontWeight: 400 }}
-            >
-              {stat.value}
-            </p>
-            <p className="text-gray-400 text-xs tracking-wider uppercase">{stat.label}</p>
+            <ShowcaseCard step={STEPS[index]} progress={progress} showProgress />
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      {/* Dot nav */}
+      <div className="flex justify-center mb-8">
+        <DotNav count={STEPS.length} active={index} onSelect={go} />
+      </div>
+
+      {/* Step pills */}
+      <div className="space-y-2 mb-8">
+        {STEPS.map((step, i) => (
+          <motion.div
+            key={step.id}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, delay: i * 0.07 }}
+          >
+            <StepPill step={step} isActive={i === index} onClick={() => go(i)} />
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-2">
+        {STATS.map((s, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, scale: 0.92 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.45, delay: 0.5 + i * 0.08 }}
+          >
+            <StatCard value={s.value} label={s.label} />
           </motion.div>
         ))}
       </div>
@@ -472,387 +383,242 @@ const MobileStepCarousel = memo(function MobileStepCarousel() {
   )
 })
 
-// ── Desktop Step Viewer (keeping the cool one) ────────────
-const DesktopStepViewer = memo(function DesktopStepViewer() {
-  const [activeIndex, setActiveIndex] = useState(0)
-  const [progress, setProgress] = useState(0)
-  const [isPaused, setIsPaused] = useState(false)
-  const [isMounted, setIsMounted] = useState(false)
-  
-  const intervalRef = useRef(null)
-  const progressRef = useRef(null)
+// ── Desktop viewer ─────────────────────────────────────────
+const DesktopViewer = memo(function DesktopViewer() {
+  const [index, setIndex]   = useState(0)
+  const [dir, setDir]       = useState(1)
+  const [paused, setPaused] = useState(false)
 
-  const activeStep = STEPS[activeIndex]
-  const Icon = activeStep.icon
-
-  // Ensure component is mounted
-  useEffect(() => {
-    setIsMounted(true)
-    return () => {
-      setIsMounted(false)
-      if (intervalRef.current) clearInterval(intervalRef.current)
-      if (progressRef.current) clearInterval(progressRef.current)
-    }
+  const advance = useCallback(() => {
+    setDir(1)
+    setIndex(i => (i + 1) % STEPS.length)
   }, [])
 
-  const nextStep = useCallback(() => {
-    setActiveIndex((prev) => (prev + 1) % STEPS.length)
-    setProgress(0)
+  const progress = useAutoPlay({ length: STEPS.length, paused, onAdvance: advance })
+
+  const go = useCallback((next) => {
+    setDir(next >= index ? 1 : -1)
+    setIndex(next)
+  }, [index])
+
+  const prev = useCallback(() => {
+    setDir(-1)
+    setIndex(i => (i - 1 + STEPS.length) % STEPS.length)
   }, [])
 
-  const prevStep = useCallback(() => {
-    setActiveIndex((prev) => (prev - 1 + STEPS.length) % STEPS.length)
-    setProgress(0)
+  const next = useCallback(() => {
+    setDir(1)
+    setIndex(i => (i + 1) % STEPS.length)
   }, [])
 
-  const goToStep = useCallback((index) => {
-    setActiveIndex(index)
-    setProgress(0)
-  }, [])
-
-  // Auto-play functionality - FIXED
-  useEffect(() => {
-    if (isPaused || !isMounted) return
-
-    // Clear existing intervals
-    if (intervalRef.current) clearInterval(intervalRef.current)
-    if (progressRef.current) clearInterval(progressRef.current)
-
-    // Progress animation
-    progressRef.current = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 100) return 0
-        return prev + 2
-      })
-    }, 80)
-
-    // Step change
-    intervalRef.current = setInterval(nextStep, AUTO_PLAY_INTERVAL)
-
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current)
-      if (progressRef.current) clearInterval(progressRef.current)
-    }
-  }, [isPaused, activeIndex, nextStep, isMounted])
-
-  if (!isMounted) return null
+  const step = STEPS[index]
 
   return (
-    <div 
+    <div
       className="hidden md:block"
-      onMouseEnter={() => setIsPaused(true)}
-      onMouseLeave={() => setIsPaused(false)}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
     >
-      {/* Main Stage */}
-      <div className="relative">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeStep.id}
-            variants={slideIn}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            className="grid md:grid-cols-2 gap-8 lg:gap-16 items-center"
-          >
-            {/* Left: Visual */}
-            <div className="relative">
-              <div className="aspect-square rounded-[3rem] bg-black overflow-hidden relative group">
-                {/* Background patterns */}
-                <div className="absolute inset-0" aria-hidden="true">
-                  <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl 
-                                group-hover:scale-110 transition-transform duration-1000" />
-                  <div className="absolute bottom-0 left-0 w-80 h-80 bg-white/5 rounded-full blur-3xl
-                                group-hover:scale-110 transition-transform duration-1000" />
-                  <div
-                    className="absolute inset-0 opacity-[0.03]"
-                    style={{
-                      backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 40px, rgba(255,255,255,0.1) 40px, rgba(255,255,255,0.1) 41px)`,
-                    }}
-                  />
-                </div>
+      <AnimatePresence custom={dir} mode="wait">
+        <motion.div
+          key={step.id}
+          custom={dir}
+          variants={desktopSlide}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+          className="grid md:grid-cols-2 gap-10 lg:gap-20 items-center"
+        >
+          {/* Left: showcase card */}
+          <div className="aspect-square">
+            <ShowcaseCard step={step} progress={progress} showProgress={!paused} />
+          </div>
 
-                {/* Content */}
-                <div className="relative z-10 h-full flex flex-col items-center justify-center p-12">
-                  <motion.div
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ duration: 0.5, delay: 0.2 }}
-                    className="w-24 h-24 rounded-3xl bg-white flex items-center justify-center mb-8 shadow-2xl
-                             group-hover:scale-110 transition-transform duration-500"
-                    style={{ boxShadow: "0 30px 70px -15px rgba(255,255,255,0.3)" }}
-                  >
-                    <Icon size={40} strokeWidth={1.5} className="text-black" />
-                  </motion.div>
-
-                  <motion.span
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.5, delay: 0.3 }}
-                    className="text-white/10 mb-6"
-                    style={{
-                      fontFamily: "Georgia, serif",
-                      fontSize: "120px",
-                      fontWeight: 300,
-                      lineHeight: 0.85,
-                    }}
-                  >
-                    {activeStep.number}
-                  </motion.span>
-
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: 0.4 }}
-                    className="text-center"
-                  >
-                    <h3
-                      className="text-white mb-3"
-                      style={{
-                        fontFamily: 'Georgia, "Times New Roman", serif',
-                        fontSize: "32px",
-                        fontWeight: 400,
-                        letterSpacing: "-0.01em",
-                      }}
-                    >
-                      {activeStep.title}
-                    </h3>
-                    <p className="text-white/50 max-w-sm mx-auto" style={{ fontSize: "15px" }}>
-                      {activeStep.detail}
-                    </p>
-                  </motion.div>
-                </div>
-
-                {/* Glow effect */}
-                <div
-                  className="absolute inset-0 opacity-50 group-hover:opacity-70 transition-opacity duration-1000"
-                  style={{
-                    background: "radial-gradient(circle at 50% 50%, rgba(255,255,255,0.1), transparent 70%)",
-                  }}
-                  aria-hidden="true"
-                />
-
-                {/* Auto-play indicator */}
-                {!isPaused && (
-                  <div className="absolute top-6 right-6">
-                    <div className="relative">
-                      <ProgressRing progress={progress} size={48} />
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-white text-xs font-medium">{activeIndex + 1}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Paused indicator */}
-                {isPaused && (
-                  <div className="absolute top-6 right-6 bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-full">
-                    <span className="text-white/60 text-xs tracking-wider uppercase">Paused</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Right: Info */}
-            <div className="space-y-8">
-              <div>
-                <div className="flex items-center gap-3 mb-4">
-                  <span
-                    className="text-black/20"
-                    style={{ fontFamily: "Georgia, serif", fontSize: "14px", fontWeight: 500 }}
-                  >
-                    STEP {activeStep.number}
-                  </span>
-                  <div className="h-px flex-1 bg-gray-200" />
-                </div>
-
-                <h3
-                  className="text-black mb-5"
-                  style={{
-                    fontFamily: 'Georgia, "Times New Roman", serif',
-                    fontSize: "clamp(2rem, 4vw, 3rem)",
-                    fontWeight: 400,
-                    letterSpacing: "-0.02em",
-                    lineHeight: 1.2,
-                  }}
-                >
-                  {activeStep.title}
-                </h3>
-
-                <p
-                  className="text-gray-600 leading-relaxed max-w-md"
-                  style={{ fontSize: "17px" }}
-                >
-                  {activeStep.description}
-                </p>
-              </div>
-
-              {/* Navigation */}
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={prevStep}
-                  className="w-12 h-12 rounded-full border-2 border-gray-200 flex items-center justify-center
-                           hover:border-black hover:bg-black hover:text-white transition-all duration-300"
-                  aria-label="Previous step"
-                >
-                  <ChevronLeft size={20} strokeWidth={2} />
-                </button>
-
-                <div className="flex gap-2">
-                  {STEPS.map((_, i) => (
-                    <button
-                      key={`nav-${i}`}
-                      onClick={() => goToStep(i)}
-                      className={`h-1.5 rounded-full transition-all duration-500 ${
-                        i === activeIndex ? "w-12 bg-black" : "w-1.5 bg-gray-200 hover:bg-gray-300"
-                      }`}
-                      aria-label={`Go to step ${i + 1}`}
-                    />
-                  ))}
-                </div>
-
-                <button
-                  onClick={nextStep}
-                  className="w-12 h-12 rounded-full bg-black text-white flex items-center justify-center
-                           hover:bg-gray-800 hover:scale-110 transition-all duration-300"
-                  aria-label="Next step"
-                >
-                  <ChevronRight size={20} strokeWidth={2} />
-                </button>
-              </div>
-
-              {/* Quick stats */}
-              <div className="grid grid-cols-3 gap-4 pt-8">
-                {STATS.map((stat, i) => (
-                  <div
-                    key={`stat-desktop-${i}`}
-                    className="bg-gradient-to-br from-gray-50 to-white rounded-2xl p-4 border border-gray-100
-                             hover:shadow-md hover:-translate-y-0.5 transition-all duration-300"
-                  >
-                    <p
-                      className="text-black mb-1"
-                      style={{ fontFamily: "Georgia, serif", fontSize: "18px", fontWeight: 400 }}
-                    >
-                      {stat.value}
-                    </p>
-                    <p className="text-gray-400 text-xs tracking-wider uppercase">{stat.label}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </motion.div>
-        </AnimatePresence>
-      </div>
-
-      {/* Bottom step thumbnails */}
-      <div className="grid grid-cols-4 gap-4 mt-12">
-        {STEPS.map((step, i) => {
-          const Icon = step.icon
-          const isActive = i === activeIndex
-
-          return (
-            <button
-              key={`thumb-${step.id}`}
-              onClick={() => goToStep(i)}
-              className={`relative rounded-2xl p-6 text-left transition-all duration-500
-                       ${
-                         isActive
-                           ? "bg-black text-white shadow-xl scale-105"
-                           : "bg-gray-50 text-gray-900 hover:bg-gray-100 hover:scale-[1.02]"
-                       }`}
-            >
-              <div
-                className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 transition-all duration-300 ${
-                  isActive ? "bg-white text-black" : "bg-white/80 text-gray-900"
-                }`}
-              >
-                <Icon size={18} strokeWidth={1.5} />
-              </div>
-              <p
-                className={`text-sm mb-1 ${isActive ? "text-white" : "text-gray-900"}`}
-                style={{ fontFamily: "Georgia, serif", fontWeight: 400 }}
-              >
-                {step.title}
-              </p>
-              <span
-                className={`text-xs tracking-wider uppercase ${
-                  isActive ? "text-white/50" : "text-gray-400"
-                }`}
-              >
-                Step {step.number}
+          {/* Right: content */}
+          <div>
+            {/* Step label */}
+            <div className="flex items-center gap-3 mb-5">
+              <span className="text-black/25 tracking-wider uppercase"
+                style={{ fontFamily: SERIF, fontSize: "11px" }}>
+                STEP {step.number}
               </span>
+              <div className="h-px flex-1 bg-gray-100" aria-hidden="true" />
+              {/* Pause/play indicator */}
+              <div className={`flex items-center gap-1.5 transition-opacity duration-300 ${paused ? "opacity-100" : "opacity-0"}`}>
+                <Pause size={10} className="text-gray-300" />
+                <span className="text-gray-300 tracking-wider uppercase" style={{ fontSize: "9px" }}>Paused</span>
+              </div>
+            </div>
 
-              {isActive && (
-                <motion.div
-                  layoutId="activeIndicator"
-                  className="absolute inset-0 rounded-2xl border-2 border-white/20"
-                  aria-hidden="true"
-                />
-              )}
-            </button>
-          )
-        })}
+            <h3
+              className="text-black mb-5 leading-tight"
+              style={{
+                fontFamily: SERIF, fontWeight: 400,
+                fontSize: "clamp(1.9rem, 4vw, 2.8rem)",
+                letterSpacing: "-0.025em", lineHeight: 1.1,
+              }}
+            >
+              {step.title}
+            </h3>
+
+            <p className="text-gray-500 leading-relaxed mb-10 max-w-md"
+              style={{ fontSize: "16px" }}>
+              {step.description}
+            </p>
+
+            {/* Nav controls */}
+            <div className="flex items-center gap-4 mb-10">
+              <motion.button
+                whileTap={{ scale: 0.9 }}
+                onClick={prev}
+                aria-label="Previous step"
+                className="w-11 h-11 rounded-full border-2 border-gray-200 flex items-center justify-center
+                           hover:border-black hover:bg-black hover:text-white
+                           transition-all duration-300"
+              >
+                <ChevronLeft size={18} strokeWidth={2} />
+              </motion.button>
+
+              <DotNav count={STEPS.length} active={index} onSelect={go} />
+
+              <motion.button
+                whileTap={{ scale: 0.9 }}
+                onClick={next}
+                aria-label="Next step"
+                className="w-11 h-11 rounded-full bg-black text-white flex items-center justify-center
+                           hover:bg-gray-800 hover:scale-105 transition-all duration-300"
+              >
+                <ChevronRight size={18} strokeWidth={2} />
+              </motion.button>
+            </div>
+
+            {/* Stats */}
+            <div className="grid grid-cols-3 gap-3">
+              {STATS.map((s, i) => (
+                <StatCard key={i} value={s.value} label={s.label} />
+              ))}
+            </div>
+          </div>
+        </motion.div>
+      </AnimatePresence>
+
+      {/* Step thumbnail strip */}
+      <div className="grid grid-cols-4 gap-3 mt-14">
+        {STEPS.map((s, i) => (
+          <motion.div
+            key={s.id}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, delay: i * 0.08 }}
+          >
+            <StepPill step={s} isActive={i === index} onClick={() => go(i)} />
+          </motion.div>
+        ))}
       </div>
 
-      {/* Auto-play hint */}
-      <div className="text-center mt-6">
-        <p className="text-gray-400 text-sm">
-          {isPaused ? "Hover away to resume" : "Hover to pause • Auto-playing every 4 seconds"}
-        </p>
-      </div>
+      <p className="text-center text-gray-300 mt-5" style={{ fontSize: "11px" }}>
+        Hover to pause · auto-advances every 4s
+      </p>
     </div>
   )
 })
 
-// ── CTA Section ────────────────────────────────────────────
-const CTASection = memo(function CTASection() {
-  const ref = useRef(null)
-  const isInView = useInView(ref, { once: true, margin: "-100px" })
+// ── Section header ─────────────────────────────────────────
+const SectionHeader = memo(function SectionHeader() {
+  const ref    = useRef(null)
+  const inView = useInView(ref, { once: true, margin: "-80px" })
 
   return (
     <motion.div
       ref={ref}
-      initial={{ opacity: 0, y: 30 }}
-      animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
-      transition={{ duration: 0.6, delay: 0.3 }}
-      className="mt-12 md:mt-24 text-center"
+      variants={stagger}
+      initial="hidden"
+      animate={inView ? "visible" : "hidden"}
+      className="mb-12 md:mb-20"
+    >
+      <motion.div variants={fadeLeft} className="flex items-center gap-4 mb-5">
+        <span className="block w-10 h-px bg-black" aria-hidden="true" />
+        <span className="tracking-[0.4em] uppercase text-gray-400"
+          style={{ fontFamily: SERIF, fontSize: "10px" }}>
+          Simple Process
+        </span>
+      </motion.div>
+
+      <div className="md:flex md:items-end md:justify-between md:gap-10">
+        <motion.h2
+          variants={fadeUp}
+          id="how-it-works-heading"
+          className="text-black mb-3 md:mb-0"
+          style={{
+            fontFamily: SERIF, fontWeight: 300,
+            fontSize: "clamp(2rem, 7vw, 3.5rem)",
+            lineHeight: 1.05, letterSpacing: "-0.03em",
+          }}
+        >
+          How It Works
+        </motion.h2>
+
+        <motion.p
+          variants={fadeUp}
+          className="text-gray-400 max-w-xs leading-relaxed md:text-right"
+          style={{ fontSize: "14px" }}
+        >
+          Four simple steps from booking to a spotless result.
+        </motion.p>
+      </div>
+    </motion.div>
+  )
+})
+
+// ── CTA ────────────────────────────────────────────────────
+const CTA = memo(function CTA() {
+  const ref    = useRef(null)
+  const inView = useInView(ref, { once: true, margin: "-60px" })
+
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, y: 20 }}
+      animate={inView ? { opacity: 1, y: 0 } : {}}
+      transition={{ duration: 0.6, delay: 0.2 }}
+      className="mt-12 md:mt-20 flex justify-center"
     >
       <motion.a
         href="/bookings"
         whileHover={{ scale: 1.02, y: -2 }}
-        whileTap={{ scale: 0.98 }}
-        className="group inline-flex items-center gap-4 h-14 md:h-16 px-10 md:px-12
-                   bg-black text-white rounded-full
-                   hover:shadow-2xl hover:shadow-black/30
-                   transition-all duration-300 no-underline mx-5"
+        whileTap={{ scale: 0.97 }}
+        className="group inline-flex items-center gap-3 h-14 px-10
+                   bg-black text-white rounded-full no-underline
+                   hover:shadow-xl hover:shadow-black/15 transition-shadow duration-500 w-full sm:w-auto justify-center"
       >
-        <span
-          className="tracking-[0.15em] uppercase"
-          style={{ fontSize: "11px", fontWeight: 500 }}
-        >
+        <span className="tracking-wider uppercase"
+          style={{ fontSize: "11px", fontWeight: 500, letterSpacing: "0.14em" }}>
           Start Your First Booking
         </span>
-        <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center 
-                       group-hover:bg-white group-hover:text-black transition-all duration-300">
-          <ArrowRight size={16} strokeWidth={2} />
+        <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center
+                        group-hover:bg-white transition-colors duration-300">
+          <ArrowRight size={14} strokeWidth={2}
+            className="text-white group-hover:text-black transition-colors duration-300
+                       group-hover:translate-x-0.5 transition-transform" />
         </div>
       </motion.a>
     </motion.div>
   )
 })
 
-// ── Main Component ─────────────────────────────────────────
+// ── Main ───────────────────────────────────────────────────
 export default function HowItWorks() {
   return (
     <section
-      className="w-full bg-white py-16 md:py-36 lg:py-44 overflow-hidden"
+      className="w-full bg-white py-16 md:py-28 lg:py-36 overflow-hidden"
       style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
       aria-labelledby="how-it-works-heading"
     >
-      <div className="max-w-[1400px] mx-auto">
+      <div className="max-w-6xl mx-auto px-4 sm:px-8 md:px-12 lg:px-16">
         <SectionHeader />
-        <MobileStepCarousel />
-        <DesktopStepViewer />
-        <CTASection />
+        <MobileCarousel />
+        <DesktopViewer />
+        <CTA />
       </div>
     </section>
   )
