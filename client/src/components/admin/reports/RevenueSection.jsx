@@ -1,3 +1,4 @@
+// src/components/admin/reports/RevenueSection.jsx
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -6,6 +7,15 @@ import {
     CartesianGrid, Tooltip, ResponsiveContainer,
     ReferenceLine
 } from 'recharts';
+import {
+    TrendingUp,
+    TrendingDown,
+    BarChart3,
+    Zap,
+    ArrowUpRight,
+    ArrowDownRight,
+    Minus
+} from 'lucide-react';
 
 const formatCurrency = (value) => {
     if (value >= 10000000) return `₹${(value / 10000000).toFixed(1)}Cr`;
@@ -22,22 +32,22 @@ const CustomTooltip = ({ active, payload, label }) => {
     const change = data?.change || 0;
 
     return (
-        <div className="bg-[#0a0a0a] border border-white/[0.08] px-5 py-4 rounded-2xl shadow-2xl">
-            <div className="flex items-center gap-3 mb-3 pb-3 border-b border-white/[0.06]">
-                <div className="w-2 h-2 rounded-full bg-white/60" />
-                <p className="text-xs text-white/40 font-medium">{label}</p>
+        <div className="bg-black border border-white/[0.08] px-4 py-3 rounded-xl shadow-2xl">
+            <div className="flex items-center gap-2 mb-2 pb-2 border-b border-white/[0.06]">
+                <div className="w-1.5 h-1.5 rounded-full bg-white/60" />
+                <p className="text-[10px] text-gray-500 font-medium">{label}</p>
             </div>
-            <p className="text-2xl text-white font-bold">
+            <p className="text-lg font-bold text-white">
                 ₹{value.toLocaleString('en-IN')}
             </p>
             {change !== 0 && !isNaN(change) && (
-                <div className={`mt-3 inline-flex items-center gap-2 text-xs font-medium px-2.5 py-1 rounded-lg ${
-                    change > 0 
-                        ? 'bg-green-500/10 text-green-400' 
-                        : 'bg-red-500/10 text-red-400'
+                <div className={`mt-2 inline-flex items-center gap-1.5 text-[10px] font-medium px-2 py-0.5 rounded-lg ${
+                    change > 0
+                        ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
+                        : 'bg-red-500/15 text-red-400 border border-red-500/20'
                 }`}>
-                    <span>{change > 0 ? '↑' : '↓'}</span>
-                    <span>{Math.abs(change).toFixed(1)}%</span>
+                    {change > 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                    {Math.abs(change).toFixed(1)}%
                 </div>
             )}
         </div>
@@ -47,63 +57,24 @@ const CustomTooltip = ({ active, payload, label }) => {
 const CustomDot = (props) => {
     const { cx, cy, payload } = props;
     if (!payload?.isHighlight) return null;
-    
+
     return (
         <g>
-            <circle cx={cx} cy={cy} r={8} fill="rgba(255,255,255,0.06)" />
-            <circle cx={cx} cy={cy} r={4} fill="rgba(255,255,255,0.3)" />
-            <circle cx={cx} cy={cy} r={2} fill="rgba(255,255,255,0.9)" />
+            <circle cx={cx} cy={cy} r={8} fill="rgba(255,255,255,0.04)" />
+            <circle cx={cx} cy={cy} r={4} fill="rgba(255,255,255,0.2)" />
+            <circle cx={cx} cy={cy} r={2} fill="rgba(255,255,255,0.8)" />
         </g>
     );
 };
 
-const MetricCard = ({ label, value, subValue, trend, icon }) => (
-    <div className="relative group">
-        <div className="absolute inset-0 bg-white/[0.02] rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
-        <div className="relative p-4">
-            <div className="flex items-center justify-between mb-3">
-                <span className="text-lg">{icon}</span>
-                {trend !== undefined && trend !== 0 && !isNaN(trend) && (
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${
-                        trend > 0 
-                            ? 'bg-green-500/10 text-green-400/80' 
-                            : 'bg-red-500/10 text-red-400/80'
-                    }`}>
-                        {trend > 0 ? '+' : ''}{trend.toFixed(1)}%
-                    </span>
-                )}
-            </div>
-            <p className="text-lg font-semibold text-white mb-0.5">{value}</p>
-            <p className="text-[10px] text-white/30 uppercase tracking-wider">{label}</p>
-            {subValue && (
-                <p className="text-[10px] text-white/20 mt-1">{subValue}</p>
-            )}
-        </div>
-    </div>
-);
-
-const TimeRangeButton = ({ active, children, onClick }) => (
-    <button
-        onClick={onClick}
-        className={`px-3 py-1.5 text-[10px] font-medium rounded-lg transition-all ${
-            active 
-                ? 'bg-white/[0.08] text-white' 
-                : 'text-white/30 hover:text-white/50 hover:bg-white/[0.03]'
-        }`}
-    >
-        {children}
-    </button>
-);
-
 export default function RevenueSection({ data, loading, compact }) {
-    const [hoveredIndex, setHoveredIndex] = useState(null);
     const [showAvgLine, setShowAvgLine] = useState(true);
     const [selectedRange, setSelectedRange] = useState('all');
 
     const { chartData, stats } = useMemo(() => {
         if (!data || !Array.isArray(data) || data.length === 0) {
-            return { 
-                chartData: [], 
+            return {
+                chartData: [],
                 stats: {
                     totalRevenue: 0,
                     avgRevenue: 0,
@@ -113,13 +84,12 @@ export default function RevenueSection({ data, loading, compact }) {
                     growthRate: 0,
                     bestDay: null,
                     worstDay: null
-                } 
+                }
             };
         }
 
         const normalized = data.map((item, index) => {
             const revenue = item.revenue || item.total || item.amount || 0;
-            
             return {
                 label: item._id || item.date || item.label || item.period || `Day ${index + 1}`,
                 revenue,
@@ -140,15 +110,12 @@ export default function RevenueSection({ data, loading, compact }) {
         const revenues = normalized.map(d => d.revenue);
         const totalRevenue = revenues.reduce((sum, val) => sum + val, 0);
         const avgRevenue = normalized.length > 0 ? totalRevenue / normalized.length : 0;
-        
         const validRevenues = revenues.filter(r => r > 0);
         const maxRevenue = validRevenues.length > 0 ? Math.max(...validRevenues) : 0;
         const minRevenue = validRevenues.length > 0 ? Math.min(...validRevenues) : 0;
-        
-        // Find best and worst days
+
         const bestDay = normalized.find(d => d.revenue === maxRevenue);
-        const worstDay = normalized.find(d => d.revenue === minRevenue && minRevenue > 0);
-        
+
         if (maxRevenue > 0 || minRevenue > 0) {
             normalized.forEach((item) => {
                 if (item.revenue === maxRevenue || (item.revenue === minRevenue && minRevenue > 0)) {
@@ -162,10 +129,8 @@ export default function RevenueSection({ data, loading, compact }) {
             const midpoint = Math.floor(normalized.length / 2);
             const firstHalf = revenues.slice(0, midpoint);
             const secondHalf = revenues.slice(midpoint);
-            
             const firstAvg = firstHalf.length > 0 ? firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length : 0;
             const secondAvg = secondHalf.length > 0 ? secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length : 0;
-            
             trend = firstAvg > 0 ? ((secondAvg - firstAvg) / firstAvg) * 100 : 0;
         }
 
@@ -178,40 +143,36 @@ export default function RevenueSection({ data, loading, compact }) {
                 minRevenue,
                 trend,
                 growthRate: normalized[normalized.length - 1]?.change || 0,
-                bestDay,
-                worstDay
+                bestDay
             }
         };
     }, [data]);
 
+    // Loading State
     if (loading) {
         return (
-            <div className="bg-[#0a0a0a] border border-white/[0.06] rounded-2xl overflow-hidden">
-                {/* Header skeleton */}
-                <div className="p-6 border-b border-white/[0.04]">
-                    <div className="flex items-start justify-between">
-                        <div className="space-y-3">
-                            <div className="h-3 w-20 bg-white/[0.06] rounded animate-pulse" />
-                            <div className="h-8 w-40 bg-white/[0.06] rounded animate-pulse" />
-                        </div>
-                        <div className="flex gap-2">
-                            <div className="h-8 w-16 bg-white/[0.04] rounded-lg animate-pulse" />
-                            <div className="h-8 w-16 bg-white/[0.04] rounded-lg animate-pulse" />
+            <div className="bg-white/[0.02] border border-white/[0.08] rounded-xl sm:rounded-2xl overflow-hidden">
+                <div className="p-3 sm:p-4 border-b border-white/[0.06]">
+                    <div className="flex items-center gap-2 sm:gap-2.5">
+                        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white/[0.06] animate-pulse" />
+                        <div className="space-y-1.5">
+                            <div className="h-3 w-24 bg-white/[0.06] rounded animate-pulse" />
+                            <div className="h-2.5 w-16 bg-white/[0.04] rounded animate-pulse" />
                         </div>
                     </div>
                 </div>
-                {/* Chart skeleton */}
-                <div className="p-6">
+                <div className="p-4 sm:p-6">
                     <div className={`${compact ? 'h-48' : 'h-64'} bg-white/[0.02] rounded-xl animate-pulse`} />
                 </div>
-                {/* Stats skeleton */}
-                <div className="px-6 pb-6">
-                    <div className="grid grid-cols-4 gap-3">
-                        {[...Array(4)].map((_, i) => (
-                            <div key={i} className="h-24 bg-white/[0.02] rounded-xl animate-pulse" />
-                        ))}
+                {!compact && (
+                    <div className="px-4 sm:px-6 pb-4 sm:pb-6">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+                            {[...Array(4)].map((_, i) => (
+                                <div key={i} className="h-20 bg-white/[0.02] rounded-xl animate-pulse" />
+                            ))}
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
         );
     }
@@ -219,116 +180,106 @@ export default function RevenueSection({ data, loading, compact }) {
     const { totalRevenue, avgRevenue, trend, growthRate, maxRevenue, minRevenue, bestDay } = stats;
 
     return (
-        <div className="bg-[#0a0a0a] border border-white/[0.06] rounded-2xl overflow-hidden">
-            {/* Header Section */}
-            <div className="p-6 border-b border-white/[0.04]">
-                <div className="flex items-start justify-between gap-4 flex-wrap">
-                    {/* Left side - Title and main value */}
-                    <div className="flex-1 min-w-[200px]">
-                        <div className="flex items-center gap-2 mb-2">
-                            <span className="text-[10px] font-semibold text-white/40 uppercase tracking-[0.2em]">
-                                Revenue
-                            </span>
+        <div className="bg-white/[0.02] border border-white/[0.08] rounded-xl sm:rounded-2xl overflow-hidden">
+
+            {/* Header */}
+            <div className="flex items-center justify-between p-3 sm:p-4 border-b border-white/[0.06]">
+                <div className="flex items-center gap-2 sm:gap-2.5">
+                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white/[0.06] flex items-center justify-center">
+                        <BarChart3 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500" />
+                    </div>
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <p className="text-xs sm:text-sm font-medium text-white">Revenue</p>
                             {chartData.length > 0 && (
                                 <>
-                                    <span className="text-white/10">•</span>
-                                    <span className="text-[10px] text-white/25">
+                                    <span className="text-[8px] text-gray-700">•</span>
+                                    <span className="text-[10px] text-gray-600">
                                         {chartData.length} periods
                                     </span>
                                 </>
                             )}
                         </div>
-                        
-                        {totalRevenue > 0 ? (
-                            <div className="flex items-baseline gap-4">
-                                <h2 className="text-3xl font-bold text-white tracking-tight">
-                                    ₹{totalRevenue.toLocaleString('en-IN')}
-                                </h2>
+                        {totalRevenue > 0 && (
+                            <div className="flex items-center gap-2 mt-0.5">
+                                <p className="text-[10px] sm:text-xs text-gray-600 hidden sm:block">
+                                    ₹{totalRevenue.toLocaleString('en-IN')} total
+                                </p>
                                 {trend !== 0 && !isNaN(trend) && (
-                                    <div className={`flex items-center gap-1.5 text-sm font-medium ${
-                                        trend > 0 ? 'text-green-400/80' : 'text-red-400/80'
-                                    }`}>
-                                        <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${
-                                            trend > 0 ? 'bg-green-500/15' : 'bg-red-500/15'
-                                        }`}>
-                                            {trend > 0 ? '↑' : '↓'}
-                                        </span>
-                                        {Math.abs(trend).toFixed(1)}%
-                                    </div>
+                                    <span className={`
+                                        text-[9px] font-medium px-1.5 py-0.5 rounded
+                                        ${trend > 0
+                                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
+                                            : 'bg-red-500/15 text-red-400 border border-red-500/20'
+                                        }
+                                    `}>
+                                        {trend > 0 ? '+' : ''}{trend.toFixed(1)}%
+                                    </span>
                                 )}
                             </div>
-                        ) : (
-                            <h2 className="text-3xl font-bold text-white/20">—</h2>
                         )}
                     </div>
+                </div>
 
-                    {/* Right side - Controls */}
-                    <div className="flex items-center gap-3">
-                        {/* Average toggle */}
-                        <button
-                            onClick={() => setShowAvgLine(!showAvgLine)}
-                            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-medium transition-all border ${
-                                showAvgLine 
-                                    ? 'bg-white/[0.05] border-white/[0.08] text-white/70' 
-                                    : 'border-transparent text-white/30 hover:text-white/50'
-                            }`}
-                        >
-                            <div className={`w-3 h-0.5 border-t border-dashed ${
-                                showAvgLine ? 'border-white/40' : 'border-white/20'
-                            }`} />
-                            Avg Line
-                        </button>
+                {/* Controls */}
+                <div className="flex items-center gap-2">
+                    {/* Avg Line Toggle */}
+                    <button
+                        onClick={() => setShowAvgLine(!showAvgLine)}
+                        className={`
+                            hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[10px] font-medium transition-all
+                            ${showAvgLine
+                                ? 'border-white/[0.15] bg-white/[0.06] text-gray-300'
+                                : 'border-white/[0.08] bg-white/[0.02] text-gray-600 hover:text-gray-400'
+                            }
+                        `}
+                    >
+                        <div className={`w-3 h-0.5 border-t border-dashed ${showAvgLine ? 'border-gray-400' : 'border-gray-600'}`} />
+                        Avg
+                    </button>
 
-                        {/* Time range */}
-                        <div className="flex items-center bg-white/[0.03] rounded-xl p-1 border border-white/[0.04]">
-                            <TimeRangeButton 
-                                active={selectedRange === '7d'} 
-                                onClick={() => setSelectedRange('7d')}
+                    {/* Time Range */}
+                    <div className="flex items-center bg-white/[0.02] rounded-lg p-0.5 border border-white/[0.06]">
+                        {['7d', '30d', 'all'].map(range => (
+                            <button
+                                key={range}
+                                onClick={() => setSelectedRange(range)}
+                                className={`
+                                    px-2 sm:px-2.5 py-1 text-[10px] font-medium rounded-md transition-all uppercase
+                                    ${selectedRange === range
+                                        ? 'bg-white/[0.08] text-white'
+                                        : 'text-gray-600 hover:text-gray-400'
+                                    }
+                                `}
                             >
-                                7D
-                            </TimeRangeButton>
-                            <TimeRangeButton 
-                                active={selectedRange === '30d'} 
-                                onClick={() => setSelectedRange('30d')}
-                            >
-                                30D
-                            </TimeRangeButton>
-                            <TimeRangeButton 
-                                active={selectedRange === 'all'} 
-                                onClick={() => setSelectedRange('all')}
-                            >
-                                All
-                            </TimeRangeButton>
-                        </div>
+                                {range === 'all' ? 'All' : range}
+                            </button>
+                        ))}
                     </div>
                 </div>
             </div>
 
-            {/* Chart Section */}
-            <div className="p-6">
+            {/* Chart */}
+            <div className="p-3 sm:p-4 md:p-6">
                 {chartData.length === 0 ? (
                     <div className={`${compact ? 'h-48' : 'h-64'} flex flex-col items-center justify-center`}>
-                        <div className="w-16 h-16 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center mb-4">
-                            <span className="text-3xl opacity-50">📊</span>
+                        <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white/[0.04] flex items-center justify-center mb-3 sm:mb-4">
+                            <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
                         </div>
-                        <p className="text-white/40 text-sm font-medium mb-1">No data available</p>
-                        <p className="text-white/20 text-xs">Select a different time range</p>
+                        <p className="text-sm sm:text-base text-gray-400 mb-1">No revenue data</p>
+                        <p className="text-[10px] sm:text-xs text-gray-600 text-center">
+                            Try selecting a different time range
+                        </p>
                     </div>
                 ) : (
                     <ResponsiveContainer width="100%" height={compact ? 200 : 260}>
-                        <AreaChart 
-                            data={chartData} 
+                        <AreaChart
+                            data={chartData}
                             margin={{ top: 10, right: 10, left: -15, bottom: 0 }}
-                            onMouseMove={(state) => {
-                                if (state?.isTooltipActive) {
-                                    setHoveredIndex(state.activeTooltipIndex);
-                                }
-                            }}
-                            onMouseLeave={() => setHoveredIndex(null)}
                         >
                             <defs>
                                 <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="#ffffff" stopOpacity={0.12} />
+                                    <stop offset="0%" stopColor="#ffffff" stopOpacity={0.08} />
                                     <stop offset="100%" stopColor="#ffffff" stopOpacity={0} />
                                 </linearGradient>
                             </defs>
@@ -338,9 +289,9 @@ export default function RevenueSection({ data, loading, compact }) {
                                 vertical={false}
                             />
                             {showAvgLine && avgRevenue > 0 && (
-                                <ReferenceLine 
-                                    y={avgRevenue} 
-                                    stroke="rgba(255,255,255,0.12)" 
+                                <ReferenceLine
+                                    y={avgRevenue}
+                                    stroke="rgba(255,255,255,0.08)"
                                     strokeDasharray="6 6"
                                     strokeWidth={1}
                                 />
@@ -349,7 +300,7 @@ export default function RevenueSection({ data, loading, compact }) {
                                 dataKey="label"
                                 axisLine={false}
                                 tickLine={false}
-                                tick={{ fill: 'rgba(255,255,255,0.25)', fontSize: 10 }}
+                                tick={{ fill: 'rgba(255,255,255,0.2)', fontSize: 10 }}
                                 dy={12}
                                 tickFormatter={(val) => {
                                     if (!val) return '';
@@ -363,25 +314,25 @@ export default function RevenueSection({ data, loading, compact }) {
                             <YAxis
                                 axisLine={false}
                                 tickLine={false}
-                                tick={{ fill: 'rgba(255,255,255,0.2)', fontSize: 10 }}
+                                tick={{ fill: 'rgba(255,255,255,0.15)', fontSize: 10 }}
                                 tickFormatter={formatCurrency}
                                 dx={-5}
                             />
-                            <Tooltip 
-                                content={<CustomTooltip />} 
-                                cursor={{ stroke: 'rgba(255,255,255,0.06)', strokeWidth: 1 }} 
+                            <Tooltip
+                                content={<CustomTooltip />}
+                                cursor={{ stroke: 'rgba(255,255,255,0.04)', strokeWidth: 1 }}
                             />
                             <Area
                                 type="monotone"
                                 dataKey="revenue"
-                                stroke="rgba(255,255,255,0.5)"
+                                stroke="rgba(255,255,255,0.4)"
                                 strokeWidth={2}
                                 fill="url(#revenueGradient)"
                                 dot={<CustomDot />}
-                                activeDot={{ 
-                                    r: 5, 
+                                activeDot={{
+                                    r: 5,
                                     fill: '#ffffff',
-                                    stroke: 'rgba(255,255,255,0.2)',
+                                    stroke: 'rgba(255,255,255,0.15)',
                                     strokeWidth: 4
                                 }}
                             />
@@ -390,60 +341,58 @@ export default function RevenueSection({ data, loading, compact }) {
                 )}
             </div>
 
-            {/* Stats Grid Section */}
+            {/* Stats Grid */}
             {!compact && chartData.length > 0 && (
-                <div className="px-6 pb-6">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-white/[0.04] rounded-2xl overflow-hidden">
-                        <div className="bg-[#0a0a0a]">
-                            <MetricCard 
-                                icon="📈"
-                                label="Peak Revenue"
-                                value={formatCurrency(maxRevenue)}
-                                subValue={bestDay?.label}
-                            />
-                        </div>
-                        <div className="bg-[#0a0a0a]">
-                            <MetricCard 
-                                icon="📊"
-                                label="Daily Average"
-                                value={formatCurrency(avgRevenue)}
-                            />
-                        </div>
-                        <div className="bg-[#0a0a0a]">
-                            <MetricCard 
-                                icon="📉"
-                                label="Lowest"
-                                value={formatCurrency(minRevenue)}
-                            />
-                        </div>
-                        <div className="bg-[#0a0a0a]">
-                            <MetricCard 
-                                icon="⚡"
-                                label="Latest Growth"
-                                value={`${growthRate > 0 ? '+' : ''}${growthRate.toFixed(1)}%`}
-                                trend={growthRate}
-                            />
-                        </div>
+                <div className="px-3 sm:px-4 md:px-6 pb-3 sm:pb-4 md:pb-6">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+                        <MetricCard
+                            icon={TrendingUp}
+                            label="Peak Revenue"
+                            value={formatCurrency(maxRevenue)}
+                            sub={bestDay?.label}
+                        />
+                        <MetricCard
+                            icon={BarChart3}
+                            label="Daily Average"
+                            value={formatCurrency(avgRevenue)}
+                        />
+                        <MetricCard
+                            icon={TrendingDown}
+                            label="Lowest"
+                            value={formatCurrency(minRevenue)}
+                        />
+                        <MetricCard
+                            icon={Zap}
+                            label="Latest Growth"
+                            value={`${growthRate > 0 ? '+' : ''}${growthRate.toFixed(1)}%`}
+                            highlight={growthRate !== 0}
+                            positive={growthRate > 0}
+                        />
                     </div>
                 </div>
             )}
 
             {/* Compact Stats */}
             {compact && chartData.length > 0 && (
-                <div className="px-6 pb-4">
-                    <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-4">
-                            <span className="text-white/30">
-                                Avg: <span className="text-white/60">{formatCurrency(avgRevenue)}</span>
+                <div className="px-3 sm:px-4 pb-3 sm:pb-4">
+                    <div className="flex items-center justify-between text-[10px] sm:text-xs">
+                        <div className="flex items-center gap-3">
+                            <span className="text-gray-600">
+                                Avg: <span className="text-gray-400">{formatCurrency(avgRevenue)}</span>
                             </span>
-                            <span className="text-white/30">
-                                Peak: <span className="text-white/60">{formatCurrency(maxRevenue)}</span>
+                            <span className="text-[8px] text-gray-700">•</span>
+                            <span className="text-gray-600">
+                                Peak: <span className="text-gray-400">{formatCurrency(maxRevenue)}</span>
                             </span>
                         </div>
                         {growthRate !== 0 && !isNaN(growthRate) && (
-                            <span className={`font-medium ${
-                                growthRate > 0 ? 'text-green-400/70' : 'text-red-400/70'
-                            }`}>
+                            <span className={`
+                                text-[9px] font-medium px-1.5 py-0.5 rounded
+                                ${growthRate > 0
+                                    ? 'bg-emerald-500/15 text-emerald-400'
+                                    : 'bg-red-500/15 text-red-400'
+                                }
+                            `}>
                                 {growthRate > 0 ? '+' : ''}{growthRate.toFixed(1)}%
                             </span>
                         )}
@@ -451,34 +400,64 @@ export default function RevenueSection({ data, loading, compact }) {
                 </div>
             )}
 
-            {/* Footer - Insight */}
+            {/* Insight Footer */}
             {!compact && chartData.length > 2 && (
-                <div className="px-6 py-4 border-t border-white/[0.04] bg-white/[0.01]">
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-xl bg-white/[0.04] flex items-center justify-center shrink-0">
-                            <span className="text-sm">💡</span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-xs text-white/40 leading-relaxed">
-                                {trend > 5 
-                                    ? `Revenue is trending upward with ${trend.toFixed(1)}% growth compared to the first half of this period.`
-                                    : trend < -5 
-                                        ? `Revenue shows a ${Math.abs(trend).toFixed(1)}% decline. Consider reviewing recent changes.`
-                                        : `Revenue remains stable with minimal variance across the period.`
-                                }
-                            </p>
-                        </div>
-                        <div className={`shrink-0 px-2.5 py-1 rounded-lg text-[10px] font-semibold ${
-                            trend > 5 
-                                ? 'bg-green-500/10 text-green-400/80'
-                                : trend < -5 
-                                    ? 'bg-red-500/10 text-red-400/80'
-                                    : 'bg-white/[0.05] text-white/40'
-                        }`}>
-                            {trend > 5 ? 'Uptrend' : trend < -5 ? 'Downtrend' : 'Stable'}
-                        </div>
+                <div className="flex items-center gap-3 px-3 sm:px-4 md:px-6 py-3 sm:py-4 border-t border-white/[0.06] bg-white/[0.01]">
+                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white/[0.06] flex items-center justify-center shrink-0">
+                        {trend > 5
+                            ? <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                            : trend < -5
+                                ? <TrendingDown className="w-3.5 h-3.5 text-red-400" />
+                                : <Minus className="w-3.5 h-3.5 text-gray-500" />
+                        }
                     </div>
+                    <p className="flex-1 text-[10px] sm:text-xs text-gray-500 leading-relaxed">
+                        {trend > 5
+                            ? `Revenue trending upward with ${trend.toFixed(1)}% growth compared to the first half.`
+                            : trend < -5
+                                ? `Revenue shows a ${Math.abs(trend).toFixed(1)}% decline. Consider reviewing recent changes.`
+                                : `Revenue remains stable with minimal variance across the period.`
+                        }
+                    </p>
+                    <span className={`
+                        shrink-0 text-[9px] font-medium px-1.5 py-0.5 rounded
+                        ${trend > 5
+                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
+                            : trend < -5
+                                ? 'bg-red-500/15 text-red-400 border border-red-500/20'
+                                : 'bg-white/[0.06] text-gray-500 border border-white/[0.08]'
+                        }
+                    `}>
+                        {trend > 5 ? 'Uptrend' : trend < -5 ? 'Downtrend' : 'Stable'}
+                    </span>
                 </div>
+            )}
+        </div>
+    );
+}
+
+function MetricCard({ icon: Icon, label, value, sub, highlight, positive }) {
+    return (
+        <div className={`
+            bg-white/[0.02] border rounded-xl p-3 sm:p-4 transition-all hover:bg-white/[0.04]
+            ${highlight
+                ? positive
+                    ? 'border-emerald-500/20'
+                    : 'border-red-500/20'
+                : 'border-white/[0.06]'
+            }
+        `}>
+            <div className="flex items-center gap-1.5 mb-2">
+                <div className="w-6 h-6 rounded-lg bg-white/[0.06] flex items-center justify-center">
+                    <Icon className="w-3 h-3 text-gray-400" />
+                </div>
+                <span className="text-[10px] text-gray-500 font-medium">{label}</span>
+            </div>
+            <p className="text-sm sm:text-base font-bold text-white tracking-tight truncate">
+                {value}
+            </p>
+            {sub && (
+                <p className="text-[10px] text-gray-600 mt-0.5 truncate">{sub}</p>
             )}
         </div>
     );

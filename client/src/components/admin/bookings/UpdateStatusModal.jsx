@@ -1,7 +1,8 @@
+// src/components/admin/bookings/UpdateStatusModal.jsx
 'use client';
 
 import { useState } from 'react';
-import { X, Loader2, ChevronLeft } from 'lucide-react';
+import { X, Loader2, ChevronLeft, Check } from 'lucide-react';
 import adminService from '@/services/adminService';
 import toast from 'react-hot-toast';
 
@@ -13,11 +14,11 @@ const STATUS_FLOW = {
     cancelled: [],
 };
 
-const STATUS_LABELS = {
-    confirmed: 'Confirm Booking',
-    'in-progress': 'Mark In Progress',
-    completed: 'Mark Completed',
-    cancelled: 'Cancel Booking',
+const STATUS_CONFIG = {
+    confirmed: { label: 'Confirm Booking', color: 'bg-blue-500', icon: '✓' },
+    'in-progress': { label: 'Start Service', color: 'bg-purple-500', icon: '▶' },
+    completed: { label: 'Mark Completed', color: 'bg-emerald-500', icon: '✓' },
+    cancelled: { label: 'Cancel Booking', color: 'bg-red-500/20 text-red-400', icon: '✕' },
 };
 
 export default function UpdateStatusModal({ booking, onClose, onSuccess }) {
@@ -42,20 +43,14 @@ export default function UpdateStatusModal({ booking, onClose, onSuccess }) {
             setLoading(true);
             await adminService.updateBookingStatus(booking._id, selectedStatus, reason);
             
-            // Success toast
             toast.success(
                 selectedStatus === 'completed'
-                    ? 'Booking completed! Revenue added.'
+                    ? 'Booking completed!'
                     : `Booking ${selectedStatus}`
             );
 
-            // Wait a bit for the API to process
             await new Promise(resolve => setTimeout(resolve, 300));
-
-            // Close modal first
             onClose();
-
-            // Then trigger refresh - this ensures parent component can refresh
             setTimeout(() => {
                 if (onSuccess) onSuccess();
             }, 100);
@@ -63,76 +58,98 @@ export default function UpdateStatusModal({ booking, onClose, onSuccess }) {
         } catch (error) {
             console.error('Update status error:', error);
             toast.error(error.response?.data?.message || 'Failed to update');
-            setLoading(false); // Only reset loading on error
+            setLoading(false);
         }
     };
 
     return (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-end sm:items-center justify-center" onClick={onClose}>
-            <div className="bg-zinc-900 w-full sm:max-w-md sm:rounded-lg border-t sm:border border-zinc-800 flex flex-col max-h-full sm:max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center" onClick={onClose}>
+            <div 
+                className="bg-black w-full sm:max-w-md sm:rounded-2xl border border-white/[0.08] flex flex-col max-h-[90vh] overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+            >
+                {/* Top Line */}
+                <div className="h-px w-full bg-gradient-to-r from-transparent via-white/20 to-transparent" />
                 
                 {/* Header */}
-                <div className="flex items-center gap-3 px-4 py-4 border-b border-zinc-800">
-                    <button onClick={onClose} className="sm:hidden" disabled={loading}>
-                        <ChevronLeft className="w-5 h-5 text-zinc-400" />
+                <div className="flex items-center gap-3 px-4 py-4 border-b border-white/[0.06]">
+                    <button 
+                        onClick={onClose} 
+                        className="sm:hidden w-8 h-8 rounded-lg bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-gray-500 hover:text-white transition-colors"
+                        disabled={loading}
+                    >
+                        <ChevronLeft className="w-4 h-4" />
                     </button>
                     <div className="flex-1">
-                        <p className="text-xs text-zinc-500">Update Status</p>
-                        <p className="text-sm text-white font-mono">{booking.bookingCode}</p>
+                        <p className="text-[10px] text-gray-500 uppercase tracking-wider">Update Status</p>
+                        <p className="text-sm text-white font-mono mt-0.5">{booking.bookingCode}</p>
                     </div>
-                    <button onClick={onClose} className="hidden sm:block" disabled={loading}>
-                        <X className="w-4 h-4 text-zinc-400 hover:text-white" />
+                    <button 
+                        onClick={onClose} 
+                        className="hidden sm:flex w-8 h-8 rounded-lg bg-white/[0.04] border border-white/[0.08] items-center justify-center text-gray-500 hover:text-white transition-colors"
+                        disabled={loading}
+                    >
+                        <X className="w-4 h-4" />
                     </button>
                 </div>
 
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-5">
-                    {/* Current */}
+                    {/* Current Status */}
                     <div>
-                        <p className="text-xs text-zinc-500 mb-2">Current Status</p>
-                        <span className="inline-block text-sm text-white capitalize border border-zinc-700 px-3 py-1.5 rounded-lg">
-                            {booking.status}
+                        <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Current Status</p>
+                        <span className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-white capitalize">
+                            <span className="w-2 h-2 rounded-full bg-white/40" />
+                            {booking.status.replace('-', ' ')}
                         </span>
                     </div>
 
                     {/* Options */}
                     {availableStatuses.length > 0 ? (
                         <div>
-                            <p className="text-xs text-zinc-500 mb-3">Change To</p>
+                            <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-3">Change To</p>
                             <div className="space-y-2">
-                                {availableStatuses.map((status) => (
-                                    <button
-                                        key={status}
-                                        onClick={() => setSelectedStatus(status)}
-                                        disabled={loading}
-                                        className={`w-full flex items-center justify-between p-3 rounded-lg border text-left transition-colors disabled:opacity-50 ${
-                                            selectedStatus === status
-                                                ? 'border-zinc-600 bg-zinc-800/50'
-                                                : 'border-zinc-800 hover:border-zinc-700'
-                                        }`}
-                                    >
-                                        <span className="text-sm text-white">
-                                            {STATUS_LABELS[status] || status}
-                                        </span>
-                                        {selectedStatus === status && (
-                                            <div className="w-4 h-4 rounded-full bg-white flex items-center justify-center">
-                                                <svg className="w-2.5 h-2.5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                                </svg>
-                                            </div>
-                                        )}
-                                    </button>
-                                ))}
+                                {availableStatuses.map((status) => {
+                                    const config = STATUS_CONFIG[status];
+                                    const isSelected = selectedStatus === status;
+                                    
+                                    return (
+                                        <button
+                                            key={status}
+                                            onClick={() => setSelectedStatus(status)}
+                                            disabled={loading}
+                                            className={`
+                                                w-full flex items-center justify-between p-3.5 rounded-xl border text-left transition-all
+                                                ${isSelected
+                                                    ? 'border-white/20 bg-white/[0.06]'
+                                                    : 'border-white/[0.08] bg-white/[0.02] hover:border-white/[0.12]'
+                                                }
+                                                disabled:opacity-50
+                                            `}
+                                        >
+                                            <span className="text-sm text-white">
+                                                {config?.label || status}
+                                            </span>
+                                            {isSelected && (
+                                                <div className="w-5 h-5 rounded-full bg-white flex items-center justify-center">
+                                                    <Check className="w-3 h-3 text-black" />
+                                                </div>
+                                            )}
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </div>
                     ) : (
-                        <p className="text-sm text-zinc-500 text-center py-8">No status changes available</p>
+                        <div className="flex flex-col items-center py-8">
+                            <p className="text-sm text-gray-500">No status changes available</p>
+                        </div>
                     )}
 
-                    {/* Reason */}
+                    {/* Reason for cancellation */}
                     {selectedStatus === 'cancelled' && (
                         <div>
-                            <label className="block text-xs text-zinc-500 mb-2">
+                            <label className="block text-[10px] text-gray-500 uppercase tracking-wider mb-2">
                                 Reason *
                             </label>
                             <textarea
@@ -141,26 +158,26 @@ export default function UpdateStatusModal({ booking, onClose, onSuccess }) {
                                 placeholder="Why is this being cancelled?"
                                 rows={3}
                                 disabled={loading}
-                                className="w-full bg-zinc-800 border border-zinc-700 text-white placeholder-zinc-600 text-sm px-3 py-3 rounded-lg focus:outline-none focus:border-zinc-600 resize-none disabled:opacity-50"
+                                className="w-full bg-white/[0.02] border border-white/[0.08] text-white placeholder-gray-600 text-sm px-3 py-3 rounded-xl focus:outline-none focus:border-white/[0.15] resize-none disabled:opacity-50 transition-colors"
                             />
                         </div>
                     )}
                 </div>
 
                 {/* Footer */}
-                <div className="p-4 border-t border-zinc-800">
+                <div className="p-4 border-t border-white/[0.06]">
                     <div className="flex gap-2">
                         <button
                             onClick={onClose}
                             disabled={loading}
-                            className="flex-1 sm:flex-none px-4 py-2.5 rounded-lg border border-zinc-800 text-zinc-400 text-xs font-medium hover:text-white hover:border-zinc-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl border border-white/[0.08] bg-white/[0.02] text-gray-400 text-xs font-medium hover:text-white hover:bg-white/[0.04] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             Cancel
                         </button>
                         <button
                             onClick={handleSubmit}
                             disabled={loading || !selectedStatus}
-                            className="flex-1 py-2.5 rounded-lg bg-white text-black text-xs font-medium hover:bg-zinc-200 disabled:bg-zinc-800 disabled:text-zinc-600 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                            className="flex-1 py-2.5 rounded-xl bg-white text-black text-xs font-medium hover:bg-gray-200 disabled:bg-white/[0.08] disabled:text-gray-600 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
                         >
                             {loading ? (
                                 <>
