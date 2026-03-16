@@ -1,9 +1,16 @@
-// components/TopBar.jsx (Recommended - Cleanest)
+// components/TopBar.jsx
 "use client"
 
 import { motion } from "framer-motion"
+import { useEffect, useState } from "react"
 
 export default function TopBar() {
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   const items = [
     "Free Doorstep Service",
     "Duliajan, Assam", 
@@ -13,6 +20,33 @@ export default function TopBar() {
     "Same Day Available",
   ]
 
+  // ✅ Static fallback for SSR (no animations)
+  if (!mounted) {
+    return (
+      <div className="bg-black overflow-hidden h-10 flex items-center relative">
+        {/* Fade edges */}
+        <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-black via-black/80 to-transparent z-10 pointer-events-none" />
+        <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-black via-black/80 to-transparent z-10 pointer-events-none" />
+
+        {/* Static content */}
+        <div className="flex items-center">
+          {items.map((item, i) => (
+            <span key={i} className="inline-flex items-center mx-5 sm:mx-7">
+              <span
+                className="tracking-[0.2em] uppercase text-white/50"
+                style={{ fontSize: "10px" }}
+              >
+                {item}
+              </span>
+              <span className="ml-5 sm:ml-7 w-1.5 h-1.5 rounded-full bg-white/20" />
+            </span>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  // ✅ Animated version for client-side
   return (
     <motion.div
       className="bg-black overflow-hidden h-10 flex items-center relative group"
