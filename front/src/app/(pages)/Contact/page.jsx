@@ -1,6 +1,6 @@
 "use client"
 
-import { memo, useState, useRef } from "react"
+import { memo, useState, useRef, useCallback } from "react"
 import { motion, AnimatePresence, useInView } from "framer-motion"
 import {
   ArrowUpRight,
@@ -12,18 +12,19 @@ import {
   Instagram,
   Facebook,
   Sparkles,
-  Check,
   Plus,
-  X,
 } from "lucide-react"
 
 // ── Constants ──────────────────────────────────────────────
+const PHONE_NUMBER = "6900706456"
+const WHATSAPP_NUMBER = "916900706456"
+
 const CONTACT_METHODS = [
   {
     id: "whatsapp",
     label: "WhatsApp",
     description: "Fastest way to reach us",
-    href: "https://wa.me/916900706456?text=Hi%2C%20I%20want%20to%20book%20a%20service",
+    href: `https://wa.me/${WHATSAPP_NUMBER}?text=Hi%2C%20I%20want%20to%20book%20a%20service`,
     available: "24/7",
     featured: true,
   },
@@ -31,9 +32,9 @@ const CONTACT_METHODS = [
     id: "phone",
     icon: Phone,
     label: "Call Us",
-    value: "+91 6900706456",
+    value: `+91 ${PHONE_NUMBER}`,
     description: "Speak directly with our team",
-    href: "tel:6900706456",
+    href: `tel:${PHONE_NUMBER}`,
     available: "9AM – 5PM",
   },
   {
@@ -50,23 +51,19 @@ const CONTACT_METHODS = [
 const FAQS = [
   {
     question: "What areas do you serve?",
-    answer:
-      "We currently serve all areas within Duliajan, Assam. We come to your home, office, or any location you prefer.",
+    answer: "We currently serve all areas within Duliajan, Assam. We come to your home, office, or any location you prefer.",
   },
   {
     question: "How do I book a service?",
-    answer:
-      "You can book through our website, call us directly, or send a WhatsApp message. We'll confirm your slot within minutes.",
+    answer: "You can book through our website, call us directly, or send a WhatsApp message. We'll confirm your slot within minutes.",
   },
   {
     question: "What are your working hours?",
-    answer:
-      "We're available Monday to Sunday, 9:00 AM to 5:00 PM. You can reach us on WhatsApp anytime.",
+    answer: "We're available Monday to Sunday, 9:00 AM to 5:00 PM. You can reach us on WhatsApp anytime.",
   },
   {
     question: "Do I need to provide water or electricity?",
-    answer:
-      "We bring all our own equipment and supplies. Just show us where your car is parked and we handle the rest.",
+    answer: "We bring all our own equipment and supplies. Just show us where your car is parked and we handle the rest.",
   },
 ]
 
@@ -85,16 +82,14 @@ const SOCIALS = [
   },
 ]
 
-const HERO_IMAGE =
-  "https://images.unsplash.com/photo-1607860108855-64acf2078ed9?w=1920&q=80"
-const MAP_IMAGE =
-  "https://images.unsplash.com/photo-1569336415962-a4bd9f69cd83?w=800&q=80"
+const HERO_IMAGE = "https://images.unsplash.com/photo-1607860108855-64acf2078ed9?w=1920&q=80"
+const MAP_IMAGE = "https://images.unsplash.com/photo-1569336415962-a4bd9f69cd83?w=800&q=80"
 
-// ── Shared tokens ──────────────────────────────────────────
+// ── Typography Tokens ─────────────────────────────────────
 const SANS = "'Helvetica Neue', Helvetica, Arial, sans-serif"
 const SERIF = 'Georgia, "Times New Roman", serif'
 
-// ── Animation variants ─────────────────────────────────────
+// ── Animation Variants ─────────────────────────────────────
 const fadeUp = {
   hidden: { opacity: 0, y: 28 },
   visible: (i = 0) => ({
@@ -106,24 +101,16 @@ const fadeUp = {
 
 const fadeLeft = {
   hidden: { opacity: 0, x: -36 },
-  visible: {
-    opacity: 1,
-    x: 0,
-    transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] },
-  },
+  visible: { opacity: 1, x: 0, transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] } },
 }
 
 const fadeRight = {
   hidden: { opacity: 0, x: 36 },
-  visible: {
-    opacity: 1,
-    x: 0,
-    transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] },
-  },
+  visible: { opacity: 1, x: 0, transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] } },
 }
 
-// ── Shared UI helpers ──────────────────────────────────────
-function Eyebrow({ children, light = false }) {
+// ── Reusable UI Components ─────────────────────────────────
+const Eyebrow = memo(function Eyebrow({ children, light = false }) {
   return (
     <div className="flex items-center gap-3 mb-5">
       <span className={`w-8 h-px ${light ? "bg-white/30" : "bg-black"}`} />
@@ -135,9 +122,9 @@ function Eyebrow({ children, light = false }) {
       </span>
     </div>
   )
-}
+})
 
-function SectionHeading({ children, light = false, className = "" }) {
+const SectionHeading = memo(function SectionHeading({ children, light = false, className = "" }) {
   return (
     <h2
       className={`${light ? "text-white" : "text-black"} ${className}`}
@@ -152,7 +139,7 @@ function SectionHeading({ children, light = false, className = "" }) {
       {children}
     </h2>
   )
-}
+})
 
 // ── WhatsApp Icon ──────────────────────────────────────────
 const WhatsAppIcon = memo(function WhatsAppIcon({ className = "", size = 24 }) {
@@ -177,7 +164,7 @@ const Hero = memo(function Hero() {
       className="relative min-h-[80dvh] md:min-h-[85vh] bg-black overflow-hidden flex items-end"
       style={{ fontFamily: SANS }}
     >
-      {/* Background */}
+      {/* Background Image */}
       <div className="absolute inset-0">
         <img
           src={HERO_IMAGE}
@@ -190,9 +177,10 @@ const Hero = memo(function Hero() {
         <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent" />
       </div>
 
-      {/* Grid texture */}
+      {/* Grid Texture */}
       <div
-        className="absolute inset-0 opacity-[0.03]"
+        className="absolute inset-0 opacity-[0.03] pointer-events-none"
+        aria-hidden="true"
         style={{
           backgroundImage: `
             linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
@@ -200,10 +188,8 @@ const Hero = memo(function Hero() {
           `,
           backgroundSize: "60px 60px",
         }}
-        aria-hidden="true"
       />
 
-      {/* Content */}
       <div className="relative z-10 w-full max-w-6xl mx-auto px-5 sm:px-8 md:px-12 pb-14 md:pb-20">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -246,7 +232,6 @@ const Hero = memo(function Hero() {
           through any channel that works for you.
         </motion.p>
 
-        {/* CTA buttons */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -255,26 +240,22 @@ const Hero = memo(function Hero() {
         >
           <motion.a
             whileTap={{ scale: 0.96 }}
-            href="https://wa.me/916900706456?text=Hi%2C%20I%20want%20to%20book%20a%20service"
+            href={CONTACT_METHODS[0].href}
             target="_blank"
             rel="noopener noreferrer"
-            className="group inline-flex items-center gap-3 h-12 sm:h-14 px-5 sm:px-8
-                       bg-white text-black rounded-full no-underline
-                       hover:bg-gray-100 transition-colors duration-300"
+            className="group inline-flex items-center gap-3 h-12 sm:h-14 px-5 sm:px-8 bg-white text-black rounded-full hover:bg-gray-100 transition-colors duration-300"
           >
             <WhatsAppIcon size={17} />
             <span className="tracking-wider uppercase" style={{ fontSize: "11px", fontWeight: 500 }}>
               Message Us
             </span>
-            <ArrowRight size={15} className="group-hover:translate-x-0.5 transition-transform duration-300" />
+            <ArrowRight size={15} className="group-hover:translate-x-0.5 transition-transform" />
           </motion.a>
 
           <motion.a
             whileTap={{ scale: 0.96 }}
-            href="tel:6900706456"
-            className="group inline-flex items-center gap-2.5 h-12 sm:h-14 px-5 sm:px-8
-                       border border-white/20 text-white rounded-full no-underline
-                       hover:bg-white/5 transition-colors duration-300"
+            href={`tel:${PHONE_NUMBER}`}
+            className="group inline-flex items-center gap-2.5 h-12 sm:h-14 px-5 sm:px-8 border border-white/20 text-white rounded-full hover:bg-white/5 transition-colors duration-300"
           >
             <Phone size={15} strokeWidth={1.5} />
             <span className="tracking-wider uppercase" style={{ fontSize: "11px" }}>
@@ -283,7 +264,6 @@ const Hero = memo(function Hero() {
           </motion.a>
         </motion.div>
 
-        {/* Live availability indicator */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -292,7 +272,7 @@ const Hero = memo(function Hero() {
         >
           <div className="flex items-center gap-2">
             <span className="relative flex h-2.5 w-2.5">
-              <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" style={{ animationDuration: "2s" }} />
+              <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400" />
             </span>
             <span className="text-white/60" style={{ fontSize: "13px" }}>Available now</span>
@@ -314,21 +294,14 @@ const ContactMethods = memo(function ContactMethods() {
     <section ref={ref} className="w-full bg-white py-16 md:py-24 lg:py-32" style={{ fontFamily: SANS }}>
       <div className="max-w-6xl mx-auto px-5 sm:px-8 md:px-12">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16">
-
-          {/* Left */}
-          <motion.div
-            variants={fadeLeft}
-            initial="hidden"
-            animate={inView ? "visible" : "hidden"}
-          >
+          {/* Left Column */}
+          <motion.div variants={fadeLeft} initial="hidden" animate={inView ? "visible" : "hidden"}>
             <Eyebrow>Get In Touch</Eyebrow>
             <SectionHeading className="mb-5">
-              Choose Your{" "}
-              <span className="text-gray-300">Preferred Channel</span>
+              Choose Your <span className="text-gray-300">Preferred Channel</span>
             </SectionHeading>
             <p className="text-gray-500 leading-relaxed mb-8 max-w-sm" style={{ fontSize: "15px" }}>
-              We're available on multiple platforms. Pick whatever works best —
-              we respond quickly on all channels.
+              We're available on multiple platforms. Pick whatever works best — we respond quickly on all channels.
             </p>
 
             <div className="flex gap-8 pt-6 border-t border-gray-100">
@@ -348,7 +321,7 @@ const ContactMethods = memo(function ContactMethods() {
             </div>
           </motion.div>
 
-          {/* Right: cards */}
+          {/* Contact Cards */}
           <motion.div
             variants={fadeRight}
             initial="hidden"
@@ -369,18 +342,14 @@ const ContactMethods = memo(function ContactMethods() {
                   href={method.href}
                   target={method.href.startsWith("http") ? "_blank" : undefined}
                   rel={method.href.startsWith("http") ? "noopener noreferrer" : undefined}
-                  className={`group flex items-center gap-4 p-4 sm:p-5 rounded-xl border
-                              transition-colors duration-300 no-underline
-                              ${method.featured
+                  className={`group flex items-center gap-4 p-4 sm:p-5 rounded-xl border transition-colors duration-300 no-underline
+                    ${method.featured
                       ? "bg-black border-black hover:bg-gray-900"
-                      : "bg-white border-gray-200 hover:border-black"
-                    }`}
+                      : "bg-white border-gray-200 hover:border-black"}`}
                 >
-                  {/* Icon container */}
                   <div
-                    className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0
-                                transition-colors duration-300
-                                ${method.featured ? "bg-white/10" : "bg-gray-100 group-hover:bg-black"}`}
+                    className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-colors duration-300
+                      ${method.featured ? "bg-white/10" : "bg-gray-100 group-hover:bg-black"}`}
                   >
                     {isWhatsApp ? (
                       <WhatsAppIcon
@@ -396,7 +365,6 @@ const ContactMethods = memo(function ContactMethods() {
                     )}
                   </div>
 
-                  {/* Text */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
                       <p
@@ -406,32 +374,24 @@ const ContactMethods = memo(function ContactMethods() {
                         {method.label}
                       </p>
                       {method.featured && (
-                        <span
-                          className="px-1.5 py-0.5 bg-white/20 rounded text-white/70 uppercase tracking-wider"
-                          style={{ fontSize: "8px" }}
-                        >
+                        <span className="px-1.5 py-0.5 bg-white/20 rounded text-white/70 uppercase tracking-wider text-[8px]">
                           Fast
                         </span>
                       )}
                     </div>
-                    <p
-                      className={`truncate ${method.featured ? "text-white/50" : "text-gray-400"}`}
-                      style={{ fontSize: "12px" }}
-                    >
+                    <p className={`truncate ${method.featured ? "text-white/50" : "text-gray-400"}`} style={{ fontSize: "12px" }}>
                       {method.description}
                     </p>
                   </div>
 
-                  {/* Arrow */}
                   <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0
-                                transition-colors duration-300
-                                ${method.featured ? "bg-white/10" : "bg-gray-100 group-hover:bg-black"}`}
+                    className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-colors duration-300
+                      ${method.featured ? "bg-white/10" : "bg-gray-100 group-hover:bg-black"}`}
                   >
                     <ArrowUpRight
                       size={13}
                       className={`transition-all duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5
-                                  ${method.featured ? "text-white" : "text-gray-400 group-hover:text-white"}`}
+                        ${method.featured ? "text-white" : "text-gray-400 group-hover:text-white"}`}
                     />
                   </div>
                 </motion.a>
@@ -459,9 +419,9 @@ const FAQItem = memo(function FAQItem({ faq, isOpen, onToggle }) {
         >
           {faq.question}
         </span>
+
         <motion.div
           animate={{ backgroundColor: isOpen ? "#000" : "#f3f4f6" }}
-          transition={{ duration: 0.2 }}
           className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
         >
           <motion.div animate={{ rotate: isOpen ? 45 : 0 }} transition={{ duration: 0.25 }}>
@@ -473,7 +433,6 @@ const FAQItem = memo(function FAQItem({ faq, isOpen, onToggle }) {
       <AnimatePresence initial={false}>
         {isOpen && (
           <motion.div
-            key="answer"
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
@@ -496,11 +455,14 @@ const FAQ = memo(function FAQ() {
   const inView = useInView(ref, { once: true, margin: "-60px" })
   const [openIndex, setOpenIndex] = useState(0)
 
+  const toggleFAQ = useCallback((index) => {
+    setOpenIndex((prev) => (prev === index ? -1 : index))
+  }, [])
+
   return (
     <section ref={ref} className="w-full bg-gray-50 py-16 md:py-24 lg:py-32" style={{ fontFamily: SANS }}>
       <div className="max-w-6xl mx-auto px-5 sm:px-8 md:px-12">
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-10 lg:gap-16">
-
           {/* Left */}
           <motion.div
             variants={fadeLeft}
@@ -516,25 +478,20 @@ const FAQ = memo(function FAQ() {
               Quick answers to questions you might have.
             </p>
             <a
-              href="https://wa.me/916900706456?text=Hi%2C%20I%20have%20a%20question"
+              href={`https://wa.me/${WHATSAPP_NUMBER}?text=Hi%2C%20I%20have%20a%20question`}
               target="_blank"
               rel="noopener noreferrer"
               className="group inline-flex items-center gap-2 text-black no-underline"
             >
-              <span
-                className="tracking-wider uppercase border-b border-black pb-0.5 group-hover:border-gray-400 transition-colors duration-300"
-                style={{ fontSize: "11px", fontWeight: 500 }}
-              >
+              <span className="tracking-wider uppercase border-b border-black pb-0.5 group-hover:border-gray-400 transition-colors duration-300"
+                style={{ fontSize: "11px", fontWeight: 500 }}>
                 Ask a Question
               </span>
-              <ArrowUpRight
-                size={12}
-                className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform duration-300"
-              />
+              <ArrowUpRight size={12} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
             </a>
           </motion.div>
 
-          {/* Right: FAQ list */}
+          {/* FAQ List */}
           <motion.div
             variants={fadeRight}
             initial="hidden"
@@ -546,7 +503,7 @@ const FAQ = memo(function FAQ() {
                 key={i}
                 faq={faq}
                 isOpen={openIndex === i}
-                onToggle={() => setOpenIndex(openIndex === i ? -1 : i)}
+                onToggle={() => toggleFAQ(i)}
               />
             ))}
           </motion.div>
@@ -556,7 +513,7 @@ const FAQ = memo(function FAQ() {
   )
 })
 
-// ── Location ───────────────────────────────────────────────
+// ── Location Section ───────────────────────────────────────
 const Location = memo(function Location() {
   const ref = useRef(null)
   const inView = useInView(ref, { once: true, margin: "-60px" })
@@ -565,8 +522,7 @@ const Location = memo(function Location() {
     <section ref={ref} className="w-full bg-white py-16 md:py-24 lg:py-32" style={{ fontFamily: SANS }}>
       <div className="max-w-6xl mx-auto px-5 sm:px-8 md:px-12">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
-
-          {/* Map image */}
+          {/* Map */}
           <motion.div
             variants={fadeLeft}
             initial="hidden"
@@ -575,33 +531,26 @@ const Location = memo(function Location() {
           >
             <img
               src={MAP_IMAGE}
-              alt="Duliajan, Assam location"
+              alt="Our service area in Duliajan, Assam"
               className="absolute inset-0 w-full h-full object-cover"
               loading="lazy"
             />
             <div className="absolute inset-0 bg-black/20" />
 
-            {/* Pin */}
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="relative">
-                <span
-                  className="absolute -inset-4 bg-white/30 rounded-full animate-ping"
-                  style={{ animationDuration: "2s" }}
-                />
-                <div className="relative w-13 h-13 w-12 h-12 bg-black rounded-full flex items-center justify-center shadow-2xl">
+                <span className="absolute -inset-4 bg-white/30 rounded-full animate-ping" style={{ animationDuration: "2s" }} />
+                <div className="relative w-12 h-12 bg-black rounded-full flex items-center justify-center shadow-2xl">
                   <MapPin size={20} className="text-white" />
                 </div>
               </div>
             </div>
 
-            {/* Maps button */}
             <a
               href="https://maps.google.com/?q=Duliajan,Assam"
               target="_blank"
               rel="noopener noreferrer"
-              className="absolute bottom-4 left-4 right-4 flex items-center justify-center gap-2
-                         h-11 bg-white text-black rounded-xl no-underline
-                         hover:bg-gray-50 active:scale-[0.98] transition-all duration-300 shadow-lg"
+              className="absolute bottom-4 left-4 right-4 flex items-center justify-center gap-2 h-11 bg-white text-black rounded-xl hover:bg-gray-50 active:scale-[0.98] transition-all duration-300 shadow-lg"
             >
               <span className="tracking-wider uppercase" style={{ fontSize: "10px", fontWeight: 500 }}>
                 Open in Google Maps
@@ -622,22 +571,13 @@ const Location = memo(function Location() {
               Based in <span className="text-gray-300">Duliajan</span>
             </SectionHeading>
             <p className="text-gray-500 leading-relaxed mb-7" style={{ fontSize: "15px" }}>
-              We're located in Duliajan, Assam. But remember — we come to you!
-              Just share your location and we'll be there.
+              We're located in Duliajan, Assam. But remember — we come to you! Just share your location and we'll be there.
             </p>
 
             <div className="space-y-3 mb-6">
               {[
-                {
-                  icon: MapPin,
-                  label: "Address",
-                  value: "Near Sonapur Namghar, Duliajan, Assam",
-                },
-                {
-                  icon: Clock,
-                  label: "Working Hours",
-                  value: "Monday – Sunday, 9:00 AM – 5:00 PM",
-                },
+                { icon: MapPin, label: "Address", value: "Near Sonapur Namghar, Duliajan, Assam" },
+                { icon: Clock, label: "Working Hours", value: "Monday – Sunday, 9:00 AM – 5:00 PM" },
               ].map(({ icon: Icon, label, value }) => (
                 <div key={label} className="bg-gray-50 rounded-xl p-4">
                   <div className="flex items-start gap-4">
@@ -658,7 +598,7 @@ const Location = memo(function Location() {
             </div>
 
             <div className="flex items-center gap-2">
-              <Check size={15} className="text-emerald-500 shrink-0" />
+              <span className="text-emerald-500">✔</span>
               <span className="text-gray-500" style={{ fontSize: "13px" }}>
                 Doorstep service across all of Duliajan
               </span>
@@ -678,12 +618,7 @@ const BottomCTA = memo(function BottomCTA() {
   return (
     <section ref={ref} className="w-full bg-black py-16 md:py-24" style={{ fontFamily: SANS }}>
       <div className="max-w-6xl mx-auto px-5 sm:px-8 md:px-12">
-        <motion.div
-          variants={fadeUp}
-          initial="hidden"
-          animate={inView ? "visible" : "hidden"}
-        >
-          {/* Main CTA */}
+        <motion.div variants={fadeUp} initial="hidden" animate={inView ? "visible" : "hidden"}>
           <div className="text-center mb-14">
             <div className="flex items-center justify-center gap-2 mb-4">
               <Sparkles size={13} className="text-white/30" />
@@ -693,8 +628,7 @@ const BottomCTA = memo(function BottomCTA() {
             </div>
 
             <SectionHeading light className="mb-5">
-              Book Your First Service{" "}
-              <span className="italic text-white/40">Today</span>
+              Book Your First Service <span className="italic text-white/40">Today</span>
             </SectionHeading>
 
             <p className="text-white/40 max-w-md mx-auto mb-8 leading-relaxed" style={{ fontSize: "14px" }}>
@@ -705,32 +639,26 @@ const BottomCTA = memo(function BottomCTA() {
               <motion.a
                 whileTap={{ scale: 0.96 }}
                 href="/bookings"
-                className="group inline-flex items-center gap-2.5 h-12 sm:h-14 px-6 sm:px-8
-                           bg-white text-black rounded-full no-underline
-                           hover:bg-gray-100 transition-colors duration-300"
+                className="group inline-flex items-center gap-2.5 h-12 sm:h-14 px-6 sm:px-8 bg-white text-black rounded-full hover:bg-gray-100 transition-colors"
               >
                 <span className="tracking-wider uppercase" style={{ fontSize: "11px", fontWeight: 500 }}>
                   Book Now
                 </span>
-                <ArrowRight size={15} className="group-hover:translate-x-0.5 transition-transform duration-300" />
+                <ArrowRight size={15} className="group-hover:translate-x-0.5 transition-transform" />
               </motion.a>
 
               <motion.a
                 whileTap={{ scale: 0.96 }}
                 href="/services"
-                className="inline-flex items-center gap-2.5 h-12 sm:h-14 px-6 sm:px-8
-                           border border-white/20 text-white rounded-full no-underline
-                           hover:bg-white/5 transition-colors duration-300"
+                className="inline-flex items-center gap-2.5 h-12 sm:h-14 px-6 sm:px-8 border border-white/20 text-white rounded-full hover:bg-white/5 transition-colors"
               >
                 <span className="tracking-wider uppercase" style={{ fontSize: "11px" }}>View Services</span>
               </motion.a>
             </div>
           </div>
 
-          {/* Divider */}
           <div className="w-full h-px bg-white/10 mb-10" />
 
-          {/* Social links */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
             <div>
               <p className="text-white mb-1" style={{ fontFamily: SERIF, fontSize: "17px", fontWeight: 400 }}>
@@ -751,9 +679,7 @@ const BottomCTA = memo(function BottomCTA() {
                     href={social.href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-2.5 px-4 py-2.5 border border-white/10
-                               rounded-xl hover:bg-white/5 hover:border-white/20
-                               transition-all duration-300 no-underline"
+                    className="flex items-center gap-2.5 px-4 py-2.5 border border-white/10 rounded-xl hover:bg-white/5 hover:border-white/20 transition-all duration-300"
                     aria-label={social.label}
                   >
                     <Icon size={16} strokeWidth={1.5} className="text-white/60" />

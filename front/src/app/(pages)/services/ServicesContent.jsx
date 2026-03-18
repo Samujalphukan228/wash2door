@@ -8,11 +8,34 @@ import {
   ArrowLeft,
   Phone,
   Sparkles,
+  Loader2,
+  AlertCircle,
 } from "lucide-react"
 import { getPublicServices, getCategories } from "@/lib/services.api"
 
 // ── Constants ──────────────────────────────────────────────
 const PHONE_NUMBER = "6900706456"
+const SKELETON_COUNT = 6
+
+// ── Animation Variants ─────────────────────────────────────
+const fadeInUp = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { 
+    opacity: 1, 
+    y: 0,
+    transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] }
+  }
+}
+
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+}
 
 // ── Helper Functions ───────────────────────────────────────
 const getImageUrl = (image) => {
@@ -22,9 +45,28 @@ const getImageUrl = (image) => {
   return null
 }
 
+const calculateLowestPrice = (variants, fallbackPrice) => {
+  if (!variants || variants.length === 0) return fallbackPrice
+
+  const activeVariants = variants.filter((v) => v.isActive !== false)
+  if (activeVariants.length === 0) return fallbackPrice
+
+  return Math.min(...activeVariants.map(v => v.discountPrice || v.price))
+}
+
 // ── Image Component ────────────────────────────────────────
 const ServiceImage = memo(function ServiceImage({ src, alt, fallbackIcon }) {
   const [hasError, setHasError] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+
+  const handleLoad = useCallback(() => {
+    setIsLoading(false)
+  }, [])
+
+  const handleError = useCallback(() => {
+    setHasError(true)
+    setIsLoading(false)
+  }, [])
 
   if (!src || hasError) {
     return (
@@ -35,13 +77,19 @@ const ServiceImage = memo(function ServiceImage({ src, alt, fallbackIcon }) {
   }
 
   return (
-    <img
-      src={src}
-      alt={alt}
-      className="w-full h-full object-cover"
-      loading="lazy"
-      onError={() => setHasError(true)}
-    />
+    <>
+      {isLoading && (
+        <div className="absolute inset-0 bg-gray-100 animate-pulse" />
+      )}
+      <img
+        src={src}
+        alt={alt}
+        className="w-full h-full object-cover"
+        loading="lazy"
+        onLoad={handleLoad}
+        onError={handleError}
+      />
+    </>
   )
 })
 
@@ -53,41 +101,103 @@ const SkeletonCard = memo(function SkeletonCard() {
       <div className="p-6 space-y-3">
         <div className="h-5 w-32 bg-gray-100 animate-pulse rounded" />
         <div className="h-4 w-full bg-gray-100 animate-pulse rounded" />
+        <div className="h-4 w-3/4 bg-gray-100 animate-pulse rounded" />
         <div className="h-12 w-full bg-gray-100 animate-pulse rounded-xl mt-4" />
       </div>
     </div>
   )
 })
 
+// ── Loading Spinner ────────────────────────────────────────
+const LoadingSpinner = memo(function LoadingSpinner() {
+  return (
+    <div className="flex items-center justify-center py-20">
+      <Loader2 size={32} className="animate-spin text-gray-300" />
+    </div>
+  )
+})
+
+// ── Error Message ──────────────────────────────────────────
+const ErrorMessage = memo(function ErrorMessage({ message, onRetry }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-20 px-5">
+      <AlertCircle size={48} className="text-red-400 mb-4" />
+      <h3 className="text-xl font-medium text-gray-900 mb-2">
+        Something went wrong
+      </h3>
+      <p className="text-gray-500 text-center mb-6 max-w-md">
+        {message || "Failed to load services. Please try again."}
+      </p>
+      {onRetry && (
+        <button
+          onClick={onRetry}
+          className="inline-flex items-center gap-2 h-12 px-6 bg-black text-white rounded-xl hover:bg-gray-900 transition-colors"
+        >
+          <span className="text-sm font-medium">Try Again</span>
+        </button>
+      )}
+    </div>
+  )
+})
+
+// ── Empty State ────────────────────────────────────────────
+const EmptyState = memo(function EmptyState({ message, icon }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-20 px-5">
+      <span className="text-6xl mb-4">{icon || "📭"}</span>
+      <h3 className="text-xl font-medium text-gray-900 mb-2">
+        No services found
+      </h3>
+      <p className="text-gray-500 text-center max-w-md">
+        {message || "There are no services available in this category right now."}
+      </p>
+    </div>
+  )
+})
+
 // ══════════════════════════════════════════════════════════
-// ── CLEAN BLACK HERO ─────────────────────────────────────
+// ── HERO SECTION ─────────────────────────────────────────
 // ══════════════════════════════════════════════════════════
 
 const Hero = memo(function Hero({ activeCategoryData, onBack }) {
   const isCategory = !!activeCategoryData
 
   return (
-    <section className="relative bg-black pt-24 pb-12 md:pt-32 md:pb-16">
-      {/* Simple grid pattern */}
-      <div className="absolute inset-0 opacity-[0.02]"
-           style={{
-             backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
-                              linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
-             backgroundSize: "60px 60px",
-           }} />
+    <section className="relative bg-black pt-24 pb-12 md:pt-32 md:pb-16 overflow-hidden">
+      {/* Background pattern */}
+      <div 
+        className="absolute inset-0 opacity-[0.02] pointer-events-none"
+        aria-hidden="true"
+        style={{
+          backgroundImage: `
+            linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)
+          `,
+          backgroundSize: "60px 60px",
+        }} 
+      />
 
       <div className="relative z-10 max-w-6xl mx-auto px-5 sm:px-8 md:px-12">
-        {isCategory && (
-          <button
-            onClick={onBack}
-            className="flex items-center gap-2 text-white/50 hover:text-white mb-8 transition-colors"
-          >
-            <ArrowLeft size={16} />
-            <span className="text-sm">Back to all services</span>
-          </button>
-        )}
+        <AnimatePresence mode="wait">
+          {isCategory && (
+            <motion.button
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -10 }}
+              transition={{ duration: 0.3 }}
+              onClick={onBack}
+              className="flex items-center gap-2 text-white/50 hover:text-white mb-8 transition-colors"
+            >
+              <ArrowLeft size={16} />
+              <span className="text-sm">Back to all services</span>
+            </motion.button>
+          )}
+        </AnimatePresence>
 
-        <h1
+        <motion.h1
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
           className="text-white mb-4"
           style={{
             fontFamily: 'Georgia, "Times New Roman", serif',
@@ -98,37 +208,45 @@ const Hero = memo(function Hero({ activeCategoryData, onBack }) {
         >
           {isCategory ? (
             <>
-              {activeCategoryData.icon} {activeCategoryData.name}
+              <span className="mr-3">{activeCategoryData.icon}</span>
+              {activeCategoryData.name}
             </>
           ) : (
             "Our Services"
           )}
-        </h1>
+        </motion.h1>
 
-        <p className="text-white/50 max-w-2xl" style={{ fontSize: "17px" }}>
+        <motion.p
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+          className="text-white/50 max-w-2xl"
+          style={{ fontSize: "17px" }}
+        >
           {isCategory
             ? activeCategoryData.description || "Browse all services in this category"
             : "Professional car care and home cleaning at your doorstep"}
-        </p>
+        </motion.p>
       </div>
     </section>
   )
 })
 
 // ══════════════════════════════════════════════════════════
-// ── SIMPLE CATEGORY CARD ─────────────────────────────────
+// ── CATEGORY CARD ────────────────────────────────────────
 // ══════════════════════════════════════════════════════════
 
 const CategoryCard = memo(function CategoryCard({ category, onClick }) {
-  const image = getImageUrl(category.image)
+  const image = useMemo(() => getImageUrl(category.image), [category.image])
+
+  const handleClick = useCallback(() => {
+    onClick(category._id)
+  }, [category._id, onClick])
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.5 }}
-      onClick={() => onClick(category._id)}
+      variants={fadeInUp}
+      onClick={handleClick}
       className="group cursor-pointer bg-white rounded-2xl overflow-hidden border border-gray-100
                  hover:shadow-xl hover:border-gray-200 transition-all duration-300"
     >
@@ -141,9 +259,11 @@ const CategoryCard = memo(function CategoryCard({ category, onClick }) {
       {/* Content */}
       <div className="p-6">
         <div className="flex items-center justify-between mb-3">
-          <span className="text-3xl">{category.icon}</span>
+          <span className="text-3xl" aria-hidden="true">{category.icon}</span>
           {category.totalServices > 0 && (
-            <span className="text-gray-400 text-sm">{category.totalServices} services</span>
+            <span className="text-gray-400 text-sm">
+              {category.totalServices} service{category.totalServices !== 1 ? 's' : ''}
+            </span>
           )}
         </div>
 
@@ -174,29 +294,31 @@ const CategoryCard = memo(function CategoryCard({ category, onClick }) {
 })
 
 // ══════════════════════════════════════════════════════════
-// ── SIMPLE SERVICE CARD ──────────────────────────────────
+// ── SERVICE CARD ─────────────────────────────────────────
 // ══════════════════════════════════════════════════════════
 
 const ServiceCard = memo(function ServiceCard({ service }) {
-  const image = getImageUrl(service.primaryImage) || getImageUrl(service.images?.[0])
+  const image = useMemo(
+    () => getImageUrl(service.primaryImage) || getImageUrl(service.images?.[0]),
+    [service.primaryImage, service.images]
+  )
+
   const categoryIcon = service.category?.icon || ""
   const categoryName = service.category?.name || ""
 
-  const activeVariants = useMemo(
-    () => service.variants?.filter((v) => v.isActive !== false) || [],
-    [service.variants]
+  const lowestPrice = useMemo(
+    () => calculateLowestPrice(service.variants, service.startingPrice),
+    [service.variants, service.startingPrice]
   )
 
-  const lowestPrice = activeVariants.length > 0
-    ? Math.min(...activeVariants.map(v => v.discountPrice || v.price))
-    : service.startingPrice
+  const bookingUrl = useMemo(
+    () => `/bookings?service=${encodeURIComponent(service._id)}`,
+    [service._id]
+  )
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.5 }}
+      variants={fadeInUp}
       className="bg-white rounded-2xl overflow-hidden border border-gray-100
                  hover:shadow-xl hover:border-gray-200 transition-all duration-300"
     >
@@ -205,19 +327,26 @@ const ServiceCard = memo(function ServiceCard({ service }) {
         <ServiceImage src={image} alt={service.name} fallbackIcon={categoryIcon} />
         
         {/* Price badge */}
-        <div className="absolute top-4 right-4">
-          <span className="bg-black/90 backdrop-blur-sm text-white px-4 py-2 rounded-xl"
-                style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontSize: "16px" }}>
-            ₹{lowestPrice?.toLocaleString("en-IN")}
-          </span>
-        </div>
+        {lowestPrice && (
+          <div className="absolute top-4 right-4">
+            <span 
+              className="bg-black/90 backdrop-blur-sm text-white px-4 py-2 rounded-xl"
+              style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontSize: "16px" }}
+            >
+              ₹{lowestPrice.toLocaleString("en-IN")}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Content */}
       <div className="p-6">
-        <p className="text-gray-400 text-xs mb-3 uppercase tracking-wider">
-          {categoryIcon} {categoryName}
-        </p>
+        {categoryName && (
+          <p className="text-gray-400 text-xs mb-3 uppercase tracking-wider">
+            {categoryIcon && <span className="mr-1">{categoryIcon}</span>}
+            {categoryName}
+          </p>
+        )}
 
         <h3
           className="text-black mb-3"
@@ -230,12 +359,14 @@ const ServiceCard = memo(function ServiceCard({ service }) {
           {service.name}
         </h3>
 
-        <p className="text-gray-500 text-sm mb-5 line-clamp-2">
-          {service.description || service.shortDescription}
-        </p>
+        {(service.description || service.shortDescription) && (
+          <p className="text-gray-500 text-sm mb-5 line-clamp-2">
+            {service.description || service.shortDescription}
+          </p>
+        )}
 
         <a
-          href={`/bookings?service=${encodeURIComponent(service._id)}`}
+          href={bookingUrl}
           className="flex items-center justify-center gap-2 h-12 bg-black text-white rounded-xl
                      hover:bg-gray-900 transition-colors no-underline"
         >
@@ -244,6 +375,56 @@ const ServiceCard = memo(function ServiceCard({ service }) {
         </a>
       </div>
     </motion.div>
+  )
+})
+
+// ══════════════════════════════════════════════════════════
+// ── CTA SECTION ──────────────────────────────────────────
+// ══════════════════════════════════════════════════════════
+
+const CTASection = memo(function CTASection() {
+  return (
+    <section className="bg-black py-16 md:py-20">
+      <div className="max-w-6xl mx-auto px-5 text-center">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+        >
+          <Sparkles size={32} className="mx-auto mb-6 text-white/30" />
+          
+          <h2
+            className="text-white mb-8"
+            style={{
+              fontFamily: 'Georgia, "Times New Roman", serif',
+              fontWeight: 300,
+              fontSize: "clamp(2rem, 4vw, 3rem)",
+            }}
+          >
+            Ready to Book?
+          </h2>
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <a
+              href="/bookings"
+              className="inline-flex items-center gap-3 h-14 px-10 bg-white text-black rounded-full no-underline hover:bg-gray-100 transition-colors"
+            >
+              <span className="text-sm font-medium">Book Now</span>
+              <ArrowRight size={16} />
+            </a>
+
+            <a
+              href={`tel:${PHONE_NUMBER}`}
+              className="inline-flex items-center gap-3 h-14 px-10 border border-white/20 text-white rounded-full no-underline hover:bg-white/5 transition-colors"
+            >
+              <Phone size={16} />
+              <span className="text-sm">{PHONE_NUMBER}</span>
+            </a>
+          </div>
+        </motion.div>
+      </div>
+    </section>
   )
 })
 
@@ -260,44 +441,38 @@ export default function ServicesContent() {
   const [services, setServices] = useState([])
   const [activeCategoryData, setActiveCategoryData] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-  useEffect(() => {
-    let isMounted = true
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    setError(null)
 
-    const fetchData = async () => {
-      setLoading(true)
+    try {
+      if (categoryId) {
+        const [servicesData, categoriesData] = await Promise.all([
+          getPublicServices({ category: categoryId }),
+          getCategories(),
+        ])
 
-      try {
-        if (categoryId) {
-          const [servicesData, categoriesData] = await Promise.all([
-            getPublicServices({ category: categoryId }),
-            getCategories(),
-          ])
-
-          if (isMounted) {
-            setServices(Array.isArray(servicesData) ? servicesData : [])
-            const found = categoriesData?.find((c) => c._id === categoryId)
-            setActiveCategoryData(found || null)
-          }
-        } else {
-          const data = await getCategories()
-          if (isMounted) {
-            setCategories(Array.isArray(data) ? data : [])
-            setActiveCategoryData(null)
-          }
-        }
-      } catch (err) {
-        console.error(err)
-      } finally {
-        if (isMounted) setLoading(false)
+        setServices(Array.isArray(servicesData) ? servicesData : [])
+        const found = categoriesData?.find((c) => c._id === categoryId)
+        setActiveCategoryData(found || null)
+      } else {
+        const data = await getCategories()
+        setCategories(Array.isArray(data) ? data : [])
+        setActiveCategoryData(null)
       }
-    }
-
-    fetchData()
-    return () => {
-      isMounted = false
+    } catch (err) {
+      console.error("Failed to fetch data:", err)
+      setError(err.message || "Failed to load services")
+    } finally {
+      setLoading(false)
     }
   }, [categoryId])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
 
   const handleCategoryClick = useCallback(
     (catId) => {
@@ -310,7 +485,12 @@ export default function ServicesContent() {
     router.push("/services")
   }, [router])
 
+  const handleRetry = useCallback(() => {
+    fetchData()
+  }, [fetchData])
+
   const isViewingCategory = !!categoryId
+  const hasContent = isViewingCategory ? services.length > 0 : categories.length > 0
 
   return (
     <main style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
@@ -318,68 +498,47 @@ export default function ServicesContent() {
 
       <section className="bg-white py-12 md:py-20">
         <div className="max-w-6xl mx-auto px-5 sm:px-8 md:px-12">
-          {loading ? (
+          {error ? (
+            <ErrorMessage message={error} onRetry={handleRetry} />
+          ) : loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
+              {Array.from({ length: SKELETON_COUNT }).map((_, i) => (
                 <SkeletonCard key={i} />
               ))}
             </div>
-          ) : isViewingCategory ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {services.map((service) => (
-                <ServiceCard key={service._id} service={service} />
-              ))}
-            </div>
+          ) : !hasContent ? (
+            <EmptyState 
+              message={isViewingCategory 
+                ? "No services available in this category" 
+                : "No categories available"
+              }
+              icon={isViewingCategory ? "🔍" : "📦"}
+            />
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {categories.map((category) => (
-                <CategoryCard
-                  key={category._id}
-                  category={category}
-                  onClick={handleCategoryClick}
-                />
-              ))}
-            </div>
+            <motion.div
+              variants={staggerContainer}
+              initial="hidden"
+              animate="visible"
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+            >
+              {isViewingCategory 
+                ? services.map((service) => (
+                    <ServiceCard key={service._id} service={service} />
+                  ))
+                : categories.map((category) => (
+                    <CategoryCard
+                      key={category._id}
+                      category={category}
+                      onClick={handleCategoryClick}
+                    />
+                  ))
+              }
+            </motion.div>
           )}
         </div>
       </section>
 
-      {!loading && (
-        <section className="bg-black py-16 md:py-20">
-          <div className="max-w-6xl mx-auto px-5 text-center">
-            <Sparkles size={32} className="mx-auto mb-6 text-white/30" />
-            
-            <h2
-              className="text-white mb-8"
-              style={{
-                fontFamily: 'Georgia, "Times New Roman", serif',
-                fontWeight: 300,
-                fontSize: "clamp(2rem, 4vw, 3rem)",
-              }}
-            >
-              Ready to Book?
-            </h2>
-
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <a
-                href="/bookings"
-                className="inline-flex items-center gap-3 h-14 px-10 bg-white text-black rounded-full no-underline hover:bg-gray-100"
-              >
-                <span className="text-sm font-medium">Book Now</span>
-                <ArrowRight size={16} />
-              </a>
-
-              <a
-                href={`tel:${PHONE_NUMBER}`}
-                className="inline-flex items-center gap-3 h-14 px-10 border border-white/20 text-white rounded-full no-underline hover:bg-white/5"
-              >
-                <Phone size={16} />
-                <span className="text-sm">{PHONE_NUMBER}</span>
-              </a>
-            </div>
-          </div>
-        </section>
-      )}
+      {!loading && !error && <CTASection />}
     </main>
   )
 }
