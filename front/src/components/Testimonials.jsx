@@ -1,8 +1,9 @@
+// components/Testimonials.jsx
 "use client"
 
-import { useRef, useState, useCallback, memo } from "react"
+import { useRef, useState, useCallback, useEffect, memo } from "react"
 import { motion, AnimatePresence, useInView } from "framer-motion"
-import { Star, ArrowLeft, ArrowRight, Check } from "lucide-react"
+import { Star, ArrowLeft, ArrowRight, Check, Quote } from "lucide-react"
 
 // ── Constants ──────────────────────────────────────────────
 const TESTIMONIALS = [
@@ -14,6 +15,7 @@ const TESTIMONIALS = [
     text: "Absolutely fantastic service! They arrived on time, were extremely professional, and my car looks brand new. Will definitely book again.",
     service: "Premium Wash",
     initials: "RS",
+    date: "2 weeks ago",
   },
   {
     id: 2,
@@ -23,6 +25,7 @@ const TESTIMONIALS = [
     text: "So convenient to have them come to my office parking. No more wasting weekends at the car wash. The quality is top-notch every single time.",
     service: "Standard Wash",
     initials: "PP",
+    date: "1 month ago",
   },
   {
     id: 3,
@@ -32,6 +35,7 @@ const TESTIMONIALS = [
     text: "I was skeptical at first, but these guys exceeded all my expectations. My SUV has never looked this clean. Highly recommend their premium package.",
     service: "Premium Wash",
     initials: "AK",
+    date: "3 weeks ago",
   },
   {
     id: 4,
@@ -41,6 +45,7 @@ const TESTIMONIALS = [
     text: "The booking process was so simple and the team was very courteous. They even cleaned spots I did not notice. Great attention to detail!",
     service: "Basic Wash",
     initials: "SR",
+    date: "1 week ago",
   },
   {
     id: 5,
@@ -50,112 +55,173 @@ const TESTIMONIALS = [
     text: "Finally a car wash service that respects your time. They came exactly when they said they would. My car is spotless. Five stars!",
     service: "Standard Wash",
     initials: "VS",
+    date: "2 months ago",
   },
 ]
 
-const FEATURES = ["Professional team", "Eco-friendly products", "100% satisfaction"]
+const FEATURES = [
+  "Trained professional team",
+  "Eco-friendly products",
+  "100% satisfaction guarantee",
+]
 
 const STATS = [
-  { value: "5.0", label: "Rating"     },
-  { value: "500+", label: "Customers" },
-  { value: "98%",  label: "Satisfied" },
+  { value: "5.0", label: "Avg Rating" },
+  { value: "500+", label: "Happy Customers" },
+  { value: "98%", label: "Would Recommend" },
 ]
 
 const SERIF = 'Georgia, "Times New Roman", serif'
-const EASE  = [0.22, 1, 0.36, 1]
+const SANS = "'Helvetica Neue', Helvetica, Arial, sans-serif"
+const EASE = [0.22, 1, 0.36, 1]
 
-// ── Animation variants ─────────────────────────────────────
+const AUTO_PLAY_INTERVAL = 6000
+
+// ── Variants ───────────────────────────────────────────────
 const stagger = {
-  hidden:  {},
-  visible: { transition: { staggerChildren: 0.1, delayChildren: 0.1 } },
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.12, delayChildren: 0.1 } },
 }
 
 const fadeUp = {
-  hidden:  { opacity: 0, y: 28 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.65, ease: EASE } },
+  hidden: { opacity: 0, y: 28 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.7, ease: EASE } },
 }
 
 const fadeLeft = {
-  hidden:  { opacity: 0, x: -24 },
-  visible: { opacity: 1, x: 0,  transition: { duration: 0.55, ease: EASE } },
+  hidden: { opacity: 0, x: -20 },
+  visible: { opacity: 1, x: 0, transition: { duration: 0.6, ease: EASE } },
 }
 
-// Directional slide — custom prop carries direction (+1 / -1)
-const slide = {
-  enter:  (d) => ({ x: d > 0 ? 80 : -80, opacity: 0 }),
-  center: { x: 0, opacity: 1, transition: { duration: 0.45, ease: EASE } },
-  exit:   (d) => ({ x: d > 0 ? -80 : 80, opacity: 0,
-    transition: { duration: 0.3, ease: "easeIn" } }),
+const cardVariants = {
+  enter: (dir) => ({ opacity: 0, x: dir > 0 ? 60 : -60, scale: 0.98 }),
+  center: {
+    opacity: 1,
+    x: 0,
+    scale: 1,
+    transition: { duration: 0.5, ease: EASE },
+  },
+  exit: (dir) => ({
+    opacity: 0,
+    x: dir > 0 ? -60 : 60,
+    scale: 0.98,
+    transition: { duration: 0.35, ease: "easeIn" },
+  }),
 }
 
-// ── StarRating ─────────────────────────────────────────────
-const StarRating = memo(function StarRating({ rating = 5 }) {
+// ── Star Rating ────────────────────────────────────────────
+const StarRating = memo(function StarRating({ rating = 5, size = 14 }) {
   return (
     <div className="flex gap-0.5" aria-label={`${rating} out of 5 stars`}>
       {Array.from({ length: 5 }).map((_, i) => (
-        <Star key={i} size={13}
-          className={i < rating ? "fill-yellow-400 text-yellow-400" : "fill-gray-200 text-gray-200"} />
+        <Star
+          key={i}
+          size={size}
+          className={
+            i < rating
+              ? "fill-amber-400 text-amber-400"
+              : "fill-gray-200 text-gray-200"
+          }
+        />
       ))}
     </div>
   )
 })
 
 // ── Avatar ─────────────────────────────────────────────────
-function Avatar({ initials, size = "md", light = false }) {
-  const dim = size === "lg" ? "w-14 h-14" : "w-11 h-11"
-  const fsize = size === "lg" ? "17px" : "14px"
+function Avatar({ initials, size = "md", variant = "dark" }) {
+  const dims = {
+    sm: "w-10 h-10",
+    md: "w-12 h-12",
+    lg: "w-14 h-14",
+  }
+  const fonts = {
+    sm: "14px",
+    md: "15px",
+    lg: "18px",
+  }
+
+  const bgClass = variant === "light" ? "bg-white" : "bg-black"
+  const textClass = variant === "light" ? "text-black" : "text-white"
+  const shadow =
+    variant === "light" ? { boxShadow: "0 8px 24px -6px rgba(0,0,0,0.15)" } : {}
+
   return (
-    <div className={`${dim} rounded-full flex items-center justify-center shrink-0
-                     ${light ? "bg-white" : "bg-black"}`}
-      style={light ? { boxShadow: "0 8px 24px -4px rgba(255,255,255,0.2)" } : {}}>
-      <span className={light ? "text-black" : "text-white"}
-        style={{ fontFamily: SERIF, fontSize: fsize, fontWeight: 400 }}>
+    <div
+      className={`${dims[size]} rounded-full flex items-center justify-center shrink-0 ${bgClass}`}
+      style={shadow}
+    >
+      <span
+        className={textClass}
+        style={{ fontFamily: SERIF, fontSize: fonts[size], fontWeight: 400 }}
+      >
         {initials}
       </span>
     </div>
   )
 }
 
-// ── DotNav ─────────────────────────────────────────────────
-function DotNav({ count, active, onSelect, light }) {
+// ── Dot Navigation ─────────────────────────────────────────
+function DotNav({ count, active, onSelect, variant = "dark" }) {
+  const activeBg = variant === "light" ? "bg-white" : "bg-black"
+  const inactiveBg =
+    variant === "light"
+      ? "bg-white/30 hover:bg-white/60"
+      : "bg-gray-200 hover:bg-gray-400"
+
   return (
     <div className="flex items-center gap-2">
       {Array.from({ length: count }).map((_, i) => (
-        <button key={i} onClick={() => onSelect(i)}
-          aria-label={`Testimonial ${i + 1}`}
-          className={`h-1.5 rounded-full transition-all duration-400
-                      ${i === active
-                        ? `w-8 ${light ? "bg-white" : "bg-black"}`
-                        : `w-1.5 ${light ? "bg-white/30 hover:bg-white/60" : "bg-gray-200 hover:bg-gray-400"}`}`} />
+        <button
+          key={i}
+          onClick={() => onSelect(i)}
+          aria-label={`Go to testimonial ${i + 1}`}
+          className={`h-1.5 rounded-full transition-all duration-500 ${
+            i === active ? `w-8 ${activeBg}` : `w-1.5 ${inactiveBg}`
+          }`}
+        />
       ))}
     </div>
   )
 }
 
-// ── NavButtons ─────────────────────────────────────────────
-function NavButtons({ onPrev, onNext }) {
-  return (
-    <>
-      <motion.button whileTap={{ scale: 0.9 }} onClick={onPrev}
-        aria-label="Previous testimonial"
-        className="w-11 h-11 rounded-full border-2 border-gray-200 flex items-center justify-center
-                   hover:border-black hover:bg-black hover:text-white transition-all duration-300">
-        <ArrowLeft size={17} strokeWidth={2} />
-      </motion.button>
-      <motion.button whileTap={{ scale: 0.9 }} onClick={onNext}
-        aria-label="Next testimonial"
+// ── Arrow Buttons ──────────────────────────────────────────
+function ArrowButton({ direction, onClick, variant = "outline" }) {
+  const Icon = direction === "left" ? ArrowLeft : ArrowRight
+  const label = direction === "left" ? "Previous" : "Next"
+
+  if (variant === "filled") {
+    return (
+      <motion.button
+        whileTap={{ scale: 0.9 }}
+        onClick={onClick}
+        aria-label={`${label} testimonial`}
         className="w-11 h-11 rounded-full bg-black text-white flex items-center justify-center
-                   hover:bg-gray-800 hover:scale-105 transition-all duration-300">
-        <ArrowRight size={17} strokeWidth={2} />
+                   hover:bg-gray-800 transition-all duration-300"
+      >
+        <Icon size={16} strokeWidth={2} />
       </motion.button>
-    </>
+    )
+  }
+
+  return (
+    <motion.button
+      whileTap={{ scale: 0.9 }}
+      onClick={onClick}
+      aria-label={`${label} testimonial`}
+      className="w-11 h-11 rounded-full border-2 border-gray-200 flex items-center justify-center
+                 text-gray-600 hover:border-black hover:bg-black hover:text-white
+                 transition-all duration-300"
+    >
+      <Icon size={16} strokeWidth={2} />
+    </motion.button>
   )
 }
 
-// ── Section header ─────────────────────────────────────────
+// ── Section Header ─────────────────────────────────────────
 const SectionHeader = memo(function SectionHeader() {
-  const ref    = useRef(null)
-  const inView = useInView(ref, { once: true, margin: "-80px" })
+  const ref = useRef(null)
+  const inView = useInView(ref, { once: true, margin: "-60px" })
 
   return (
     <motion.header
@@ -163,44 +229,70 @@ const SectionHeader = memo(function SectionHeader() {
       variants={stagger}
       initial="hidden"
       animate={inView ? "visible" : "hidden"}
-      className="mb-12 md:mb-20"
+      className="mb-12 md:mb-16 lg:mb-20"
     >
-      <motion.div variants={fadeLeft} className="flex items-center gap-4 mb-5">
-        <span className="block w-10 h-px bg-black" aria-hidden="true" />
-        <span className="tracking-[0.4em] uppercase text-gray-400"
-          style={{ fontFamily: SERIF, fontSize: "10px" }}>
+      {/* Tag */}
+      <motion.div variants={fadeLeft} className="flex items-center gap-4 mb-6">
+        <span className="block w-10 h-px bg-black/20" aria-hidden="true" />
+        <span
+          className="tracking-[0.35em] uppercase text-gray-400"
+          style={{ fontFamily: SANS, fontSize: "10px", fontWeight: 500 }}
+        >
           Customer Reviews
         </span>
       </motion.div>
 
-      <div className="md:flex md:items-end md:justify-between md:gap-10">
-        <motion.h2
-          variants={fadeUp}
-          id="testimonials-heading"
-          className="text-black mb-4 md:mb-0"
-          style={{
-            fontFamily: SERIF, fontWeight: 300,
-            fontSize: "clamp(2rem, 7vw, 3.5rem)",
-            lineHeight: 1.05, letterSpacing: "-0.03em",
-          }}
-        >
-          Real Stories,
-          <br className="hidden sm:block" />
-          <span className="text-gray-300">Real Shine</span>
-        </motion.h2>
+      <div className="lg:flex lg:items-end lg:justify-between lg:gap-16">
+        {/* Headline */}
+        <div className="mb-6 lg:mb-0">
+          <motion.h2
+            variants={fadeUp}
+            id="testimonials-heading"
+            className="text-black"
+            style={{
+              fontFamily: SERIF,
+              fontWeight: 300,
+              fontSize: "clamp(2rem, 6vw, 3.5rem)",
+              lineHeight: 1.05,
+              letterSpacing: "-0.03em",
+            }}
+          >
+            Real Stories,
+          </motion.h2>
+          <motion.h2
+            variants={fadeUp}
+            className="text-black/15"
+            style={{
+              fontFamily: SERIF,
+              fontWeight: 300,
+              fontSize: "clamp(2rem, 6vw, 3.5rem)",
+              lineHeight: 1.05,
+              letterSpacing: "-0.03em",
+              fontStyle: "italic",
+            }}
+          >
+            Real Shine.
+          </motion.h2>
+        </div>
 
-        {/* Stats — right-aligned on desktop, below heading on mobile */}
-        <motion.div
-          variants={fadeUp}
-          className="flex gap-6 md:gap-8"
-        >
+        {/* Stats */}
+        <motion.div variants={fadeUp} className="flex gap-8 lg:gap-10 lg:pb-1">
           {STATS.map(({ value, label }, i) => (
-            <div key={i} className="md:text-right">
-              <p className="text-black leading-none"
-                style={{ fontFamily: SERIF, fontSize: "clamp(1.3rem,3vw,1.8rem)", fontWeight: 300 }}>
+            <div key={i} className="lg:text-right">
+              <p
+                className="text-black leading-none mb-1"
+                style={{
+                  fontFamily: SERIF,
+                  fontSize: "clamp(1.25rem, 2.5vw, 1.75rem)",
+                  fontWeight: 400,
+                }}
+              >
                 {value}
               </p>
-              <p className="text-gray-400 tracking-wider uppercase mt-1" style={{ fontSize: "9px" }}>
+              <p
+                className="text-gray-400 tracking-[0.12em] uppercase"
+                style={{ fontSize: "9px", fontFamily: SANS }}
+              >
                 {label}
               </p>
             </div>
@@ -211,220 +303,352 @@ const SectionHeader = memo(function SectionHeader() {
   )
 })
 
-// ── Desktop testimonial card (black panel + info sidebar) ──
-function DesktopCard({ t, dir }) {
+// ── Desktop Card ───────────────────────────────────────────
+function DesktopTestimonialCard({ testimonial, direction }) {
+  const t = testimonial
+
   return (
     <motion.div
       key={t.id}
-      custom={dir}
-      variants={slide}
+      custom={direction}
+      variants={cardVariants}
       initial="enter"
       animate="center"
       exit="exit"
-      className="grid md:grid-cols-5 gap-8 lg:gap-12 items-stretch"
+      className="grid lg:grid-cols-5 gap-6 lg:gap-10 items-stretch"
     >
-      {/* Left: black quote panel */}
-      <div className="md:col-span-3">
-        <div className="relative bg-black rounded-[2rem] p-8 lg:p-12 overflow-hidden h-full">
-          {/* Atmosphere */}
+      {/* Left: Quote Card */}
+      <div className="lg:col-span-3">
+        <div className="relative bg-black rounded-3xl p-8 lg:p-10 xl:p-12 h-full overflow-hidden">
+          {/* Ambient effects */}
           <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
-            <div className="absolute top-0 right-0 w-72 h-72 bg-white/5 rounded-full blur-3xl" />
-            <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full blur-3xl" />
+            <div className="absolute -top-24 -right-24 w-80 h-80 bg-white/[0.04] rounded-full blur-[100px]" />
+            <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-white/[0.03] rounded-full blur-[80px]" />
           </div>
 
-          <div className="relative z-10 flex flex-col h-full">
-            <StarRating rating={t.rating} />
+          {/* Content */}
+          <div className="relative z-10 h-full flex flex-col">
+            {/* Quote icon */}
+            <div className="mb-6">
+              <Quote
+                size={32}
+                strokeWidth={1}
+                className="text-white/10 fill-white/5"
+              />
+            </div>
 
+            {/* Stars */}
+            <StarRating rating={t.rating} size={16} />
+
+            {/* Quote text */}
             <blockquote
-              className="text-white/88 my-8 flex-1"
+              className="text-white/90 my-8 flex-1"
               style={{
-                fontFamily: SERIF, fontWeight: 300,
-                fontSize: "clamp(1.3rem, 2.2vw, 1.75rem)",
-                lineHeight: 1.55, letterSpacing: "-0.01em",
+                fontFamily: SERIF,
+                fontWeight: 300,
+                fontSize: "clamp(1.25rem, 2vw, 1.625rem)",
+                lineHeight: 1.6,
+                letterSpacing: "-0.01em",
               }}
             >
               "{t.text}"
             </blockquote>
 
+            {/* Author */}
             <div className="flex items-center gap-4 pt-6 border-t border-white/10">
-              <Avatar initials={t.initials} size="lg" light />
-              <div>
-                <cite className="text-white not-italic block"
-                  style={{ fontFamily: SERIF, fontSize: "17px", fontWeight: 400 }}>
+              <Avatar initials={t.initials} size="lg" variant="light" />
+              <div className="flex-1">
+                <cite
+                  className="text-white not-italic block"
+                  style={{ fontFamily: SERIF, fontSize: "17px", fontWeight: 400 }}
+                >
                   {t.name}
                 </cite>
-                <p className="text-white/40" style={{ fontSize: "12px" }}>{t.location}</p>
+                <p className="text-white/40" style={{ fontSize: "12px", fontFamily: SANS }}>
+                  {t.location} · {t.date}
+                </p>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Right: info card */}
+      {/* Right: Info Card */}
       <motion.div
-        className="md:col-span-2"
-        initial={{ opacity: 0, x: 20 }}
+        className="lg:col-span-2"
+        initial={{ opacity: 0, x: 24 }}
         animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.5, delay: 0.18, ease: EASE }}
+        transition={{ duration: 0.5, delay: 0.15, ease: EASE }}
       >
-        <div className="bg-gray-50 rounded-[2rem] p-8 h-full flex flex-col">
-          <p className="text-gray-400 tracking-wider uppercase mb-2"
-            style={{ fontSize: "9px" }}>
-            Service Booked
-          </p>
-          <h3 className="text-black mb-8"
-            style={{ fontFamily: SERIF, fontSize: "22px", fontWeight: 400 }}>
-            {t.service}
-          </h3>
+        <div className="bg-gray-50 rounded-3xl p-8 h-full flex flex-col">
+          {/* Service */}
+          <div className="mb-8">
+            <p
+              className="text-gray-400 tracking-[0.15em] uppercase mb-2"
+              style={{ fontSize: "9px", fontFamily: SANS }}
+            >
+              Service Booked
+            </p>
+            <h3
+              className="text-black"
+              style={{ fontFamily: SERIF, fontSize: "24px", fontWeight: 400 }}
+            >
+              {t.service}
+            </h3>
+          </div>
 
-          <div className="space-y-3 flex-1">
-            {FEATURES.map((f, i) => (
+          {/* Features */}
+          <div className="space-y-4 flex-1">
+            {FEATURES.map((feature, i) => (
               <div key={i} className="flex items-center gap-3">
-                <div className="w-5 h-5 rounded-full bg-black flex items-center justify-center shrink-0">
-                  <Check size={10} strokeWidth={2.5} className="text-white" />
+                <div className="w-6 h-6 rounded-full bg-black flex items-center justify-center shrink-0">
+                  <Check size={12} strokeWidth={2.5} className="text-white" />
                 </div>
-                <span className="text-gray-600" style={{ fontSize: "13px" }}>{f}</span>
+                <span
+                  className="text-gray-600"
+                  style={{ fontSize: "14px", fontFamily: SANS }}
+                >
+                  {feature}
+                </span>
               </div>
             ))}
           </div>
 
-          <motion.a
-            whileHover={{ x: 3 }}
-            whileTap={{ scale: 0.97 }}
+          {/* CTA */}
+          <a
             href="/bookings"
-            className="inline-flex items-center gap-2 mt-8 text-black no-underline group"
+            className="group inline-flex items-center gap-2 mt-8 text-black no-underline"
           >
-            <span className="tracking-wider uppercase border-b border-black pb-0.5
-                             group-hover:border-gray-400 transition-colors duration-300"
-              style={{ fontSize: "10px", fontWeight: 500 }}>
-              Book this service
+            <span
+              className="tracking-[0.12em] uppercase border-b border-black pb-0.5
+                         group-hover:border-gray-400 transition-colors duration-300"
+              style={{ fontSize: "10px", fontWeight: 500, fontFamily: SANS }}
+            >
+              Book This Service
             </span>
-            <ArrowRight size={13}
-              className="group-hover:translate-x-0.5 transition-transform duration-300" />
-          </motion.a>
+            <ArrowRight
+              size={13}
+              strokeWidth={2}
+              className="group-hover:translate-x-1 transition-transform duration-300"
+            />
+          </a>
         </div>
       </motion.div>
     </motion.div>
   )
 }
 
-// ── Desktop testimonials ───────────────────────────────────
+// ── Desktop Testimonials ───────────────────────────────────
 const DesktopTestimonials = memo(function DesktopTestimonials() {
-  const [[idx, dir], setSlide] = useState([0, 1])
+  const [[index, direction], setSlide] = useState([0, 1])
+  const [paused, setPaused] = useState(false)
 
-  const go = useCallback((next) => {
-    setSlide(([cur]) => [next, next > cur ? 1 : -1])
+  const goTo = useCallback((next) => {
+    setSlide(([current]) => [next, next > current ? 1 : -1])
   }, [])
 
   const prev = useCallback(() => {
-    setSlide(([cur]) => [(cur - 1 + TESTIMONIALS.length) % TESTIMONIALS.length, -1])
+    setSlide(([current]) => [
+      (current - 1 + TESTIMONIALS.length) % TESTIMONIALS.length,
+      -1,
+    ])
   }, [])
 
   const next = useCallback(() => {
-    setSlide(([cur]) => [(cur + 1) % TESTIMONIALS.length, 1])
+    setSlide(([current]) => [(current + 1) % TESTIMONIALS.length, 1])
   }, [])
 
+  // Auto-play
+  useEffect(() => {
+    if (paused) return
+    const id = setInterval(next, AUTO_PLAY_INTERVAL)
+    return () => clearInterval(id)
+  }, [paused, next])
+
   return (
-    <div className="hidden md:block">
-      <AnimatePresence custom={dir} mode="wait">
-        <DesktopCard key={TESTIMONIALS[idx].id} t={TESTIMONIALS[idx]} dir={dir} />
+    <div
+      className="hidden md:block"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+    >
+      <AnimatePresence custom={direction} mode="wait">
+        <DesktopTestimonialCard
+          key={TESTIMONIALS[index].id}
+          testimonial={TESTIMONIALS[index]}
+          direction={direction}
+        />
       </AnimatePresence>
 
+      {/* Controls */}
       <div className="flex items-center justify-center gap-5 mt-10">
-        <NavButtons onPrev={prev} onNext={next} />
-        <DotNav count={TESTIMONIALS.length} active={idx} onSelect={go} />
+        <ArrowButton direction="left" onClick={prev} variant="outline" />
+        <DotNav count={TESTIMONIALS.length} active={index} onSelect={goTo} />
+        <ArrowButton direction="right" onClick={next} variant="filled" />
       </div>
+
+      <p
+        className="text-center text-gray-300 mt-4"
+        style={{ fontSize: "11px", fontFamily: SANS }}
+      >
+        Hover to pause · Auto-advances every 6s
+      </p>
     </div>
   )
 })
 
-// ── Mobile testimonials ────────────────────────────────────
-const MobileTestimonials = memo(function MobileTestimonials() {
-  const [[idx, dir], setSlide] = useState([0, 1])
+// ── Mobile Card ────────────────────────────────────────────
+function MobileTestimonialCard({ testimonial, direction }) {
+  const t = testimonial
 
-  const go = useCallback((next) => {
-    setSlide(([cur]) => [next, next >= cur ? 1 : -1])
+  return (
+    <motion.div
+      key={t.id}
+      custom={direction}
+      variants={cardVariants}
+      initial="enter"
+      animate="center"
+      exit="exit"
+      className="bg-white border border-gray-100 rounded-3xl p-5 shadow-sm"
+    >
+      {/* Header */}
+      <div className="flex items-start gap-3 mb-4">
+        <Avatar initials={t.initials} size="md" />
+        <div className="flex-1 min-w-0">
+          <cite
+            className="text-black block not-italic truncate"
+            style={{ fontFamily: SERIF, fontSize: "15px", fontWeight: 400 }}
+          >
+            {t.name}
+          </cite>
+          <p
+            className="text-gray-400"
+            style={{ fontSize: "11px", fontFamily: SANS }}
+          >
+            {t.location} · {t.date}
+          </p>
+        </div>
+        <StarRating rating={t.rating} size={12} />
+      </div>
+
+      {/* Quote */}
+      <blockquote
+        className="text-gray-700 mb-5"
+        style={{
+          fontFamily: SERIF,
+          fontWeight: 300,
+          fontSize: "15px",
+          lineHeight: 1.7,
+        }}
+      >
+        "{t.text}"
+      </blockquote>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+        <span
+          className="px-3 py-1.5 rounded-full bg-gray-100 text-gray-500 tracking-[0.1em] uppercase"
+          style={{ fontSize: "9px", fontFamily: SANS }}
+        >
+          {t.service}
+        </span>
+      </div>
+    </motion.div>
+  )
+}
+
+// ── Mobile Testimonials ────────────────────────────────────
+const MobileTestimonials = memo(function MobileTestimonials() {
+  const [[index, direction], setSlide] = useState([0, 1])
+
+  const goTo = useCallback((next) => {
+    setSlide(([current]) => [next, next >= current ? 1 : -1])
   }, [])
 
   const prev = useCallback(() => {
-    setSlide(([cur]) => [(cur - 1 + TESTIMONIALS.length) % TESTIMONIALS.length, -1])
+    setSlide(([current]) => [
+      (current - 1 + TESTIMONIALS.length) % TESTIMONIALS.length,
+      -1,
+    ])
   }, [])
 
   const next = useCallback(() => {
-    setSlide(([cur]) => [(cur + 1) % TESTIMONIALS.length, 1])
+    setSlide(([current]) => [(current + 1) % TESTIMONIALS.length, 1])
   }, [])
 
-  const t = TESTIMONIALS[idx]
+  // Swipe support
+  const touchRef = useRef(0)
+  const onTouchStart = useCallback((e) => {
+    touchRef.current = e.touches[0].clientX
+  }, [])
+  const onTouchEnd = useCallback(
+    (e) => {
+      const dx = touchRef.current - e.changedTouches[0].clientX
+      if (Math.abs(dx) < 50) return
+      if (dx > 0) next()
+      else prev()
+    },
+    [next, prev]
+  )
 
   return (
     <div className="md:hidden">
       {/* Card */}
-      <div className="overflow-hidden mb-6">
-        <AnimatePresence custom={dir} mode="wait">
-          <motion.div
-            key={t.id}
-            custom={dir}
-            variants={slide}
-            initial="enter"
-            animate="center"
-            exit="exit"
-            className="bg-white border border-gray-100 rounded-3xl p-5 shadow-sm"
-          >
-            {/* Header row */}
-            <div className="flex items-center gap-3 mb-4">
-              <Avatar initials={t.initials} />
-              <div className="flex-1 min-w-0">
-                <cite className="text-black block not-italic truncate"
-                  style={{ fontFamily: SERIF, fontSize: "15px", fontWeight: 400 }}>
-                  {t.name}
-                </cite>
-                <p className="text-gray-400" style={{ fontSize: "11px" }}>{t.location}</p>
-              </div>
-              <StarRating rating={t.rating} />
-            </div>
-
-            {/* Quote */}
-            <blockquote
-              className="text-gray-700 mb-5 leading-relaxed"
-              style={{ fontFamily: SERIF, fontWeight: 300, fontSize: "15px", lineHeight: 1.65 }}
-            >
-              "{t.text}"
-            </blockquote>
-
-            {/* Footer */}
-            <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-              <span className="px-3 py-1.5 rounded-full bg-gray-100 text-gray-500 tracking-wider uppercase"
-                style={{ fontSize: "9px" }}>
-                {t.service}
-              </span>
-              <span className="text-gray-300" style={{ fontSize: "11px" }}>
-                {idx + 1} / {TESTIMONIALS.length}
-              </span>
-            </div>
-          </motion.div>
+      <div
+        className="mb-6 touch-pan-y"
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+      >
+        <AnimatePresence custom={direction} mode="wait">
+          <MobileTestimonialCard
+            key={TESTIMONIALS[index].id}
+            testimonial={TESTIMONIALS[index]}
+            direction={direction}
+          />
         </AnimatePresence>
       </div>
 
       {/* Controls */}
-      <div className="flex items-center justify-center gap-4 mb-10">
-        <NavButtons onPrev={prev} onNext={next} />
-        <DotNav count={TESTIMONIALS.length} active={idx} onSelect={go} />
+      <div className="flex items-center justify-center gap-4 mb-8">
+        <ArrowButton direction="left" onClick={prev} variant="outline" />
+        <DotNav count={TESTIMONIALS.length} active={index} onSelect={goTo} />
+        <ArrowButton direction="right" onClick={next} variant="filled" />
       </div>
+
+      {/* Counter */}
+      <p
+        className="text-center text-gray-300 mb-8"
+        style={{ fontSize: "11px", fontFamily: SANS }}
+      >
+        Swipe or tap arrows · {index + 1} of {TESTIMONIALS.length}
+      </p>
 
       {/* CTA */}
       <div className="flex justify-center">
-        <motion.a
-          whileTap={{ scale: 0.97 }}
+        <a
           href="/bookings"
-          className="inline-flex items-center gap-3 h-13 h-12 px-8
-                     bg-black text-white rounded-full no-underline
-                     hover:bg-gray-900 transition-colors duration-300 w-full justify-center sm:w-auto"
+          className="group relative inline-flex items-center justify-center gap-3
+                     w-full sm:w-auto h-14 px-10 bg-black text-white
+                     rounded-full no-underline overflow-hidden
+                     hover:shadow-xl hover:shadow-black/10 transition-shadow duration-500"
         >
-          <span className="tracking-wider uppercase" style={{ fontSize: "11px", fontWeight: 500 }}>
+          <div
+            className="absolute inset-0 bg-gradient-to-r from-gray-800 to-gray-700
+                       -translate-x-full group-hover:translate-x-0
+                       transition-transform duration-600 ease-out"
+            aria-hidden="true"
+          />
+          <span
+            className="relative z-10 tracking-[0.14em] uppercase"
+            style={{ fontSize: "11px", fontWeight: 500, fontFamily: SANS }}
+          >
             Book Your First Wash
           </span>
-          <ArrowRight size={14} strokeWidth={2} />
-        </motion.a>
+          <ArrowRight
+            size={15}
+            strokeWidth={2}
+            className="relative z-10 group-hover:translate-x-1 transition-transform duration-300"
+          />
+        </a>
       </div>
     </div>
   )
@@ -434,11 +658,11 @@ const MobileTestimonials = memo(function MobileTestimonials() {
 export default function Testimonials() {
   return (
     <section
-      className="w-full bg-white py-16 md:py-28 lg:py-36"
-      style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
+      className="w-full bg-white py-20 md:py-28 lg:py-36"
+      style={{ fontFamily: SANS }}
       aria-labelledby="testimonials-heading"
     >
-      <div className="max-w-6xl mx-auto px-4 sm:px-8 md:px-12 lg:px-16">
+      <div className="max-w-7xl mx-auto px-5 sm:px-8 md:px-12 lg:px-16 xl:px-20">
         <SectionHeader />
         <DesktopTestimonials />
         <MobileTestimonials />
