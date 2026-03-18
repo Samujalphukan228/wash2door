@@ -2,20 +2,39 @@
 import api from './api'
 
 /**
- * Create a new booking
+ * Create a new booking (NO VARIANTS)
  */
 export async function createBooking(bookingData) {
   try {
-    const response = await api.post('/bookings', bookingData)
+    console.log('📦 Creating booking with data:', JSON.stringify(bookingData, null, 2))
+
+    const response = await api.post('/bookings', {
+      serviceId: bookingData.serviceId,
+      bookingDate: bookingData.bookingDate,
+      timeSlot: bookingData.timeSlot,
+      location: bookingData.location,
+      specialNotes: bookingData.specialNotes || ''
+    })
     
+    console.log('📦 Response:', response.data)
+
     if (response.data?.success) {
-      return response.data.data  // ← FIXED
+      return response.data.data
     }
     
     throw new Error(response.data?.message || 'Failed to create booking')
   } catch (error) {
+    // ✅ FIXED: Better error logging
+    console.log('❌ Full error:', error)
+    console.log('❌ Error response:', error.response)
+    console.log('❌ Error data:', error.response?.data)
+    console.log('❌ Validation errors:', error.response?.data?.errors)
+    
     throw new Error(
-      error.response?.data?.message || error.message || 'Failed to create booking'
+      error.response?.data?.errors?.join(', ') || 
+      error.response?.data?.message || 
+      error.message || 
+      'Failed to create booking'
     )
   }
 }
@@ -33,7 +52,7 @@ export async function getUserBookings(statusFilter = "", page = 1, limit = 10) {
     const response = await api.get(`/bookings/my-bookings?${params.toString()}`)
     
     if (response.data?.success) {
-      return response.data.data  // ← FIXED: Returns { bookings: [], total, pages }
+      return response.data.data
     }
     
     throw new Error(response.data?.message || 'Failed to fetch bookings')
@@ -52,7 +71,7 @@ export async function getBookingById(bookingId) {
     const response = await api.get(`/bookings/${bookingId}`)
     
     if (response.data?.success) {
-      return response.data.data  // ← FIXED
+      return response.data.data
     }
     
     throw new Error(response.data?.message || 'Failed to fetch booking')
@@ -68,10 +87,10 @@ export async function getBookingById(bookingId) {
  */
 export async function cancelBooking(bookingId, reason = "") {
   try {
-    const response = await api.put(`/bookings/${bookingId}/cancel`, { reason })  // ← FIXED: PUT not PATCH
+    const response = await api.put(`/bookings/${bookingId}/cancel`, { reason })
     
     if (response.data?.success) {
-      return response.data.data  // ← FIXED
+      return response.data.data
     }
     
     throw new Error(response.data?.message || 'Failed to cancel booking')
@@ -87,13 +106,13 @@ export async function cancelBooking(bookingId, reason = "") {
  */
 export async function rescheduleBooking(bookingId, newDate, newTimeSlot) {
   try {
-    const response = await api.put(`/bookings/${bookingId}/reschedule`, {  // ← FIXED: PUT not PATCH
+    const response = await api.put(`/bookings/${bookingId}/reschedule`, {
       newDate,
       newTimeSlot
     })
     
     if (response.data?.success) {
-      return response.data.data  // ← FIXED
+      return response.data.data
     }
     
     throw new Error(response.data?.message || 'Failed to reschedule booking')
@@ -105,37 +124,16 @@ export async function rescheduleBooking(bookingId, newDate, newTimeSlot) {
 }
 
 /**
- * Get available time slots for a specific date
- */
-export async function getAvailableSlots(date, serviceId) {
-  try {
-    const response = await api.get('/bookings/available-slots', {
-      params: { date, serviceId }
-    })
-    
-    if (response.data?.success) {
-      return response.data.data || []
-    }
-    
-    return []
-  } catch (error) {
-    throw new Error(
-      error.response?.data?.message || error.message || 'Failed to fetch available slots'
-    )
-  }
-}
-
-/**
- * Check availability for a date (GLOBAL - no serviceId needed)
+ * Check availability for a date (GLOBAL) - ✅ FIXED URL
  */
 export async function checkAvailability(date) {
   try {
-    const response = await api.get('/bookings/availability', {
+    const response = await api.get('/bookings/availability', {  // ✅ FIXED
       params: { date }
     })
     
     if (response.data?.success) {
-      return response.data
+      return response.data.data
     }
     
     throw new Error(response.data?.message || 'Failed to check availability')
@@ -147,16 +145,20 @@ export async function checkAvailability(date) {
 }
 
 /**
- * Get services (public)
+ * Get service pricing (returns single price, not variants)
  */
-export async function getServices() {
+export async function getServicePricing(serviceId) {
   try {
-    const response = await api.get('/public/services')
+    const response = await api.get(`/bookings/service/${serviceId}/pricing`)
     
-    return response.data?.data || response.data || []
+    if (response.data?.success) {
+      return response.data.data
+    }
+    
+    throw new Error(response.data?.message || 'Failed to fetch service pricing')
   } catch (error) {
     throw new Error(
-      error.response?.data?.message || error.message || 'Failed to fetch services'
+      error.response?.data?.message || error.message || 'Failed to fetch service pricing'
     )
   }
 }

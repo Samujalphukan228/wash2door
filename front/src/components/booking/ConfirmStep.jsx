@@ -14,22 +14,30 @@ export default function ConfirmStep({ data, onBack, onSuccess }) {
     const [bookingCode, setBookingCode] = useState("")
 
     const handleConfirm = async () => {
-        try {
-            setLoading(true)
-            setError("")
+    try {
+        setLoading(true)
+        setError("")
 
-            const bookingPayload = {
-                serviceId: data.serviceId,
-                variantId: data.variantId,
-                bookingDate: data.bookingDate,
-                timeSlot: data.timeSlot,
-                location: {
-                    address: data.location.address,
-                    city: data.location.city,
-                    landmark: data.location.landmark || "",
-                },
-                specialNotes: data.specialNotes || "",
-            }
+        // ✅ Debug: Log what we're sending
+        console.log('📦 Booking data:', {
+            serviceId: data.serviceId,
+            bookingDate: data.bookingDate,
+            timeSlot: data.timeSlot,
+            location: data.location,
+            specialNotes: data.specialNotes
+        })
+
+        const bookingPayload = {
+            serviceId: data.serviceId,
+            bookingDate: data.bookingDate,
+            timeSlot: data.timeSlot,
+            location: {
+                address: data.location.address,
+                city: data.location.city,
+                landmark: data.location.landmark || "",
+            },
+            specialNotes: data.specialNotes || "",
+        }
 
             const result = await createBooking(bookingPayload)
             setBookingCode(result.bookingCode || result._id)
@@ -116,9 +124,7 @@ export default function ConfirmStep({ data, onBack, onSuccess }) {
                             <p className="text-black text-lg mb-2" style={{ fontFamily: 'Georgia, serif' }}>
                                 {data._ui?.serviceName}
                             </p>
-                            <p className="text-gray-600 text-sm">
-                                {data._ui?.variantName}
-                            </p>
+                            {/* ✅ No variant name displayed */}
                         </div>
                         <p className="text-black text-2xl font-semibold">₹{data._ui?.price?.toLocaleString('en-IN')}</p>
                     </div>

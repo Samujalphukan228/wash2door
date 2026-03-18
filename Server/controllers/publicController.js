@@ -1,7 +1,8 @@
-// controllers/publicController.js - UPDATED with GLOBAL SLOT CHECK
+// controllers/publicController.js - UPDATED with SUBCATEGORY SUPPORT
 
 import Service from '../models/Service.js';
 import Category from '../models/Category.js';
+import Subcategory from '../models/Subcategory.js';  // ✅ ADD THIS IMPORT
 import Review from '../models/Review.js';
 import Booking from '../models/Booking.js';
 import mongoose from 'mongoose';
@@ -18,6 +19,7 @@ export const getActiveServices = async (req, res) => {
     try {
         const {
             category,
+            subcategory,    // ✅ ADD THIS
             tier,
             sort,
             search,
@@ -33,6 +35,11 @@ export const getActiveServices = async (req, res) => {
 
         if (category && isValidObjectId(category)) {
             query.category = category;
+        }
+
+        // ✅ ADD SUBCATEGORY FILTER
+        if (subcategory && isValidObjectId(subcategory)) {
+            query.subcategory = subcategory;
         }
 
         if (tier) {
@@ -65,7 +72,8 @@ export const getActiveServices = async (req, res) => {
 
         const services = await Service.find(query)
             .populate('category', 'name slug icon image')
-            .select('name shortDescription category tier images variants highlights startingPrice averageRating totalReviews totalBookings displayOrder isFeatured')
+            .populate('subcategory', 'name slug icon')  // ✅ ADD THIS
+            .select('name shortDescription category subcategory tier images highlights price discountPrice duration averageRating totalReviews totalBookings displayOrder isFeatured')
             .sort(sortOption)
             .limit(limitNum)
             .skip((pageNum - 1) * limitNum);
@@ -75,28 +83,19 @@ export const getActiveServices = async (req, res) => {
             name: service.name,
             shortDescription: service.shortDescription,
             category: service.category,
+            subcategory: service.subcategory,   // ✅ ADD THIS
             tier: service.tier,
             primaryImage: service.primaryImage,
             images: service.images,
             highlights: service.highlights,
-            startingPrice: service.startingPrice,
-            priceRange: service.priceRange,
+            price: service.price,               // ✅ NO VARIANTS
+            discountPrice: service.discountPrice,
+            finalPrice: service.finalPrice,
+            duration: service.duration,
             averageRating: service.averageRating,
             totalReviews: service.totalReviews,
             totalBookings: service.totalBookings,
             isFeatured: service.isFeatured,
-            variantCount: service.variants ? service.variants.filter(v => v.isActive).length : 0,
-            variants: service.variants
-                ? service.variants
-                    .filter(v => v.isActive)
-                    .map(v => ({
-                        _id: v._id,
-                        name: v.name,
-                        price: v.price,
-                        discountPrice: v.discountPrice,
-                        duration: v.duration
-                    }))
-                : []
         }));
 
         res.status(200).json({
@@ -137,6 +136,7 @@ export const getServiceDetails = async (req, res) => {
             isActive: true
         })
             .populate('category', 'name slug icon image')
+            .populate('subcategory', 'name slug icon image')  // ✅ ADD THIS
             .select('-createdBy');
 
         if (!service) {
@@ -145,10 +145,6 @@ export const getServiceDetails = async (req, res) => {
                 message: 'Service not found'
             });
         }
-
-        const activeVariants = service.variants
-            .filter(v => v.isActive)
-            .sort((a, b) => a.displayOrder - b.displayOrder);
 
         const reviews = await Review.find({
             serviceId,
@@ -174,13 +170,13 @@ export const getServiceDetails = async (req, res) => {
             { $sort: { _id: -1 } }
         ]);
 
-        // Get related services (same category, exclude current)
         const relatedServices = await Service.find({
             category: service.category._id,
             _id: { $ne: serviceId },
             isActive: true
         })
-            .select('name shortDescription images startingPrice averageRating tier')
+            .populate('subcategory', 'name slug icon')  // ✅ ADD THIS
+            .select('name shortDescription images price discountPrice duration averageRating tier subcategory')
             .limit(4);
 
         res.status(200).json({
@@ -192,15 +188,17 @@ export const getServiceDetails = async (req, res) => {
                     description: service.description,
                     shortDescription: service.shortDescription,
                     category: service.category,
+                    subcategory: service.subcategory,   // ✅ ADD THIS
                     tier: service.tier,
                     images: service.images,
                     primaryImage: service.primaryImage,
                     highlights: service.highlights,
                     includes: service.includes,
                     excludes: service.excludes,
-                    variants: activeVariants,
-                    startingPrice: service.startingPrice,
-                    priceRange: service.priceRange,
+                    price: service.price,               // ✅ NO VARIANTS
+                    discountPrice: service.discountPrice,
+                    finalPrice: service.finalPrice,
+                    duration: service.duration,
                     averageRating: service.averageRating,
                     totalReviews: service.totalReviews,
                     totalBookings: service.totalBookings,
@@ -230,23 +228,27 @@ export const getCategories = async (req, res) => {
         const { withServiceCount = 'true' } = req.query;
 
         const categories = await Category.find({ isActive: true })
-            .select('name slug icon image description displayOrder')
+            .select('name slug icon image description displayOrder totalSubcategories totalServices')
             .sort({ displayOrder: 1, createdAt: -1 })
             .lean();
 
         let result = categories;
 
-        // Add service count if requested
         if (withServiceCount === 'true') {
             result = await Promise.all(
                 categories.map(async (cat) => {
-                    const count = await Service.countDocuments({
+                    const serviceCount = await Service.countDocuments({
+                        category: cat._id,
+                        isActive: true
+                    });
+                    const subcategoryCount = await Subcategory.countDocuments({  // ✅ ADD THIS
                         category: cat._id,
                         isActive: true
                     });
                     return {
                         ...cat,
-                        totalServices: count
+                        totalServices: serviceCount,
+                        totalSubcategories: subcategoryCount   // ✅ ADD THIS
                     };
                 })
             );
@@ -263,6 +265,74 @@ export const getCategories = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to fetch categories'
+        });
+    }
+};
+
+// ============================================
+// ✅ NEW: GET SUBCATEGORIES BY CATEGORY
+// ============================================
+export const getSubcategoriesByCategory = async (req, res) => {
+    try {
+        const { categoryId } = req.params;
+
+        if (!isValidObjectId(categoryId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid category ID'
+            });
+        }
+
+        // Check category exists
+        const category = await Category.findById(categoryId)
+            .select('name slug icon')
+            .lean();
+
+        if (!category) {
+            return res.status(404).json({
+                success: false,
+                message: 'Category not found'
+            });
+        }
+
+        const subcategories = await Subcategory.find({
+            category: categoryId,
+            isActive: true
+        })
+            .select('_id name slug icon description image totalServices category displayOrder')
+            .sort({ displayOrder: 1 })
+            .lean();
+
+        // Add live service count per subcategory
+        const result = await Promise.all(
+            subcategories.map(async (sub) => {
+                const serviceCount = await Service.countDocuments({
+                    subcategory: sub._id,
+                    isActive: true
+                });
+                return {
+                    ...sub,
+                    category: {
+                        _id: category._id,
+                        name: category.name,
+                        icon: category.icon
+                    },
+                    totalServices: serviceCount
+                };
+            })
+        );
+
+        res.status(200).json({
+            success: true,
+            total: result.length,
+            data: result
+        });
+
+    } catch (error) {
+        console.error('getSubcategoriesByCategory error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch subcategories'
         });
     }
 };
@@ -297,7 +367,7 @@ export const getServiceReviews = async (req, res) => {
             }
         }
 
-        let sortOption = { createdAt: -1 }; // newest
+        let sortOption = { createdAt: -1 };
         if (sort === 'oldest') sortOption = { createdAt: 1 };
         if (sort === 'highest') sortOption = { rating: -1, createdAt: -1 };
         if (sort === 'lowest') sortOption = { rating: 1, createdAt: -1 };
@@ -310,7 +380,6 @@ export const getServiceReviews = async (req, res) => {
             .limit(limitNum)
             .skip((pageNum - 1) * limitNum);
 
-        // Get rating stats
         const ratingStats = await Review.aggregate([
             { $match: { serviceId: new mongoose.Types.ObjectId(serviceId), isVisible: true } },
             {
@@ -351,9 +420,8 @@ export const getServiceReviews = async (req, res) => {
 // ============================================
 export const checkAvailability = async (req, res) => {
     try {
-        const { serviceId, date } = req.query;
+        const { date } = req.query;
 
-        // Date is required, serviceId is optional (kept for API compatibility)
         if (!date) {
             return res.status(400).json({
                 success: false,
@@ -369,7 +437,6 @@ export const checkAvailability = async (req, res) => {
             });
         }
 
-        // Check if date is in the past
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
@@ -380,7 +447,6 @@ export const checkAvailability = async (req, res) => {
             });
         }
 
-        // Check if Sunday (closed)
         if (bookingDate.getDay() === 0) {
             return res.status(200).json({
                 success: true,
@@ -406,25 +472,18 @@ export const checkAvailability = async (req, res) => {
         const endOfDay = new Date(bookingDate);
         endOfDay.setHours(23, 59, 59, 999);
 
-        // ============================================
-        // GLOBAL CHECK - Get ALL bookings for this date
-        // Not filtered by serviceId
-        // ============================================
         const bookedSlots = await Booking.find({
             bookingDate: { $gte: startOfDay, $lte: endOfDay },
             status: { $nin: ['cancelled'] }
-        }).select('timeSlot serviceName variantName');
+        }).select('timeSlot serviceName');
 
-        // Create a map of booked slots with details
         const bookedSlotMap = {};
         bookedSlots.forEach(booking => {
             bookedSlotMap[booking.timeSlot] = {
-                serviceName: booking.serviceName,
-                variantName: booking.variantName
+                serviceName: booking.serviceName
             };
         });
 
-        // For today, filter out past time slots
         const now = new Date();
         const isToday = bookingDate.toDateString() === now.toDateString();
 
@@ -433,20 +492,16 @@ export const checkAvailability = async (req, res) => {
             const [hours] = startTime.split(':');
             const slotHour = parseInt(hours);
 
-            // Check if slot is booked
             const isBooked = bookedSlotMap[slot] !== undefined;
 
-            // Check if slot is in the past (for today)
             let isPast = false;
             if (isToday) {
                 const currentHour = now.getHours();
-                // Add 1 hour buffer - can't book slots starting within the next hour
                 if (slotHour <= currentHour + 1) {
                     isPast = true;
                 }
             }
 
-            // Determine availability and reason
             let available = true;
             let reason = null;
             let bookedBy = null;
@@ -460,12 +515,7 @@ export const checkAvailability = async (req, res) => {
                 bookedBy = bookedSlotMap[slot].serviceName;
             }
 
-            return {
-                slot,
-                available,
-                reason,
-                bookedBy
-            };
+            return { slot, available, reason, bookedBy };
         });
 
         const availableCount = slots.filter(s => s.available).length;
@@ -506,7 +556,8 @@ export const getFeaturedServices = async (req, res) => {
             isFeatured: true
         })
             .populate('category', 'name slug icon')
-            .select('name shortDescription images startingPrice averageRating totalReviews tier')
+            .populate('subcategory', 'name slug icon')  // ✅ ADD THIS
+            .select('name shortDescription images price discountPrice duration averageRating totalReviews tier subcategory')
             .sort({ displayOrder: 1 })
             .limit(limitNum);
 
@@ -518,9 +569,13 @@ export const getFeaturedServices = async (req, res) => {
                 name: service.name,
                 shortDescription: service.shortDescription,
                 category: service.category,
+                subcategory: service.subcategory,   // ✅ ADD THIS
                 tier: service.tier,
                 primaryImage: service.primaryImage,
-                startingPrice: service.startingPrice,
+                price: service.price,
+                discountPrice: service.discountPrice,
+                finalPrice: service.finalPrice,
+                duration: service.duration,
                 averageRating: service.averageRating,
                 totalReviews: service.totalReviews
             }))
@@ -557,7 +612,6 @@ export const getAvailableSlots = async (req, res) => {
             });
         }
 
-        // Check if date is in the past
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
@@ -568,7 +622,6 @@ export const getAvailableSlots = async (req, res) => {
             });
         }
 
-        // Check if Sunday
         if (bookingDate.getDay() === 0) {
             return res.status(200).json({
                 success: true,
@@ -587,7 +640,6 @@ export const getAvailableSlots = async (req, res) => {
         const endOfDay = new Date(bookingDate);
         endOfDay.setHours(23, 59, 59, 999);
 
-        // Get all booked slots for this date (GLOBAL)
         const bookedSlots = await Booking.find({
             bookingDate: { $gte: startOfDay, $lte: endOfDay },
             status: { $nin: ['cancelled'] }
@@ -595,26 +647,18 @@ export const getAvailableSlots = async (req, res) => {
 
         const bookedSlotNames = bookedSlots.map(b => b.timeSlot);
 
-        // For today, filter out past slots
         const now = new Date();
         const isToday = bookingDate.toDateString() === now.toDateString();
 
         const availableSlots = TIME_SLOTS.filter(slot => {
-            // Check if already booked
-            if (bookedSlotNames.includes(slot)) {
-                return false;
-            }
+            if (bookedSlotNames.includes(slot)) return false;
 
-            // Check if past (for today)
             if (isToday) {
                 const [startTime] = slot.split('-');
                 const [hours] = startTime.split(':');
                 const slotHour = parseInt(hours);
                 const currentHour = now.getHours();
-
-                if (slotHour <= currentHour + 1) {
-                    return false;
-                }
+                if (slotHour <= currentHour + 1) return false;
             }
 
             return true;
@@ -645,6 +689,7 @@ export default {
     getActiveServices,
     getServiceDetails,
     getCategories,
+    getSubcategoriesByCategory,  // ✅ ADD THIS
     getServiceReviews,
     checkAvailability,
     getFeaturedServices,

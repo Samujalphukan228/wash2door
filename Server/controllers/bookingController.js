@@ -1,4 +1,4 @@
-// controllers/bookingController.js
+// controllers/bookingController.js - FIXED TIMEZONE & CANCELLED SLOTS
 
 import Booking from '../models/Booking.js';
 import Service from '../models/Service.js';
@@ -24,48 +24,33 @@ const isValidObjectId = (id) =>
     mongoose.Types.ObjectId.isValid(id) &&
     /^[0-9a-fA-F]{24}$/.test(id);
 
-// ============================================
-// GET SERVICE WITH VARIANT PRICING
-// ============================================
+// ✅ HELPER: Get local date string from Date object
+const getLocalDateStr = (date) => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+}
 
+// ============================================
+// GET SERVICE INFO FOR BOOKING
+// ============================================
 export const getServiceWithPricing = async (req, res) => {
     try {
         const { serviceId } = req.params;
 
         if (!isValidObjectId(serviceId)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid service ID'
-            });
+            return res.status(400).json({ success: false, message: 'Invalid service ID' });
         }
 
-        const service = await Service.findOne({
-            _id: serviceId,
-            isActive: true
-        })
-            .select('name category tier shortDescription variants images')
-            .populate('category', 'name slug icon');
+        const service = await Service.findOne({ _id: serviceId, isActive: true })
+            .select('name tier shortDescription price discountPrice duration images')
+            .populate('category', 'name slug icon')
+            .populate('subcategory', 'name slug icon');
 
         if (!service) {
-            return res.status(404).json({
-                success: false,
-                message: 'Service not found'
-            });
+            return res.status(404).json({ success: false, message: 'Service not found' });
         }
-
-        const activeVariants = service.variants
-            .filter(v => v.isActive)
-            .sort((a, b) => a.displayOrder - b.displayOrder)
-            .map(v => ({
-                _id: v._id,
-                name: v.name,
-                description: v.description,
-                image: v.image,
-                price: v.price,
-                discountPrice: v.discountPrice,
-                duration: v.duration,
-                features: v.features
-            }));
 
         res.status(200).json({
             success: true,
@@ -74,55 +59,62 @@ export const getServiceWithPricing = async (req, res) => {
                 serviceName: service.name,
                 serviceTier: service.tier,
                 category: service.category,
+                subcategory: service.subcategory,
                 shortDescription: service.shortDescription,
                 primaryImage: service.primaryImage,
-                variants: activeVariants
+                price: service.price,
+                discountPrice: service.discountPrice,
+                finalPrice: service.finalPrice,
+                duration: service.duration
             }
         });
 
     } catch (error) {
-        console.error('Get service pricing error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error fetching service pricing'
-        });
+        console.error('getServiceWithPricing error:', error);
+        res.status(500).json({ success: false, message: 'Error fetching service' });
     }
 };
 
 // ============================================
-// CHECK TIME SLOT AVAILABILITY (GLOBAL)
+// CHECK AVAILABILITY - ✅ FIXED TIMEZONE & CANCELLED BOOKINGS
 // ============================================
-
 export const checkAvailability = async (req, res) => {
     try {
         const { date } = req.query;
 
         if (!date) {
-            return res.status(400).json({
-                success: false,
-                message: 'Date is required'
-            });
+            return res.status(400).json({ success: false, message: 'Date is required' });
         }
 
-        const bookingDate = new Date(date);
+        // ✅ Validate format
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            return res.status(400).json({ success: false, message: 'Invalid date format. Use YYYY-MM-DD' });
+        }
+
+        const now = new Date();
+        const todayStr = getLocalDateStr(now)
+
+        console.log('🔍 ==================== AVAILABILITY CHECK ====================')
+        console.log('📅 Received date:', date)
+        console.log('📅 Server today:', todayStr)
+        console.log('📅 Server time:', now.toLocaleString())
+
+        // ✅ FIXED: Parse date at noon local time to avoid UTC conversion issues
+        const [year, month, day] = date.split('-').map(Number)
+        const bookingDate = new Date(year, month - 1, day, 12, 0, 0, 0)
+
+        console.log('📅 Parsed booking date:', bookingDate.toLocaleDateString())
+        console.log('📅 Day of week:', bookingDate.getDay(), '(0=Sun)')
+
         if (isNaN(bookingDate.getTime())) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid date format. Use YYYY-MM-DD'
-            });
+            return res.status(400).json({ success: false, message: 'Invalid date' });
         }
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        if (bookingDate < today) {
-            return res.status(400).json({
-                success: false,
-                message: 'Cannot check availability for past dates'
-            });
+        // ✅ Compare date strings not Date objects
+        if (date < todayStr) {
+            return res.status(400).json({ success: false, message: 'Cannot check availability for past dates' });
         }
 
-        // Check if Sunday (closed)
         if (isClosedDay(bookingDate)) {
             return res.status(200).json({
                 success: true,
@@ -133,129 +125,90 @@ export const checkAvailability = async (req, res) => {
                     message: 'We are closed on Sundays',
                     availableSlots: 0,
                     totalSlots: TIME_SLOTS.length,
-                    slots: TIME_SLOTS.map(slot => ({
-                        slot,
-                        available: false,
-                        reason: 'Closed'
-                    }))
+                    slots: TIME_SLOTS.map(slot => ({ slot, available: false, reason: 'Closed' }))
                 }
             });
         }
 
-        // ============================================
-        // GLOBAL CHECK using slotLockKey
-        // Find all locked slots for this date
-        // ============================================
-        const dateStr = bookingDate.toISOString().split('T')[0];
-
+        // ✅ FIXED: Only get ACTIVE bookings (exclude cancelled/completed)
         const lockedBookings = await Booking.find({
-            slotLockKey: { $regex: `^${dateStr}\\|` }
-        }).select('timeSlot serviceName variantName');
+            slotLockKey: { $regex: `^${date}\\|` },
+            status: { $in: ['pending', 'confirmed'] }
+        }).select('timeSlot serviceName status');
 
-        // Build a map: timeSlot → booking info
+        console.log('📋 Active bookings:', lockedBookings.length)
+
         const lockedSlotMap = {};
-        lockedBookings.forEach(booking => {
-            lockedSlotMap[booking.timeSlot] = {
-                serviceName: booking.serviceName,
-                variantName: booking.variantName
-            };
+        lockedBookings.forEach(b => {
+            lockedSlotMap[b.timeSlot] = b.serviceName;
         });
 
-        // For today, calculate past slots
-        const now = new Date();
-        const isToday = bookingDate.toDateString() === now.toDateString();
+        const isToday = date === todayStr
 
         const slots = TIME_SLOTS.map(slot => {
             const [startTime] = slot.split('-');
             const [hours, minutes] = startTime.split(':').map(Number);
 
             const isBooked = lockedSlotMap[slot] !== undefined;
-
-            // Check if slot is in the past (for today)
             let isPast = false;
+
             if (isToday) {
-                const currentHour = now.getHours();
-                const currentMin = now.getMinutes();
-                // Slot is past if current time has reached or passed the start time
-                if (currentHour > hours || (currentHour === hours && currentMin >= minutes)) {
-                    isPast = true;
-                }
+                // ✅ FIXED: Create actual slot datetime and compare timestamps
+                const slotDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0)
+                isPast = now.getTime() >= slotDateTime.getTime()
             }
 
             let available = true;
             let reason = null;
-            let bookedBy = null;
 
-            if (isPast) {
-                available = false;
-                reason = 'Past';
-            } else if (isBooked) {
-                available = false;
-                reason = 'Booked';
-                bookedBy = lockedSlotMap[slot].serviceName;
-            }
+            if (isPast) { available = false; reason = 'Past'; }
+            else if (isBooked) { available = false; reason = 'Booked'; }
 
-            return { slot, available, reason, bookedBy };
+            return { slot, available, reason };
         });
 
-        const availableCount = slots.filter(s => s.available).length;
+        const availableCount = slots.filter(s => s.available).length
+        console.log('📊 Available:', availableCount, '/', slots.length)
+        console.log('🔍 ============================================================')
 
         res.status(200).json({
             success: true,
             data: {
                 date,
-                isAvailable: availableCount > 0,
+                isAvailable: slots.some(s => s.available),
                 isClosed: false,
-                availableSlots: availableCount,
+                availableSlots: slots.filter(s => s.available).length,
                 totalSlots: slots.length,
                 slots
             }
         });
 
     } catch (error) {
-        console.error('Check availability error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error checking availability'
-        });
+        console.error('checkAvailability error:', error);
+        res.status(500).json({ success: false, message: 'Error checking availability' });
     }
 };
 
 // ============================================
-// CREATE BOOKING (GLOBAL SLOT LOCK)
+// CREATE BOOKING - ✅ FIXED TIMEZONE & CANCELLED SLOT CHECK
 // ============================================
-
 export const createBooking = async (req, res) => {
     try {
-        const {
-            serviceId,
-            variantId,
-            bookingDate,
-            timeSlot,
-            location,
-            specialNotes
-        } = req.body;
+        const { serviceId, bookingDate, timeSlot, location, specialNotes } = req.body;
 
-        // ---- Validate required fields ----
-        if (!serviceId || !variantId || !bookingDate || !timeSlot || !location) {
+        if (!serviceId || !bookingDate || !timeSlot || !location) {
             return res.status(400).json({
                 success: false,
-                message: 'Required: serviceId, variantId, bookingDate, timeSlot, location'
+                message: 'Required: serviceId, bookingDate, timeSlot, location'
             });
         }
 
         if (!isValidObjectId(serviceId)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid service ID'
-            });
+            return res.status(400).json({ success: false, message: 'Invalid service ID' });
         }
 
         if (!location.address || !location.city) {
-            return res.status(400).json({
-                success: false,
-                message: 'Location address and city are required'
-            });
+            return res.status(400).json({ success: false, message: 'Location address and city are required' });
         }
 
         if (!isValidTimeSlot(timeSlot)) {
@@ -265,57 +218,45 @@ export const createBooking = async (req, res) => {
             });
         }
 
-        // ---- Validate date ----
-        const requestedDate = new Date(bookingDate);
+        // ✅ FIXED: Parse date from local string
+        const [year, month, day] = bookingDate.split('-').map(Number)
+        const requestedDate = new Date(year, month - 1, day, 12, 0, 0, 0)
+
         if (isNaN(requestedDate.getTime())) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid date format. Use YYYY-MM-DD'
-            });
+            return res.status(400).json({ success: false, message: 'Invalid date format. Use YYYY-MM-DD' });
         }
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        const now = new Date()
+        const todayStr = getLocalDateStr(now)
 
-        if (requestedDate < today) {
-            return res.status(400).json({
-                success: false,
-                message: 'Booking date must be in the future'
-            });
+        if (bookingDate < todayStr) {
+            return res.status(400).json({ success: false, message: 'Booking date must be in the future' });
         }
 
         if (isClosedDay(requestedDate)) {
-            return res.status(400).json({
-                success: false,
-                message: 'We are closed on Sundays'
-            });
+            return res.status(400).json({ success: false, message: 'We are closed on Sundays' });
         }
 
-        const maxDate = new Date();
-        maxDate.setDate(maxDate.getDate() + LIMITS.MAX_BOOKING_ADVANCE_DAYS);
-        if (requestedDate > maxDate) {
+        const maxDate = new Date()
+        maxDate.setDate(maxDate.getDate() + LIMITS.MAX_BOOKING_ADVANCE_DAYS)
+        const maxDateStr = getLocalDateStr(maxDate)
+
+        if (bookingDate > maxDateStr) {
             return res.status(400).json({
                 success: false,
                 message: `Cannot book more than ${LIMITS.MAX_BOOKING_ADVANCE_DAYS} days in advance`
             });
         }
 
-        // ---- Check if slot time has passed (for today) ----
-        const isToday = requestedDate.toDateString() === new Date().toDateString();
+        const isToday = bookingDate === todayStr
         if (isToday) {
             const [startTime] = timeSlot.split('-');
             const [hours, minutes] = startTime.split(':').map(Number);
-            const now = new Date();
-
             if (now.getHours() > hours || (now.getHours() === hours && now.getMinutes() >= minutes)) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'This time slot has already passed for today'
-                });
+                return res.status(400).json({ success: false, message: 'This time slot has already passed for today' });
             }
         }
 
-        // ---- Max active bookings per user ----
         const activeBookings = await Booking.countDocuments({
             customerId: req.user._id,
             status: { $in: ['pending', 'confirmed'] }
@@ -328,67 +269,53 @@ export const createBooking = async (req, res) => {
             });
         }
 
-        // ---- Find service & variant ----
-        const service = await Service.findOne({
-            _id: serviceId,
-            isActive: true
-        }).populate('category', 'name slug');
+        const service = await Service.findOne({ _id: serviceId, isActive: true })
+            .populate('category', 'name slug')
+            .populate('subcategory', 'name slug');
 
         if (!service) {
-            return res.status(404).json({
-                success: false,
-                message: 'Service not found or not available'
-            });
+            return res.status(404).json({ success: false, message: 'Service not found or not available' });
         }
 
-        const selectedVariant = service.variants.id(variantId);
-
-        if (!selectedVariant) {
-            return res.status(404).json({
-                success: false,
-                message: 'Variant not found in this service'
-            });
-        }
-
-        if (!selectedVariant.isActive) {
+        if (!service.subcategory || !service.subcategory._id) {
             return res.status(400).json({
                 success: false,
-                message: 'This variant is currently not available'
+                message: 'This service is missing a subcategory assignment and cannot be booked.'
             });
         }
 
-        // ============================================
-        // GLOBAL SLOT CHECK using slotLockKey
-        // ============================================
-        const dateStr = requestedDate.toISOString().split('T')[0];
-        const slotLockKey = `${dateStr}|${timeSlot}`;
+        const slotLockKey = `${bookingDate}|${timeSlot}`;
 
-        const slotTaken = await Booking.findOne({ slotLockKey });
+        // ✅ FIXED: Exclude cancelled bookings from slot check
+        const slotTaken = await Booking.findOne({
+            slotLockKey,
+            status: { $in: ['pending', 'confirmed'] }
+        });
 
         if (slotTaken) {
             return res.status(400).json({
                 success: false,
-                message: `Time slot ${timeSlot} on ${dateStr} is already booked${slotTaken.serviceName ? ` (${slotTaken.serviceName})` : ''}. Please choose another slot.`
+                message: `Time slot ${timeSlot} on ${bookingDate} is already booked. Please choose another slot.`
             });
         }
 
-        // ---- Calculate price ----
-        const finalPrice = selectedVariant.discountPrice ?? selectedVariant.price;
+        let finalPrice = service.discountPrice || service.price || 0;
+        let duration = service.duration || 60;
 
-        // ---- Create booking ----
-        // slotLockKey is auto-set in pre('save') hook
+        console.log(`📦 Creating booking for ${service.name}. Price: ${finalPrice}, Duration: ${duration}`);
+
         const booking = await Booking.create({
             bookingType: 'online',
             customerId: req.user._id,
             categoryId: service.category._id,
             categoryName: service.category.name,
+            subcategoryId: service.subcategory._id,
+            subcategoryName: service.subcategory.name,
             serviceId: service._id,
             serviceName: service.name,
-            serviceTier: service.tier,
-            variantId: selectedVariant._id,
-            variantName: selectedVariant.name,
+            serviceTier: service.tier || 'basic',
             price: finalPrice,
-            duration: selectedVariant.duration,
+            duration: duration,
             bookingDate: requestedDate,
             timeSlot,
             location: {
@@ -400,42 +327,29 @@ export const createBooking = async (req, res) => {
             paymentMethod: 'cash'
         });
 
-        // Update service booking count
-        await Service.findByIdAndUpdate(serviceId, {
-            $inc: { totalBookings: 1 }
-        });
+        await Service.findByIdAndUpdate(serviceId, { $inc: { totalBookings: 1 } });
 
-        // ---- Socket events ----
         emitNewBooking(booking, `${req.user.firstName} ${req.user.lastName}`);
 
-        // ---- Send emails ----
         const emailData = {
             bookingCode: booking.bookingCode,
             serviceName: booking.serviceName,
             serviceCategory: booking.categoryName,
-            vehicleTypeName: booking.variantName,
+            subcategoryName: booking.subcategoryName,
             price: booking.price,
             duration: booking.duration,
             bookingDate: booking.bookingDate,
             timeSlot: booking.timeSlot,
             location: booking.location,
-            vehicleDetails: { brand: '', model: '', color: '', plateNumber: '' },
             specialNotes: booking.specialNotes
         };
 
-        try {
-            await sendBookingConfirmationEmail(req.user, emailData);
-        } catch (e) {
-            console.error('Customer email failed:', e.message);
-        }
+        try { await sendBookingConfirmationEmail(req.user, emailData); }
+        catch (e) { console.error('Customer email failed:', e.message); }
 
-        try {
-            await sendAdminNewBookingEmail(emailData, req.user);
-        } catch (e) {
-            console.error('Admin email failed:', e.message);
-        }
+        try { await sendAdminNewBookingEmail(emailData, req.user); }
+        catch (e) { console.error('Admin email failed:', e.message); }
 
-        // ---- Response ----
         res.status(201).json({
             success: true,
             message: 'Booking created successfully!',
@@ -443,9 +357,9 @@ export const createBooking = async (req, res) => {
                 bookingId: booking._id,
                 bookingCode: booking.bookingCode,
                 categoryName: booking.categoryName,
+                subcategoryName: booking.subcategoryName,
                 serviceName: booking.serviceName,
                 serviceTier: booking.serviceTier,
-                variantName: booking.variantName,
                 price: booking.price,
                 duration: booking.duration,
                 bookingDate: booking.bookingDate,
@@ -457,11 +371,8 @@ export const createBooking = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Create booking error:', error);
+        console.error('createBooking error:', error);
 
-        // ============================================
-        // Duplicate key = race condition caught by DB
-        // ============================================
         if (error.code === 11000) {
             return res.status(400).json({
                 success: false,
@@ -471,24 +382,16 @@ export const createBooking = async (req, res) => {
 
         if (error.name === 'ValidationError') {
             const messages = Object.values(error.errors).map(e => e.message);
-            return res.status(400).json({
-                success: false,
-                message: 'Validation error',
-                errors: messages
-            });
+            return res.status(400).json({ success: false, message: 'Validation error', errors: messages });
         }
 
-        res.status(500).json({
-            success: false,
-            message: 'Failed to create booking'
-        });
+        res.status(500).json({ success: false, message: 'Failed to create booking' });
     }
 };
 
 // ============================================
 // GET MY BOOKINGS
 // ============================================
-
 export const getMyBookings = async (req, res) => {
     try {
         const { status, page = 1, limit = 10 } = req.query;
@@ -516,7 +419,6 @@ export const getMyBookings = async (req, res) => {
 
         const bookingsWithMeta = bookings.map(booking => {
             const bookingObj = booking.toObject();
-
             const bookingDateTime = new Date(booking.bookingDate);
             const [startHour] = booking.timeSlot.split('-')[0].split(':');
             bookingDateTime.setHours(parseInt(startHour), 0, 0, 0);
@@ -544,43 +446,29 @@ export const getMyBookings = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Get bookings error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to fetch bookings'
-        });
+        console.error('getMyBookings error:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch bookings' });
     }
 };
 
 // ============================================
 // GET SINGLE BOOKING
 // ============================================
-
 export const getBookingById = async (req, res) => {
     try {
         const { bookingId } = req.params;
 
         if (!isValidObjectId(bookingId)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid booking ID'
-            });
+            return res.status(400).json({ success: false, message: 'Invalid booking ID' });
         }
 
-        const booking = await Booking.findOne({
-            _id: bookingId,
-            customerId: req.user._id
-        });
+        const booking = await Booking.findOne({ _id: bookingId, customerId: req.user._id });
 
         if (!booking) {
-            return res.status(404).json({
-                success: false,
-                message: 'Booking not found'
-            });
+            return res.status(404).json({ success: false, message: 'Booking not found' });
         }
 
         const bookingObj = booking.toObject();
-
         const bookingDateTime = new Date(booking.bookingDate);
         const [startHour] = booking.timeSlot.split('-')[0].split(':');
         bookingDateTime.setHours(parseInt(startHour), 0, 0, 0);
@@ -596,46 +484,30 @@ export const getBookingById = async (req, res) => {
 
         bookingObj.canReview = booking.status === 'completed' && !booking.isReviewed;
 
-        res.status(200).json({
-            success: true,
-            data: bookingObj
-        });
+        res.status(200).json({ success: true, data: bookingObj });
 
     } catch (error) {
-        console.error('Get booking error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to fetch booking'
-        });
+        console.error('getBookingById error:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch booking' });
     }
 };
 
 // ============================================
-// CANCEL BOOKING (releases slotLockKey)
+// CANCEL BOOKING
 // ============================================
-
 export const cancelBooking = async (req, res) => {
     try {
         const { bookingId } = req.params;
         const { reason } = req.body;
 
         if (!isValidObjectId(bookingId)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid booking ID'
-            });
+            return res.status(400).json({ success: false, message: 'Invalid booking ID' });
         }
 
-        const booking = await Booking.findOne({
-            _id: bookingId,
-            customerId: req.user._id
-        });
+        const booking = await Booking.findOne({ _id: bookingId, customerId: req.user._id });
 
         if (!booking) {
-            return res.status(404).json({
-                success: false,
-                message: 'Booking not found'
-            });
+            return res.status(404).json({ success: false, message: 'Booking not found' });
         }
 
         if (!['pending', 'confirmed'].includes(booking.status)) {
@@ -645,7 +517,6 @@ export const cancelBooking = async (req, res) => {
             });
         }
 
-        // Cancellation time limit check
         const bookingDateTime = new Date(booking.bookingDate);
         const [startHour] = booking.timeSlot.split('-')[0].split(':');
         bookingDateTime.setHours(parseInt(startHour), 0, 0, 0);
@@ -661,17 +532,16 @@ export const cancelBooking = async (req, res) => {
             });
         }
 
-        // Update booking — pre('save') hook sets slotLockKey to null
         booking.status = 'cancelled';
         booking.cancellationReason = reason || 'Cancelled by customer';
         booking.cancelledBy = 'user';
         booking.cancelledAt = new Date();
-        await booking.save(); // slotLockKey becomes null → slot is released
+        await booking.save();
 
-        // ---- Socket events ----
+        console.log(`🗑️ Slot freed: ${getLocalDateStr(new Date(booking.bookingDate))} | ${booking.timeSlot}`)
+
         emitBookingCancelled(booking, 'user');
 
-        // ---- Send cancellation email ----
         try {
             await sendBookingCancellationEmail(req.user, {
                 bookingCode: booking.bookingCode,
@@ -691,54 +561,35 @@ export const cancelBooking = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Cancel booking error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to cancel booking'
-        });
+        console.error('cancelBooking error:', error);
+        res.status(500).json({ success: false, message: 'Failed to cancel booking' });
     }
 };
 
 // ============================================
-// RESCHEDULE BOOKING (GLOBAL SLOT LOCK)
+// RESCHEDULE BOOKING - ✅ FIXED TIMEZONE & CANCELLED SLOT CHECK
 // ============================================
-
 export const rescheduleBooking = async (req, res) => {
     try {
         const { bookingId } = req.params;
         const { newDate, newTimeSlot } = req.body;
 
         if (!isValidObjectId(bookingId)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid booking ID'
-            });
+            return res.status(400).json({ success: false, message: 'Invalid booking ID' });
         }
 
         if (!newDate || !newTimeSlot) {
-            return res.status(400).json({
-                success: false,
-                message: 'New date and time slot are required'
-            });
+            return res.status(400).json({ success: false, message: 'New date and time slot are required' });
         }
 
         if (!isValidTimeSlot(newTimeSlot)) {
-            return res.status(400).json({
-                success: false,
-                message: `Invalid time slot. Valid slots: ${TIME_SLOTS.join(', ')}`
-            });
+            return res.status(400).json({ success: false, message: 'Invalid time slot' });
         }
 
-        const booking = await Booking.findOne({
-            _id: bookingId,
-            customerId: req.user._id
-        });
+        const booking = await Booking.findOne({ _id: bookingId, customerId: req.user._id });
 
         if (!booking) {
-            return res.status(404).json({
-                success: false,
-                message: 'Booking not found'
-            });
+            return res.status(404).json({ success: false, message: 'Booking not found' });
         }
 
         if (!['pending', 'confirmed'].includes(booking.status)) {
@@ -748,91 +599,69 @@ export const rescheduleBooking = async (req, res) => {
             });
         }
 
-        // Validate new date
-        const requestedDate = new Date(newDate);
+        // ✅ FIXED: Parse date from local string
+        const [year, month, day] = newDate.split('-').map(Number)
+        const requestedDate = new Date(year, month - 1, day, 12, 0, 0, 0)
+
         if (isNaN(requestedDate.getTime())) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid date format'
-            });
+            return res.status(400).json({ success: false, message: 'Invalid date format' });
         }
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        const now = new Date()
+        const todayStr = getLocalDateStr(now)
 
-        if (requestedDate < today) {
-            return res.status(400).json({
-                success: false,
-                message: 'Cannot reschedule to a past date'
-            });
+        if (newDate < todayStr) {
+            return res.status(400).json({ success: false, message: 'Cannot reschedule to a past date' });
         }
 
         if (isClosedDay(requestedDate)) {
-            return res.status(400).json({
-                success: false,
-                message: 'We are closed on Sundays'
-            });
+            return res.status(400).json({ success: false, message: 'We are closed on Sundays' });
         }
 
-        const maxDate = new Date();
-        maxDate.setDate(maxDate.getDate() + LIMITS.MAX_BOOKING_ADVANCE_DAYS);
-        if (requestedDate > maxDate) {
+        const maxDate = new Date()
+        maxDate.setDate(maxDate.getDate() + LIMITS.MAX_BOOKING_ADVANCE_DAYS)
+        const maxDateStr = getLocalDateStr(maxDate)
+
+        if (newDate > maxDateStr) {
             return res.status(400).json({
                 success: false,
                 message: `Cannot book more than ${LIMITS.MAX_BOOKING_ADVANCE_DAYS} days in advance`
             });
         }
 
-        // Check if slot time has passed (for today)
-        const isToday = requestedDate.toDateString() === new Date().toDateString();
+        const isToday = newDate === todayStr
         if (isToday) {
             const [startTime] = newTimeSlot.split('-');
             const [hours, minutes] = startTime.split(':').map(Number);
-            const now = new Date();
-
             if (now.getHours() > hours || (now.getHours() === hours && now.getMinutes() >= minutes)) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'This time slot has already passed for today'
-                });
+                return res.status(400).json({ success: false, message: 'This time slot has already passed for today' });
             }
         }
 
-        // ============================================
-        // GLOBAL SLOT CHECK using slotLockKey
-        // ============================================
-        const newDateStr = requestedDate.toISOString().split('T')[0];
-        const newSlotLockKey = `${newDateStr}|${newTimeSlot}`;
+        const newSlotLockKey = `${newDate}|${newTimeSlot}`;
 
-        // Check if the new slot is taken (exclude current booking)
+        // ✅ FIXED: Exclude cancelled bookings from slot check
         const slotTaken = await Booking.findOne({
             _id: { $ne: bookingId },
-            slotLockKey: newSlotLockKey
+            slotLockKey: newSlotLockKey,
+            status: { $in: ['pending', 'confirmed'] }
         });
 
         if (slotTaken) {
             return res.status(400).json({
                 success: false,
-                message: `Time slot ${newTimeSlot} on ${newDateStr} is already booked. Please choose another slot.`
+                message: `Time slot ${newTimeSlot} on ${newDate} is already booked. Please choose another slot.`
             });
         }
 
-        // Store old values for socket emission
         const oldDate = booking.bookingDate;
         const oldTimeSlot = booking.timeSlot;
 
-        // Update booking — pre('save') hook updates slotLockKey automatically
         booking.bookingDate = requestedDate;
         booking.timeSlot = newTimeSlot;
-        await booking.save(); // slotLockKey auto-updates to new date|slot
+        await booking.save();
 
-        // ---- Socket events ----
-        emitBookingCancelled({
-            ...booking.toObject(),
-            bookingDate: oldDate,
-            timeSlot: oldTimeSlot
-        }, 'reschedule');
-
+        emitBookingCancelled({ ...booking.toObject(), bookingDate: oldDate, timeSlot: oldTimeSlot }, 'reschedule');
         emitNewBooking(booking, `${req.user.firstName} ${req.user.lastName}`);
 
         res.status(200).json({
@@ -842,7 +671,7 @@ export const rescheduleBooking = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Reschedule booking error:', error);
+        console.error('rescheduleBooking error:', error);
 
         if (error.code === 11000) {
             return res.status(400).json({
@@ -851,10 +680,7 @@ export const rescheduleBooking = async (req, res) => {
             });
         }
 
-        res.status(500).json({
-            success: false,
-            message: 'Failed to reschedule booking'
-        });
+        res.status(500).json({ success: false, message: 'Failed to reschedule booking' });
     }
 };
 

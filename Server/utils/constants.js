@@ -13,7 +13,10 @@ export const TIME_SLOTS = [
     '14:00-15:00',
     '15:00-16:00',
     '16:00-17:00',
-    '17:00-18:00'
+    '17:00-18:00',
+    '18:00-19:00',  // ✅ ADD
+    '19:00-20:00',  // ✅ ADD
+    '20:00-21:00',  // ✅ ADD
 ];
 
 // ============================================
@@ -76,7 +79,7 @@ export const isValidRole = (role) => USER_ROLES.includes(role);
 // ============================================
 export const LIMITS = {
     MAX_ACTIVE_BOOKINGS_PER_USER: 3,
-    MAX_BOOKING_ADVANCE_DAYS: 30,
+    MAX_BOOKING_ADVANCE_DAYS: 90,
     MIN_CANCEL_HOURS_BEFORE: 2,
     MAX_SERVICE_IMAGES: 3,
     MAX_IMAGE_SIZE_MB: 5,

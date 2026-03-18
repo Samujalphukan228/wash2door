@@ -9,7 +9,7 @@ const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
 
 export default function DateTimeStep({ data, onUpdate, onNext, onBack }) {
-    const [selectedDate, setSelectedDate] = useState(data.bookingDate ? new Date(data.bookingDate) : null)
+    const [selectedDate, setSelectedDate] = useState(data.bookingDate ? new Date(data.bookingDate + 'T12:00:00') : null)
     const [currentMonth, setCurrentMonth] = useState(new Date())
     const [slots, setSlots] = useState([])
     const [loading, setLoading] = useState(false)
@@ -28,14 +28,18 @@ export default function DateTimeStep({ data, onUpdate, onNext, onBack }) {
             setError("")
             setClosedMessage("")
 
-            const dateStr = selectedDate.toISOString().split('T')[0]
+            // ✅ FIXED: Create date string from local date parts
+            const year = selectedDate.getFullYear()
+            const month = String(selectedDate.getMonth() + 1).padStart(2, '0')
+            const day = String(selectedDate.getDate()).padStart(2, '0')
+            const dateStr = `${year}-${month}-${day}`
+
+            console.log('🖱️ Frontend: Sending date:', dateStr)
             
-            // ✅ FIXED: Only pass date, no serviceId needed
             const result = await checkAvailability(dateStr)
 
             console.log('📅 Availability result:', result)
 
-            // ✅ FIXED: Handle response structure correctly
             const availabilityData = result.data || result
 
             if (availabilityData.isClosed) {
@@ -56,9 +60,20 @@ export default function DateTimeStep({ data, onUpdate, onNext, onBack }) {
     }
 
     const handleDateSelect = (date) => {
+        console.log('🖱️ User clicked:', date.toLocaleDateString())
+
         setSelectedDate(date)
+        
+        // ✅ FIXED: Create YYYY-MM-DD from local date parts
+        const year = date.getFullYear()
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const day = String(date.getDate()).padStart(2, '0')
+        const dateStr = `${year}-${month}-${day}`
+        
+        console.log('🖱️ Sending to backend:', dateStr)
+        
         onUpdate({
-            bookingDate: date.toISOString().split('T')[0],
+            bookingDate: dateStr,
             timeSlot: "",
         })
     }
@@ -87,18 +102,31 @@ export default function DateTimeStep({ data, onUpdate, onNext, onBack }) {
 
     const isDateDisabled = (date) => {
         if (!date) return true
+        
         const today = new Date()
         today.setHours(0, 0, 0, 0)
-        if (date < today) return true
+        
+        const checkDate = new Date(date)
+        checkDate.setHours(0, 0, 0, 0)
+        
+        if (checkDate < today) return true
+        
         const maxDate = new Date()
         maxDate.setDate(maxDate.getDate() + 30)
-        if (date > maxDate) return true
+        maxDate.setHours(0, 0, 0, 0)
+        
+        if (checkDate > maxDate) return true
+        
         return false
     }
 
     const isDateSelected = (date) => {
         if (!date || !selectedDate) return false
-        return date.toDateString() === selectedDate.toDateString()
+        return (
+            date.getDate() === selectedDate.getDate() &&
+            date.getMonth() === selectedDate.getMonth() &&
+            date.getFullYear() === selectedDate.getFullYear()
+        )
     }
 
     const days = getDaysInMonth(currentMonth)

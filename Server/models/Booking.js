@@ -1,4 +1,4 @@
-// models/Booking.js
+// models/Booking.js - NO VARIANTS
 
 import mongoose from 'mongoose';
 import crypto from 'crypto';
@@ -7,31 +7,21 @@ import {
     BOOKING_STATUSES,
     BOOKING_TYPES,
     PAYMENT_METHODS,
-    PAYMENT_STATUSES,
-    SERVICE_TIERS
+    PAYMENT_STATUSES
 } from '../utils/constants.js';
 
 const bookingSchema = new mongoose.Schema({
-    // ============================================
-    // BOOKING CODE (auto generated)
-    // ============================================
     bookingCode: {
         type: String,
         unique: true
     },
-
-    // ============================================
-    // BOOKING TYPE
-    // ============================================
     bookingType: {
         type: String,
         enum: BOOKING_TYPES,
         default: 'online'
     },
 
-    // ============================================
-    // CUSTOMER
-    // ============================================
+    // Customer
     customerId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
@@ -42,9 +32,7 @@ const bookingSchema = new mongoose.Schema({
         phone: { type: String, default: '' }
     },
 
-    // ============================================
-    // CATEGORY (stored for history)
-    // ============================================
+    // Category
     categoryId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Category',
@@ -55,9 +43,18 @@ const bookingSchema = new mongoose.Schema({
         required: true
     },
 
-    // ============================================
-    // SERVICE
-    // ============================================
+    // Subcategory
+    subcategoryId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Subcategory',
+        required: [true, 'Subcategory is required']
+    },
+    subcategoryName: {
+        type: String,
+        required: true
+    },
+
+    // Service
     serviceId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Service',
@@ -68,19 +65,6 @@ const bookingSchema = new mongoose.Schema({
         required: true
     },
     serviceTier: {
-        type: String,
-        enum: SERVICE_TIERS,
-        required: true
-    },
-
-    // ============================================
-    // VARIANT (pricing option selected)
-    // ============================================
-    variantId: {
-        type: mongoose.Schema.Types.ObjectId,
-        required: [true, 'Variant is required']
-    },
-    variantName: {
         type: String,
         required: true
     },
@@ -93,9 +77,7 @@ const bookingSchema = new mongoose.Schema({
         required: true
     },
 
-    // ============================================
-    // DATE & TIME
-    // ============================================
+    // Date & Time
     bookingDate: {
         type: Date,
         required: [true, 'Booking date is required']
@@ -106,38 +88,26 @@ const bookingSchema = new mongoose.Schema({
         enum: TIME_SLOTS
     },
 
-    // ============================================
-    // SLOT LOCK KEY (for global uniqueness)
-    // Used to enforce: only ONE active booking per date+slot
-    // Format: "YYYY-MM-DD|HH:MM-HH:MM"
-    // Set to null when cancelled (so index ignores it)
-    // ============================================
+    // Slot lock
     slotLockKey: {
         type: String,
         default: null
     },
 
-    // ============================================
-    // LOCATION (simplified)
-    // ============================================
+    // Location
     location: {
         address: { type: String, required: [true, 'Address is required'] },
         city: { type: String, required: [true, 'City is required'] },
         landmark: { type: String, default: '' }
     },
 
-    // ============================================
-    // NOTES
-    // ============================================
     specialNotes: {
         type: String,
         default: '',
         maxlength: [500, 'Notes cannot exceed 500 characters']
     },
 
-    // ============================================
-    // STATUS
-    // ============================================
+    // Status
     status: {
         type: String,
         enum: BOOKING_STATUSES,
@@ -155,13 +125,7 @@ const bookingSchema = new mongoose.Schema({
         default: ''
     },
 
-    // ============================================
-    // REVIEW & PAYMENT
-    // ============================================
-    isReviewed: {
-        type: Boolean,
-        default: false
-    },
+    isReviewed: { type: Boolean, default: false },
     paymentMethod: {
         type: String,
         enum: PAYMENT_METHODS,
@@ -172,22 +136,15 @@ const bookingSchema = new mongoose.Schema({
         enum: PAYMENT_STATUSES,
         default: 'pending'
     },
-
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         default: null
     }
+}, { timestamps: true });
 
-}, {
-    timestamps: true
-});
-
-// ============================================
-// AUTO GENERATE BOOKING CODE + SLOT LOCK KEY
-// ============================================
+// Auto generate booking code + slot lock key
 bookingSchema.pre('save', function (next) {
-    // Generate booking code
     if (!this.bookingCode) {
         const random = crypto.randomBytes(3).toString('hex').toUpperCase();
         const timestamp = Date.now().toString(36).toUpperCase().slice(-3);
@@ -195,11 +152,6 @@ bookingSchema.pre('save', function (next) {
         this.bookingCode = `${prefix}-${timestamp}${random}`;
     }
 
-    // ============================================
-    // SET OR CLEAR slotLockKey based on status
-    // Active booking → set the key (enforces uniqueness)
-    // Cancelled booking → null (releases the slot)
-    // ============================================
     if (this.status === 'cancelled') {
         this.slotLockKey = null;
     } else {
@@ -210,85 +162,50 @@ bookingSchema.pre('save', function (next) {
     next();
 });
 
-// ============================================
-// INDEXES
-// ============================================
+// Indexes
 bookingSchema.index({ customerId: 1 });
 bookingSchema.index({ status: 1 });
 bookingSchema.index({ bookingDate: 1 });
 bookingSchema.index({ bookingCode: 1 });
 bookingSchema.index({ serviceId: 1 });
 bookingSchema.index({ categoryId: 1 });
+bookingSchema.index({ subcategoryId: 1 });
 bookingSchema.index({ bookingType: 1 });
 bookingSchema.index({ createdAt: -1 });
-
-// ============================================
-// GLOBAL UNIQUE SLOT INDEX
-// Only ONE active booking per date+timeSlot combo
-// slotLockKey is null for cancelled bookings,
-// so they are excluded by the sparse option
-// ============================================
 bookingSchema.index(
     { slotLockKey: 1 },
-    {
-        unique: true,
-        sparse: true  // ignores documents where slotLockKey is null
-    }
+    { unique: true, sparse: true }
 );
 
-// ============================================
-// VIRTUALS
-// ============================================
-bookingSchema.virtual('customerName').get(function () {
-    if (this.bookingType === 'walkin') {
-        return this.walkInCustomer?.name || 'Walk-in Customer';
-    }
-    return null;
-});
-
+// Virtuals
 bookingSchema.virtual('isUpcoming').get(function () {
-    if (this.status === 'cancelled' || this.status === 'completed') {
-        return false;
-    }
-    const now = new Date();
+    if (['cancelled', 'completed'].includes(this.status)) return false;
     const bookingDateTime = new Date(this.bookingDate);
     const [startHour] = this.timeSlot.split('-')[0].split(':');
     bookingDateTime.setHours(parseInt(startHour), 0, 0, 0);
-    return bookingDateTime > now;
+    return bookingDateTime > new Date();
 });
 
 bookingSchema.virtual('canCancel').get(function () {
-    if (!['pending', 'confirmed'].includes(this.status)) {
-        return false;
-    }
-    const now = new Date();
+    if (!['pending', 'confirmed'].includes(this.status)) return false;
     const bookingDateTime = new Date(this.bookingDate);
     const [startHour] = this.timeSlot.split('-')[0].split(':');
     bookingDateTime.setHours(parseInt(startHour), 0, 0, 0);
     const cancelDeadline = new Date(bookingDateTime.getTime() - 2 * 60 * 60 * 1000);
-    return now < cancelDeadline;
+    return new Date() < cancelDeadline;
 });
 
-// ============================================
-// STATIC METHODS
-// ============================================
-
-// Get available slots for a date (GLOBAL - across all services)
+// Static: get available slots
 bookingSchema.statics.getAvailableSlots = async function (date) {
-    const bookingDate = new Date(date);
-    const dateStr = bookingDate.toISOString().split('T')[0];
-
-    // Find all locked slots for this date
+    const dateStr = new Date(date).toISOString().split('T')[0];
     const bookedSlots = await this.find({
         slotLockKey: { $regex: `^${dateStr}\\|` }
     }).select('timeSlot');
-
     const bookedSlotNames = bookedSlots.map(b => b.timeSlot);
-
     return TIME_SLOTS.filter(slot => !bookedSlotNames.includes(slot));
 };
 
-// Get booking stats for a user
+// Static: get user stats
 bookingSchema.statics.getUserStats = async function (userId) {
     const stats = await this.aggregate([
         { $match: { customerId: new mongoose.Types.ObjectId(userId) } },
@@ -306,21 +223,14 @@ bookingSchema.statics.getUserStats = async function (userId) {
     ]);
 
     const result = {
-        total: 0,
-        pending: 0,
-        confirmed: 0,
-        inProgress: 0,
-        completed: 0,
-        cancelled: 0,
-        totalSpent: 0
+        total: 0, pending: 0, confirmed: 0,
+        inProgress: 0, completed: 0, cancelled: 0, totalSpent: 0
     };
 
     stats.forEach(s => {
         result[s._id === 'in-progress' ? 'inProgress' : s._id] = s.count;
         result.total += s.count;
-        if (s._id === 'completed') {
-            result.totalSpent = s.totalSpent;
-        }
+        if (s._id === 'completed') result.totalSpent = s.totalSpent;
     });
 
     return result;

@@ -1,11 +1,8 @@
-// routes/serviceRoutes.js - UPDATED
+// routes/serviceRoutes.js
 
 import express from 'express';
 import { protect, isAdmin } from '../middleware/auth.js';
-import {
-    handleServiceImageUpload,
-    handleVariantImageUpload
-} from '../middleware/uploadMiddleware.js';
+import { handleServiceImageUpload } from '../middleware/uploadMiddleware.js';
 
 import {
     getAllServicesAdmin,
@@ -13,9 +10,6 @@ import {
     createService,
     updateService,
     deleteService,
-    addVariant,
-    updateVariant,
-    deleteVariant,
     setPrimaryImage,
     deleteImage,
     toggleFeatured,
@@ -58,10 +52,5 @@ router.put('/reorder/bulk', reorderServices);
 // Image management
 router.put('/:serviceId/images/:imageId/primary', setPrimaryImage);
 router.delete('/:serviceId/images/:imageId', deleteImage);
-
-// Variant routes
-router.post('/:serviceId/variants', handleVariantImageUpload, addVariant);
-router.put('/:serviceId/variants/:variantId', handleVariantImageUpload, updateVariant);
-router.delete('/:serviceId/variants/:variantId', deleteVariant);
 
 export default router;

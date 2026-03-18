@@ -17,7 +17,7 @@ export async function getCategories() {
 }
 
 /**
- * Get public services (optionally filtered by category)
+ * Get public services (optionally filtered)
  */
 export async function getPublicServices(filters = {}) {
   try {
@@ -25,6 +25,9 @@ export async function getPublicServices(filters = {}) {
 
     if (filters.category) {
       params.category = filters.category
+    }
+    if (filters.subcategory) {
+      params.subcategory = filters.subcategory
     }
     if (filters.limit) {
       params.limit = filters.limit
@@ -41,30 +44,18 @@ export async function getPublicServices(filters = {}) {
 }
 
 /**
- * Get available slots for booking
- */
-export async function getAvailableSlots(date, serviceId) {
-  try {
-    const response = await api.get('/bookings/available-slots', {
-      params: { date, serviceId }
-    })
-
-    return response.data?.data || response.data || []
-  } catch (error) {
-    throw new Error(
-      error.response?.data?.message || error.message || 'Failed to fetch available slots'
-    )
-  }
-}
-
-/**
- * Get single service by ID
+ * Get single service by ID (NO VARIANTS - single price structure)
  */
 export async function getServiceById(serviceId) {
   try {
-    const response = await api.get(`/public/services/${serviceId}`)
+    const response = await api.get(`/bookings/service/${serviceId}/pricing`)
 
-    return response.data?.data || response.data || null
+    // ✅ Service structure: { price, discountPrice, duration, finalPrice }
+    if (response.data?.success) {
+      return response.data.data
+    }
+
+    throw new Error(response.data?.message || 'Service not found')
   } catch (error) {
     throw new Error(
       error.response?.data?.message || error.message || 'Failed to fetch service'
@@ -80,7 +71,7 @@ export async function getUserBookings() {
     const response = await api.get('/bookings/my-bookings')
 
     if (response.data?.success) {
-      return response.data
+      return response.data.data
     }
 
     throw new Error(response.data?.message || 'Failed to fetch bookings')

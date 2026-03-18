@@ -3,7 +3,7 @@
 
 import { useEffect, useState, memo } from "react"
 import { Loader2, Star, ChevronRight } from "lucide-react"
-import { getServices } from "@/lib/booking.api"
+import { getPublicServices } from "@/lib/services.api"
 
 const ServiceCard = memo(function ServiceCard({ service, isSelected, onSelect }) {
     const image = service.primaryImage || service.images?.[0]?.url
@@ -49,9 +49,9 @@ const ServiceCard = memo(function ServiceCard({ service, isSelected, onSelect })
 
                 <div className="flex items-center justify-between pt-4 border-t border-gray-100">
                     <div>
-                        <p className="text-gray-400 text-xs mb-1">Starting from</p>
+                        <p className="text-gray-400 text-xs mb-1">Price</p>
                         <p className="text-black" style={{ fontFamily: 'Georgia, serif', fontSize: "18px" }}>
-                            ₹{service.startingPrice?.toLocaleString("en-IN")}
+                            ₹{service.finalPrice?.toLocaleString("en-IN")}
                         </p>
                     </div>
                     <div className="flex items-center gap-3">
@@ -78,7 +78,7 @@ export default function ServiceStep({ data, onUpdate, onUpdateUI, onNext }) {
         const fetchServices = async () => {
             try {
                 setLoading(true)
-                const result = await getServices()
+                const result = await getPublicServices()
                 setServices(result || [])
             } catch (err) {
                 setError(err.message)
@@ -91,21 +91,21 @@ export default function ServiceStep({ data, onUpdate, onUpdateUI, onNext }) {
     }, [])
 
     const handleSelect = (service) => {
-        // Reset variantId when service changes
+        // ✅ NO variantId - direct service booking
         onUpdate({ 
-            serviceId: service._id,
-            variantId: ''  // ← Reset variant
+            serviceId: service._id
         })
         onUpdateUI({
             serviceName: service.name,
             serviceImage: service.primaryImage || service.images?.[0]?.url,
             serviceTier: service.tier,
             categoryName: service.category?.name || "",
-            price: service.startingPrice,
-            variantName: '',  // ← Reset
-            duration: 0,      // ← Reset
+            // ✅ Get price and duration DIRECTLY from service
+            price: service.finalPrice || service.price,
+            duration: service.duration,
+            variantName: '',  // ← No variant
         })
-        onNext()  // ← Go to variant step
+        onNext()  // ← Go directly to Date & Time (skip variant step)
     }
 
     if (loading) {
