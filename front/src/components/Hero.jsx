@@ -1,328 +1,638 @@
 // components/Hero.jsx
 "use client"
 
-import { useRef } from "react"
+import { useRef, useEffect, useState } from "react"
 import { motion, useScroll, useTransform, useSpring } from "framer-motion"
-import { ArrowUpRight, Phone } from "lucide-react"
+import { ArrowRight, Phone, Droplets, Shield, Clock, ChevronDown } from "lucide-react"
 
+/* ─── Constants ─── */
 const STATS = [
-  { value: "100+", label: "Cars Cleaned" },
-  { value: "4.8★", label: "Star Rating" },
-  { value: "2hr", label: "Avg Service" },
+  { value: "100+", label: "Cars Serviced", icon: Droplets },
+  { value: "4.8", label: "Star Rating", icon: Shield },
+  { value: "2hr", label: "Avg Turnaround", icon: Clock },
 ]
 
-const HEADLINE_LINES = [
-  { text: "The Shine", italic: false },
-  { text: "That Finds", italic: true },
-  { text: "You.", italic: false },
+const SERVICES_MARQUEE = [
+  "Exterior Wash",
+  "Interior Detailing",
+  "Sofa Cleaning",
+  "Water Tank Cleaning",
+  "Ceramic Coating",
+  "Engine Bay Wash",
 ]
 
-const SERVICES = ["Car Wash", "Sofa Cleaning", "Water Tank"]
+const BG_IMAGE =
+  "https://images.unsplash.com/photo-1618843479313-40f8afb4b4d8?q=90&w=2800&auto=format&fit=crop"
 
-const BG_IMAGE = "https://images.unsplash.com/photo-1550355291-bbee04a92027?q=90&w=2400&auto=format&fit=crop"
-const WHATSAPP_URL = "https://wa.me/916900706456?text=Hi%2C%20I%27d%20like%20to%20book%20a%20car%20wash"
+const WHATSAPP_URL =
+  "https://wa.me/916900706456?text=Hi%2C%20I%27d%20like%20to%20book%20a%20car%20wash"
+
 const SERIF = 'Georgia, "Times New Roman", serif'
+const SANS = "'Helvetica Neue', Helvetica, Arial, sans-serif"
 const EASE = [0.22, 1, 0.36, 1]
 
-const headlineLine = {
-  hidden: { opacity: 0, y: 80 },
-  visible: (i) => ({ opacity: 1, y: 0, transition: { duration: 1, ease: EASE, delay: 0.15 * i } }),
-}
-
-const fadeInUp = {
-  hidden: { opacity: 0, y: 25 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: EASE, delay: 0.6 } },
-}
-
-const fadeIn = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { duration: 0.6, delay: 0.8 } },
-}
-
-const scaleXVariant = {
-  hidden: { scaleX: 0 },
-  visible: { scaleX: 1, transition: { duration: 1.2, ease: EASE, delay: 0.5 } },
-}
-
-const bgReveal = {
-  hidden: { opacity: 0, scale: 1.05 },
-  visible: { opacity: 1, scale: 1, transition: { duration: 1.8, ease: EASE } },
-}
-
-const accentLine = {
-  hidden: { scaleY: 0 },
-  visible: { scaleY: 1, transition: { duration: 1.4, ease: EASE, delay: 0.3 } },
-}
-
-function ParallaxBackground({ sectionRef }) {
-  const { scrollYProgress } = useScroll({ target: sectionRef, offset: ["start start", "end start"] })
-  const smoothProgress = useSpring(scrollYProgress, { stiffness: 100, damping: 30, restDelta: 0.001 })
-  const y = useTransform(smoothProgress, [0, 1], ["0%", "30%"])
-  const scale = useTransform(smoothProgress, [0, 1], [1, 1.1])
-  const opacity = useTransform(scrollYProgress, [0, 0.5, 1], [1, 0.85, 0.7])
-
-  return (
-    <motion.div initial="hidden" animate="visible" variants={bgReveal} style={{ y, scale, opacity }} className="absolute inset-0 overflow-hidden will-change-transform">
-      <div className="absolute inset-0 w-full h-full">
-        <img
-          src={BG_IMAGE}
-          alt=""
-          role="presentation"
-          className="w-full h-[130%] object-cover object-center"
-          style={{ filter: "brightness(0.35) contrast(1.05) saturate(0.9)", minHeight: "100%" }}
-          loading="eager"
-        />
-      </div>
-    </motion.div>
-  )
-}
-
-function GradientOverlays() {
-  return (
-    <div className="absolute inset-0 pointer-events-none z-[1]" aria-hidden="true">
-      <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-neutral-950/60 via-30% to-transparent" />
-      <div className="absolute inset-0 bg-gradient-to-r from-neutral-950/80 via-neutral-950/20 via-40% to-transparent" />
-      <div className="absolute inset-x-0 top-0 h-32 md:h-40 bg-gradient-to-b from-neutral-950/70 to-transparent" />
-      <div className="absolute right-0 top-0 bottom-0 w-1/4 bg-gradient-to-l from-neutral-950/50 to-transparent hidden lg:block" />
-      <div
-        className="absolute inset-0 opacity-[0.03] mix-blend-overlay"
-        style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E\")" }}
-      />
-    </div>
-  )
-}
-
+/* ─── Subcomponents ─── */
 function PulsingDot() {
   return (
     <span className="relative flex h-2 w-2 shrink-0" aria-hidden="true">
-      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />
       <span className="relative inline-flex rounded-full h-full w-full bg-emerald-400" />
     </span>
   )
 }
 
-function StatusBadge({ label }) {
+function ServicesMarquee() {
+  const doubled = [...SERVICES_MARQUEE, ...SERVICES_MARQUEE]
   return (
-    <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.3 }} className="flex items-center gap-2 px-3 py-1.5 md:px-3.5 md:py-2 border border-white/10 rounded-full bg-white/[0.04] backdrop-blur-md shrink-0">
-      <PulsingDot />
-      <span className="tracking-[0.15em] md:tracking-[0.2em] uppercase text-white/60 whitespace-nowrap text-[8px] md:text-[9px]">
-        {label}
-      </span>
-    </motion.div>
+    <div className="overflow-hidden whitespace-nowrap">
+      <motion.div
+        className="inline-flex gap-8"
+        animate={{ x: ["0%", "-50%"] }}
+        transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
+      >
+        {doubled.map((service, i) => (
+          <span key={i} className="inline-flex items-center gap-3">
+            <span
+              className="text-white/20 tracking-[0.25em] uppercase"
+              style={{ fontSize: "10px", fontFamily: SANS }}
+            >
+              {service}
+            </span>
+            <span className="w-1 h-1 rounded-full bg-white/15" />
+          </span>
+        ))}
+      </motion.div>
+    </div>
   )
 }
 
-function BookButton({ fullWidth = false }) {
-  return (
-    <motion.a
-      href="/bookings"
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
-      className={`group relative inline-flex items-center justify-center gap-3 px-6 py-3.5 md:px-8 md:py-4 border border-white/15 overflow-hidden rounded-[4px] hover:border-white/30 transition-all duration-300 ${fullWidth ? "w-full" : ""}`}
-      aria-label="Book a car wash appointment"
-    >
-      <span className="absolute inset-0 bg-white origin-bottom scale-y-0 group-hover:scale-y-100 transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]" aria-hidden="true" />
-      <span className="relative z-10 tracking-[0.15em] md:tracking-[0.2em] uppercase text-white group-hover:text-neutral-950 transition-colors duration-500 text-[10px] md:text-[10.5px] font-medium">
-        Book Now
-      </span>
-      <ArrowUpRight size={14} strokeWidth={1.5} className="relative z-10 text-white group-hover:text-neutral-950 transition-all duration-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" aria-hidden="true" />
-    </motion.a>
-  )
-}
-
-function WhatsAppLink({ fullWidth = false }) {
-  return (
-    <motion.a
-      href={WHATSAPP_URL}
-      target="_blank"
-      rel="noopener noreferrer"
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
-      className={`group inline-flex items-center gap-2.5 py-3 text-white/35 hover:text-emerald-400 transition-colors duration-300 ${fullWidth ? "justify-center w-full" : ""}`}
-      aria-label="Contact us on WhatsApp"
-    >
-      <Phone size={13} strokeWidth={1.5} className="group-hover:rotate-12 transition-transform duration-300" />
-      <span className="tracking-[0.15em] md:tracking-[0.18em] uppercase text-[9px] md:text-[10px]">WhatsApp Us</span>
-    </motion.a>
-  )
-}
-
-function StatItem({ value, label, align = "left", delay = 0 }) {
+function ScrollIndicator() {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 15 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, delay: 1.1 + delay * 0.1 }}
-      className={`${align === "right" ? "text-right" : ""} flex-1 md:flex-none`}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ delay: 2.5, duration: 1 }}
+      className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex-col items-center gap-2 hidden md:flex"
     >
-      <p className="text-white leading-none font-light" style={{ fontFamily: SERIF, fontSize: align === "right" ? "clamp(1.5rem, 3vw, 2.5rem)" : "clamp(1.25rem, 4vw, 1.5rem)" }}>
-        {value}
-      </p>
-      <p className="tracking-[0.2em] md:tracking-[0.25em] uppercase text-white/30 mt-1 md:mt-1.5 text-[7px] md:text-[8px]">
-        {label}
-      </p>
+      <span
+        className="text-white/20 tracking-[0.3em] uppercase"
+        style={{ fontSize: "7px", fontFamily: SANS }}
+      >
+        Scroll
+      </span>
+      <motion.div
+        animate={{ y: [0, 6, 0] }}
+        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+      >
+        <ChevronDown size={14} className="text-white/20" />
+      </motion.div>
     </motion.div>
   )
 }
 
-function HeadlineBlock({ size = "mobile", sectionRef }) {
-  const { scrollYProgress } = useScroll({ target: sectionRef, offset: ["start start", "end start"] })
-  const opacity = useTransform(scrollYProgress, [0, 0.3], [1, 0])
-  const y = useTransform(scrollYProgress, [0, 0.3], [0, -40])
-  const fontSize = size === "desktop" ? "clamp(3.5rem, 8vw, 8rem)" : "clamp(2.5rem, 12vw, 4rem)"
-
-  return (
-    <motion.div style={{ opacity, y }} className={size === "desktop" ? "mb-10 lg:mb-14" : "mb-6"}>
-      {HEADLINE_LINES.map(({ text, italic }, i) => (
-        <motion.div key={`headline-${i}`} custom={i} initial="hidden" animate="visible" variants={headlineLine} className="overflow-hidden">
-          <h1
-            className={`will-change-transform ${italic ? "text-white/45 italic" : "text-white"}`}
-            style={{ fontFamily: SERIF, fontWeight: 300, fontSize, lineHeight: 0.95, letterSpacing: "-0.02em" }}
-          >
-            {text}
-          </h1>
-        </motion.div>
-      ))}
-    </motion.div>
-  )
+function useGreeting() {
+  const [greeting, setGreeting] = useState("")
+  useEffect(() => {
+    const h = new Date().getHours()
+    setGreeting(h < 12 ? "Good Morning" : h < 17 ? "Good Afternoon" : "Good Evening")
+  }, [])
+  return greeting
 }
 
-function ServiceLink({ service, index }) {
-  return (
-    <motion.a
-      href="/Services"
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: 1.3 + index * 0.08 }}
-      className="tracking-[0.15em] md:tracking-[0.2em] uppercase text-white/25 hover:text-white/60 transition-colors duration-300 group text-[8px] md:text-[9px]"
-    >
-      {service}
-      <span className="block h-px bg-white/30 w-0 group-hover:w-full transition-all duration-300 mt-0.5" aria-hidden="true" />
-    </motion.a>
-  )
-}
-
+/* ─── Main Component ─── */
 export default function Hero() {
   const sectionRef = useRef(null)
+  const greeting = useGreeting()
+
+  /* Gentle fade‑dim on scroll — no parallax movement */
+  const { scrollYProgress } = useScroll({
+    target: sectionRef,
+    offset: ["start start", "end start"],
+  })
+  const smoothScroll = useSpring(scrollYProgress, { stiffness: 40, damping: 20 })
+  const bgOpacity = useTransform(smoothScroll, [0, 0.5], [1, 0.6])
 
   return (
-    <section ref={sectionRef} className="relative w-full h-screen min-h-[600px] max-h-[1200px] overflow-hidden bg-neutral-950" aria-label="Hero section">
-      <ParallaxBackground sectionRef={sectionRef} />
-      <GradientOverlays />
+    <section
+      ref={sectionRef}
+      className="relative w-full h-svh min-h-[660px] overflow-hidden bg-black"
+      aria-label="Hero section"
+    >
+      {/* ─── Background (static, no parallax) ─── */}
+      <motion.div className="absolute inset-0" style={{ opacity: bgOpacity }}>
+        <img
+          src={BG_IMAGE}
+          alt=""
+          role="presentation"
+          className="absolute inset-0 w-full h-full object-cover object-center"
+          style={{ filter: "brightness(0.32) contrast(1.1) saturate(0.7)" }}
+          loading="eager"
+          fetchPriority="high"
+        />
+      </motion.div>
 
-      {/* Left accent line */}
-      <motion.div
-        initial="hidden"
-        animate="visible"
-        variants={accentLine}
-        className="absolute left-6 lg:left-10 top-0 w-px h-full origin-top hidden md:block z-[2]"
-        style={{ background: "linear-gradient(to bottom, transparent 10%, rgba(255,255,255,0.08) 25%, rgba(255,255,255,0.08) 75%, transparent 90%)" }}
-        aria-hidden="true"
-      />
-
-      {/* Watermark */}
-      <div
-        className="absolute -right-4 bottom-20 select-none pointer-events-none hidden lg:block z-0"
-        style={{ fontFamily: SERIF, fontWeight: 300, fontSize: "clamp(10rem, 18vw, 20rem)", lineHeight: 0.8, color: "rgba(255,255,255,0.02)", letterSpacing: "-0.05em" }}
-        aria-hidden="true"
-      >
-        SHINE
+      {/* ─── Overlays ─── */}
+      <div className="absolute inset-0 z-[1] pointer-events-none" aria-hidden="true">
+        <div className="absolute inset-x-0 bottom-0 h-[65%] bg-gradient-to-t from-black via-black/75 to-transparent" />
+        <div className="absolute inset-y-0 left-0 w-[55%] bg-gradient-to-r from-black/60 to-transparent" />
+        <div className="absolute inset-x-0 top-0 h-36 bg-gradient-to-b from-black/50 to-transparent" />
+        {/* Noise */}
+        <div
+          className="absolute inset-0 opacity-[0.035]"
+          style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
+          }}
+        />
       </div>
 
-      {/* ── Mobile Layout ── */}
-      <div className="relative z-10 h-full flex flex-col md:hidden px-5 pt-5 pb-8">
-        <header className="flex items-center justify-between shrink-0">
-          <motion.span
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="tracking-[0.25em] uppercase text-white/50 text-[8px]"
-            style={{ fontFamily: SERIF }}
+      {/* ═══════════ MOBILE + TABLET (< lg) ═══════════ */}
+      <div className="relative z-10 h-full flex flex-col lg:hidden px-5 sm:px-8">
+        {/* Top */}
+        <div className="flex items-center justify-between pt-5 sm:pt-6 shrink-0">
+          <motion.div
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.2, duration: 0.8 }}
+            className="flex items-center gap-2.5"
           >
-            Duliajan
-          </motion.span>
-          <StatusBadge label="Open · 9–5" />
-        </header>
-
-        <div className="flex-1 min-h-[60px]" />
-
-        <div className="shrink-0">
-          <HeadlineBlock size="mobile" sectionRef={sectionRef} />
-
-          <motion.div variants={fadeInUp} initial="hidden" animate="visible" className="mb-6">
-            <p className="text-white/40 leading-[1.75] mb-6 max-w-[300px] text-[12px] tracking-wide">
-              Professional car &amp; home cleaning at your doorstep — fast, safe &amp; hassle-free.
-            </p>
-            <div className="flex flex-col gap-2">
-              <BookButton fullWidth />
-              <WhatsAppLink fullWidth />
+            <div className="w-6 h-6 rounded-full border border-white/15 flex items-center justify-center">
+              <Droplets size={10} className="text-white/35" />
             </div>
+            <span
+              className="text-white/25 tracking-[0.25em] uppercase"
+              style={{ fontSize: "8px", fontFamily: SANS, fontWeight: 500 }}
+            >
+              Wash2Door
+            </span>
           </motion.div>
 
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1, duration: 0.6 }} className="pt-5 border-t border-white/[0.08]">
-            <div className="flex justify-between gap-4">
-              {STATS.map((stat, i) => (
-                <StatItem key={`stat-mobile-${i}`} value={stat.value} label={stat.label} delay={i} />
-              ))}
-            </div>
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35, duration: 0.6 }}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/[0.1] bg-white/[0.04] backdrop-blur-xl"
+          >
+            <PulsingDot />
+            <span
+              className="text-white/35 tracking-[0.15em] uppercase"
+              style={{ fontSize: "7px", fontFamily: SANS }}
+            >
+              Accepting Bookings
+            </span>
+          </motion.div>
+        </div>
+
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Content */}
+        <div className="shrink-0 pb-7 sm:pb-10">
+          {/* Greeting tag */}
+          <motion.div
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.45, duration: 0.7 }}
+            className="flex items-center gap-3 mb-5"
+          >
+            <div className="w-7 h-px bg-gradient-to-r from-emerald-400/50 to-transparent" />
+            <span
+              className="text-emerald-400/50 tracking-[0.3em] uppercase"
+              style={{ fontSize: "8px", fontFamily: SANS }}
+            >
+              {greeting}
+            </span>
+          </motion.div>
+
+          {/* Headline */}
+          <div className="mb-4">
+            {["Pristine", "Car Care,"].map((line, i) => (
+              <motion.div
+                key={line}
+                initial={{ opacity: 0, y: 40 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.55 + i * 0.1, duration: 1, ease: EASE }}
+                className="overflow-hidden"
+              >
+                <h1
+                  className="text-white leading-[0.92]"
+                  style={{
+                    fontFamily: SERIF,
+                    fontWeight: 300,
+                    fontSize: "clamp(2.8rem, 12vw, 5.5rem)",
+                    letterSpacing: "-0.03em",
+                  }}
+                >
+                  {line}
+                </h1>
+              </motion.div>
+            ))}
+
+            <motion.div
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.75, duration: 1, ease: EASE }}
+              className="overflow-hidden mt-0.5"
+            >
+              <h1
+                className="leading-[0.92]"
+                style={{
+                  fontFamily: SERIF,
+                  fontWeight: 300,
+                  fontSize: "clamp(2.4rem, 10vw, 5rem)",
+                  letterSpacing: "-0.02em",
+                  color: "rgba(255,255,255,0.14)",
+                  fontStyle: "italic",
+                }}
+              >
+                Delivered.
+              </h1>
+            </motion.div>
+          </div>
+
+          {/* Accent */}
+          <motion.div
+            initial={{ scaleX: 0 }}
+            animate={{ scaleX: 1 }}
+            transition={{ delay: 0.9, duration: 0.7, ease: EASE }}
+            className="flex items-center gap-3 origin-left mb-5"
+          >
+            <div className="w-10 h-px bg-gradient-to-r from-emerald-400/40 to-transparent" />
+            <div className="w-1 h-1 rounded-full bg-emerald-400/30" />
+          </motion.div>
+
+          {/* Description */}
+          <motion.p
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1, duration: 0.7 }}
+            className="text-white/30 leading-[1.75] mb-7 sm:mb-8"
+            style={{
+              fontSize: "12px",
+              fontFamily: SANS,
+              maxWidth: "300px",
+              letterSpacing: "0.015em",
+            }}
+          >
+            Premium doorstep car cleaning in Duliajan. Book in seconds — we
+            bring everything. You just unlock the car.
+          </motion.p>
+
+          {/* CTAs */}
+          <motion.div
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.1, duration: 0.7 }}
+            className="flex flex-col sm:flex-row gap-3 mb-8 sm:mb-10"
+          >
+            <a
+              href="/bookings"
+              className="group relative flex items-center justify-between px-6 h-[52px] sm:h-[54px] bg-white rounded-full overflow-hidden flex-1 sm:flex-initial sm:min-w-[220px]"
+            >
+              <div className="absolute inset-0 bg-emerald-400 translate-x-[-101%] group-hover:translate-x-0 transition-transform duration-500 ease-out" />
+              <span
+                className="relative z-10 tracking-[0.2em] uppercase text-black"
+                style={{ fontSize: "9px", fontFamily: SANS, fontWeight: 600 }}
+              >
+                Book Your Wash
+              </span>
+              <div className="relative z-10 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-black flex items-center justify-center group-hover:rotate-[-45deg] transition-transform duration-500">
+                <ArrowRight size={13} className="text-white" />
+              </div>
+            </a>
+
+            <a
+              href={WHATSAPP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex items-center justify-center gap-2.5 h-[50px] sm:h-[54px] px-6 rounded-full border border-white/[0.08] bg-white/[0.03] backdrop-blur-sm text-white/30 hover:text-white/55 hover:border-white/15 hover:bg-white/[0.06] transition-all duration-500 sm:min-w-[180px]"
+            >
+              <Phone size={12} strokeWidth={1.5} />
+              <span
+                className="tracking-[0.2em] uppercase"
+                style={{ fontSize: "8px", fontFamily: SANS }}
+              >
+                WhatsApp Us
+              </span>
+            </a>
+          </motion.div>
+
+          {/* Stats */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1.3, duration: 0.8 }}
+            className="grid grid-cols-3 gap-2.5 sm:gap-3"
+          >
+            {STATS.map((stat, i) => {
+              const Icon = stat.icon
+              return (
+                <motion.div
+                  key={stat.label}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 1.4 + i * 0.07 }}
+                  className="p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-white/[0.06] bg-white/[0.02]"
+                >
+                  <Icon size={11} className="text-emerald-400/30 mb-2.5" strokeWidth={1.5} />
+                  <p
+                    className="text-white leading-none mb-1"
+                    style={{ fontFamily: SERIF, fontWeight: 300, fontSize: "clamp(18px, 5vw, 24px)" }}
+                  >
+                    {stat.value}
+                  </p>
+                  <p
+                    className="text-white/18 tracking-[0.12em] uppercase"
+                    style={{ fontSize: "6.5px", fontFamily: SANS }}
+                  >
+                    {stat.label}
+                  </p>
+                </motion.div>
+              )
+            })}
           </motion.div>
         </div>
       </div>
 
-      {/* ── Desktop Layout ── */}
-      <div className="relative z-10 h-full hidden md:flex flex-col px-10 lg:px-16 xl:px-24 py-8 lg:py-10">
-        <header className="flex items-center justify-between shrink-0">
-          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.7, delay: 0.2 }} className="flex items-center gap-4">
-            <span className="w-8 h-px bg-white/20" aria-hidden="true" />
-            <span className="tracking-[0.25em] uppercase text-white/45 text-[10px] lg:text-[11px]" style={{ fontFamily: SERIF }}>
-              Doorstep Car Care · Duliajan
+      {/* ═══════════ DESKTOP (>= lg) ═══════════ */}
+      <div className="relative z-10 h-full hidden lg:flex flex-col px-16 xl:px-24 2xl:px-32 py-10">
+        {/* Top Bar */}
+        <div className="flex items-center justify-between shrink-0">
+          <motion.div
+            initial={{ opacity: 0, x: -12 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.2, duration: 0.8 }}
+            className="flex items-center gap-4"
+          >
+            <div className="w-8 h-8 rounded-full border border-white/12 flex items-center justify-center">
+              <Droplets size={13} className="text-white/25" />
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <span
+                className="text-white/30 tracking-[0.3em] uppercase"
+                style={{ fontSize: "9px", fontFamily: SANS, fontWeight: 500 }}
+              >
+                Wash2Door
+              </span>
+              <span
+                className="text-white/12 tracking-[0.18em] uppercase"
+                style={{ fontSize: "7px", fontFamily: SANS }}
+              >
+                Duliajan, Assam
+              </span>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3, duration: 0.6 }}
+            className="flex items-center gap-5"
+          >
+            <span
+              className="text-white/18 tracking-[0.12em]"
+              style={{ fontSize: "11px", fontFamily: SANS }}
+            >
+              {greeting}
+            </span>
+            <div className="w-px h-4 bg-white/8" />
+            <div className="flex items-center gap-2.5 px-4 py-2 rounded-full border border-white/[0.08] bg-white/[0.03] backdrop-blur-xl">
+              <PulsingDot />
+              <span
+                className="text-white/35 tracking-[0.18em] uppercase"
+                style={{ fontSize: "8px", fontFamily: SANS }}
+              >
+                Open · 9 AM – 5 PM
+              </span>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Content area */}
+        <div className="flex-1 flex flex-col justify-end pb-4">
+          {/* Tag */}
+          <motion.div
+            initial={{ opacity: 0, x: -12 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.4, duration: 0.8 }}
+            className="flex items-center gap-4 mb-10"
+          >
+            <div className="w-8 h-px bg-gradient-to-r from-emerald-400/50 to-transparent" />
+            <span
+              className="text-emerald-400/45 tracking-[0.35em] uppercase"
+              style={{ fontSize: "9px", fontFamily: SANS }}
+            >
+              Premium Doorstep Detailing
             </span>
           </motion.div>
-          <StatusBadge label="Open · 9AM – 5PM" />
-        </header>
 
-        <div className="flex-1 flex items-center py-8">
-          <div className="w-full max-w-[1400px]">
-            <HeadlineBlock size="desktop" sectionRef={sectionRef} />
+          {/* Headline + Right Column */}
+          <div className="flex items-end justify-between gap-16 xl:gap-20 mb-14">
+            {/* Headline */}
+            <div className="shrink-0 min-w-0">
+              <motion.div
+                initial={{ opacity: 0, y: 55 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5, duration: 1.1, ease: EASE }}
+                className="overflow-hidden"
+              >
+                <h1
+                  className="text-white leading-[0.88] whitespace-nowrap"
+                  style={{
+                    fontFamily: SERIF,
+                    fontWeight: 300,
+                    fontSize: "clamp(4rem, 7vw, 8.5rem)",
+                    letterSpacing: "-0.03em",
+                  }}
+                >
+                  Pristine
+                </h1>
+              </motion.div>
 
-            <motion.div variants={fadeInUp} initial="hidden" animate="visible" className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-8 lg:gap-12">
-              <div className="flex items-end gap-6 lg:gap-8">
-                <div className="w-px h-16 lg:h-20 shrink-0 bg-gradient-to-b from-white/10 to-transparent" aria-hidden="true" />
-                <div>
-                  <p className="tracking-wide text-white/40 leading-[1.85] mb-6 max-w-sm lg:max-w-md text-[11px] lg:text-[12px]">
-                    Professional car &amp; home cleaning at your doorstep — fast, safe &amp; hassle-free.
-                  </p>
-                  <div className="flex flex-wrap items-center gap-4 lg:gap-5">
-                    <BookButton />
-                    <WhatsAppLink />
-                  </div>
-                </div>
+              <motion.div
+                initial={{ opacity: 0, y: 55 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.6, duration: 1.1, ease: EASE }}
+                className="overflow-hidden"
+              >
+                <h1
+                  className="text-white leading-[0.88] whitespace-nowrap"
+                  style={{
+                    fontFamily: SERIF,
+                    fontWeight: 300,
+                    fontSize: "clamp(4rem, 7vw, 8.5rem)",
+                    letterSpacing: "-0.03em",
+                  }}
+                >
+                  Car Care
+                  <span className="text-emerald-400/25">,</span>
+                </h1>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 55 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.7, duration: 1.1, ease: EASE }}
+                className="overflow-hidden mt-1"
+              >
+                <h1
+                  className="leading-[0.88] whitespace-nowrap"
+                  style={{
+                    fontFamily: SERIF,
+                    fontWeight: 300,
+                    fontSize: "clamp(3.5rem, 6vw, 7.5rem)",
+                    letterSpacing: "-0.02em",
+                    color: "rgba(255,255,255,0.1)",
+                    fontStyle: "italic",
+                  }}
+                >
+                  Delivered to Your Door.
+                </h1>
+              </motion.div>
+            </div>
+
+            {/* Right column */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.85, duration: 0.8 }}
+              className="shrink-0 w-[280px] xl:w-[300px] pb-2"
+            >
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-5 h-px bg-gradient-to-r from-emerald-400/35 to-transparent" />
+                <div className="w-1 h-1 rounded-full bg-emerald-400/20" />
               </div>
 
-              <div className="flex items-end gap-6 lg:gap-10">
-                {STATS.map((stat, i) => (
-                  <StatItem key={`stat-desktop-${i}`} value={stat.value} label={stat.label} align="right" delay={i} />
-                ))}
+              <p
+                className="text-white/28 leading-[1.8] mb-8"
+                style={{ fontSize: "13px", fontFamily: SANS, letterSpacing: "0.01em" }}
+              >
+                Premium car cleaning that comes to you. Book in seconds — we
+                arrive fully equipped. You just unlock the car.
+              </p>
+
+              <div className="flex flex-col gap-3">
+                <a
+                  href="/bookings"
+                  className="group relative flex items-center justify-between px-7 h-[52px] bg-white rounded-full overflow-hidden hover:shadow-lg hover:shadow-white/5 transition-shadow duration-500"
+                >
+                  <div className="absolute inset-0 bg-emerald-400 translate-x-[-101%] group-hover:translate-x-0 transition-transform duration-500 ease-out" />
+                  <span
+                    className="relative z-10 tracking-[0.2em] uppercase text-black"
+                    style={{ fontSize: "9px", fontFamily: SANS, fontWeight: 600 }}
+                  >
+                    Book Your Wash
+                  </span>
+                  <div className="relative z-10 w-8 h-8 rounded-full bg-black flex items-center justify-center group-hover:rotate-[-45deg] transition-transform duration-500">
+                    <ArrowRight size={14} className="text-white" />
+                  </div>
+                </a>
+
+                <a
+                  href={WHATSAPP_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group flex items-center justify-center gap-3 h-[50px] rounded-full border border-white/[0.07] bg-white/[0.02] backdrop-blur-sm text-white/28 hover:text-white/50 hover:border-white/12 hover:bg-white/[0.05] transition-all duration-500"
+                >
+                  <Phone size={12} strokeWidth={1.5} />
+                  <span
+                    className="tracking-[0.2em] uppercase"
+                    style={{ fontSize: "9px", fontFamily: SANS }}
+                  >
+                    WhatsApp Us
+                  </span>
+                </a>
               </div>
             </motion.div>
           </div>
-        </div>
 
-        <footer className="shrink-0">
-          <motion.div initial="hidden" animate="visible" variants={scaleXVariant} className="w-full h-px bg-white/[0.08] mb-4 lg:mb-5 origin-left" aria-hidden="true" />
-          <motion.div variants={fadeIn} initial="hidden" animate="visible" className="flex flex-wrap items-center justify-between gap-4">
-            <nav className="flex items-center gap-5 lg:gap-7" aria-label="Quick service links">
-              {SERVICES.map((service, i) => (
-                <ServiceLink key={`service-${i}`} service={service} index={i} />
-              ))}
-            </nav>
-            <motion.a href="/Services" whileHover={{ x: 3 }} className="flex items-center gap-3 text-white/30 hover:text-white/60 transition-colors duration-300 group">
-              <span className="tracking-[0.2em] uppercase text-[8px] lg:text-[9px]">All Services</span>
-              <span className="h-px bg-current w-4 group-hover:w-8 transition-all duration-300" aria-hidden="true" />
-            </motion.a>
+          {/* Bottom */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1.05, duration: 0.8 }}
+          >
+            {/* Marquee */}
+            <div className="mb-5">
+              <ServicesMarquee />
+            </div>
+
+            <div className="w-full h-px bg-white/[0.05] mb-5" />
+
+            <div className="flex items-end justify-between">
+              {/* Stats */}
+              <div className="flex items-center gap-4 xl:gap-5">
+                {STATS.map((stat, i) => {
+                  const Icon = stat.icon
+                  return (
+                    <motion.div
+                      key={stat.label}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 1.15 + i * 0.07 }}
+                      className="group px-5 xl:px-6 py-4 rounded-xl border border-white/[0.04] bg-white/[0.015] hover:bg-white/[0.035] hover:border-white/[0.08] transition-all duration-500 cursor-default"
+                    >
+                      <div className="flex items-center gap-2.5 mb-2.5">
+                        <Icon
+                          size={12}
+                          className="text-emerald-400/20 group-hover:text-emerald-400/40 transition-colors duration-500"
+                          strokeWidth={1.5}
+                        />
+                        <div className="w-3 h-px bg-white/8" />
+                      </div>
+                      <p
+                        className="text-white leading-none mb-1"
+                        style={{
+                          fontFamily: SERIF,
+                          fontWeight: 300,
+                          fontSize: "clamp(1.2rem, 1.8vw, 1.6rem)",
+                        }}
+                      >
+                        {stat.value}
+                      </p>
+                      <p
+                        className="text-white/18 tracking-[0.18em] uppercase"
+                        style={{ fontSize: "7px", fontFamily: SANS }}
+                      >
+                        {stat.label}
+                      </p>
+                    </motion.div>
+                  )
+                })}
+              </div>
+
+              {/* Quick links */}
+              <motion.nav
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 1.35 }}
+                className="flex items-center gap-7 xl:gap-8"
+                aria-label="Quick links"
+              >
+                {["Services", "About", "Contact"].map((link) => (
+                  <a
+                    key={link}
+                    href={`/${link.toLowerCase()}`}
+                    className="group flex flex-col items-center gap-1.5"
+                  >
+                    <span
+                      className="text-white/18 group-hover:text-white/45 tracking-[0.22em] uppercase transition-colors duration-400"
+                      style={{ fontSize: "8px", fontFamily: SANS }}
+                    >
+                      {link}
+                    </span>
+                    <span
+                      className="h-px bg-emerald-400/25 w-0 group-hover:w-full transition-all duration-400"
+                      aria-hidden="true"
+                    />
+                  </a>
+                ))}
+              </motion.nav>
+            </div>
           </motion.div>
-        </footer>
+        </div>
       </div>
+
+      <ScrollIndicator />
     </section>
   )
 }
