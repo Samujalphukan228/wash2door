@@ -252,8 +252,8 @@ function StepListItem({ step, isActive, onClick, progress }) {
       className={`w-full text-left rounded-2xl transition-all duration-500 overflow-hidden
         ${
           isActive
-            ? "bg-gray-900 text-white shadow-xl shadow-black/10"
-            : "bg-gray-50 text-gray-900 hover:bg-gray-100"
+            ? "bg-black text-white shadow-xl shadow-black/10"
+            : "bg-gray-50 text-black hover:bg-gray-100"
         }`}
     >
       <div className="p-4 flex items-center gap-4">

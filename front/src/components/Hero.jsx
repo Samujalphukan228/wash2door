@@ -7,9 +7,9 @@ import { ArrowRight, Phone, Droplets, Shield, Clock } from "lucide-react"
 
 /* ─── Constants ─── */
 const STATS = [
-  { value: "100+", label: "Cars Done", icon: Droplets },
-  { value: "4.8★", label: "Rating", icon: Shield },
-  { value: "2hr", label: "Turnaround", icon: Clock },
+  { value: "500+", label: "Happy Clients", icon: Shield },
+  { value: "4.9★", label: "Avg Rating", icon: Clock },
+  { value: "2min", label: "Booking", icon: Droplets },
 ]
 
 const SERVICES_MARQUEE = [
@@ -34,8 +34,8 @@ const EASE = [0.22, 1, 0.36, 1]
 function PulsingDot() {
   return (
     <span className="relative flex h-1.5 w-1.5 shrink-0" aria-hidden="true">
-      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />
-      <span className="relative inline-flex rounded-full h-full w-full bg-emerald-400" />
+      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-60" />
+      <span className="relative inline-flex rounded-full h-full w-full bg-white" />
     </span>
   )
 }
@@ -168,9 +168,9 @@ export default function Hero() {
             transition={{ delay: 0.4, duration: 0.6 }}
             className="flex items-center gap-2 mb-4"
           >
-            <div className="w-5 h-px bg-gradient-to-r from-emerald-400/50 to-transparent" />
+            <div className="w-5 h-px bg-gradient-to-r from-white/30 to-transparent" />
             <span
-              className="text-emerald-400/60 tracking-[0.25em] uppercase"
+              className="text-white/50 tracking-[0.25em] uppercase"
               style={{ fontSize: "7px", fontFamily: SANS }}
             >
               {greeting}
@@ -212,7 +212,7 @@ export default function Hero() {
                 }}
               >
                 Car Care
-                <span className="text-emerald-400/30">,</span>
+                <span className="text-white/20">,</span>
               </h1>
             </motion.div>
 
@@ -244,8 +244,8 @@ export default function Hero() {
             transition={{ delay: 0.85, duration: 0.6, ease: EASE }}
             className="flex items-center gap-2 origin-left mb-4"
           >
-            <div className="w-8 h-px bg-gradient-to-r from-emerald-400/40 to-transparent" />
-            <div className="w-1 h-1 rounded-full bg-emerald-400/25" />
+            <div className="w-8 h-px bg-gradient-to-r from-white/30 to-transparent" />
+            <div className="w-1 h-1 rounded-full bg-white/20" />
           </motion.div>
 
           {/* Description */}
@@ -275,7 +275,7 @@ export default function Hero() {
               href="/bookings"
               className="group flex-1 relative flex items-center justify-between px-4 h-12 bg-white rounded-full overflow-hidden"
             >
-              <div className="absolute inset-0 bg-emerald-400 -translate-x-full group-active:translate-x-0 transition-transform duration-300" />
+              <div className="absolute inset-0 bg-white/80 -translate-x-full group-active:translate-x-0 transition-transform duration-300" />
               <span
                 className="relative z-10 tracking-[0.15em] uppercase text-black"
                 style={{ fontSize: "8px", fontFamily: SANS, fontWeight: 600 }}
@@ -400,9 +400,9 @@ export default function Hero() {
             transition={{ delay: 0.4, duration: 0.7 }}
             className="flex items-center gap-3 mb-8"
           >
-            <div className="w-6 h-px bg-gradient-to-r from-emerald-400/50 to-transparent" />
+            <div className="w-6 h-px bg-gradient-to-r from-white/30 to-transparent" />
             <span
-              className="text-emerald-400/50 tracking-[0.3em] uppercase"
+              className="text-white/40 tracking-[0.3em] uppercase"
               style={{ fontSize: "8px", fontFamily: SANS }}
             >
               Premium Doorstep Detailing
@@ -446,7 +446,7 @@ export default function Hero() {
                   }}
                 >
                   Car Care
-                  <span className="text-emerald-400/25">,</span>
+                  <span className="text-white/15">,</span>
                 </h1>
               </motion.div>
 
@@ -479,8 +479,8 @@ export default function Hero() {
               className="shrink-0 w-[260px] xl:w-[280px] pb-1"
             >
               <div className="flex items-center gap-2 mb-4">
-                <div className="w-4 h-px bg-gradient-to-r from-emerald-400/35 to-transparent" />
-                <div className="w-1 h-1 rounded-full bg-emerald-400/20" />
+                <div className="w-4 h-px bg-gradient-to-r from-white/25 to-transparent" />
+                <div className="w-1 h-1 rounded-full bg-white/15" />
               </div>
 
               <p
@@ -495,7 +495,7 @@ export default function Hero() {
                   href="/bookings"
                   className="group relative flex items-center justify-between px-5 h-12 bg-white rounded-full overflow-hidden hover:shadow-lg hover:shadow-white/5 transition-shadow duration-400"
                 >
-                  <div className="absolute inset-0 bg-emerald-400 -translate-x-full group-hover:translate-x-0 transition-transform duration-400 ease-out" />
+                  <div className="absolute inset-0 bg-white/80 -translate-x-full group-hover:translate-x-0 transition-transform duration-400 ease-out" />
                   <span
                     className="relative z-10 tracking-[0.18em] uppercase text-black"
                     style={{ fontSize: "8px", fontFamily: SANS, fontWeight: 600 }}
@@ -554,7 +554,7 @@ export default function Hero() {
                       <div className="flex items-center gap-2 mb-2">
                         <Icon
                           size={10}
-                          className="text-emerald-400/25 group-hover:text-emerald-400/40 transition-colors duration-400"
+                          className="text-white/20 group-hover:text-white/35 transition-colors duration-400"
                           strokeWidth={1.5}
                         />
                         <div className="w-2.5 h-px bg-white/10" />
@@ -601,7 +601,7 @@ export default function Hero() {
                       {link}
                     </span>
                     <span
-                      className="h-px bg-emerald-400/25 w-0 group-hover:w-full transition-all duration-300"
+                      className="h-px bg-white/25 w-0 group-hover:w-full transition-all duration-300"
                       aria-hidden="true"
                     />
                   </a>
