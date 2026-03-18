@@ -11,10 +11,10 @@ import AuthModal from "./AuthModal"
 
 const NAV_LINKS = [
   { label: "Home", href: "/" },
-  { label: "About", href: "/About" },
+  { label: "About", href: "/about" },
   { label: "Services", href: "/services" },
   { label: "Bookings", href: "/my-bookings", protected: true },
-  { label: "Contact", href: "/Contact" },
+  { label: "Contact", href: "/contact" },
 ]
 
 const DROPDOWN_ITEMS = [
