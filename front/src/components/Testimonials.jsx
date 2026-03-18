@@ -119,8 +119,8 @@ const StarRating = memo(function StarRating({ rating = 5, size = 14 }) {
           size={size}
           className={
             i < rating
-              ? "fill-amber-400 text-amber-400"
-              : "fill-gray-200 text-gray-200"
+              ? "fill-white/40 text-white/40"
+              : "fill-white/15 text-white/15"
           }
         />
       ))}
@@ -141,14 +141,15 @@ function Avatar({ initials, size = "md", variant = "dark" }) {
     lg: "18px",
   }
 
-  const bgClass = variant === "light" ? "bg-white" : "bg-black"
+  const bgClass = variant === "light" ? "bg-white" : "bg-white/10"
   const textClass = variant === "light" ? "text-black" : "text-white"
+  const borderClass = variant === "light" ? "" : "border border-white/20"
   const shadow =
     variant === "light" ? { boxShadow: "0 8px 24px -6px rgba(0,0,0,0.15)" } : {}
 
   return (
     <div
-      className={`${dims[size]} rounded-full flex items-center justify-center shrink-0 ${bgClass}`}
+      className={`${dims[size]} rounded-full flex items-center justify-center shrink-0 ${bgClass} ${borderClass}`}
       style={shadow}
     >
       <span
@@ -163,11 +164,11 @@ function Avatar({ initials, size = "md", variant = "dark" }) {
 
 // ── Dot Navigation ─────────────────────────────────────────
 function DotNav({ count, active, onSelect, variant = "dark" }) {
-  const activeBg = variant === "light" ? "bg-white" : "bg-black"
+  const activeBg = variant === "light" ? "bg-white" : "bg-white"
   const inactiveBg =
     variant === "light"
       ? "bg-white/30 hover:bg-white/60"
-      : "bg-gray-200 hover:bg-gray-400"
+      : "bg-white/20 hover:bg-white/40"
 
   return (
     <div className="flex items-center gap-2">
@@ -196,8 +197,8 @@ function ArrowButton({ direction, onClick, variant = "outline" }) {
         whileTap={{ scale: 0.9 }}
         onClick={onClick}
         aria-label={`${label} testimonial`}
-        className="w-11 h-11 rounded-full bg-black text-white flex items-center justify-center
-                   hover:bg-gray-800 transition-all duration-300"
+        className="w-11 h-11 rounded-full bg-white text-black flex items-center justify-center
+                   hover:bg-white/80 transition-all duration-300"
       >
         <Icon size={16} strokeWidth={2} />
       </motion.button>
@@ -209,8 +210,8 @@ function ArrowButton({ direction, onClick, variant = "outline" }) {
       whileTap={{ scale: 0.9 }}
       onClick={onClick}
       aria-label={`${label} testimonial`}
-      className="w-11 h-11 rounded-full border-2 border-gray-200 flex items-center justify-center
-                 text-gray-600 hover:border-black hover:bg-black hover:text-white
+      className="w-11 h-11 rounded-full border-2 border-white/30 flex items-center justify-center
+                 text-white/50 hover:border-white hover:bg-white/10 hover:text-white
                  transition-all duration-300"
     >
       <Icon size={16} strokeWidth={2} />
@@ -233,10 +234,10 @@ const SectionHeader = memo(function SectionHeader() {
     >
       {/* Tag */}
       <motion.div variants={fadeLeft} className="flex items-center gap-4 mb-6">
-        <span className="block w-10 h-px bg-black/20" aria-hidden="true" />
+        <span className="block w-10 h-px bg-white/20" aria-hidden="true" />
         <span
-          className="tracking-[0.35em] uppercase text-gray-400"
-          style={{ fontFamily: SANS, fontSize: "10px", fontWeight: 500 }}
+          className="tracking-[0.35em] uppercase text-white/50"
+          style={{ fontSize: "10px", fontFamily: SANS, fontWeight: 500 }}
         >
           Customer Reviews
         </span>
@@ -248,7 +249,7 @@ const SectionHeader = memo(function SectionHeader() {
           <motion.h2
             variants={fadeUp}
             id="testimonials-heading"
-            className="text-black"
+            className="text-white"
             style={{
               fontFamily: SERIF,
               fontWeight: 300,
@@ -261,7 +262,7 @@ const SectionHeader = memo(function SectionHeader() {
           </motion.h2>
           <motion.h2
             variants={fadeUp}
-            className="text-black/15"
+            className="text-white/15"
             style={{
               fontFamily: SERIF,
               fontWeight: 300,
@@ -280,7 +281,7 @@ const SectionHeader = memo(function SectionHeader() {
           {STATS.map(({ value, label }, i) => (
             <div key={i} className="lg:text-right">
               <p
-                className="text-black leading-none mb-1"
+                className="text-white leading-none mb-1"
                 style={{
                   fontFamily: SERIF,
                   fontSize: "clamp(1.25rem, 2.5vw, 1.75rem)",
@@ -290,7 +291,7 @@ const SectionHeader = memo(function SectionHeader() {
                 {value}
               </p>
               <p
-                className="text-gray-400 tracking-[0.12em] uppercase"
+                className="text-white/40 tracking-[0.12em] uppercase"
                 style={{ fontSize: "9px", fontFamily: SANS }}
               >
                 {label}
@@ -319,11 +320,11 @@ function DesktopTestimonialCard({ testimonial, direction }) {
     >
       {/* Left: Quote Card */}
       <div className="lg:col-span-3">
-        <div className="relative bg-black rounded-3xl p-8 lg:p-10 xl:p-12 h-full overflow-hidden">
+        <div className="relative bg-white/[0.04] border border-white/10 rounded-3xl p-8 lg:p-10 xl:p-12 h-full overflow-hidden backdrop-blur-md">
           {/* Ambient effects */}
           <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
-            <div className="absolute -top-24 -right-24 w-80 h-80 bg-white/[0.04] rounded-full blur-[100px]" />
-            <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-white/[0.03] rounded-full blur-[80px]" />
+            <div className="absolute -top-24 -right-24 w-80 h-80 bg-white/[0.08] rounded-full blur-[100px]" />
+            <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-white/[0.06] rounded-full blur-[80px]" />
           </div>
 
           {/* Content */}
@@ -342,7 +343,7 @@ function DesktopTestimonialCard({ testimonial, direction }) {
 
             {/* Quote text */}
             <blockquote
-              className="text-white/90 my-8 flex-1"
+              className="text-white/85 my-8 flex-1"
               style={{
                 fontFamily: SERIF,
                 fontWeight: 300,
@@ -380,17 +381,17 @@ function DesktopTestimonialCard({ testimonial, direction }) {
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.5, delay: 0.15, ease: EASE }}
       >
-        <div className="bg-gray-50 rounded-3xl p-8 h-full flex flex-col">
+        <div className="bg-white/[0.03] border border-white/10 rounded-3xl p-8 h-full flex flex-col backdrop-blur-md">
           {/* Service */}
           <div className="mb-8">
             <p
-              className="text-gray-400 tracking-[0.15em] uppercase mb-2"
+              className="text-white/40 tracking-[0.15em] uppercase mb-2"
               style={{ fontSize: "9px", fontFamily: SANS }}
             >
               Service Booked
             </p>
             <h3
-              className="text-black"
+              className="text-white"
               style={{ fontFamily: SERIF, fontSize: "24px", fontWeight: 400 }}
             >
               {t.service}
@@ -401,11 +402,11 @@ function DesktopTestimonialCard({ testimonial, direction }) {
           <div className="space-y-4 flex-1">
             {FEATURES.map((feature, i) => (
               <div key={i} className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded-full bg-black flex items-center justify-center shrink-0">
+                <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center shrink-0">
                   <Check size={12} strokeWidth={2.5} className="text-white" />
                 </div>
                 <span
-                  className="text-gray-600"
+                  className="text-white/60"
                   style={{ fontSize: "14px", fontFamily: SANS }}
                 >
                   {feature}
@@ -417,11 +418,11 @@ function DesktopTestimonialCard({ testimonial, direction }) {
           {/* CTA */}
           <a
             href="/bookings"
-            className="group inline-flex items-center gap-2 mt-8 text-black no-underline"
+            className="group inline-flex items-center gap-2 mt-8 text-white no-underline"
           >
             <span
-              className="tracking-[0.12em] uppercase border-b border-black pb-0.5
-                         group-hover:border-gray-400 transition-colors duration-300"
+              className="tracking-[0.12em] uppercase border-b border-white/40 pb-0.5
+                         group-hover:border-white transition-colors duration-300"
               style={{ fontSize: "10px", fontWeight: 500, fontFamily: SANS }}
             >
               Book This Service
@@ -487,7 +488,7 @@ const DesktopTestimonials = memo(function DesktopTestimonials() {
       </div>
 
       <p
-        className="text-center text-gray-300 mt-4"
+        className="text-center text-white/30 mt-4"
         style={{ fontSize: "11px", fontFamily: SANS }}
       >
         Hover to pause · Auto-advances every 6s
@@ -508,20 +509,20 @@ function MobileTestimonialCard({ testimonial, direction }) {
       initial="enter"
       animate="center"
       exit="exit"
-      className="bg-white border border-gray-100 rounded-3xl p-5 shadow-sm"
+      className="bg-white/[0.04] border border-white/10 rounded-3xl p-5 backdrop-blur-md"
     >
       {/* Header */}
       <div className="flex items-start gap-3 mb-4">
         <Avatar initials={t.initials} size="md" />
         <div className="flex-1 min-w-0">
           <cite
-            className="text-black block not-italic truncate"
+            className="text-white block not-italic truncate"
             style={{ fontFamily: SERIF, fontSize: "15px", fontWeight: 400 }}
           >
             {t.name}
           </cite>
           <p
-            className="text-gray-400"
+            className="text-white/40"
             style={{ fontSize: "11px", fontFamily: SANS }}
           >
             {t.location} · {t.date}
@@ -532,7 +533,7 @@ function MobileTestimonialCard({ testimonial, direction }) {
 
       {/* Quote */}
       <blockquote
-        className="text-gray-700 mb-5"
+        className="text-white/70 mb-5"
         style={{
           fontFamily: SERIF,
           fontWeight: 300,
@@ -544,9 +545,9 @@ function MobileTestimonialCard({ testimonial, direction }) {
       </blockquote>
 
       {/* Footer */}
-      <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+      <div className="flex items-center justify-between pt-4 border-t border-white/10">
         <span
-          className="px-3 py-1.5 rounded-full bg-gray-100 text-gray-500 tracking-[0.1em] uppercase"
+          className="px-3 py-1.5 rounded-full bg-white/10 text-white/50 tracking-[0.1em] uppercase"
           style={{ fontSize: "9px", fontFamily: SANS }}
         >
           {t.service}
@@ -616,7 +617,7 @@ const MobileTestimonials = memo(function MobileTestimonials() {
 
       {/* Counter */}
       <p
-        className="text-center text-gray-300 mb-8"
+        className="text-center text-white/30 mb-8"
         style={{ fontSize: "11px", fontFamily: SANS }}
       >
         Swipe or tap arrows · {index + 1} of {TESTIMONIALS.length}
@@ -627,12 +628,12 @@ const MobileTestimonials = memo(function MobileTestimonials() {
         <a
           href="/bookings"
           className="group relative inline-flex items-center justify-center gap-3
-                     w-full sm:w-auto h-14 px-10 bg-black text-white
+                     w-full sm:w-auto h-14 px-10 bg-white text-black
                      rounded-full no-underline overflow-hidden
-                     hover:shadow-xl hover:shadow-black/10 transition-shadow duration-500"
+                     hover:shadow-xl hover:shadow-white/10 transition-shadow duration-500"
         >
           <div
-            className="absolute inset-0 bg-gradient-to-r from-gray-800 to-gray-700
+            className="absolute inset-0 bg-white/80
                        -translate-x-full group-hover:translate-x-0
                        transition-transform duration-600 ease-out"
             aria-hidden="true"
@@ -658,7 +659,7 @@ const MobileTestimonials = memo(function MobileTestimonials() {
 export default function Testimonials() {
   return (
     <section
-      className="w-full bg-white py-20 md:py-28 lg:py-36"
+      className="w-full bg-black py-20 md:py-28 lg:py-36"
       style={{ fontFamily: SANS }}
       aria-labelledby="testimonials-heading"
     >
