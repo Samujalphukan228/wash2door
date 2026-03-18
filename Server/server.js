@@ -1,5 +1,3 @@
-// server.js - COMPLETE WITH SUBCATEGORY ROUTES
-
 import express from 'express';
 import { createServer } from 'http';
 import dotenv from 'dotenv';
@@ -27,17 +25,10 @@ dotenv.config();
 
 const app = express();
 const server = createServer(app);
+
 initSocket(server);
 
-// Trust proxy for Render/Vercel
 app.set('trust proxy', 1);
-
-connectDB().then(() => {
-    startCleanupScheduler();
-}).catch((error) => {
-    console.error('Failed to connect to database:', error.message);
-    process.exit(1);
-});
 
 const ALLOWED_ORIGINS = [
     'http://localhost:3000',
@@ -48,17 +39,14 @@ const ALLOWED_ORIGINS = [
 ].filter(Boolean);
 
 app.use(helmet());
+
 app.use(cors({
     origin: (origin, callback) => {
         if (!origin) return callback(null, true);
         if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
-
-        // Allow Vercel preview deployments
         if (origin.match(/^https:\/\/wash2door.*\.vercel\.app$/)) {
             return callback(null, true);
         }
-
-        console.warn(`⚠️ CORS blocked: ${origin}`);
         callback(new Error(`CORS: origin ${origin} not allowed`));
     },
     credentials: true,
@@ -76,7 +64,7 @@ app.use(hpp());
 app.get('/api/health', (req, res) => {
     res.status(200).json({
         success: true,
-        message: 'Server is running!',
+        message: 'Server is running',
         timestamp: new Date().toISOString()
     });
 });
@@ -96,25 +84,17 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
-    console.log(`
-    ╔═══════════════════════════════════════════════════════════╗
-    ║        🚀 SERVER RUNNING - Port ${PORT}                      ║
-    ╠═══════════════════════════════════════════════════════════╣
-    ║   Auth:          /api/auth/*                              ║
-    ║   Admin:         /api/admin/*                             ║
-    ║   Public:        /api/public/*                            ║
-    ║   Bookings:      /api/bookings/*                          ║
-    ║   Reviews:       /api/reviews/*                           ║
-    ║   Categories:    /api/categories/*                        ║
-    ║   Subcategories: /api/subcategories/*                     ║
-    ║   Services:      /api/services/*                          ║
-    ╚═══════════════════════════════════════════════════════════╝
-    `);
+    console.log(`Server running on port ${PORT}`);
 });
+
+connectDB()
+    .then(() => {
+        startCleanupScheduler();
+    })
+    .catch((error) => {
+        console.error('DB connection failed:', error.message);
+    });
 
 process.on('unhandledRejection', (err) => {
-    console.error(`❌ Error: ${err.message}`);
-    server.close(() => process.exit(1));
+    console.error(`Error: ${err.message}`);
 });
-
-export default app;
