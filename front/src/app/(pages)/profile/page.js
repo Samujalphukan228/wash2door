@@ -1,14 +1,15 @@
 // app/profile/page.jsx
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import {
   User, Mail, Calendar, Car, Settings, Lock, Trash2,
   Edit2, Save, X, ChevronRight, Star, Clock, CheckCircle,
-  XCircle, Loader2, Eye, EyeOff, ArrowUpRight, Shield,
-  Phone, MapPin, Timer, AlertCircle
+  Loader2, Eye, EyeOff, ArrowUpRight, Shield,
+  Timer, AlertCircle
 } from 'lucide-react'
 import {
   getUserProfile, updateUserProfile, changePassword,
@@ -38,14 +39,12 @@ const TABS = [
 function useScrollLock(isLocked) {
   useEffect(() => {
     if (!isLocked) return
-
     const scrollY = window.scrollY
     document.body.style.position = 'fixed'
     document.body.style.top = `-${scrollY}px`
     document.body.style.left = '0'
     document.body.style.right = '0'
     document.body.style.overflow = 'hidden'
-
     return () => {
       document.body.style.position = ''
       document.body.style.top = ''
@@ -82,7 +81,6 @@ function Avatar({ initials, size = 'md', variant = 'dark' }) {
     light: 'bg-white text-black border border-gray-200',
     ghost: 'bg-white/10 text-white border border-white/15',
   }
-
   return (
     <div
       className={`rounded-full flex items-center justify-center shrink-0 ${sizes[size]} ${variants[variant]}`}
@@ -102,26 +100,15 @@ function InputField({ label, icon: Icon, disabled, hint, ...props }) {
       </label>
       <div className="relative">
         {Icon && (
-          <Icon
-            size={14}
-            strokeWidth={1.5}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300"
-          />
+          <Icon size={14} strokeWidth={1.5} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" />
         )}
         <input
           disabled={disabled}
-          className={`w-full ${Icon ? 'pl-9' : 'pl-3'} pr-3 py-3 border text-[11px]
-                     rounded transition-all duration-200 min-h-[44px]
-                     ${disabled
-              ? 'border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed'
-              : 'border-gray-200 bg-white text-black focus:outline-none focus:border-black'
-            }`}
+          className={`w-full ${Icon ? 'pl-9' : 'pl-3'} pr-3 py-3 border text-[11px] rounded transition-all duration-200 min-h-[44px] ${disabled ? 'border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed' : 'border-gray-200 bg-white text-black focus:outline-none focus:border-black'}`}
           {...props}
         />
       </div>
-      {hint && (
-        <p className="text-[8px] text-gray-300 mt-1">{hint}</p>
-      )}
+      {hint && <p className="text-[8px] text-gray-300 mt-1">{hint}</p>}
     </div>
   )
 }
@@ -134,24 +121,16 @@ function PasswordField({ label, showPassword, onToggle, ...props }) {
         {label}
       </label>
       <div className="relative">
-        <Lock
-          size={14}
-          strokeWidth={1.5}
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300"
-        />
+        <Lock size={14} strokeWidth={1.5} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" />
         <input
           type={showPassword ? 'text' : 'password'}
-          className="w-full pl-9 pr-10 py-3 border border-gray-200 text-[11px]
-                     text-black bg-white placeholder-gray-300 rounded
-                     focus:outline-none focus:border-black transition-colors duration-200
-                     min-h-[44px]"
+          className="w-full pl-9 pr-10 py-3 border border-gray-200 text-[11px] text-black bg-white placeholder-gray-300 rounded focus:outline-none focus:border-black transition-colors duration-200 min-h-[44px]"
           {...props}
         />
         <button
           type="button"
           onClick={onToggle}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300
-                     active:text-gray-600 transition-colors"
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 active:text-gray-600 transition-colors"
         >
           {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
         </button>
@@ -169,15 +148,10 @@ function StatCard({ value, label, icon: Icon }) {
           <Icon size={14} strokeWidth={1.5} className="text-gray-400" />
         </div>
       )}
-      <p
-        className="text-black leading-none"
-        style={{ fontFamily: SERIF, fontWeight: 300, fontSize: '18px' }}
-      >
+      <p className="text-black leading-none" style={{ fontFamily: SERIF, fontWeight: 300, fontSize: '18px' }}>
         {value}
       </p>
-      <p className="text-[7px] tracking-[0.15em] uppercase text-gray-400 mt-1">
-        {label}
-      </p>
+      <p className="text-[7px] tracking-[0.15em] uppercase text-gray-400 mt-1">{label}</p>
     </div>
   )
 }
@@ -199,33 +173,22 @@ function MobileBookingCard({ booking, onClick }) {
   return (
     <button
       onClick={onClick}
-      className="w-full text-left border border-gray-200 rounded overflow-hidden
-                 active:scale-[0.98] transition-transform duration-150 bg-white"
+      className="w-full text-left border border-gray-200 rounded overflow-hidden active:scale-[0.98] transition-transform duration-150 bg-white"
     >
-      {/* Header */}
       <div className="relative bg-black px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="min-w-0 flex-1">
-            <h3
-              className="text-white truncate text-[14px]"
-              style={{ fontFamily: SERIF, fontWeight: 400 }}
-            >
+            <h3 className="text-white truncate text-[14px]" style={{ fontFamily: SERIF, fontWeight: 400 }}>
               {booking.serviceName}
             </h3>
-            <p className="text-white/40 text-[9px] tracking-[0.08em] mt-0.5">
-              {booking.bookingCode}
-            </p>
+            <p className="text-white/40 text-[9px] tracking-[0.08em] mt-0.5">{booking.bookingCode}</p>
           </div>
           <div className="text-right ml-3">
-            <p
-              className="text-white"
-              style={{ fontFamily: SERIF, fontWeight: 300, fontSize: '16px' }}
-            >
+            <p className="text-white" style={{ fontFamily: SERIF, fontWeight: 300, fontSize: '16px' }}>
               ₹{booking.price}
             </p>
           </div>
         </div>
-
         {isUpcoming && (
           <span className="absolute top-2 right-2 flex h-2 w-2">
             <span className="animate-ping absolute h-full w-full rounded-full bg-emerald-400 opacity-75" />
@@ -233,16 +196,11 @@ function MobileBookingCard({ booking, onClick }) {
           </span>
         )}
       </div>
-
-      {/* Content */}
       <div className="px-4 py-3">
         <div className="flex items-center justify-between mb-2">
           <StatusBadge status={booking.status} />
-          <span className="text-[9px] text-gray-400 uppercase tracking-wider">
-            {booking.vehicleTypeName}
-          </span>
+          <span className="text-[9px] text-gray-400 uppercase tracking-wider">{booking.vehicleTypeName}</span>
         </div>
-
         <div className="flex items-center gap-3 text-[10px] text-gray-500">
           <span className="flex items-center gap-1">
             <Calendar size={10} className="text-gray-300" />
@@ -279,16 +237,13 @@ function DesktopBookingCard({ booking, onClick }) {
   return (
     <button
       onClick={onClick}
-      className="w-full text-left group border border-gray-200 rounded overflow-hidden
-                 hover:border-black hover:shadow-md transition-all duration-300 bg-white"
+      className="w-full text-left group border border-gray-200 rounded overflow-hidden hover:border-black hover:shadow-md transition-all duration-300 bg-white"
     >
       <div className="p-5 flex items-center gap-5">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2.5 mb-1.5">
             <StatusBadge status={booking.status} />
-            <span className="text-[9px] text-gray-300 font-mono uppercase">
-              {booking.bookingCode}
-            </span>
+            <span className="text-[9px] text-gray-300 font-mono uppercase">{booking.bookingCode}</span>
             {isUpcoming && (
               <span className="relative flex h-1.5 w-1.5">
                 <span className="animate-ping absolute h-full w-full rounded-full bg-emerald-400 opacity-75" />
@@ -296,17 +251,11 @@ function DesktopBookingCard({ booking, onClick }) {
               </span>
             )}
           </div>
-          <h3
-            className="text-black truncate mb-0.5"
-            style={{ fontFamily: SERIF, fontWeight: 400, fontSize: '15px' }}
-          >
+          <h3 className="text-black truncate mb-0.5" style={{ fontFamily: SERIF, fontWeight: 400, fontSize: '15px' }}>
             {booking.serviceName}
           </h3>
-          <p className="text-[10px] text-gray-400 uppercase tracking-wider">
-            {booking.vehicleTypeName}
-          </p>
+          <p className="text-[10px] text-gray-400 uppercase tracking-wider">{booking.vehicleTypeName}</p>
         </div>
-
         <div className="hidden lg:flex items-center gap-2 shrink-0">
           <div className="flex items-center gap-1.5 px-2.5 py-1.5 border border-gray-100 rounded">
             <Calendar size={11} className="text-gray-400" />
@@ -317,18 +266,11 @@ function DesktopBookingCard({ booking, onClick }) {
             <span className="text-[10px] text-black">{booking.timeSlot}</span>
           </div>
         </div>
-
         <div className="flex items-center gap-3 shrink-0">
-          <p
-            className="text-black"
-            style={{ fontFamily: SERIF, fontWeight: 300, fontSize: '20px' }}
-          >
+          <p className="text-black" style={{ fontFamily: SERIF, fontWeight: 300, fontSize: '20px' }}>
             ₹{booking.price}
           </p>
-          <ChevronRight
-            size={14}
-            className="text-gray-300 group-hover:text-black transition-colors"
-          />
+          <ChevronRight size={14} className="text-gray-300 group-hover:text-black transition-colors" />
         </div>
       </div>
     </button>
@@ -354,11 +296,10 @@ function Modal({ isOpen, onClose, children }) {
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
-        className="relative w-full sm:max-w-md bg-white sm:rounded-lg rounded-t-2xl
-                   max-h-[90vh] overflow-hidden animate-slide-up"
+        className="relative w-full sm:max-w-md bg-white sm:rounded-lg rounded-t-2xl max-h-[90vh] overflow-hidden"
+        style={{ animation: 'slide-up 0.3s ease-out' }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Mobile handle */}
         <div className="sm:hidden flex justify-center pt-3 pb-2">
           <div className="w-10 h-1 bg-gray-200 rounded-full" />
         </div>
@@ -366,16 +307,6 @@ function Modal({ isOpen, onClose, children }) {
           {children}
         </div>
       </div>
-
-      <style jsx>{`
-        @keyframes slide-up {
-          from { transform: translateY(100%); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
-        }
-        .animate-slide-up {
-          animation: slide-up 0.3s ease-out;
-        }
-      `}</style>
     </div>
   )
 }
@@ -392,21 +323,15 @@ function DeactivateModal({ isOpen, onClose, onConfirm, loading }) {
   return (
     <Modal isOpen={isOpen} onClose={onClose}>
       <div className="p-5">
-        <div className="w-12 h-12 border border-red-200 bg-red-50 rounded-full
-                        flex items-center justify-center mb-4">
+        <div className="w-12 h-12 border border-red-200 bg-red-50 rounded-full flex items-center justify-center mb-4">
           <AlertCircle size={22} className="text-red-500" strokeWidth={1.5} />
         </div>
-
-        <h2
-          className="text-black mb-1.5"
-          style={{ fontFamily: SERIF, fontWeight: 400, fontSize: '18px' }}
-        >
+        <h2 className="text-black mb-1.5" style={{ fontFamily: SERIF, fontWeight: 400, fontSize: '18px' }}>
           Deactivate Account?
         </h2>
         <p className="text-gray-500 text-[11px] leading-relaxed mb-5">
           Once deactivated, you won't be able to access your account. Contact support to reactivate.
         </p>
-
         <div className="mb-5">
           <label className="block text-[8px] tracking-[0.2em] uppercase text-gray-400 mb-1.5">
             Confirm Password
@@ -417,10 +342,7 @@ function DeactivateModal({ isOpen, onClose, onConfirm, loading }) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter your password"
-              className="w-full px-3 pr-10 py-3 border border-gray-200 rounded
-                         text-[11px] text-black placeholder-gray-300
-                         focus:outline-none focus:border-black transition-colors
-                         min-h-[44px]"
+              className="w-full px-3 pr-10 py-3 border border-gray-200 rounded text-[11px] text-black placeholder-gray-300 focus:outline-none focus:border-black transition-colors min-h-[44px]"
             />
             <button
               type="button"
@@ -431,25 +353,18 @@ function DeactivateModal({ isOpen, onClose, onConfirm, loading }) {
             </button>
           </div>
         </div>
-
         <div className="flex gap-2">
           <button
             onClick={onClose}
             disabled={loading}
-            className="flex-1 px-4 py-3 border border-gray-200 rounded
-                       text-[9px] tracking-[0.15em] uppercase text-black
-                       min-h-[44px] active:scale-[0.98] transition-all
-                       disabled:opacity-50"
+            className="flex-1 px-4 py-3 border border-gray-200 rounded text-[9px] tracking-[0.15em] uppercase text-black min-h-[44px] active:scale-[0.98] transition-all disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             onClick={() => onConfirm(password)}
             disabled={loading || !password}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-3
-                       bg-red-600 text-white rounded min-h-[44px]
-                       text-[9px] tracking-[0.15em] uppercase
-                       active:scale-[0.98] transition-all disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-red-600 text-white rounded min-h-[44px] text-[9px] tracking-[0.15em] uppercase active:scale-[0.98] transition-all disabled:opacity-50"
           >
             {loading ? (
               <Loader2 size={14} className="animate-spin" />
@@ -466,7 +381,7 @@ function DeactivateModal({ isOpen, onClose, onConfirm, loading }) {
   )
 }
 
-// ─── Message Toast ───
+// ─── Toast ───
 function Toast({ type, message, onClose }) {
   if (!message) return null
 
@@ -497,36 +412,29 @@ export default function ProfilePage() {
   const { user, loading: authLoading, logout, checkAuth } = useAuth()
   const router = useRouter()
 
-  // State
   const [activeTab, setActiveTab] = useState('profile')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-
   const [profile, setProfile] = useState(null)
   const [stats, setStats] = useState(null)
   const [isEditing, setIsEditing] = useState(false)
   const [formData, setFormData] = useState({ firstName: '', lastName: '' })
-
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
     newPassword: '',
     confirmNewPassword: '',
   })
   const [showPasswords, setShowPasswords] = useState(false)
-
   const [bookings, setBookings] = useState([])
   const [bookingsLoading, setBookingsLoading] = useState(false)
-
   const [showDeactivateModal, setShowDeactivateModal] = useState(false)
 
-  // Auth redirect
   useEffect(() => {
     if (!authLoading && !user) router.push('/')
   }, [user, authLoading, router])
 
-  // Fetch data
   useEffect(() => {
     if (user) {
       fetchProfile()
@@ -538,7 +446,6 @@ export default function ProfilePage() {
     if (user && activeTab === 'bookings') fetchBookings()
   }, [user, activeTab])
 
-  // Auto-clear messages
   useEffect(() => {
     if (success) {
       const t = setTimeout(() => setSuccess(''), 3000)
@@ -553,7 +460,6 @@ export default function ProfilePage() {
     }
   }, [error])
 
-  // ─── API Calls ───
   const fetchProfile = async () => {
     try {
       setLoading(true)
@@ -610,28 +516,13 @@ export default function ProfilePage() {
     e.preventDefault()
     setError('')
     setSuccess('')
-
-    if (passwordData.newPassword.length < 8) {
-      setError('Min 8 characters required')
-      return
-    }
-    if (passwordData.newPassword !== passwordData.confirmNewPassword) {
-      setError('Passwords do not match')
-      return
-    }
+    if (passwordData.newPassword.length < 8) { setError('Min 8 characters required'); return }
+    if (passwordData.newPassword !== passwordData.confirmNewPassword) { setError('Passwords do not match'); return }
     const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])/
-    if (!regex.test(passwordData.newPassword)) {
-      setError('Needs uppercase, lowercase, number & special char')
-      return
-    }
-
+    if (!regex.test(passwordData.newPassword)) { setError('Needs uppercase, lowercase, number & special char'); return }
     setSaving(true)
     try {
-      await changePassword(
-        passwordData.currentPassword,
-        passwordData.newPassword,
-        passwordData.confirmNewPassword
-      )
+      await changePassword(passwordData.currentPassword, passwordData.newPassword, passwordData.confirmNewPassword)
       setSuccess('Password changed')
       setPasswordData({ currentPassword: '', newPassword: '', confirmNewPassword: '' })
     } catch (err) {
@@ -642,10 +533,7 @@ export default function ProfilePage() {
   }
 
   const handleDeactivateAccount = async (password) => {
-    if (!password) {
-      setError('Enter your password')
-      return
-    }
+    if (!password) { setError('Enter your password'); return }
     setSaving(true)
     setError('')
     try {
@@ -664,7 +552,6 @@ export default function ProfilePage() {
     setSuccess('')
   }
 
-  // ─── Loading / Auth Guard ───
   if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
@@ -677,37 +564,26 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-white pb-16 sm:pb-0" style={{ fontFamily: SANS }}>
+
       {/* ── Header ── */}
       <div className="bg-black">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 md:px-8">
           <div className="pt-16 pb-6 sm:pt-20 sm:pb-8">
             <div className="flex items-center gap-2 mb-3">
               <span className="block w-5 h-px bg-white/30" />
-              <span
-                className="tracking-[0.3em] uppercase text-white/40"
-                style={{ fontSize: '8px' }}
-              >
+              <span className="tracking-[0.3em] uppercase text-white/40" style={{ fontSize: '8px' }}>
                 Account
               </span>
             </div>
-
             <div className="flex items-end justify-between gap-4">
               <div>
-                <h1
-                  className="text-white mb-1"
-                  style={{
-                    fontFamily: SERIF,
-                    fontWeight: 300,
-                    fontSize: 'clamp(1.25rem, 4vw, 1.75rem)',
-                  }}
-                >
+                <h1 className="text-white mb-1" style={{ fontFamily: SERIF, fontWeight: 300, fontSize: 'clamp(1.25rem, 4vw, 1.75rem)' }}>
                   My Account
                 </h1>
                 <p className="text-[9px] tracking-[0.15em] uppercase text-white/30">
                   Manage profile & preferences
                 </p>
               </div>
-
               <div className="hidden sm:block">
                 <Avatar
                   initials={`${user?.firstName?.[0] || ''}${user?.lastName?.[0] || ''}`}
@@ -730,9 +606,7 @@ export default function ProfilePage() {
                 <button
                   key={tab.id}
                   onClick={() => switchTab(tab.id)}
-                  className={`relative flex items-center gap-2 px-5 py-3
-                             text-[9px] tracking-[0.12em] uppercase transition-colors
-                             ${activeTab === tab.id ? 'text-black' : 'text-gray-400 hover:text-black'}`}
+                  className={`relative flex items-center gap-2 px-5 py-3 text-[9px] tracking-[0.12em] uppercase transition-colors ${activeTab === tab.id ? 'text-black' : 'text-gray-400 hover:text-black'}`}
                 >
                   <Icon size={13} strokeWidth={1.5} />
                   <span>{tab.label}</span>
@@ -754,67 +628,45 @@ export default function ProfilePage() {
         {/* ═══ Profile Tab ═══ */}
         {activeTab === 'profile' && (
           <div className="space-y-4">
-            {/* User Card */}
             <div className="border border-gray-200 rounded p-4 sm:p-6">
               <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
                 <Avatar
                   initials={`${user?.firstName?.[0] || ''}${user?.lastName?.[0] || ''}`}
                   size="lg"
                 />
-
                 <div className="text-center sm:text-left flex-1 min-w-0">
-                  <h2
-                    className="text-black"
-                    style={{ fontFamily: SERIF, fontWeight: 300, fontSize: '18px' }}
-                  >
+                  <h2 className="text-black" style={{ fontFamily: SERIF, fontWeight: 300, fontSize: '18px' }}>
                     {user?.firstName} {user?.lastName}
                   </h2>
                   <p className="text-[10px] text-gray-400 mt-0.5">{user?.email}</p>
-
                   {stats && (
                     <div className="flex items-center justify-center sm:justify-start gap-4 mt-3">
                       <div>
-                        <span
-                          className="text-black"
-                          style={{ fontFamily: SERIF, fontWeight: 300, fontSize: '16px' }}
-                        >
+                        <span className="text-black" style={{ fontFamily: SERIF, fontWeight: 300, fontSize: '16px' }}>
                           {stats.bookings?.total || 0}
                         </span>
-                        <span className="text-[8px] tracking-[0.12em] uppercase text-gray-400 ml-1">
-                          Bookings
-                        </span>
+                        <span className="text-[8px] tracking-[0.12em] uppercase text-gray-400 ml-1">Bookings</span>
                       </div>
                       <div className="w-px h-3 bg-gray-200" />
                       <div>
-                        <span
-                          className="text-black"
-                          style={{ fontFamily: SERIF, fontWeight: 300, fontSize: '16px' }}
-                        >
+                        <span className="text-black" style={{ fontFamily: SERIF, fontWeight: 300, fontSize: '16px' }}>
                           ₹{stats.totalSpent || 0}
                         </span>
-                        <span className="text-[8px] tracking-[0.12em] uppercase text-gray-400 ml-1">
-                          Spent
-                        </span>
+                        <span className="text-[8px] tracking-[0.12em] uppercase text-gray-400 ml-1">Spent</span>
                       </div>
                     </div>
                   )}
                 </div>
-
                 <button
                   onClick={() => {
                     if (isEditing) {
                       setIsEditing(false)
-                      setFormData({
-                        firstName: profile?.firstName || '',
-                        lastName: profile?.lastName || '',
-                      })
+                      setFormData({ firstName: profile?.firstName || '', lastName: profile?.lastName || '' })
                     } else {
                       setIsEditing(true)
                     }
                   }}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 border border-gray-200
-                             rounded text-[9px] tracking-[0.12em] uppercase
-                             hover:border-black active:scale-[0.98] transition-all shrink-0"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 border border-gray-200 rounded text-[9px] tracking-[0.12em] uppercase hover:border-black active:scale-[0.98] transition-all shrink-0"
                 >
                   {isEditing ? <X size={12} /> : <Edit2 size={12} />}
                   {isEditing ? 'Cancel' : 'Edit'}
@@ -822,15 +674,11 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* Form */}
             <div className="border border-gray-200 rounded p-4 sm:p-6">
               <div className="flex items-center gap-2 mb-4">
                 <span className="block w-3 h-px bg-gray-300" />
-                <h3 className="text-[8px] tracking-[0.25em] uppercase text-gray-400">
-                  Personal Information
-                </h3>
+                <h3 className="text-[8px] tracking-[0.25em] uppercase text-gray-400">Personal Information</h3>
               </div>
-
               <form onSubmit={handleUpdateProfile} className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <InputField
@@ -846,34 +694,18 @@ export default function ProfilePage() {
                     disabled={!isEditing}
                   />
                 </div>
-
-                <InputField
-                  label="Email"
-                  icon={Mail}
-                  value={profile?.email || ''}
-                  disabled
-                  hint="Email cannot be changed"
-                />
-
+                <InputField label="Email" icon={Mail} value={profile?.email || ''} disabled hint="Email cannot be changed" />
                 <div className="h-px bg-gray-100" />
-
                 <div>
                   <div className="flex items-center gap-2 mb-3">
                     <span className="block w-3 h-px bg-gray-300" />
-                    <h3 className="text-[8px] tracking-[0.25em] uppercase text-gray-400">
-                      Account Details
-                    </h3>
+                    <h3 className="text-[8px] tracking-[0.25em] uppercase text-gray-400">Account Details</h3>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 border border-gray-100 rounded">
                       <Calendar size={11} className="text-gray-400" />
                       <span className="text-[10px] text-black">
-                        {profile?.createdAt
-                          ? new Date(profile.createdAt).toLocaleDateString('en-IN', {
-                              month: 'short',
-                              year: 'numeric',
-                            })
-                          : 'N/A'}
+                        {profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }) : 'N/A'}
                       </span>
                     </div>
                     <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 border border-gray-100 rounded">
@@ -882,24 +714,13 @@ export default function ProfilePage() {
                     </div>
                   </div>
                 </div>
-
                 {isEditing && (
                   <button
                     type="submit"
                     disabled={saving}
-                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2
-                               px-6 py-3 bg-black text-white rounded min-h-[44px]
-                               text-[9px] tracking-[0.15em] uppercase
-                               active:scale-[0.98] transition-all disabled:opacity-50"
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 bg-black text-white rounded min-h-[44px] text-[9px] tracking-[0.15em] uppercase active:scale-[0.98] transition-all disabled:opacity-50"
                   >
-                    {saving ? (
-                      <Loader2 size={12} className="animate-spin" />
-                    ) : (
-                      <>
-                        <Save size={12} />
-                        Save Changes
-                      </>
-                    )}
+                    {saving ? <Loader2 size={12} className="animate-spin" /> : <><Save size={12} />Save Changes</>}
                   </button>
                 )}
               </form>
@@ -913,23 +734,16 @@ export default function ProfilePage() {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <span className="block w-3 h-px bg-gray-300" />
-                <h2
-                  className="text-black"
-                  style={{ fontFamily: SERIF, fontWeight: 300, fontSize: '16px' }}
-                >
+                <h2 className="text-black" style={{ fontFamily: SERIF, fontWeight: 300, fontSize: '16px' }}>
                   Recent Bookings
                 </h2>
               </div>
               <button
                 onClick={() => router.push('/my-bookings')}
-                className="group inline-flex items-center gap-1 text-[9px]
-                           tracking-[0.12em] uppercase text-gray-400 hover:text-black transition-colors"
+                className="group inline-flex items-center gap-1 text-[9px] tracking-[0.12em] uppercase text-gray-400 hover:text-black transition-colors"
               >
                 View All
-                <ArrowUpRight
-                  size={11}
-                  className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform"
-                />
+                <ArrowUpRight size={11} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
               </button>
             </div>
 
@@ -942,54 +756,35 @@ export default function ProfilePage() {
                 <div className="w-14 h-14 border border-gray-200 rounded-full flex items-center justify-center mb-4">
                   <Car size={24} strokeWidth={1} className="text-gray-300" />
                 </div>
-                <h3
-                  className="text-black mb-1"
-                  style={{ fontFamily: SERIF, fontWeight: 300, fontSize: '16px' }}
-                >
+                <h3 className="text-black mb-1" style={{ fontFamily: SERIF, fontWeight: 300, fontSize: '16px' }}>
                   No bookings yet
                 </h3>
                 <p className="text-[10px] text-gray-400 mb-5">Book your first service today</p>
-                <a
+                <Link
                   href="/bookings"
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded
-                             text-[9px] tracking-[0.15em] uppercase min-h-[44px]
-                             active:scale-[0.98] transition-all"
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded text-[9px] tracking-[0.15em] uppercase min-h-[44px] active:scale-[0.98] transition-all"
                 >
                   Book Now
                   <ArrowUpRight size={12} />
-                </a>
+                </Link>
               </div>
             ) : (
               <div className="space-y-2.5">
-                {/* Mobile */}
                 <div className="sm:hidden space-y-2.5">
                   {bookings.slice(0, 5).map((b) => (
-                    <MobileBookingCard
-                      key={b._id}
-                      booking={b}
-                      onClick={() => router.push('/my-bookings')}
-                    />
+                    <MobileBookingCard key={b._id} booking={b} onClick={() => router.push('/my-bookings')} />
                   ))}
                 </div>
-
-                {/* Desktop */}
                 <div className="hidden sm:block space-y-2.5">
                   {bookings.slice(0, 5).map((b) => (
-                    <DesktopBookingCard
-                      key={b._id}
-                      booking={b}
-                      onClick={() => router.push('/my-bookings')}
-                    />
+                    <DesktopBookingCard key={b._id} booking={b} onClick={() => router.push('/my-bookings')} />
                   ))}
                 </div>
-
                 {bookings.length > 5 && (
                   <div className="text-center pt-3">
                     <button
                       onClick={() => router.push('/my-bookings')}
-                      className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded
-                                 text-[9px] tracking-[0.15em] uppercase min-h-[44px]
-                                 active:scale-[0.98] transition-all"
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded text-[9px] tracking-[0.15em] uppercase min-h-[44px] active:scale-[0.98] transition-all"
                     >
                       View All Bookings
                       <ChevronRight size={12} />
@@ -1009,25 +804,18 @@ export default function ProfilePage() {
                 <Shield size={16} className="text-gray-400" />
               </div>
               <div>
-                <h2
-                  className="text-black"
-                  style={{ fontFamily: SERIF, fontWeight: 300, fontSize: '16px' }}
-                >
+                <h2 className="text-black" style={{ fontFamily: SERIF, fontWeight: 300, fontSize: '16px' }}>
                   Change Password
                 </h2>
                 <p className="text-[9px] text-gray-400">Keep your account secure</p>
               </div>
             </div>
-
             <div className="h-px bg-gray-100 mb-5" />
-
             <form onSubmit={handleChangePassword} className="space-y-4 max-w-sm">
               <PasswordField
                 label="Current Password"
                 value={passwordData.currentPassword}
-                onChange={(e) =>
-                  setPasswordData({ ...passwordData, currentPassword: e.target.value })
-                }
+                onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
                 showPassword={showPasswords}
                 onToggle={() => setShowPasswords(!showPasswords)}
                 placeholder="Current password"
@@ -1036,9 +824,7 @@ export default function ProfilePage() {
               <PasswordField
                 label="New Password"
                 value={passwordData.newPassword}
-                onChange={(e) =>
-                  setPasswordData({ ...passwordData, newPassword: e.target.value })
-                }
+                onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
                 showPassword={showPasswords}
                 onToggle={() => setShowPasswords(!showPasswords)}
                 placeholder="New password"
@@ -1050,31 +836,18 @@ export default function ProfilePage() {
               <PasswordField
                 label="Confirm Password"
                 value={passwordData.confirmNewPassword}
-                onChange={(e) =>
-                  setPasswordData({ ...passwordData, confirmNewPassword: e.target.value })
-                }
+                onChange={(e) => setPasswordData({ ...passwordData, confirmNewPassword: e.target.value })}
                 showPassword={showPasswords}
                 onToggle={() => setShowPasswords(!showPasswords)}
                 placeholder="Confirm password"
                 required
               />
-
               <button
                 type="submit"
                 disabled={saving}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2
-                           px-6 py-3 bg-black text-white rounded min-h-[44px]
-                           text-[9px] tracking-[0.15em] uppercase
-                           active:scale-[0.98] transition-all disabled:opacity-50"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 bg-black text-white rounded min-h-[44px] text-[9px] tracking-[0.15em] uppercase active:scale-[0.98] transition-all disabled:opacity-50"
               >
-                {saving ? (
-                  <Loader2 size={12} className="animate-spin" />
-                ) : (
-                  <>
-                    <Lock size={12} />
-                    Update Password
-                  </>
-                )}
+                {saving ? <Loader2 size={12} className="animate-spin" /> : <><Lock size={12} />Update Password</>}
               </button>
             </form>
           </div>
@@ -1083,14 +856,11 @@ export default function ProfilePage() {
         {/* ═══ Settings Tab ═══ */}
         {activeTab === 'settings' && (
           <div className="space-y-4">
-            {/* Stats */}
             {stats && (
               <div className="border border-gray-200 rounded p-4 sm:p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <span className="block w-3 h-px bg-gray-300" />
-                  <h3 className="text-[8px] tracking-[0.25em] uppercase text-gray-400">
-                    Account Overview
-                  </h3>
+                  <h3 className="text-[8px] tracking-[0.25em] uppercase text-gray-400">Account Overview</h3>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <StatCard value={stats.bookings?.total || 0} label="Total" icon={Car} />
@@ -1100,37 +870,25 @@ export default function ProfilePage() {
                 </div>
               </div>
             )}
-
-            {/* Danger Zone */}
             <div className="border border-red-200 rounded p-4 sm:p-6">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-9 h-9 border border-red-200 bg-red-50 rounded-full flex items-center justify-center">
                   <AlertCircle size={16} className="text-red-500" />
                 </div>
                 <div>
-                  <h3
-                    className="text-black"
-                    style={{ fontFamily: SERIF, fontWeight: 400, fontSize: '14px' }}
-                  >
+                  <h3 className="text-black" style={{ fontFamily: SERIF, fontWeight: 400, fontSize: '14px' }}>
                     Danger Zone
                   </h3>
                   <p className="text-[9px] text-gray-400">Irreversible actions</p>
                 </div>
               </div>
-
               <div className="h-px bg-red-100 my-4" />
-
               <p className="text-[11px] text-gray-500 leading-relaxed mb-4 max-w-md">
-                Once deactivated, your account and data will be inaccessible. Contact support to
-                reactivate.
+                Once deactivated, your account and data will be inaccessible. Contact support to reactivate.
               </p>
-
               <button
                 onClick={() => setShowDeactivateModal(true)}
-                className="inline-flex items-center gap-2 px-4 py-2.5
-                           text-red-500 border border-red-200 rounded
-                           hover:bg-red-600 hover:text-white hover:border-red-600
-                           active:scale-[0.98] transition-all text-[9px] tracking-[0.12em] uppercase"
+                className="inline-flex items-center gap-2 px-4 py-2.5 text-red-500 border border-red-200 rounded hover:bg-red-600 hover:text-white hover:border-red-600 active:scale-[0.98] transition-all text-[9px] tracking-[0.12em] uppercase"
               >
                 <Trash2 size={12} />
                 Deactivate Account
@@ -1150,9 +908,7 @@ export default function ProfilePage() {
               <button
                 key={tab.id}
                 onClick={() => switchTab(tab.id)}
-                className={`flex-1 flex flex-col items-center justify-center gap-0.5 relative
-                           transition-colors active:bg-gray-50
-                           ${isActive ? 'text-black' : 'text-gray-300'}`}
+                className={`flex-1 flex flex-col items-center justify-center gap-0.5 relative transition-colors active:bg-gray-50 ${isActive ? 'text-black' : 'text-gray-300'}`}
               >
                 {isActive && (
                   <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-[2px] bg-black rounded-full" />
