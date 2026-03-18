@@ -170,13 +170,13 @@ function ContactList({ small = false }) {
             <Icon
               size={iconSize}
               strokeWidth={1.5}
-              className="text-white/25 mt-0.5 shrink-0"
+              className="text-white/30 mt-0.5 shrink-0"
             />
             <span
               className={`leading-relaxed transition-colors duration-300 ${
                 item.href
-                  ? "text-white/40 group-hover/c:text-white/70"
-                  : "text-white/30"
+                  ? "text-white/45 group-hover/c:text-white/70"
+                  : "text-white/35"
               }`}
               style={textStyle}
             >
@@ -215,18 +215,18 @@ function SocialRow({ full = false }) {
           target="_blank"
           rel="noopener noreferrer"
           aria-label={label}
-          className={`border border-white/15 rounded-full flex items-center
+          className={`border border-white/20 rounded-full flex items-center
             justify-center hover:border-white hover:bg-white group
             transition-all duration-300
             ${full ? "flex-1 h-11 gap-2" : "w-10 h-10"}`}
         >
           <Icon
             size={15}
-            className="text-white/45 group-hover:text-black transition-colors duration-300"
+            className="text-white/50 group-hover:text-black transition-colors duration-300"
           />
           {full && (
             <span
-              className="text-white/45 group-hover:text-black transition-colors duration-300"
+              className="text-white/50 group-hover:text-black transition-colors duration-300"
               style={STYLES.socialLabel}
             >
               {label}
@@ -247,7 +247,7 @@ function WhatsAppButton({ fullWidth = false }) {
       rel="noopener noreferrer"
       aria-label="Chat on WhatsApp"
       className={`inline-flex items-center gap-2.5 h-11 px-6 bg-white
-        text-black rounded-full no-underline hover:bg-gray-100
+        text-black rounded-full no-underline hover:bg-white/90
         transition-colors duration-300
         ${fullWidth ? "w-full justify-center" : ""}`}
     >
@@ -263,7 +263,7 @@ function NavColumn({ title, links }) {
   return (
     <div>
       <h4
-        className="text-white/25 mb-5 tracking-[0.35em] uppercase"
+        className="text-white/30 mb-5 tracking-[0.35em] uppercase"
         style={STYLES.sectionTitle}
       >
         {title}
@@ -279,7 +279,7 @@ function NavColumn({ title, links }) {
                 href={href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block py-2 text-white/40 hover:text-white
+                className="block py-2 text-white/45 hover:text-white/75
                   transition-colors duration-300 no-underline group"
                 style={STYLES.navLink}
               >
@@ -294,7 +294,7 @@ function NavColumn({ title, links }) {
             <Link
               key={label}
               href={href}
-              className="block py-2 text-white/40 hover:text-white
+              className="block py-2 text-white/45 hover:text-white/75
                 transition-colors duration-300 no-underline group"
               style={STYLES.navLink}
             >
@@ -315,13 +315,13 @@ function ScrollToTop() {
       whileTap={{ scale: 0.9 }}
       onClick={scrollToTop}
       aria-label="Back to top"
-      className="w-11 h-11 border border-white/15 rounded-full flex items-center
+      className="w-11 h-11 border border-white/20 rounded-full flex items-center
         justify-center hover:border-white hover:bg-white group
         transition-all duration-300"
     >
       <ChevronUp
         size={17}
-        className="text-white/40 group-hover:text-black transition-colors duration-300"
+        className="text-white/50 group-hover:text-black transition-colors duration-300"
       />
     </motion.button>
   )
@@ -329,10 +329,10 @@ function ScrollToTop() {
 
 function BottomBar({ showAllRights = false }) {
   return (
-    <div className="flex items-center justify-between gap-4 pt-6 border-t border-white/[0.07]">
+    <div className="flex items-center justify-between gap-4 pt-6 border-t border-white/[0.1]">
       <div>
         <p
-          className="text-white/25"
+          className="text-white/35"
           style={showAllRights ? STYLES.copyright : STYLES.copyrightSm}
         >
           © {CURRENT_YEAR} Wash2Door
@@ -342,7 +342,7 @@ function BottomBar({ showAllRights = false }) {
           href="https://nexxupp.com"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-white/15 hover:text-white/35 transition-colors no-underline"
+          className="text-white/20 hover:text-white/40 transition-colors no-underline"
           style={showAllRights ? STYLES.madeBySm : STYLES.madeBy}
         >
           Made by Nexxupp
@@ -399,7 +399,7 @@ function MobileFooter() {
       <motion.div variants={fadeUp}>
         <BrandLogo mobile />
         <p
-          className="text-white/30 leading-relaxed max-w-[280px]"
+          className="text-white/40 leading-relaxed max-w-[280px]"
           style={STYLES.description}
         >
           Professional cleaning services delivered to your doorstep.
@@ -415,7 +415,7 @@ function MobileFooter() {
       {/* Contact */}
       <motion.div variants={fadeUp}>
         <h4
-          className="text-white/25 mb-4 tracking-[0.35em] uppercase"
+          className="text-white/30 mb-4 tracking-[0.35em] uppercase"
           style={STYLES.sectionTitle}
         >
           Contact
@@ -456,7 +456,7 @@ function DesktopFooter() {
         <motion.div variants={fadeUp} className="col-span-5">
           <BrandLogo />
           <p
-            className="text-white/30 leading-relaxed mb-8 max-w-sm"
+            className="text-white/40 leading-relaxed mb-8 max-w-sm"
             style={STYLES.description}
           >
             Professional car wash, sofa cleaning, and water tank cleaning
@@ -485,20 +485,20 @@ function DesktopFooter() {
       {/* Divider */}
       <motion.div
         variants={lineReveal}
-        className="h-px bg-white/[0.07] origin-left mb-6"
+        className="h-px bg-white/[0.1] origin-left mb-6"
         aria-hidden="true"
       />
 
       {/* Bottom Bar */}
       <div className="flex items-center justify-between">
-        <p className="text-white/25" style={STYLES.copyright}>
+        <p className="text-white/35" style={STYLES.copyright}>
           © {CURRENT_YEAR} Wash2Door. All rights reserved.
         </p>
         <a
           href="https://nexxupp.com"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-white/15 hover:text-white/35 transition-colors no-underline"
+          className="text-white/20 hover:text-white/40 transition-colors no-underline"
           style={STYLES.madeBySm}
         >
           Made by Nexxupp
