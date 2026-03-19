@@ -1,4 +1,3 @@
-// src/app/admin/services/page.jsx
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -6,7 +5,6 @@ import DashboardLayout from '@/components/admin/layout/DashboardLayout';
 import CreateServiceModal from '@/components/admin/services/CreateServiceModal';
 import EditServiceModal from '@/components/admin/services/EditServiceModal';
 import ServiceDetailModal from '@/components/admin/services/ServiceDetailModal';
-import VariantModal from '@/components/admin/services/VariantModal';
 import serviceService from '@/services/serviceService';
 import categoryService from '@/services/categoryService';
 import Image from 'next/image';
@@ -26,7 +24,6 @@ import {
     Star,
     Tag,
     Clock,
-    Layers,
     Package,
     CheckCircle2,
     XCircle,
@@ -56,7 +53,6 @@ export default function ServicesPage() {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [showDetailModal, setShowDetailModal] = useState(false);
-    const [showVariantModal, setShowVariantModal] = useState(false);
 
     // Fetch categories
     useEffect(() => {
@@ -311,26 +307,6 @@ export default function ServicesPage() {
                     onEdit={() => {
                         setShowDetailModal(false);
                         setShowEditModal(true);
-                    }}
-                    onManageVariants={() => {
-                        setShowDetailModal(false);
-                        setShowVariantModal(true);
-                    }}
-                    onRefresh={() => fetchServices(true)}
-                />
-            )}
-
-            {showVariantModal && selectedService && (
-                <VariantModal
-                    service={selectedService}
-                    onClose={() => {
-                        setShowVariantModal(false);
-                        setSelectedService(null);
-                    }}
-                    onSuccess={() => {
-                        setShowVariantModal(false);
-                        setSelectedService(null);
-                        fetchServices(true);
                     }}
                 />
             )}
@@ -790,50 +766,31 @@ function ServiceCard({ service, onView, onEdit, onDelete, onToggleActive }) {
                     {service.name}
                 </h3>
 
-                <p className="text-[10px] sm:text-xs text-gray-500 leading-relaxed mb-3 line-clamp-2">
-                    {service.shortDescription || service.description}
+                <p className="text-[10px] sm:text-xs text-gray-500 leading-relaxed mb-3">
+                    {service.tier.charAt(0).toUpperCase() + service.tier.slice(1)} Tier Service
                 </p>
 
                 {/* Stats Row */}
                 <div className="flex items-center gap-3 mb-3">
                     <div className="flex items-center gap-1">
+                        <Tag className="w-3 h-3 text-gray-600" />
+                        <span className="text-[10px] sm:text-xs text-gray-500">
+                            ₹{service.price?.toLocaleString('en-IN')}
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-gray-600" />
+                        <span className="text-[10px] sm:text-xs text-gray-500">
+                            {service.duration} min
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-1 ml-auto">
                         <Star className="w-3 h-3 text-gray-600" />
                         <span className="text-[10px] sm:text-xs text-gray-500">
                             {service.averageRating?.toFixed(1) || '0.0'}
                         </span>
                     </div>
-                    <div className="flex items-center gap-1">
-                        <Tag className="w-3 h-3 text-gray-600" />
-                        <span className="text-[10px] sm:text-xs text-gray-500">
-                            {service.variants?.length || 0} variants
-                        </span>
-                    </div>
-                    <span className="text-xs sm:text-sm text-white font-semibold ml-auto">
-                        ₹{service.startingPrice?.toLocaleString('en-IN') || 0}+
-                    </span>
                 </div>
-
-                {/* Variants Preview */}
-                {service.variants?.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mb-3">
-                        {service.variants
-                            .filter(v => v.isActive)
-                            .slice(0, 3)
-                            .map((variant, index) => (
-                                <span
-                                    key={variant._id || index}
-                                    className="text-[9px] sm:text-[10px] border border-white/[0.08] text-gray-500 px-1.5 py-0.5 rounded-md bg-white/[0.02]"
-                                >
-                                    {variant.name}
-                                </span>
-                            ))}
-                        {service.variants.filter(v => v.isActive).length > 3 && (
-                            <span className="text-[9px] sm:text-[10px] text-gray-600">
-                                +{service.variants.filter(v => v.isActive).length - 3}
-                            </span>
-                        )}
-                    </div>
-                )}
 
                 {/* Status Badge */}
                 <div className="mb-3">

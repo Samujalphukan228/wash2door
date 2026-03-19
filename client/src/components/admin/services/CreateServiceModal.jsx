@@ -1,8 +1,7 @@
-// src/components/admin/services/CreateServiceModal.jsx
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Loader2, Upload, ChevronLeft } from 'lucide-react';
+import { X, Loader2, ChevronLeft, Upload } from 'lucide-react';
 import categoryService from '@/services/categoryService';
 import subcategoryService from '@/services/subcategoryService';
 import serviceService from '@/services/serviceService';
@@ -30,26 +29,23 @@ export default function CreateServiceModal({ onClose, onSuccess }) {
     const [category, setCategory] = useState('');
     const [subcategory, setSubcategory] = useState('');
     const [tier, setTier] = useState('basic');
+    const [name, setName] = useState('');
     const [price, setPrice] = useState('');
     const [discountPrice, setDiscountPrice] = useState('');
     const [duration, setDuration] = useState('');
-    
     const [images, setImages] = useState([]);
     const [imagePreviews, setImagePreviews] = useState([]);
 
-    // Fetch categories on mount
+    // Fetch categories
     useEffect(() => {
         const fetchCategories = async () => {
             try {
                 const response = await categoryService.getAll({ limit: 100 });
-                console.log('📦 Categories response:', response);
-                
                 const cats = response.data?.categories || response.data || [];
                 setCategories(Array.isArray(cats) ? cats : []);
             } catch (error) {
-                console.error('❌ Failed to load categories:', error);
+                console.error('Failed to load categories:', error);
                 toast.error('Failed to load categories');
-                setCategories([]);
             } finally {
                 setLoadingCategories(false);
             }
@@ -57,7 +53,7 @@ export default function CreateServiceModal({ onClose, onSuccess }) {
         fetchCategories();
     }, []);
 
-    // Fetch subcategories when category changes
+    // Fetch subcategories
     useEffect(() => {
         if (!category) {
             setSubcategories([]);
@@ -68,37 +64,19 @@ export default function CreateServiceModal({ onClose, onSuccess }) {
         const fetchSubcategories = async () => {
             try {
                 setLoadingSubcategories(true);
-                console.log('🔄 Fetching subcategories for category:', category);
-                
                 const response = await subcategoryService.getByCategory(category);
                 
-                console.log('📦 Subcategories response:', response);
-
-                // Handle the response structure correctly
                 let subs = [];
-                
-                // Check if response.data has subcategories property
                 if (response.data?.subcategories && Array.isArray(response.data.subcategories)) {
                     subs = response.data.subcategories;
-                }
-                // Check if response.data itself is an array
-                else if (Array.isArray(response.data)) {
+                } else if (Array.isArray(response.data)) {
                     subs = response.data;
                 }
-                // Fallback: check if entire response is array
-                else if (Array.isArray(response)) {
-                    subs = response;
-                }
-
-                console.log('✅ Subcategories loaded:', {
-                    count: subs.length,
-                    items: subs.map(s => ({ id: s._id, name: s.name }))
-                });
-
+                
                 setSubcategories(Array.isArray(subs) ? subs : []);
                 setSubcategory('');
             } catch (error) {
-                console.error('❌ Failed to load subcategories:', error);
+                console.error('Failed to load subcategories:', error);
                 toast.error('Failed to load subcategories');
                 setSubcategories([]);
             } finally {
@@ -129,6 +107,10 @@ export default function CreateServiceModal({ onClose, onSuccess }) {
     };
 
     const handleSubmit = async () => {
+        if (!name.trim()) { 
+            toast.error('Service name is required'); 
+            return; 
+        }
         if (!category) { 
             toast.error('Select a category'); 
             return; 
@@ -149,32 +131,14 @@ export default function CreateServiceModal({ onClose, onSuccess }) {
         try {
             setLoading(true);
 
-            const selectedSub = subcategories.find(s => s._id === subcategory);
-            const selectedCat = categories.find(c => c._id === category);
-
             const formData = new FormData();
+            formData.append('name', name.trim());
             formData.append('category', category);
             formData.append('subcategory', subcategory);
             formData.append('tier', tier);
-            
-            // Auto-generate name
-            const serviceName = `${selectedCat?.icon || ''} ${selectedSub?.name || 'Service'} - ${tier.charAt(0).toUpperCase() + tier.slice(1)}`;
-            formData.append('name', serviceName.trim());
-            formData.append('description', serviceName.trim());
-            formData.append('shortDescription', serviceName.trim());
-            
-            // Single variant with pricing
-            const variant = {
-                name: tier.charAt(0).toUpperCase() + tier.slice(1),
-                description: '',
-                price: Number(price),
-                discountPrice: discountPrice ? Number(discountPrice) : null,
-                duration: Number(duration),
-                features: [],
-                displayOrder: 0,
-                isActive: true
-            };
-            formData.append('variants', JSON.stringify([variant]));
+            formData.append('price', Number(price));
+            if (discountPrice) formData.append('discountPrice', Number(discountPrice));
+            formData.append('duration', Number(duration));
             
             // Add images
             images.forEach(img => formData.append('images', img));
@@ -184,14 +148,14 @@ export default function CreateServiceModal({ onClose, onSuccess }) {
             onClose();
             onSuccess();
         } catch (error) {
-            console.error('❌ Create service error:', error);
+            console.error('Create service error:', error);
             toast.error(error.response?.data?.message || 'Failed to create service');
         } finally {
             setLoading(false);
         }
     };
 
-    const canSubmit = category && subcategory && price && duration;
+    const canSubmit = name.trim() && category && subcategory && price && duration;
 
     return (
         <>
@@ -236,6 +200,19 @@ export default function CreateServiceModal({ onClose, onSuccess }) {
                     {/* Content */}
                     <div className="flex-1 overflow-y-auto px-4 py-5 space-y-5">
                         
+                        {/* Service Name */}
+                        <div>
+                            <label className={sectionLabel}>Service Name *</label>
+                            <input
+                                type="text"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                placeholder="e.g. Professional Photography"
+                                disabled={loading}
+                                className={inputCls}
+                            />
+                        </div>
+
                         {/* Category */}
                         <div>
                             <label className={sectionLabel}>Category *</label>
@@ -249,15 +226,11 @@ export default function CreateServiceModal({ onClose, onSuccess }) {
                                     className={inputCls}
                                 >
                                     <option value="">Select category</option>
-                                    {categories.length > 0 ? (
-                                        categories.map(cat => (
-                                            <option key={cat._id} value={cat._id}>
-                                                {cat.icon} {cat.name}
-                                            </option>
-                                        ))
-                                    ) : (
-                                        <option disabled>No categories available</option>
-                                    )}
+                                    {categories.map(cat => (
+                                        <option key={cat._id} value={cat._id}>
+                                            {cat.icon} {cat.name}
+                                        </option>
+                                    ))}
                                 </select>
                             )}
                         </div>
@@ -298,7 +271,7 @@ export default function CreateServiceModal({ onClose, onSuccess }) {
 
                         {/* Tier */}
                         <div>
-                            <label className={sectionLabel}>Service Tier *</label>
+                            <label className={sectionLabel}>Service Tier</label>
                             <div className="grid grid-cols-4 gap-2">
                                 {TIERS.map(t => (
                                     <button
@@ -321,8 +294,8 @@ export default function CreateServiceModal({ onClose, onSuccess }) {
                             </div>
                         </div>
 
-                        {/* Price */}
-                        <div className="grid grid-cols-3 gap-3">
+                        {/* Price & Discount */}
+                        <div className="grid grid-cols-2 gap-3">
                             <div>
                                 <label className={sectionLabel}>Price (₹) *</label>
                                 <input
@@ -335,7 +308,7 @@ export default function CreateServiceModal({ onClose, onSuccess }) {
                                 />
                             </div>
                             <div>
-                                <label className={sectionLabel}>Discount</label>
+                                <label className={sectionLabel}>Discount Price</label>
                                 <input
                                     type="number"
                                     value={discountPrice}
@@ -345,17 +318,19 @@ export default function CreateServiceModal({ onClose, onSuccess }) {
                                     className={inputCls}
                                 />
                             </div>
-                            <div>
-                                <label className={sectionLabel}>Duration (min) *</label>
-                                <input
-                                    type="number"
-                                    value={duration}
-                                    onChange={(e) => setDuration(e.target.value)}
-                                    placeholder="60"
-                                    disabled={loading}
-                                    className={inputCls}
-                                />
-                            </div>
+                        </div>
+
+                        {/* Duration */}
+                        <div>
+                            <label className={sectionLabel}>Duration (min) *</label>
+                            <input
+                                type="number"
+                                value={duration}
+                                onChange={(e) => setDuration(e.target.value)}
+                                placeholder="60"
+                                disabled={loading}
+                                className={inputCls}
+                            />
                         </div>
 
                         {/* Images */}
@@ -369,7 +344,7 @@ export default function CreateServiceModal({ onClose, onSuccess }) {
                                             type="button"
                                             onClick={() => removeImage(i)}
                                             disabled={loading}
-                                            className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/80 rounded-md flex items-center justify-center text-white/70 hover:bg-black transition-all duration-150"
+                                            className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/80 rounded-md flex items-center justify-center text-white/70 hover:bg-black transition-all"
                                         >
                                             <X className="w-3 h-3" />
                                         </button>
@@ -377,7 +352,7 @@ export default function CreateServiceModal({ onClose, onSuccess }) {
                                 ))}
 
                                 {imagePreviews.length < 3 && (
-                                    <label className="aspect-square border-2 border-dashed border-white/[0.06] hover:border-white/[0.12] rounded-lg flex flex-col items-center justify-center cursor-pointer transition-all duration-150 bg-white/[0.02]">
+                                    <label className="aspect-square border-2 border-dashed border-white/[0.06] hover:border-white/[0.12] rounded-lg flex flex-col items-center justify-center cursor-pointer transition-all bg-white/[0.02]">
                                         <Upload className="w-5 h-5 text-white/25 mb-1" />
                                         <span className="text-[11px] text-white/25">Add</span>
                                         <input 

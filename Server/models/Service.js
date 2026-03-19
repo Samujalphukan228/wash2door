@@ -1,5 +1,3 @@
-// models/Service.js - NO VARIANTS
-
 import mongoose from 'mongoose';
 
 const serviceSchema = new mongoose.Schema({
@@ -22,17 +20,6 @@ const serviceSchema = new mongoose.Schema({
         type: String,
         unique: true,
         lowercase: true
-    },
-    description: {
-        type: String,
-        required: [true, 'Description is required'],
-        trim: true
-    },
-    shortDescription: {
-        type: String,
-        trim: true,
-        maxlength: [200, 'Short description max 200 characters'],
-        default: ''
     },
     tier: {
         type: String,
@@ -69,9 +56,6 @@ const serviceSchema = new mongoose.Schema({
         },
         default: []
     },
-    highlights: { type: [String], default: [] },
-    includes: { type: [String], default: [] },
-    excludes: { type: [String], default: [] },
     isActive: { type: Boolean, default: true },
     isFeatured: { type: Boolean, default: false },
     displayOrder: { type: Number, default: 0 },

@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Loader2, Upload, ChevronLeft } from 'lucide-react';
+import { X, Loader2, ChevronLeft } from 'lucide-react';
 import categoryService from '@/services/categoryService';
+import subcategoryService from '@/services/subcategoryService';
 import serviceService from '@/services/serviceService';
 import toast from 'react-hot-toast';
 
@@ -20,41 +21,31 @@ const sectionLabel = `text-[10px] text-white/25 uppercase tracking-widest font-m
 
 export default function EditServiceModal({ service, onClose, onSuccess }) {
     const [loading, setLoading] = useState(false);
-    const [activeTab, setActiveTab] = useState('basic');
     const [categories, setCategories] = useState([]);
+    const [subcategories, setSubcategories] = useState([]);
     const [loadingCategories, setLoadingCategories] = useState(true);
+    const [loadingSubcategories, setLoadingSubcategories] = useState(false);
 
     const [name, setName] = useState(service.name || '');
-    const [description, setDescription] = useState(service.description || '');
-    const [shortDescription, setShortDescription] = useState(service.shortDescription || '');
     const [category, setCategory] = useState(service.category?._id || service.category || '');
+    const [subcategory, setSubcategory] = useState(service.subcategory?._id || service.subcategory || '');
     const [tier, setTier] = useState(service.tier || 'basic');
-    const [displayOrder, setDisplayOrder] = useState(service.displayOrder || 0);
+    const [price, setPrice] = useState(service.price || '');
+    const [duration, setDuration] = useState(service.duration || '');
     const [isActive, setIsActive] = useState(service.isActive);
     const [isFeatured, setIsFeatured] = useState(service.isFeatured || false);
 
-    const [highlights, setHighlights] = useState(
-        service.highlights?.length ? service.highlights : ['']
-    );
-    const [includes, setIncludes] = useState(
-        service.includes?.length ? service.includes : ['']
-    );
-    const [excludes, setExcludes] = useState(
-        service.excludes?.length ? service.excludes : ['']
-    );
-
-    const [existingImages, setExistingImages] = useState(service.images || []);
-    const [newImages, setNewImages] = useState([]);
-    const [newImagePreviews, setNewImagePreviews] = useState([]);
-    const [imagesToRemove, setImagesToRemove] = useState([]);
-
+    // Fetch categories on mount
     useEffect(() => {
         const fetchCategories = async () => {
             try {
                 const response = await categoryService.getAll({ limit: 100 });
-                if (response.success) setCategories(response.data);
+                const cats = response.data?.categories || response.data || [];
+                setCategories(Array.isArray(cats) ? cats : []);
             } catch (error) {
-                console.error('Failed to load categories');
+                console.error('Failed to load categories:', error);
+                toast.error('Failed to load categories');
+                setCategories([]);
             } finally {
                 setLoadingCategories(false);
             }
@@ -62,73 +53,84 @@ export default function EditServiceModal({ service, onClose, onSuccess }) {
         fetchCategories();
     }, []);
 
-    const updateArray = (setter, index, value) => {
-        setter(prev => { const arr = [...prev]; arr[index] = value; return arr; });
-    };
-    const addArrayItem = (setter) => setter(prev => [...prev, '']);
-    const removeArrayItem = (setter, index) => {
-        setter(prev => prev.filter((_, i) => i !== index));
-    };
-
-    const handleNewImages = (e) => {
-        const files = Array.from(e.target.files);
-        const currentCount = existingImages.length - imagesToRemove.length + newImages.length;
-        const remaining = 3 - currentCount;
-        if (files.length > remaining) {
-            toast.error(`Can only add ${remaining} more image(s)`);
+    // Fetch subcategories when category changes
+    useEffect(() => {
+        if (!category) {
+            setSubcategories([]);
             return;
         }
-        setNewImages(prev => [...prev, ...files]);
-        files.forEach(file => {
-            const reader = new FileReader();
-            reader.onload = (ev) => setNewImagePreviews(prev => [...prev, ev.target.result]);
-            reader.readAsDataURL(file);
-        });
-    };
 
-    const markImageForRemoval = (publicId) => {
-        setImagesToRemove(prev => [...prev, publicId]);
-        setExistingImages(prev => prev.filter(img => img.publicId !== publicId));
-    };
-
-    const removeNewImage = (index) => {
-        setNewImages(prev => prev.filter((_, i) => i !== index));
-        setNewImagePreviews(prev => prev.filter((_, i) => i !== index));
-    };
+        const fetchSubcategories = async () => {
+            try {
+                setLoadingSubcategories(true);
+                const response = await subcategoryService.getByCategory(category);
+                
+                let subs = [];
+                if (response.data?.subcategories && Array.isArray(response.data.subcategories)) {
+                    subs = response.data.subcategories;
+                } else if (Array.isArray(response.data)) {
+                    subs = response.data;
+                }
+                
+                setSubcategories(Array.isArray(subs) ? subs : []);
+            } catch (error) {
+                console.error('Failed to load subcategories:', error);
+                toast.error('Failed to load subcategories');
+                setSubcategories([]);
+            } finally {
+                setLoadingSubcategories(false);
+            }
+        };
+        
+        fetchSubcategories();
+    }, [category]);
 
     const handleSubmit = async () => {
-        if (!name.trim()) { toast.error('Service name is required'); return; }
-        if (!description.trim()) { toast.error('Description is required'); return; }
-        if (!category) { toast.error('Please select a category'); return; }
+        if (!name.trim()) {
+            toast.error('Service name is required');
+            return;
+        }
+        if (!category) {
+            toast.error('Please select a category');
+            return;
+        }
+        if (!subcategory) {
+            toast.error('Please select a subcategory');
+            return;
+        }
+        if (!price) {
+            toast.error('Price is required');
+            return;
+        }
+        if (!duration) {
+            toast.error('Duration is required');
+            return;
+        }
 
         try {
             setLoading(true);
             const formData = new FormData();
             formData.append('name', name.trim());
-            formData.append('description', description.trim());
-            formData.append('shortDescription', shortDescription.trim());
             formData.append('category', category);
+            formData.append('subcategory', subcategory);
             formData.append('tier', tier);
-            formData.append('displayOrder', displayOrder);
+            formData.append('price', Number(price));
+            formData.append('duration', Number(duration));
             formData.append('isActive', isActive);
             formData.append('isFeatured', isFeatured);
-            formData.append('highlights', JSON.stringify(highlights.filter(h => h.trim())));
-            formData.append('includes', JSON.stringify(includes.filter(i => i.trim())));
-            formData.append('excludes', JSON.stringify(excludes.filter(e => e.trim())));
-            if (imagesToRemove.length > 0) formData.append('removeImages', JSON.stringify(imagesToRemove));
-            newImages.forEach(img => formData.append('images', img));
 
             await serviceService.update(service._id, formData);
+            toast.success('Service updated successfully');
             onSuccess();
         } catch (error) {
+            console.error('Update service error:', error);
             toast.error(error.response?.data?.message || 'Failed to update service');
         } finally {
             setLoading(false);
         }
     };
 
-    const tabs = ['basic', 'images', 'features'];
-    const totalImages = existingImages.length + newImages.length;
+    const canSubmit = name.trim() && category && subcategory && price && duration;
 
     return (
         <>
@@ -137,7 +139,7 @@ export default function EditServiceModal({ service, onClose, onSuccess }) {
             <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center pointer-events-none">
                 <div className="
                     pointer-events-auto
-                    w-full sm:max-w-2xl sm:max-h-[92vh]
+                    w-full sm:max-w-lg sm:max-h-[92vh]
                     h-full sm:h-auto
                     flex flex-col
                     bg-[#0a0a0a]
@@ -168,267 +170,170 @@ export default function EditServiceModal({ service, onClose, onSuccess }) {
                         </button>
                     </div>
 
-                    {/* Tabs */}
-                    <div className="flex px-4 shrink-0 border-b border-white/[0.05]">
-                        {tabs.map(tab => (
-                            <button
-                                key={tab}
-                                onClick={() => setActiveTab(tab)}
-                                className={`
-                                    px-4 py-3 text-[11px] uppercase tracking-widest font-medium
-                                    transition-all duration-150 capitalize relative
-                                    ${activeTab === tab
-                                        ? 'text-white/80'
-                                        : 'text-white/25 hover:text-white/50'
-                                    }
-                                `}
-                            >
-                                {tab}
-                                {activeTab === tab && (
-                                    <div className="absolute bottom-0 left-0 right-0 h-px bg-white/60" />
-                                )}
-                            </button>
-                        ))}
-                    </div>
+                    <div className="h-px bg-white/[0.05] shrink-0" />
 
                     {/* Content */}
-                    <div className="flex-1 overflow-y-auto px-4 py-5">
+                    <div className="flex-1 overflow-y-auto px-4 py-5 space-y-5">
+                        
+                        {/* Service Name */}
+                        <div>
+                            <label className={sectionLabel}>Service Name *</label>
+                            <input
+                                type="text"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                placeholder="Service name"
+                                disabled={loading}
+                                className={inputCls}
+                            />
+                        </div>
 
-                        {/* Basic Tab */}
-                        {activeTab === 'basic' && (
-                            <div className="space-y-5">
-                                <div>
-                                    <label className={sectionLabel}>Service Name *</label>
-                                    <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Service name" disabled={loading} className={inputCls} />
-                                </div>
-
-                                {/* Active & Featured Toggles */}
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="p-3.5 rounded-lg border border-white/[0.07] bg-white/[0.02]">
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <p className="text-sm text-white/80 font-medium">Active</p>
-                                                <p className="text-[11px] text-white/25 mt-0.5">
-                                                    {isActive ? 'Visible' : 'Hidden'}
-                                                </p>
-                                            </div>
-                                            <button
-                                                type="button"
-                                                onClick={() => setIsActive(!isActive)}
-                                                disabled={loading}
-                                                className={`relative w-12 h-6 rounded-full transition-all duration-200 ${isActive ? 'bg-white' : 'bg-white/10'} disabled:opacity-50`}
-                                            >
-                                                <div className={`absolute top-1 w-4 h-4 rounded-full bg-black transition-transform duration-200 ${isActive ? 'translate-x-7' : 'translate-x-1'}`} />
-                                            </button>
-                                        </div>
+                        {/* Active & Featured Toggles */}
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="p-3.5 rounded-lg border border-white/[0.07] bg-white/[0.02]">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm text-white/80 font-medium">Active</p>
+                                        <p className="text-[11px] text-white/25 mt-0.5">
+                                            {isActive ? 'Visible' : 'Hidden'}
+                                        </p>
                                     </div>
-                                    <div className="p-3.5 rounded-lg border border-white/[0.07] bg-white/[0.02]">
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <p className="text-sm text-white/80 font-medium">Featured</p>
-                                                <p className="text-[11px] text-white/25 mt-0.5">
-                                                    {isFeatured ? 'Yes' : 'No'}
-                                                </p>
-                                            </div>
-                                            <button
-                                                type="button"
-                                                onClick={() => setIsFeatured(!isFeatured)}
-                                                disabled={loading}
-                                                className={`relative w-12 h-6 rounded-full transition-all duration-200 ${isFeatured ? 'bg-white' : 'bg-white/10'} disabled:opacity-50`}
-                                            >
-                                                <div className={`absolute top-1 w-4 h-4 rounded-full bg-black transition-transform duration-200 ${isFeatured ? 'translate-x-7' : 'translate-x-1'}`} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Category */}
-                                <div>
-                                    <label className={sectionLabel}>Category *</label>
-                                    {loadingCategories ? (
-                                        <div className="h-10 bg-white/[0.04] animate-pulse rounded-lg" />
-                                    ) : (
-                                        <select value={category} onChange={(e) => setCategory(e.target.value)} disabled={loading} className={inputCls}>
-                                            <option value="">Select category</option>
-                                            {categories.map(cat => (
-                                                <option key={cat._id} value={cat._id}>{cat.icon} {cat.name}</option>
-                                            ))}
-                                        </select>
-                                    )}
-                                </div>
-
-                                {/* Tier */}
-                                <div>
-                                    <label className={sectionLabel}>Service Tier</label>
-                                    <div className="grid grid-cols-4 gap-2">
-                                        {TIERS.map(t => (
-                                            <button
-                                                key={t}
-                                                type="button"
-                                                onClick={() => setTier(t)}
-                                                disabled={loading}
-                                                className={`
-                                                    py-2.5 rounded-lg border text-xs capitalize transition-all duration-150
-                                                    ${tier === t
-                                                        ? 'border-white/25 bg-white/[0.06] text-white/80'
-                                                        : 'border-white/[0.07] bg-white/[0.02] text-white/30 hover:border-white/[0.12]'
-                                                    }
-                                                    disabled:opacity-50
-                                                `}
-                                            >
-                                                {t}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Short Description */}
-                                <div>
-                                    <div className="flex items-center justify-between mb-1.5">
-                                        <label className="text-[10px] text-white/25 uppercase tracking-widest font-medium">Short Description</label>
-                                        <span className="text-[10px] text-white/15">{shortDescription.length}/200</span>
-                                    </div>
-                                    <textarea value={shortDescription} onChange={(e) => setShortDescription(e.target.value)} placeholder="Brief summary..." rows={2} maxLength={200} disabled={loading} className={`${inputCls} resize-none`} />
-                                </div>
-
-                                {/* Full Description */}
-                                <div>
-                                    <label className={sectionLabel}>Full Description *</label>
-                                    <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Full description..." rows={4} disabled={loading} className={`${inputCls} resize-none`} />
-                                </div>
-
-                                {/* Display Order */}
-                                <div>
-                                    <label className={sectionLabel}>Display Order</label>
-                                    <input type="number" value={displayOrder} onChange={(e) => setDisplayOrder(Number(e.target.value))} placeholder="0" disabled={loading} className={inputCls} />
-                                    <p className="text-[11px] text-white/20 mt-1.5">Lower numbers appear first</p>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsActive(!isActive)}
+                                        disabled={loading}
+                                        className={`relative w-12 h-6 rounded-full transition-all duration-200 ${isActive ? 'bg-white' : 'bg-white/10'} disabled:opacity-50`}
+                                    >
+                                        <div className={`absolute top-1 w-4 h-4 rounded-full bg-black transition-transform duration-200 ${isActive ? 'translate-x-7' : 'translate-x-1'}`} />
+                                    </button>
                                 </div>
                             </div>
-                        )}
+                            <div className="p-3.5 rounded-lg border border-white/[0.07] bg-white/[0.02]">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm text-white/80 font-medium">Featured</p>
+                                        <p className="text-[11px] text-white/25 mt-0.5">
+                                            {isFeatured ? 'Yes' : 'No'}
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsFeatured(!isFeatured)}
+                                        disabled={loading}
+                                        className={`relative w-12 h-6 rounded-full transition-all duration-200 ${isFeatured ? 'bg-white' : 'bg-white/10'} disabled:opacity-50`}
+                                    >
+                                        <div className={`absolute top-1 w-4 h-4 rounded-full bg-black transition-transform duration-200 ${isFeatured ? 'translate-x-7' : 'translate-x-1'}`} />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
 
-                        {/* Images Tab */}
-                        {activeTab === 'images' && (
-                            <div className="space-y-4">
-                                <label className={sectionLabel}>
-                                    Service Images (max 3) — Current: {totalImages}
-                                </label>
-
-                                <div className="grid grid-cols-3 gap-3">
-                                    {existingImages.map((img, i) => (
-                                        <div key={img.publicId || i} className="relative aspect-square bg-white/[0.03] rounded-lg overflow-hidden border border-white/[0.06]">
-                                            <img src={img.url} alt="" className="w-full h-full object-cover" />
-                                            <button
-                                                type="button"
-                                                onClick={() => markImageForRemoval(img.publicId)}
-                                                disabled={loading}
-                                                className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/80 rounded-md flex items-center justify-center text-white/70 hover:bg-black transition-all duration-150"
-                                            >
-                                                <X className="w-3 h-3" />
-                                            </button>
-                                            {img.isPrimary && (
-                                                <span className="absolute bottom-1.5 left-1.5 text-[10px] bg-white text-black px-1.5 py-0.5 rounded-md font-medium">
-                                                    Primary
-                                                </span>
-                                            )}
-                                        </div>
+                        {/* Category */}
+                        <div>
+                            <label className={sectionLabel}>Category *</label>
+                            {loadingCategories ? (
+                                <div className="h-10 bg-white/[0.04] animate-pulse rounded-lg" />
+                            ) : (
+                                <select
+                                    value={category}
+                                    onChange={(e) => setCategory(e.target.value)}
+                                    disabled={loading}
+                                    className={inputCls}
+                                >
+                                    <option value="">Select category</option>
+                                    {categories.map(cat => (
+                                        <option key={cat._id} value={cat._id}>
+                                            {cat.icon} {cat.name}
+                                        </option>
                                     ))}
+                                </select>
+                            )}
+                        </div>
 
-                                    {newImagePreviews.map((preview, i) => (
-                                        <div key={`new-${i}`} className="relative aspect-square bg-white/[0.03] rounded-lg overflow-hidden border border-white/[0.06]">
-                                            <img src={preview} alt="" className="w-full h-full object-cover" />
-                                            <button
-                                                type="button"
-                                                onClick={() => removeNewImage(i)}
-                                                disabled={loading}
-                                                className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/80 rounded-md flex items-center justify-center text-white/70 hover:bg-black transition-all duration-150"
-                                            >
-                                                <X className="w-3 h-3" />
-                                            </button>
-                                            <span className="absolute bottom-1.5 left-1.5 text-[10px] bg-white/[0.08] text-white/40 px-1.5 py-0.5 rounded-md">
-                                                New
-                                            </span>
-                                        </div>
+                        {/* Subcategory */}
+                        <div>
+                            <label className={sectionLabel}>Subcategory *</label>
+                            {!category ? (
+                                <div className="p-4 rounded-lg border border-white/[0.07] bg-white/[0.02] text-center">
+                                    <p className="text-xs text-white/30">Select a category first</p>
+                                </div>
+                            ) : loadingSubcategories ? (
+                                <div className="space-y-2">
+                                    {[...Array(3)].map((_, i) => (
+                                        <div key={i} className="h-10 bg-white/[0.04] animate-pulse rounded-lg" />
                                     ))}
-
-                                    {totalImages < 3 && (
-                                        <label className="aspect-square border-2 border-dashed border-white/[0.06] hover:border-white/[0.12] rounded-lg flex flex-col items-center justify-center cursor-pointer transition-all duration-150 bg-white/[0.02]">
-                                            <Upload className="w-5 h-5 text-white/25 mb-1" />
-                                            <span className="text-[11px] text-white/25">Add</span>
-                                            <input type="file" accept="image/*" multiple onChange={handleNewImages} disabled={loading} className="hidden" />
-                                        </label>
-                                    )}
                                 </div>
+                            ) : subcategories.length > 0 ? (
+                                <select
+                                    value={subcategory}
+                                    onChange={(e) => setSubcategory(e.target.value)}
+                                    disabled={loading}
+                                    className={inputCls}
+                                >
+                                    <option value="">Select subcategory</option>
+                                    {subcategories.map(sub => (
+                                        <option key={sub._id} value={sub._id}>
+                                            {sub.icon} {sub.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <div className="p-4 rounded-lg border border-white/[0.07] bg-white/[0.02] text-center">
+                                    <p className="text-xs text-white/30">No subcategories available</p>
+                                </div>
+                            )}
+                        </div>
 
-                                <p className="text-[11px] text-white/20">
-                                    JPG, PNG, WEBP up to 5MB each.
-                                </p>
+                        {/* Tier */}
+                        <div>
+                            <label className={sectionLabel}>Service Tier</label>
+                            <div className="grid grid-cols-4 gap-2">
+                                {TIERS.map(t => (
+                                    <button
+                                        key={t}
+                                        type="button"
+                                        onClick={() => setTier(t)}
+                                        disabled={loading}
+                                        className={`
+                                            py-2.5 rounded-lg border text-xs capitalize transition-all duration-150
+                                            ${tier === t
+                                                ? 'border-white/25 bg-white/[0.06] text-white/80'
+                                                : 'border-white/[0.07] bg-white/[0.02] text-white/30 hover:border-white/[0.12]'
+                                            }
+                                            disabled:opacity-50
+                                        `}
+                                    >
+                                        {t}
+                                    </button>
+                                ))}
                             </div>
-                        )}
+                        </div>
 
-                        {/* Features Tab */}
-                        {activeTab === 'features' && (
-                            <div className="space-y-6">
-                                {/* Highlights */}
-                                <div>
-                                    <div className="flex items-center justify-between mb-2">
-                                        <label className="text-[10px] text-white/25 uppercase tracking-widest font-medium">Highlights</label>
-                                        <button type="button" onClick={() => addArrayItem(setHighlights)} disabled={loading} className="text-[11px] text-white/30 hover:text-white/60 transition-all duration-150">+ Add</button>
-                                    </div>
-                                    <div className="space-y-2">
-                                        {highlights.map((item, i) => (
-                                            <div key={i} className="flex gap-2">
-                                                <input type="text" value={item} onChange={(e) => updateArray(setHighlights, i, e.target.value)} placeholder="e.g. Eco-friendly products" disabled={loading} className={inputCls} />
-                                                {highlights.length > 1 && (
-                                                    <button type="button" onClick={() => removeArrayItem(setHighlights, i)} disabled={loading} className="w-8 h-10 rounded-lg flex items-center justify-center text-white/20 hover:text-white/60 hover:bg-white/[0.05] transition-all duration-150 shrink-0">
-                                                        <X className="w-3.5 h-3.5" />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Includes */}
-                                <div>
-                                    <div className="flex items-center justify-between mb-2">
-                                        <label className="text-[10px] text-white/25 uppercase tracking-widest font-medium">What's Included</label>
-                                        <button type="button" onClick={() => addArrayItem(setIncludes)} disabled={loading} className="text-[11px] text-white/30 hover:text-white/60 transition-all duration-150">+ Add</button>
-                                    </div>
-                                    <div className="space-y-2">
-                                        {includes.map((item, i) => (
-                                            <div key={i} className="flex gap-2">
-                                                <input type="text" value={item} onChange={(e) => updateArray(setIncludes, i, e.target.value)} placeholder="e.g. Exterior wash" disabled={loading} className={inputCls} />
-                                                {includes.length > 1 && (
-                                                    <button type="button" onClick={() => removeArrayItem(setIncludes, i)} disabled={loading} className="w-8 h-10 rounded-lg flex items-center justify-center text-white/20 hover:text-white/60 hover:bg-white/[0.05] transition-all duration-150 shrink-0">
-                                                        <X className="w-3.5 h-3.5" />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Excludes */}
-                                <div>
-                                    <div className="flex items-center justify-between mb-2">
-                                        <label className="text-[10px] text-white/25 uppercase tracking-widest font-medium">What's Not Included</label>
-                                        <button type="button" onClick={() => addArrayItem(setExcludes)} disabled={loading} className="text-[11px] text-white/30 hover:text-white/60 transition-all duration-150">+ Add</button>
-                                    </div>
-                                    <div className="space-y-2">
-                                        {excludes.map((item, i) => (
-                                            <div key={i} className="flex gap-2">
-                                                <input type="text" value={item} onChange={(e) => updateArray(setExcludes, i, e.target.value)} placeholder="e.g. Engine cleaning" disabled={loading} className={inputCls} />
-                                                {excludes.length > 1 && (
-                                                    <button type="button" onClick={() => removeArrayItem(setExcludes, i)} disabled={loading} className="w-8 h-10 rounded-lg flex items-center justify-center text-white/20 hover:text-white/60 hover:bg-white/[0.05] transition-all duration-150 shrink-0">
-                                                        <X className="w-3.5 h-3.5" />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
+                        {/* Price & Duration */}
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className={sectionLabel}>Price (₹) *</label>
+                                <input
+                                    type="number"
+                                    value={price}
+                                    onChange={(e) => setPrice(e.target.value)}
+                                    placeholder="500"
+                                    disabled={loading}
+                                    className={inputCls}
+                                />
                             </div>
-                        )}
+                            <div>
+                                <label className={sectionLabel}>Duration (min) *</label>
+                                <input
+                                    type="number"
+                                    value={duration}
+                                    onChange={(e) => setDuration(e.target.value)}
+                                    placeholder="60"
+                                    disabled={loading}
+                                    className={inputCls}
+                                />
+                            </div>
+                        </div>
                     </div>
 
                     {/* Footer */}
@@ -438,15 +343,30 @@ export default function EditServiceModal({ service, onClose, onSuccess }) {
                             type="button"
                             onClick={onClose}
                             disabled={loading}
-                            className="hidden sm:flex items-center px-4 py-2.5 rounded-lg border border-white/[0.08] bg-white/[0.03] text-xs text-white/40 hover:text-white/70 hover:border-white/[0.14] hover:bg-white/[0.05] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="
+                                hidden sm:flex items-center px-4 py-2.5 rounded-lg
+                                border border-white/[0.08] bg-white/[0.03]
+                                text-xs text-white/40 hover:text-white/70
+                                hover:border-white/[0.14] hover:bg-white/[0.05]
+                                transition-all duration-150
+                                disabled:opacity-50 disabled:cursor-not-allowed
+                            "
                         >
                             Cancel
                         </button>
                         <button
                             type="button"
                             onClick={handleSubmit}
-                            disabled={loading || !name.trim() || !description.trim() || !category}
-                            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg bg-white text-black text-sm font-medium hover:bg-white/90 active:bg-white/80 disabled:bg-white/10 disabled:text-white/20 disabled:cursor-not-allowed shadow-lg shadow-white/10 transition-all duration-150"
+                            disabled={loading || !canSubmit}
+                            className="
+                                flex-1 flex items-center justify-center gap-2
+                                py-2.5 rounded-lg
+                                bg-white text-black text-sm font-medium
+                                hover:bg-white/90 active:bg-white/80
+                                disabled:bg-white/10 disabled:text-white/20 disabled:cursor-not-allowed
+                                shadow-lg shadow-white/10
+                                transition-all duration-150
+                            "
                         >
                             {loading ? (
                                 <>

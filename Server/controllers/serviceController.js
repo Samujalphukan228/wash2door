@@ -1,5 +1,3 @@
-// controllers/serviceController.js - NO VARIANTS
-
 import Service from '../models/Service.js';
 import Category from '../models/Category.js';
 import Subcategory from '../models/Subcategory.js';
@@ -10,13 +8,6 @@ import { emitServiceUpdate } from '../utils/socketEmitter.js';
 
 const isValidObjectId = (id) =>
     mongoose.Types.ObjectId.isValid(id) && /^[0-9a-fA-F]{24}$/.test(id);
-
-const parseArray = (value) => {
-    if (!value) return [];
-    if (Array.isArray(value)) return value;
-    try { return JSON.parse(value); }
-    catch { return [value]; }
-};
 
 // ============================================
 // GET ALL SERVICES (ADMIN)
@@ -40,8 +31,7 @@ export const getAllServicesAdmin = async (req, res) => {
         if (isFeatured !== undefined && isFeatured !== '') query.isFeatured = isFeatured === 'true';
         if (search) {
             query.$or = [
-                { name: { $regex: search.trim(), $options: 'i' } },
-                { description: { $regex: search.trim(), $options: 'i' } }
+                { name: { $regex: search.trim(), $options: 'i' } }
             ];
         }
 
@@ -81,20 +71,15 @@ export const getServiceById = async (req, res) => {
         }
 
         const service = await Service.findById(serviceId)
-            .populate('category', 'name slug icon image')
-            .populate('subcategory', 'name slug icon image')
+            .populate('category', 'name slug icon')
+            .populate('subcategory', 'name slug icon')
             .populate('createdBy', 'firstName lastName');
 
         if (!service) {
             return res.status(404).json({ success: false, message: 'Service not found' });
         }
 
-        const bookingStats = await Booking.aggregate([
-            { $match: { serviceId: new mongoose.Types.ObjectId(serviceId) } },
-            { $group: { _id: '$status', count: { $sum: 1 } } }
-        ]);
-
-        res.status(200).json({ success: true, data: { service, bookingStats } });
+        res.status(200).json({ success: true, data: service });
 
     } catch (error) {
         console.error('getServiceById ERROR:', error.message);
@@ -108,19 +93,16 @@ export const getServiceById = async (req, res) => {
 export const createService = async (req, res) => {
     try {
         const {
-            name, description, shortDescription,
-            category, subcategory, tier,
-            price, discountPrice, duration,
-            highlights, includes, excludes,
-            displayOrder, isFeatured
+            name, category, subcategory, tier,
+            price, discountPrice, duration
         } = req.body;
 
-        // Validate required
-        if (!name || !description || !category || !subcategory || !price || !duration) {
+        // ✅ Validate required fields
+        if (!name || !category || !subcategory || !price || !duration) {
             if (req.files) for (const f of req.files) await deleteCloudinaryImage(f.filename);
             return res.status(400).json({
                 success: false,
-                message: 'Name, description, category, subcategory, price and duration are required'
+                message: 'Name, category, subcategory, price and duration are required'
             });
         }
 
@@ -166,7 +148,7 @@ export const createService = async (req, res) => {
             });
         }
 
-        // Process images
+        // Process images (OPTIONAL - MAX 3)
         const serviceImages = [];
         if (req.files && req.files.length > 0) {
             req.files.forEach((file, index) => {
@@ -180,8 +162,6 @@ export const createService = async (req, res) => {
 
         const service = await Service.create({
             name: name.trim(),
-            description,
-            shortDescription: shortDescription || '',
             category,
             subcategory,
             tier: serviceTier,
@@ -189,11 +169,6 @@ export const createService = async (req, res) => {
             discountPrice: discountPrice ? Number(discountPrice) : null,
             duration: Number(duration),
             images: serviceImages,
-            highlights: parseArray(highlights),
-            includes: parseArray(includes),
-            excludes: parseArray(excludes),
-            displayOrder: Number(displayOrder) || 0,
-            isFeatured: isFeatured === 'true' || isFeatured === true,
             createdBy: req.user._id
         });
 
@@ -239,11 +214,9 @@ export const updateService = async (req, res) => {
         }
 
         const {
-            name, description, shortDescription,
-            category, subcategory, tier,
+            name, category, subcategory, tier,
             price, discountPrice, duration,
-            highlights, includes, excludes,
-            displayOrder, isActive, isFeatured, removeImages
+            isActive, isFeatured, removeImages
         } = req.body;
 
         const oldCategoryId = service.category;
@@ -298,7 +271,7 @@ export const updateService = async (req, res) => {
 
         // Remove images
         if (removeImages) {
-            const imagesToRemove = parseArray(removeImages);
+            const imagesToRemove = Array.isArray(removeImages) ? removeImages : [removeImages];
             for (const publicId of imagesToRemove) {
                 await deleteCloudinaryImage(publicId);
                 service.images = service.images.filter(img => img.publicId !== publicId);
@@ -324,17 +297,11 @@ export const updateService = async (req, res) => {
 
         // Update fields
         if (name) service.name = name.trim();
-        if (description) service.description = description;
-        if (shortDescription !== undefined) service.shortDescription = shortDescription;
         if (price !== undefined) service.price = Number(price);
         if (discountPrice !== undefined) service.discountPrice = discountPrice ? Number(discountPrice) : null;
         if (duration !== undefined) service.duration = Number(duration);
-        if (displayOrder !== undefined) service.displayOrder = Number(displayOrder);
         if (isActive !== undefined) service.isActive = isActive === 'true' || isActive === true;
         if (isFeatured !== undefined) service.isFeatured = isFeatured === 'true' || isFeatured === true;
-        if (highlights !== undefined) service.highlights = parseArray(highlights);
-        if (includes !== undefined) service.includes = parseArray(includes);
-        if (excludes !== undefined) service.excludes = parseArray(excludes);
 
         await service.save();
         await service.populate('category', 'name slug icon');
