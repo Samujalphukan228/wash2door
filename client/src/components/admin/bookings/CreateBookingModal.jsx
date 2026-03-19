@@ -8,17 +8,17 @@ import axiosInstance from '@/lib/axios';
 import toast from 'react-hot-toast';
 
 const TIME_SLOTS = [
-    '08:00-09:00', '09:00-10:00', '10:00-11:00',
-    '11:00-12:00', '12:00-13:00', '13:00-14:00',
-    '14:00-15:00', '15:00-16:00', '16:00-17:00',
-    '17:00-18:00'
+    '08:00-09:00', '09:00-10:00', '10:00-11:00', '11:00-12:00',
+    '12:00-13:00', '13:00-14:00', '14:00-15:00', '15:00-16:00',
+    '16:00-17:00', '17:00-18:00', '18:00-19:00', '19:00-20:00',
+    '20:00-21:00'
 ];
 
+// ✅ UPDATED: 3 steps instead of 4 (no variant selection)
 const STEPS = [
     { label: 'Customer', desc: 'Who is booking?' },
     { label: 'Service',  desc: 'What service?'   },
-    { label: 'Schedule', desc: 'When?'            },
-    { label: 'Details',  desc: 'Final details'    }
+    { label: 'Schedule', desc: 'When & where?'   }
 ];
 
 /* ── Shared styles ── */
@@ -33,40 +33,28 @@ const inputCls = `
 const sectionLabel = `text-[10px] text-white/25 uppercase tracking-widest font-medium mb-3 block`;
 
 /**
- * Check if a time slot has already passed for today.
- * Compares the slot's START time against the current time.
- * e.g. "14:00-15:00" → if it's currently 14:01, this slot is past.
+ * ✅ FIXED: Check if a time slot has passed
  */
 function isSlotPassed(slot, selectedDate) {
-    const today = new Date();
-    const selected = new Date(selectedDate + 'T00:00:00');
+    const now = new Date();
+    
+    const [year, month, day] = selectedDate.split('-').map(Number);
+    const selected = new Date(year, month - 1, day, 0, 0, 0, 0);
+    
+    const todayYear = now.getFullYear();
+    const todayMonth = String(now.getMonth() + 1).padStart(2, '0');
+    const todayDay = String(now.getDate()).padStart(2, '0');
+    const todayStr = `${todayYear}-${todayMonth}-${todayDay}`;
 
-    // If selected date is in the future, no slots are passed
-    if (
-        selected.getFullYear() > today.getFullYear() ||
-        selected.getMonth() > today.getMonth() ||
-        selected.getDate() > today.getDate()
-    ) {
-        return false;
-    }
+    if (selectedDate > todayStr) return false;
+    if (selectedDate < todayStr) return true;
 
-    // If selected date is in the past (shouldn't happen due to min attr, but safety)
-    if (
-        selected.getFullYear() < today.getFullYear() ||
-        selected.getMonth() < today.getMonth() ||
-        selected.getDate() < today.getDate()
-    ) {
-        return true;
-    }
-
-    // Selected date IS today — compare slot start time with current time
-    const [startTime] = slot.split('-'); // "14:00"
+    const [startTime] = slot.split('-');
     const [startHour, startMin] = startTime.split(':').map(Number);
 
-    const currentHour = today.getHours();
-    const currentMin = today.getMinutes();
+    const currentHour = now.getHours();
+    const currentMin = now.getMinutes();
 
-    // Slot is passed if current time >= slot start time
     if (currentHour > startHour) return true;
     if (currentHour === startHour && currentMin >= startMin) return true;
 
@@ -74,42 +62,41 @@ function isSlotPassed(slot, selectedDate) {
 }
 
 export default function CreateBookingModal({ onClose, onSuccess }) {
-    const [step, setStep]       = useState(1);
+    const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
 
     /* Step 1 */
-    const [bookingType,      setBookingType]      = useState('walkin');
-    const [walkInCustomer,   setWalkInCustomer]   = useState({ name: '', phone: '' });
-    const [customerSearch,   setCustomerSearch]   = useState('');
-    const [customers,        setCustomers]        = useState([]);
+    const [bookingType, setBookingType] = useState('walkin');
+    const [walkInCustomer, setWalkInCustomer] = useState({ name: '', phone: '' });
+    const [customerSearch, setCustomerSearch] = useState('');
+    const [customers, setCustomers] = useState([]);
     const [selectedCustomer, setSelectedCustomer] = useState(null);
-    const [searchLoading,    setSearchLoading]    = useState(false);
+    const [searchLoading, setSearchLoading] = useState(false);
 
-    /* Step 2 */
-    const [services,        setServices]        = useState([]);
+    /* Step 2 - ✅ SIMPLIFIED: Just service selection */
+    const [services, setServices] = useState([]);
     const [selectedService, setSelectedService] = useState(null);
-    const [selectedVariant, setSelectedVariant] = useState(null);
     const [servicesLoading, setServicesLoading] = useState(false);
 
-    /* Step 3 */
-    const [bookingDate,          setBookingDate]          = useState('');
-    const [timeSlot,             setTimeSlot]             = useState('');
-    const [availability,         setAvailability]         = useState([]);
-    const [availabilityLoading,  setAvailabilityLoading]  = useState(false);
-
-    /* Step 4 */
+    /* Step 3 - ✅ COMBINED: Date/Time + Location */
+    const [bookingDate, setBookingDate] = useState('');
+    const [timeSlot, setTimeSlot] = useState('');
+    const [availability, setAvailability] = useState([]);
+    const [availabilityLoading, setAvailabilityLoading] = useState(false);
     const [location, setLocation] = useState({
-        address: 'Walk-in / At Shop', city: 'Walk-in', landmark: ''
+        address: 'Walk-in / At Shop', 
+        city: 'Walk-in', 
+        landmark: ''
     });
-    const [specialNotes,   setSpecialNotes]   = useState('');
-    const [paymentMethod,  setPaymentMethod]  = useState('cash');
+    const [specialNotes, setSpecialNotes] = useState('');
+    const [paymentMethod, setPaymentMethod] = useState('cash');
 
-    // Refresh current time every minute so slots auto-disable as time passes
+    // Refresh current time every minute
     useEffect(() => {
         const interval = setInterval(() => {
             setCurrentTime(new Date());
-        }, 60000); // every 60 seconds
+        }, 60000);
         return () => clearInterval(interval);
     }, []);
 
@@ -120,15 +107,19 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                 setServicesLoading(true);
                 const res = await serviceService.getAll({ isActive: true, limit: 100 });
                 if (res.success) setServices(res.data);
-            } catch { toast.error('Failed to load services'); }
-            finally { setServicesLoading(false); }
+            } catch { 
+                toast.error('Failed to load services'); 
+            } finally { 
+                setServicesLoading(false); 
+            }
         })();
     }, []);
 
     /* Search customers */
     useEffect(() => {
         if (bookingType !== 'online' || customerSearch.length < 2) {
-            setCustomers([]); return;
+            setCustomers([]);
+            return;
         }
         const t = setTimeout(async () => {
             try {
@@ -141,22 +132,29 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
         return () => clearTimeout(t);
     }, [customerSearch, bookingType]);
 
-    /* Check availability */
+    /* ✅ Check availability */
     useEffect(() => {
-        if (!selectedService || !bookingDate) return;
+        if (!bookingDate) return;
+        
         (async () => {
             try {
                 setAvailabilityLoading(true);
                 const res = await axiosInstance.get('/bookings/availability', {
-                    params: { serviceId: selectedService._id, date: bookingDate }
+                    params: { date: bookingDate }
                 });
-                if (res.data.success) setAvailability(res.data.data.slots || []);
-            } catch { }
-            finally { setAvailabilityLoading(false); }
+                if (res.data.success) {
+                    setAvailability(res.data.data.slots || []);
+                }
+            } catch (err) {
+                console.error('Availability check failed:', err);
+                setAvailability([]);
+            } finally {
+                setAvailabilityLoading(false);
+            }
         })();
-    }, [selectedService, bookingDate]);
+    }, [bookingDate]);
 
-    // Clear selected time slot if it becomes passed (e.g. user sits on the page)
+    // Clear selected time slot if it becomes passed
     useEffect(() => {
         if (timeSlot && bookingDate && isSlotPassed(timeSlot, bookingDate)) {
             setTimeSlot('');
@@ -171,28 +169,39 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
     const handleSubmit = async () => {
         try {
             setLoading(true);
+            
+            // ✅ SIMPLIFIED: No variantId needed
             const payload = {
-                bookingType, serviceId: selectedService._id,
-                variantId: selectedVariant._id, bookingDate,
-                timeSlot, location, specialNotes, paymentMethod
+                bookingType,
+                serviceId: selectedService._id,
+                bookingDate,
+                timeSlot,
+                location,
+                specialNotes,
+                paymentMethod
             };
-            if (bookingType === 'walkin') payload.walkInCustomer = walkInCustomer;
-            else payload.customerId = selectedCustomer._id;
+
+            if (bookingType === 'walkin') {
+                payload.walkInCustomer = walkInCustomer;
+            } else {
+                payload.customerId = selectedCustomer._id;
+            }
+            
             await adminService.createAdminBooking(payload);
+            toast.success('Booking created successfully!');
             onSuccess();
         } catch (err) {
             toast.error(err.response?.data?.message || 'Failed to create booking');
-        } finally { setLoading(false); }
+        } finally { 
+            setLoading(false); 
+        }
     };
 
     const canProceed = {
         1: bookingType === 'walkin' ? walkInCustomer.name.trim() : selectedCustomer !== null,
-        2: selectedService && selectedVariant,
-        3: bookingDate && timeSlot,
-        4: true
+        2: selectedService !== null,
+        3: bookingDate && timeSlot
     };
-
-    const activeVariants = selectedService?.variants?.filter(v => v.isActive) || [];
 
     return (
         <>
@@ -211,26 +220,20 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                     shadow-2xl shadow-black/80
                     overflow-hidden
                 ">
-                    {/* Top gradient line */}
                     <div className="h-px w-full bg-gradient-to-r from-transparent via-white/15 to-transparent shrink-0" />
 
-                    {/* ── Header ── */}
+                    {/* Header */}
                     <div className="shrink-0 flex items-center gap-3 px-4 py-4">
                         <button
                             onClick={() => step > 1 ? setStep(step - 1) : onClose()}
-                            className="
-                                w-8 h-8 rounded-lg flex items-center justify-center
-                                border border-white/[0.06] bg-white/[0.03]
-                                text-white/35 hover:text-white/70
-                                transition-all duration-150
-                            "
+                            className="w-8 h-8 rounded-lg flex items-center justify-center border border-white/[0.06] bg-white/[0.03] text-white/35 hover:text-white/70 transition-all duration-150"
                         >
                             <ChevronLeft className="w-4 h-4" />
                         </button>
 
                         <div className="flex-1 min-w-0">
                             <p className="text-[10px] text-white/25 uppercase tracking-widest">
-                                Step {step} of 4
+                                Step {step} of 3
                             </p>
                             <p className="text-sm font-medium text-white/80 mt-0.5">
                                 {STEPS[step - 1].label}
@@ -240,20 +243,12 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                             </p>
                         </div>
 
-                        <button
-                            onClick={onClose}
-                            className="
-                                w-8 h-8 rounded-lg flex items-center justify-center
-                                border border-white/[0.06] bg-white/[0.03]
-                                text-white/30 hover:text-white/70
-                                transition-all duration-150
-                            "
-                        >
+                        <button onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center border border-white/[0.06] bg-white/[0.03] text-white/30 hover:text-white/70 transition-all duration-150">
                             <X className="w-3.5 h-3.5" />
                         </button>
                     </div>
 
-                    {/* ── Step Indicators ── */}
+                    {/* Step Indicators */}
                     <div className="shrink-0 px-4 pb-4">
                         <div className="relative flex items-center gap-1 mb-3">
                             {STEPS.map((s, i) => (
@@ -269,20 +264,14 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                         <div className="flex items-center justify-between">
                             {STEPS.map((s, i) => (
                                 <div key={s.label} className="flex items-center gap-1.5">
-                                    <div className={`
-                                        w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-semibold
-                                        transition-all duration-200
-                                        ${step === i + 1
+                                    <div className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-semibold transition-all duration-200 ${
+                                        step === i + 1
                                             ? 'bg-white text-black shadow-lg shadow-white/20'
                                             : step > i + 1
                                             ? 'bg-white/20 text-white/60'
                                             : 'bg-white/[0.06] text-white/20'
-                                        }
-                                    `}>
-                                        {step > i + 1
-                                            ? <Check className="w-2.5 h-2.5" />
-                                            : i + 1
-                                        }
+                                    }`}>
+                                        {step > i + 1 ? <Check className="w-2.5 h-2.5" /> : i + 1}
                                     </div>
                                     <span className={`text-[10px] transition-colors duration-200 ${
                                         step === i + 1 ? 'text-white/60' : 'text-white/20'
@@ -294,10 +283,9 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                         </div>
                     </div>
 
-                    {/* ── Divider ── */}
                     <div className="h-px bg-white/[0.05] shrink-0" />
 
-                    {/* ── Scrollable Content ── */}
+                    {/* Scrollable Content */}
                     <div className="flex-1 overflow-y-auto px-4 py-5 space-y-6">
 
                         {/* STEP 1 — Customer */}
@@ -307,8 +295,8 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                                     <span className={sectionLabel}>Booking Type</span>
                                     <div className="grid grid-cols-2 gap-2">
                                         {[
-                                            { value: 'walkin', label: 'Walk-in',    sub: 'At shop, no account' },
-                                            { value: 'online', label: 'Online',     sub: 'Registered customer' }
+                                            { value: 'walkin', label: 'Walk-in', sub: 'At shop, no account' },
+                                            { value: 'online', label: 'Online', sub: 'Registered customer' }
                                         ].map(({ value, label, sub }) => (
                                             <button
                                                 key={value}
@@ -317,13 +305,11 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                                                     setSelectedCustomer(null);
                                                     setCustomerSearch('');
                                                 }}
-                                                className={`
-                                                    p-3.5 rounded-lg border text-left transition-all duration-150
-                                                    ${bookingType === value
+                                                className={`p-3.5 rounded-lg border text-left transition-all duration-150 ${
+                                                    bookingType === value
                                                         ? 'border-white/25 bg-white/[0.06]'
                                                         : 'border-white/[0.07] bg-white/[0.02] hover:border-white/[0.12]'
-                                                    }
-                                                `}
+                                                }`}
                                             >
                                                 <div className="flex items-center justify-between mb-1">
                                                     <p className="text-sm text-white/80 font-medium">{label}</p>
@@ -418,7 +404,7 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                             </div>
                         )}
 
-                        {/* STEP 2 — Service */}
+                        {/* STEP 2 — Service (NO variant selection) */}
                         {step === 2 && (
                             <div className="space-y-5">
                                 <div>
@@ -434,22 +420,19 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                                             {services.map((s) => (
                                                 <button
                                                     key={s._id}
-                                                    onClick={() => { setSelectedService(s); setSelectedVariant(null); }}
-                                                    className={`
-                                                        w-full flex items-center justify-between p-3.5 rounded-lg
-                                                        border text-left transition-all duration-150
-                                                        ${selectedService?._id === s._id
+                                                    onClick={() => setSelectedService(s)}
+                                                    className={`w-full flex items-center justify-between p-3.5 rounded-lg border text-left transition-all duration-150 ${
+                                                        selectedService?._id === s._id
                                                             ? 'border-white/25 bg-white/[0.06]'
                                                             : 'border-white/[0.07] bg-white/[0.02] hover:border-white/[0.12]'
-                                                        }
-                                                    `}
+                                                    }`}
                                                 >
                                                     <div>
                                                         <p className="text-sm text-white/80">{s.name}</p>
                                                         <p className="text-[11px] text-white/30 mt-0.5">
                                                             {s.category?.name || s.tier}
                                                             <span className="mx-1.5 text-white/15">·</span>
-                                                            from ₹{s.startingPrice?.toLocaleString('en-IN')}
+                                                            ₹{(s.discountPrice || s.price || 0).toLocaleString('en-IN')}
                                                         </p>
                                                     </div>
                                                     {selectedService?._id === s._id && (
@@ -462,77 +445,43 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                                         </div>
                                     )}
                                 </div>
-
-                                {selectedService && activeVariants.length > 0 && (
-                                    <div>
-                                        <div className="h-px bg-white/[0.05] mb-4" />
-                                        <span className={sectionLabel}>Select Variant</span>
-                                        <div className="space-y-1.5">
-                                            {activeVariants.map((v) => (
-                                                <button
-                                                    key={v._id}
-                                                    onClick={() => setSelectedVariant(v)}
-                                                    className={`
-                                                        w-full flex items-center justify-between p-3.5 rounded-lg
-                                                        border text-left transition-all duration-150
-                                                        ${selectedVariant?._id === v._id
-                                                            ? 'border-white/25 bg-white/[0.06]'
-                                                            : 'border-white/[0.07] bg-white/[0.02] hover:border-white/[0.12]'
-                                                        }
-                                                    `}
-                                                >
-                                                    <div>
-                                                        <p className="text-sm text-white/80">{v.name}</p>
-                                                        <p className="text-[11px] text-white/30 mt-0.5">
-                                                            {v.duration} min
-                                                        </p>
-                                                    </div>
-                                                    <div className="text-right flex items-center gap-3">
-                                                        <div>
-                                                            <p className="text-sm font-semibold text-white tabular-nums">
-                                                                ₹{(v.discountPrice ?? v.price)?.toLocaleString('en-IN')}
-                                                            </p>
-                                                            {v.discountPrice && v.discountPrice < v.price && (
-                                                                <p className="text-[11px] text-white/25 line-through tabular-nums">
-                                                                    ₹{v.price?.toLocaleString('en-IN')}
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                        {selectedVariant?._id === v._id && (
-                                                            <div className="w-5 h-5 rounded-full bg-white flex items-center justify-center shrink-0">
-                                                                <Check className="w-3 h-3 text-black" />
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
                             </div>
                         )}
 
-                        {/* STEP 3 — Schedule */}
+                        {/* STEP 3 — Schedule + Location */}
                         {step === 3 && (
                             <div className="space-y-5">
+                                {/* Date */}
                                 <div>
                                     <span className={sectionLabel}>Booking Date</span>
                                     <input
                                         type="date"
                                         value={bookingDate}
-                                        min={new Date().toISOString().split('T')[0]}
-                                        onChange={(e) => { setBookingDate(e.target.value); setTimeSlot(''); }}
+                                        min={(() => {
+                                            const today = new Date();
+                                            const year = today.getFullYear();
+                                            const month = String(today.getMonth() + 1).padStart(2, '0');
+                                            const day = String(today.getDate()).padStart(2, '0');
+                                            return `${year}-${month}-${day}`;
+                                        })()}
+                                        onChange={(e) => { 
+                                            setBookingDate(e.target.value); 
+                                            setTimeSlot(''); 
+                                        }}
                                         className={`${inputCls} [color-scheme:dark]`}
                                     />
                                 </div>
 
+                                {/* Time Slots */}
                                 {bookingDate && (
                                     <div>
                                         <div className="flex items-center justify-between mb-3">
                                             <span className={`${sectionLabel} mb-0`}>Time Slot</span>
                                             <div className="flex items-center gap-3">
-                                                {/* Show current time hint when today is selected */}
-                                                {bookingDate === new Date().toISOString().split('T')[0] && (
+                                                {bookingDate === (() => {
+                                                    const t = new Date();
+                                                    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+                                                })() && (
                                                     <span className="text-[10px] text-white/20 font-mono">
                                                         Now {currentTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false })}
                                                     </span>
@@ -549,25 +498,22 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                                         <div className="grid grid-cols-2 gap-2">
                                             {TIME_SLOTS.map((slot) => {
                                                 const available = isSlotAvailable(slot);
-                                                const passed    = isSlotPassed(slot, bookingDate);
-                                                const disabled  = !available || passed;
-                                                const selected  = timeSlot === slot;
+                                                const passed = isSlotPassed(slot, bookingDate);
+                                                const disabled = !available || passed;
+                                                const selected = timeSlot === slot;
 
                                                 return (
                                                     <button
                                                         key={slot}
                                                         onClick={() => !disabled && setTimeSlot(slot)}
                                                         disabled={disabled}
-                                                        className={`
-                                                            relative p-3 rounded-lg border text-xs font-mono
-                                                            transition-all duration-150
-                                                            ${selected
+                                                        className={`relative p-3 rounded-lg border text-xs font-mono transition-all duration-150 ${
+                                                            selected
                                                                 ? 'border-white/30 bg-white/[0.08] text-white'
                                                                 : disabled
                                                                 ? 'border-white/[0.04] bg-white/[0.01] text-white/15 cursor-not-allowed'
                                                                 : 'border-white/[0.07] bg-white/[0.02] text-white/50 hover:border-white/[0.14] hover:text-white/70'
-                                                            }
-                                                        `}
+                                                        }`}
                                                     >
                                                         {slot}
                                                         {passed && (
@@ -591,12 +537,8 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                                         </div>
                                     </div>
                                 )}
-                            </div>
-                        )}
 
-                        {/* STEP 4 — Details */}
-                        {step === 4 && (
-                            <div className="space-y-5">
+                                <div className="h-px bg-white/[0.05]" />
 
                                 {/* Location */}
                                 <div>
@@ -633,14 +575,11 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                                             <button
                                                 key={m}
                                                 onClick={() => setPaymentMethod(m)}
-                                                className={`
-                                                    p-3 rounded-lg border text-xs font-medium capitalize
-                                                    transition-all duration-150
-                                                    ${paymentMethod === m
+                                                className={`p-3 rounded-lg border text-xs font-medium capitalize transition-all duration-150 ${
+                                                    paymentMethod === m
                                                         ? 'border-white/25 bg-white/[0.07] text-white/80'
                                                         : 'border-white/[0.07] bg-white/[0.02] text-white/35 hover:border-white/[0.12]'
-                                                    }
-                                                `}
+                                                }`}
                                             >
                                                 {m}
                                             </button>
@@ -678,13 +617,12 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                                             }
                                         />
                                         <SummaryRow label="Service" value={selectedService?.name} />
-                                        <SummaryRow label="Variant" value={selectedVariant?.name} />
-                                        <SummaryRow label="Date"    value={bookingDate} mono />
-                                        <SummaryRow label="Time"    value={timeSlot}    mono />
+                                        <SummaryRow label="Date" value={bookingDate} mono />
+                                        <SummaryRow label="Time" value={timeSlot} mono />
                                         <div className="h-px bg-white/[0.05]" />
                                         <SummaryRow
                                             label="Total"
-                                            value={`₹${(selectedVariant?.discountPrice ?? selectedVariant?.price)?.toLocaleString('en-IN')}`}
+                                            value={`₹${((selectedService?.discountPrice || selectedService?.price || 0)).toLocaleString('en-IN')}`}
                                             highlight
                                         />
                                     </div>
@@ -693,43 +631,29 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                         )}
                     </div>
 
-                    {/* ── Footer ── */}
+                    {/* Footer */}
                     <div className="shrink-0 h-px bg-white/[0.05]" />
                     <div className="shrink-0 px-4 py-4 flex gap-2">
                         {step > 1 && (
                             <button
                                 onClick={() => setStep(step - 1)}
-                                className="
-                                    hidden sm:flex items-center px-4 py-2.5 rounded-lg
-                                    border border-white/[0.08] bg-white/[0.03]
-                                    text-xs text-white/40 hover:text-white/70
-                                    hover:border-white/[0.14] hover:bg-white/[0.05]
-                                    transition-all duration-150
-                                "
+                                className="hidden sm:flex items-center px-4 py-2.5 rounded-lg border border-white/[0.08] bg-white/[0.03] text-xs text-white/40 hover:text-white/70 hover:border-white/[0.14] hover:bg-white/[0.05] transition-all duration-150"
                             >
                                 Back
                             </button>
                         )}
 
                         <button
-                            onClick={() => step < 4 ? setStep(step + 1) : handleSubmit()}
+                            onClick={() => step < 3 ? setStep(step + 1) : handleSubmit()}
                             disabled={loading || !canProceed[step]}
-                            className="
-                                flex-1 flex items-center justify-center gap-2
-                                py-2.5 rounded-lg
-                                bg-white text-black text-sm font-medium
-                                hover:bg-white/90 active:bg-white/80
-                                disabled:bg-white/10 disabled:text-white/20 disabled:cursor-not-allowed
-                                shadow-lg shadow-white/10
-                                transition-all duration-150
-                            "
+                            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg bg-white text-black text-sm font-medium hover:bg-white/90 active:bg-white/80 disabled:bg-white/10 disabled:text-white/20 disabled:cursor-not-allowed shadow-lg shadow-white/10 transition-all duration-150"
                         >
                             {loading ? (
                                 <>
                                     <Loader2 className="w-4 h-4 animate-spin" />
                                     <span>Creating…</span>
                                 </>
-                            ) : step < 4 ? (
+                            ) : step < 3 ? (
                                 'Continue'
                             ) : (
                                 'Create Booking'

@@ -1,18 +1,18 @@
-// src/services/bookingService.js
+// src/services/bookingService.js - FIXED
 
 import axiosInstance from '@/lib/axios';
 
 const bookingService = {
-    // Get service pricing with variants
+    // Get service pricing
     getServicePricing: async (serviceId) => {
         const response = await axiosInstance.get(`/bookings/pricing/${serviceId}`);
         return response.data;
     },
 
-    // Check availability
-    checkAvailability: async (serviceId, date) => {
+    // ✅ FIXED: Check availability (no serviceId needed)
+    checkAvailability: async (date) => {
         const response = await axiosInstance.get('/bookings/availability', {
-            params: { serviceId, date }
+            params: { date }
         });
         return response.data;
     },

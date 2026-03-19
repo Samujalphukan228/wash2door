@@ -825,7 +825,7 @@ export const updateBookingStatus = async (req, res) => {
 };
 
 // ============================================
-// CREATE ADMIN BOOKING (GLOBAL SLOT CHECK)
+// CREATE ADMIN BOOKING - ✅ SAME AS USER BOOKING (NO VARIANT SELECTION)
 // ============================================
 
 export const createAdminBooking = async (req, res) => {
@@ -835,7 +835,6 @@ export const createAdminBooking = async (req, res) => {
             customerId,
             walkInCustomer,
             serviceId,
-            variantId,
             bookingDate,
             timeSlot,
             location,
@@ -843,6 +842,13 @@ export const createAdminBooking = async (req, res) => {
             paymentMethod,
             paymentStatus
         } = req.body;
+
+        console.log('📥 Admin booking request:', {
+            bookingType,
+            serviceId,
+            bookingDate,
+            timeSlot
+        });
 
         // Validate booking type
         if (!bookingType || !['walkin', 'online'].includes(bookingType)) {
@@ -890,7 +896,9 @@ export const createAdminBooking = async (req, res) => {
         const service = await Service.findOne({
             _id: serviceId,
             isActive: true
-        }).populate('category', 'name slug');
+        })
+            .populate('category', 'name slug')
+            .populate('subcategory', 'name slug');
 
         if (!service) {
             return res.status(404).json({
@@ -899,28 +907,72 @@ export const createAdminBooking = async (req, res) => {
             });
         }
 
-        // Validate variant
-        if (!variantId) {
+        console.log('📦 Service found:', {
+            name: service.name,
+            hasCategory: !!service.category,
+            hasSubcategory: !!service.subcategory,
+            variantsCount: service.variants?.length || 0
+        });
+
+        // ✅ Check category and subcategory
+        if (!service.category || !service.category._id) {
             return res.status(400).json({
                 success: false,
-                message: 'Variant ID is required'
+                message: 'This service is missing a category assignment'
             });
         }
 
-        const selectedVariant = service.variants.id(variantId);
-
-        if (!selectedVariant) {
-            return res.status(404).json({
+        if (!service.subcategory || !service.subcategory._id) {
+            return res.status(400).json({
                 success: false,
-                message: 'Variant not found in this service'
+                message: 'This service is missing a subcategory assignment'
             });
         }
 
-        if (!selectedVariant.isActive) {
-            return res.status(400).json({
-                success: false,
-                message: 'This variant is currently not available'
-            });
+        // ============================================
+        // ✅ AUTO-SELECT VARIANT OR USE SERVICE PRICE (SAME AS USER BOOKING)
+        // ============================================
+        let finalPrice = 0;
+        let duration = 60;
+        let variantId = null;
+        let variantName = null;
+
+        const hasVariants = service.variants && service.variants.length > 0;
+
+        if (hasVariants) {
+            // Auto-select first active variant
+            const activeVariants = service.variants.filter(v => v.isActive);
+            
+            if (activeVariants.length === 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'This service has no available variants at the moment'
+                });
+            }
+
+            const selectedVariant = activeVariants[0];
+            finalPrice = selectedVariant.discountPrice ?? selectedVariant.price;
+            duration = selectedVariant.duration;
+            variantId = selectedVariant._id;
+            variantName = selectedVariant.name;
+
+            console.log(`📌 Auto-selected variant: ${variantName}`);
+
+        } else {
+            // Use service-level pricing
+            finalPrice = service.discountPrice ?? service.price ?? 0;
+            duration = service.duration ?? 60;
+            variantId = null;
+            variantName = null;
+
+            if (!finalPrice || finalPrice === 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'This service has no price configured'
+                });
+            }
+
+            console.log('📌 No variants - using service-level pricing');
         }
 
         // Validate date and time
@@ -931,11 +983,32 @@ export const createAdminBooking = async (req, res) => {
             });
         }
 
-        const requestedDate = new Date(bookingDate);
+        // ✅ Parse date from local string
+        const [year, month, day] = bookingDate.split('-').map(Number);
+        const requestedDate = new Date(year, month - 1, day, 12, 0, 0, 0);
+
         if (isNaN(requestedDate.getTime())) {
             return res.status(400).json({
                 success: false,
-                message: 'Invalid date format'
+                message: 'Invalid date format. Use YYYY-MM-DD'
+            });
+        }
+
+        // ✅ Helper function for local date string
+        const getLocalDateStr = (date) => {
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        };
+
+        const now = new Date();
+        const todayStr = getLocalDateStr(now);
+
+        if (bookingDate < todayStr) {
+            return res.status(400).json({
+                success: false,
+                message: 'Booking date cannot be in the past'
             });
         }
 
@@ -953,19 +1026,25 @@ export const createAdminBooking = async (req, res) => {
             });
         }
 
-        // ============================================
-        // GLOBAL SLOT CHECK - Check ALL services
-        // ============================================
-        const startOfDay = new Date(requestedDate);
-        startOfDay.setHours(0, 0, 0, 0);
+        // ✅ Check if slot time has passed today
+        const isToday = bookingDate === todayStr;
+        if (isToday) {
+            const [startTime] = timeSlot.split('-');
+            const [hours, minutes] = startTime.split(':').map(Number);
+            if (now.getHours() > hours || (now.getHours() === hours && now.getMinutes() >= minutes)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'This time slot has already passed for today'
+                });
+            }
+        }
 
-        const endOfDay = new Date(requestedDate);
-        endOfDay.setHours(23, 59, 59, 999);
+        // ✅ GLOBAL SLOT CHECK - Exclude cancelled bookings
+        const slotLockKey = `${bookingDate}|${timeSlot}`;
 
         const slotTaken = await Booking.findOne({
-            bookingDate: { $gte: startOfDay, $lte: endOfDay },
-            timeSlot,
-            status: { $nin: ['cancelled'] }
+            slotLockKey,
+            status: { $in: ['pending', 'confirmed', 'in-progress'] }
         });
 
         if (slotTaken) {
@@ -975,15 +1054,15 @@ export const createAdminBooking = async (req, res) => {
             });
         }
 
-        // Calculate price
-        const finalPrice = selectedVariant.discountPrice ?? selectedVariant.price;
-
         // Set location
         const bookingLocation = {
             address: location?.address || 'Walk-in / At Shop',
             city: location?.city || 'Walk-in',
             landmark: location?.landmark || ''
         };
+
+        console.log(`📦 Creating booking: ${service.name} ${variantName ? `(${variantName})` : '(No variant)'}`);
+        console.log(`💰 Price: ₹${finalPrice}, ⏱️ Duration: ${duration} min`);
 
         // Create booking
         const booking = await Booking.create({
@@ -994,13 +1073,15 @@ export const createAdminBooking = async (req, res) => {
                 : { name: '', phone: '' },
             categoryId: service.category._id,
             categoryName: service.category.name,
+            subcategoryId: service.subcategory._id,
+            subcategoryName: service.subcategory.name,
             serviceId: service._id,
             serviceName: service.name,
-            serviceTier: service.tier,
-            variantId: selectedVariant._id,
-            variantName: selectedVariant.name,
+            serviceTier: service.tier || 'basic',
+            variantId: variantId,
+            variantName: variantName,
             price: finalPrice,
-            duration: selectedVariant.duration,
+            duration: duration,
             bookingDate: requestedDate,
             timeSlot,
             location: bookingLocation,
@@ -1010,6 +1091,8 @@ export const createAdminBooking = async (req, res) => {
             createdBy: req.user._id,
             status: 'confirmed'
         });
+
+        console.log('✅ Booking created:', booking.bookingCode);
 
         // Update service booking count
         await Service.findByIdAndUpdate(serviceId, {
@@ -1039,6 +1122,7 @@ export const createAdminBooking = async (req, res) => {
                     ? booking.walkInCustomer
                     : { customerId },
                 categoryName: booking.categoryName,
+                subcategoryName: booking.subcategoryName,
                 serviceName: booking.serviceName,
                 variantName: booking.variantName,
                 price: booking.price,
@@ -1062,10 +1146,18 @@ export const createAdminBooking = async (req, res) => {
             });
         }
 
+        if (error.name === 'ValidationError') {
+            const messages = Object.values(error.errors).map(e => e.message);
+            return res.status(400).json({
+                success: false,
+                message: 'Validation error',
+                errors: messages
+            });
+        }
+
         res.status(500).json({
             success: false,
-            message: 'Failed to create booking',
-            error: error.message
+            message: error.message || 'Failed to create booking'
         });
     }
 };
