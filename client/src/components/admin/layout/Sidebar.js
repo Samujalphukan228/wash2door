@@ -1,33 +1,38 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import Image from 'next/image';
 import {
-    LayoutDashboard,
-    CalendarDays,
-    Wrench,
-    Users,
-    BarChart3,
-    LogOut,
-    ChevronLeft,
-    ChevronRight,
-    Car,
-    Settings,
-    Layers,
-    X,
+    LayoutDashboard, CalendarDays, Wrench,
+    Users, BarChart3, LogOut, Car,
+    Settings, Layers, User, X,
 } from 'lucide-react';
 
-const navItems = [
-    { label: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
-    { label: 'Bookings', href: '/admin/bookings', icon: CalendarDays },
-    { label: 'Categories', href: '/admin/categories', icon: Layers },
-    { label: 'Services', href: '/admin/services', icon: Wrench },
-    { label: 'Users', href: '/admin/users', icon: Users },
-    { label: 'Reports', href: '/admin/reports', icon: BarChart3 },
-    { label: 'Subcategories', href: '/admin/subcategories', icon: Layers },
+const navGroups = [
+    {
+        label: 'Overview',
+        items: [
+            { label: 'Dashboard',     href: '/admin/dashboard',     icon: LayoutDashboard },
+            { label: 'Reports',       href: '/admin/reports',       icon: BarChart3 },
+        ],
+    },
+    {
+        label: 'Manage',
+        items: [
+            { label: 'Bookings',      href: '/admin/bookings',      icon: CalendarDays },
+            { label: 'Users',         href: '/admin/users',         icon: Users },
+        ],
+    },
+    {
+        label: 'Catalog',
+        items: [
+            { label: 'Categories',    href: '/admin/categories',    icon: Layers },
+            { label: 'Subcategories', href: '/admin/subcategories', icon: Layers },
+            { label: 'Services',      href: '/admin/services',      icon: Wrench },
+        ],
+    },
 ];
 
 const getAvatarUrl = (avatar) => {
@@ -40,225 +45,162 @@ const getAvatarUrl = (avatar) => {
     return null;
 };
 
-export default function Sidebar({ open, onClose }) {
-    const pathname = usePathname();
-    const { user, logout } = useAuth();
-    const [collapsed, setCollapsed] = useState(false);
+function NavItem({ item, isActive, onClick }) {
+    const Icon = item.icon;
+    return (
+        <Link
+            href={item.href}
+            onClick={onClick}
+            className={`
+                flex items-center gap-3 px-3 py-2.5 rounded-lg
+                text-sm font-medium transition-all duration-200 ease-out select-none
+                ${isActive
+                    ? 'bg-white text-black'
+                    : 'text-gray-500 hover:text-gray-200 hover:bg-white/[0.05] active:bg-white/[0.08]'
+                }
+            `}
+        >
+            <Icon
+                className={`h-[17px] w-[17px] shrink-0 ${isActive ? 'text-black' : 'text-gray-500'}`}
+                strokeWidth={isActive ? 2.5 : 2}
+            />
+            <span>{item.label}</span>
+        </Link>
+    );
+}
 
+/**
+ * Sidebar
+ * @param {function} onLogout  - logout handler
+ * @param {function} onClose   - close drawer (mobile only, optional)
+ * @param {boolean}  isMobile  - if true, renders without hidden/show logic (parent controls visibility)
+ */
+export default function Sidebar({ onLogout, onClose, isMobile = false }) {
+    const pathname = usePathname();
+    const { user } = useAuth();
     const avatarUrl = getAvatarUrl(user?.avatar);
     const isActive = (href) => pathname === href || pathname.startsWith(href + '/');
 
+    const handleNavClick = () => {
+        if (isMobile && onClose) onClose();
+    };
+
     return (
-        <aside
-            className={`
-                fixed left-0 top-0 h-full bg-neutral-950
-                flex flex-col transition-all duration-300 ease-in-out z-50
-                border-r border-neutral-800/60
-                ${collapsed ? 'w-[60px]' : 'w-[220px]'}
-                ${open ? 'translate-x-0' : '-translate-x-full'}
-                lg:translate-x-0
-            `}
-        >
-            {/* Logo */}
-            <div className={`
-                flex items-center h-[52px] shrink-0 border-b border-neutral-800/60
-                ${collapsed ? 'justify-center px-0' : 'px-4 justify-between'}
-            `}>
-                <div className="flex items-center gap-2.5">
-                    <div className="w-6 h-6 bg-white rounded-[5px] flex items-center justify-center shrink-0">
-                        <Car className="w-3.5 h-3.5 text-black" />
-                    </div>
-                    {!collapsed && (
-                        <span className="text-[13px] font-semibold text-white tracking-[-0.01em]">
-                            Wash2Door
-                        </span>
-                    )}
-                </div>
+        <aside className="flex flex-col w-full h-full bg-[#0A0A0A] border-r border-white/[0.08]">
 
-                {!collapsed && (
-                    <div className="flex items-center gap-1">
-                        <button
-                            onClick={onClose}
-                            className="lg:hidden w-6 h-6 flex items-center justify-center text-neutral-600 hover:text-neutral-300 transition-colors rounded"
-                        >
-                            <X className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                            onClick={() => setCollapsed(true)}
-                            className="hidden lg:flex w-6 h-6 items-center justify-center text-neutral-600 hover:text-neutral-300 transition-colors rounded hover:bg-neutral-800/60"
-                        >
-                            <ChevronLeft className="w-3.5 h-3.5" />
-                        </button>
+            {/* ── Logo row ───────────────────────────────────────────── */}
+            <div className="h-16 flex items-center justify-between px-5 border-b border-white/[0.08] shrink-0">
+                <Link
+                    href="/admin/dashboard"
+                    onClick={handleNavClick}
+                    className="flex items-center gap-3 group"
+                >
+                    <div className="h-9 w-9 rounded-xl border border-white/[0.08] bg-white/[0.02] flex items-center justify-center transition-all duration-300 group-hover:border-white/[0.15] group-hover:bg-white/[0.05]">
+                        <Car
+                            className="h-4 w-4 text-gray-500 group-hover:text-gray-300 transition-colors duration-300"
+                            strokeWidth={2}
+                        />
                     </div>
-                )}
+                    <div>
+                        <p className="text-sm font-semibold text-white leading-tight">Wash2Door</p>
+                        <p className="text-[11px] text-gray-600 leading-tight mt-0.5">Admin Panel</p>
+                    </div>
+                </Link>
 
-                {collapsed && (
+                {/* Close button — mobile drawer only */}
+                {isMobile && onClose && (
                     <button
-                        onClick={() => setCollapsed(false)}
-                        className="hidden lg:flex absolute -right-2.5 top-[18px] w-5 h-5 items-center justify-center bg-neutral-900 border border-neutral-700/80 rounded-full text-neutral-500 hover:text-neutral-200 transition-colors shadow-sm"
+                        onClick={onClose}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.02] text-gray-500 hover:text-white hover:bg-white/[0.06] transition-all"
+                        aria-label="Close menu"
                     >
-                        <ChevronRight className="w-2.5 h-2.5" />
+                        <X className="w-4 h-4" strokeWidth={2} />
                     </button>
                 )}
             </div>
 
-            {/* Navigation */}
-            <nav className="flex-1 py-3 overflow-y-auto">
-                {!collapsed && (
-                    <p className="text-[10px] text-neutral-600 font-medium uppercase tracking-widest px-4 mb-1.5">
-                        Menu
-                    </p>
-                )}
-
-                <div className="px-2 space-y-px">
-                    {navItems.map((item) => {
-                        const Icon = item.icon;
-                        const active = isActive(item.href);
-
-                        return (
-                            <Link
-                                key={item.href}
-                                href={item.href}
-                                title={collapsed ? item.label : ''}
-                                onClick={onClose}
-                                className={`
-                                    flex items-center gap-2.5 px-2.5 py-2
-                                    text-[13px] rounded-md transition-all duration-150 group
-                                    ${collapsed ? 'justify-center' : ''}
-                                    ${active
-                                        ? 'bg-white text-black'
-                                        : 'text-neutral-500 hover:text-neutral-100 hover:bg-neutral-800/50'
-                                    }
-                                `}
-                            >
-                                <Icon
-                                    className={`w-[15px] h-[15px] shrink-0 transition-colors ${
-                                        active ? 'text-black' : 'text-neutral-600 group-hover:text-neutral-300'
-                                    }`}
+            {/* ── Navigation ─────────────────────────────────────────── */}
+            <nav className="flex-1 overflow-y-auto overscroll-contain p-3 space-y-4">
+                {navGroups.map((group) => (
+                    <div key={group.label}>
+                        <p className="text-[10px] font-semibold text-gray-700 uppercase tracking-[0.1em] px-3 mb-1.5">
+                            {group.label}
+                        </p>
+                        <div className="space-y-0.5">
+                            {group.items.map((item) => (
+                                <NavItem
+                                    key={item.href}
+                                    item={item}
+                                    isActive={isActive(item.href)}
+                                    onClick={handleNavClick}
                                 />
-                                {!collapsed && (
-                                    <span className="font-medium tracking-[-0.01em]">{item.label}</span>
-                                )}
-                            </Link>
-                        );
-                    })}
-                </div>
+                            ))}
+                        </div>
+                    </div>
+                ))}
             </nav>
 
-            {/* Bottom */}
-            <div className="border-t border-neutral-800/60 p-2 space-y-px shrink-0">
+            {/* ── Footer ─────────────────────────────────────────────── */}
+            <div className="p-3 border-t border-white/[0.08] shrink-0 space-y-0.5">
 
                 {/* Settings */}
-                <Link
-                    href="/admin/settings"
-                    title={collapsed ? 'Settings' : ''}
-                    onClick={onClose}
-                    className={`
-                        flex items-center gap-2.5 px-2.5 py-2
-                        text-[13px] rounded-md transition-all duration-150 group
-                        ${isActive('/admin/settings')
-                            ? 'bg-white text-black'
-                            : 'text-neutral-500 hover:text-neutral-100 hover:bg-neutral-800/50'
-                        }
-                        ${collapsed ? 'justify-center' : ''}
-                    `}
-                >
-                    <Settings
-                        className={`w-[15px] h-[15px] shrink-0 ${
-                            isActive('/admin/settings') ? 'text-black' : 'text-neutral-600 group-hover:text-neutral-300'
-                        }`}
-                    />
-                    {!collapsed && <span className="font-medium tracking-[-0.01em]">Settings</span>}
-                </Link>
+                <NavItem
+                    item={{ label: 'Settings', href: '/admin/settings', icon: Settings }}
+                    isActive={isActive('/admin/settings')}
+                    onClick={handleNavClick}
+                />
 
                 {/* Logout */}
                 <button
-                    onClick={logout}
-                    title={collapsed ? 'Logout' : ''}
-                    className={`
-                        w-full flex items-center gap-2.5 px-2.5 py-2
-                        text-[13px] text-neutral-500 hover:text-red-400
-                        hover:bg-red-500/[0.06] rounded-md transition-all duration-150
-                        ${collapsed ? 'justify-center' : ''}
-                    `}
+                    onClick={onLogout}
+                    className="flex w-full items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+                        text-gray-500 hover:text-red-400 hover:bg-red-500/[0.08]
+                        active:bg-red-500/[0.12] transition-all duration-200 ease-out"
                 >
-                    <LogOut className="w-[15px] h-[15px] shrink-0" />
-                    {!collapsed && <span className="font-medium tracking-[-0.01em]">Logout</span>}
+                    <LogOut className="h-[17px] w-[17px] shrink-0" strokeWidth={2} />
+                    <span>Logout</span>
                 </button>
 
-                {/* User Info */}
-                <div className={`pt-2 mt-1 border-t border-neutral-800/60 ${collapsed ? 'flex justify-center pb-1' : 'px-1 pb-1'}`}>
-                    {!collapsed ? (
-                        <div className="flex items-center gap-2.5 px-1.5 py-1.5 rounded-md hover:bg-neutral-800/40 transition-colors cursor-default">
-                            <div className="relative w-7 h-7 rounded-full overflow-hidden bg-neutral-800 shrink-0 ring-1 ring-neutral-700/50">
-                                {avatarUrl ? (
-                                    <Image
-                                        src={avatarUrl}
-                                        alt={user?.firstName || 'Avatar'}
-                                        fill
-                                        className="object-cover"
-                                    />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-[10px] font-semibold text-neutral-400 uppercase">
-                                        {user?.firstName?.[0]}{user?.lastName?.[0]}
-                                    </div>
-                                )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <p className="text-[12px] font-medium text-neutral-200 truncate leading-tight tracking-[-0.01em]">
-                                    {user?.firstName} {user?.lastName}
-                                </p>
-                                <p className="text-[11px] text-neutral-600 truncate leading-tight mt-0.5">
-                                    {user?.email}
-                                </p>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="relative w-7 h-7 rounded-full overflow-hidden bg-neutral-800 ring-1 ring-neutral-700/50">
+                {/* User card */}
+                <div className="pt-2 mt-1 border-t border-white/[0.06]">
+                    <div className="flex items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.02] px-3 py-2.5 transition-all duration-300 hover:border-white/[0.12] hover:bg-white/[0.04] cursor-default">
+                        <div className="relative w-8 h-8 rounded-lg border border-white/[0.08] bg-white/[0.03] flex items-center justify-center overflow-hidden shrink-0">
                             {avatarUrl ? (
                                 <Image
                                     src={avatarUrl}
-                                    alt={user?.firstName || 'Avatar'}
+                                    alt={user?.firstName || 'User'}
                                     fill
                                     className="object-cover"
                                 />
                             ) : (
-                                <div className="w-full h-full flex items-center justify-center text-[10px] font-semibold text-neutral-400 uppercase">
-                                    {user?.firstName?.[0]}{user?.lastName?.[0]}
-                                </div>
+                                <User className="h-4 w-4 text-gray-500" strokeWidth={2} />
                             )}
                         </div>
-                    )}
+                        <div className="flex-1 min-w-0">
+                            <p className="text-[12.5px] font-medium text-white truncate leading-tight">
+                                {user?.firstName
+                                    ? `${user.firstName} ${user.lastName ?? ''}`.trim()
+                                    : 'Admin User'}
+                            </p>
+                            <p className="text-[11px] text-gray-600 truncate leading-tight mt-0.5">
+                                {user?.email ?? '—'}
+                            </p>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Branding */}
-                <div className={`pt-2 border-t border-neutral-800/60 ${collapsed ? 'px-0' : 'px-1'}`}>
-                    {!collapsed ? (
-                        <p className="text-[10px] text-neutral-700 text-center tracking-wide">
-                            Built by{' '}
-                            <a
-                                href="https://nexxupp.com"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-neutral-500 hover:text-neutral-300 transition-colors"
-                            >
-                                Nexxupp
-                            </a>
-                        </p>
-                    ) : (
-                        <p className="text-[8px] text-neutral-700 text-center">
-                            <a
-                                href="https://nexxupp.com"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="hover:text-neutral-400 transition-colors"
-                                title="Built by Nexxupp"
-                            >
-                                NX
-                            </a>
-                        </p>
-                    )}
-                </div>
+                <p className="text-[10px] text-gray-700 text-center pt-2 pb-0.5">
+                    Built by{' '}
+                    <a
+                        href="https://nexxupp.com"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-gray-600 hover:text-gray-400 transition-colors"
+                    >
+                        Nexxupp
+                    </a>
+                </p>
             </div>
         </aside>
     );

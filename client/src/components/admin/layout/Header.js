@@ -1,44 +1,26 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useSocket } from '@/context/SocketContext';
 import Image from 'next/image';
-import { Bell, Menu } from 'lucide-react';
+import { Bell, User, LogOut, Zap, WifiOff, Car, Menu } from 'lucide-react';
 
-const pageTitles = {
-    '/admin/dashboard': {
-        title: 'Dashboard',
-        subtitle: 'Overview of your business',
-    },
-    '/admin/bookings': {
-        title: 'Bookings',
-        subtitle: 'Manage all bookings',
-    },
-    '/admin/categories': {
-        title: 'Categories',
-        subtitle: 'Manage categories',
-    },
-    '/admin/services': {
-        title: 'Services',
-        subtitle: 'Manage your services',
-    },
-    '/admin/users': {
-        title: 'Users',
-        subtitle: 'Manage customers',
-    },
-    '/admin/reports': {
-        title: 'Reports',
-        subtitle: 'Analytics and reports',
-    },
-    '/admin/settings': {
-        title: 'Settings',
-        subtitle: 'Account settings',
-    },
+// ─── Page title map ───────────────────────────────────────────────────────────
+const PAGE_TITLES = {
+    '/admin/dashboard':     { title: 'Dashboard',     subtitle: 'Overview of your business' },
+    '/admin/bookings':      { title: 'Bookings',       subtitle: 'Manage all bookings' },
+    '/admin/categories':    { title: 'Categories',     subtitle: 'Manage service categories' },
+    '/admin/subcategories': { title: 'Subcategories',  subtitle: 'Manage subcategories' },
+    '/admin/services':      { title: 'Services',       subtitle: 'Manage your services' },
+    '/admin/users':         { title: 'Users',          subtitle: 'Manage customers' },
+    '/admin/reports':       { title: 'Reports',        subtitle: 'Analytics and reports' },
+    '/admin/settings':      { title: 'Settings',       subtitle: 'Account & preferences' },
 };
 
-const getAvatarUrl = (avatar) => {
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function getAvatarUrl(avatar) {
     if (!avatar) return null;
     if (typeof avatar === 'object' && avatar?.url) return avatar.url;
     if (typeof avatar === 'string') {
@@ -46,182 +28,370 @@ const getAvatarUrl = (avatar) => {
         if (avatar.startsWith('http')) return avatar;
     }
     return null;
-};
+}
 
-export default function Header({ onMenuClick }) {
-    const pathname = usePathname();
-    const { user } = useAuth();
-    const { isConnected } = useSocket();
-    const [notifications, setNotifications] = useState([]);
-    const [showNotifications, setShowNotifications] = useState(false);
-    const [time, setTime] = useState('');
-    const notifRef = useRef(null);
+function getPageInfo(pathname) {
+    // Exact match first
+    if (PAGE_TITLES[pathname]) return PAGE_TITLES[pathname];
+    // Prefix match (e.g. /admin/bookings/123)
+    for (const key of Object.keys(PAGE_TITLES)) {
+        if (pathname.startsWith(key + '/')) return PAGE_TITLES[key];
+    }
+    return { title: 'Admin', subtitle: '' };
+}
 
-    const pageInfo = pageTitles[pathname] || {
-        title: 'Admin',
-        subtitle: '',
-    };
+// ─── Dropdown wrapper — handles outside click + escape ───────────────────────
+/**
+ * Generic dropdown shell.
+ * `open`, `onClose`, `buttonRef`, `children` (the panel content)
+ */
+function Dropdown({ open, onClose, buttonRef, className = '', children }) {
+    const panelRef = useRef(null);
 
-    const avatarUrl = getAvatarUrl(user?.avatar);
-
-    // Clock
     useEffect(() => {
-        const updateTime = () => {
-            setTime(
-                new Date().toLocaleTimeString('en-IN', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: true,
-                })
-            );
+        if (!open) return;
+        const handler = (e) => {
+            if (
+                panelRef.current && !panelRef.current.contains(e.target) &&
+                buttonRef.current && !buttonRef.current.contains(e.target)
+            ) onClose();
         };
-        updateTime();
-        const interval = setInterval(updateTime, 60000); // Update every minute instead of every second
-        return () => clearInterval(interval);
-    }, []);
-
-    // Close notifications on outside click
-    useEffect(() => {
-        const handleClickOutside = (e) => {
-            if (notifRef.current && !notifRef.current.contains(e.target)) {
-                setShowNotifications(false);
-            }
+        // mousedown for desktop, touchstart for mobile
+        document.addEventListener('mousedown', handler);
+        document.addEventListener('touchstart', handler);
+        return () => {
+            document.removeEventListener('mousedown', handler);
+            document.removeEventListener('touchstart', handler);
         };
-        if (showNotifications) {
-            document.addEventListener('mousedown', handleClickOutside);
-        }
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [showNotifications]);
+    }, [open, onClose, buttonRef]);
 
     return (
-        <header className="h-14 sm:h-16 border-b border-neutral-800 bg-black/95 backdrop-blur-sm flex items-center justify-between px-4 sm:px-6 lg:px-8 sticky top-0 z-30">
-            {/* Left */}
-            <div className="flex items-center gap-3 sm:gap-4">
-                <button
-                    onClick={onMenuClick}
-                    className="lg:hidden w-8 h-8 flex items-center justify-center text-neutral-400 hover:text-white transition-colors"
-                    aria-label="Open menu"
-                >
-                    <Menu className="w-5 h-5" />
-                </button>
+        <div
+            ref={panelRef}
+            className={`
+                absolute right-0 mt-2 z-50
+                rounded-xl border border-white/[0.08]
+                bg-[#0A0A0A] shadow-2xl shadow-black/70
+                transition-all duration-200 ease-out origin-top-right
+                ${open
+                    ? 'opacity-100 scale-100 translate-y-0 pointer-events-auto'
+                    : 'opacity-0 scale-95 -translate-y-1 pointer-events-none'
+                }
+                ${className}
+            `}
+            aria-hidden={!open}
+        >
+            {children}
+        </div>
+    );
+}
 
-                <div>
-                    <h1 className="text-sm sm:text-base font-semibold text-white">
-                        {pageInfo.title}
-                    </h1>
-                    {pageInfo.subtitle && (
-                        <p className="text-xs text-neutral-500 mt-0.5 hidden sm:block">
-                            {pageInfo.subtitle}
-                        </p>
-                    )}
-                </div>
-            </div>
+// ─── Header ───────────────────────────────────────────────────────────────────
+export default function Header({ onMenuClick, onLogout }) {
+    const pathname   = usePathname();
+    const { user }   = useAuth();
+    const { isConnected } = useSocket();
 
-            {/* Right */}
-            <div className="flex items-center gap-3 sm:gap-5">
-                {/* Time */}
-                <span className="text-xs text-neutral-500 font-mono hidden md:block tabular-nums">
-                    {time}
-                </span>
+    const [notifications, setNotifications] = useState([]);
+    const [showNotif,    setShowNotif]    = useState(false);
+    const [showUser,     setShowUser]     = useState(false);
+    const [time,         setTime]         = useState('');
+    const [date,         setDate]         = useState('');
 
-                {/* Socket Status */}
-                <div className="flex items-center gap-1.5">
-                    <div
-                        className={`w-1.5 h-1.5 rounded-full transition-colors ${
-                            isConnected ? 'bg-emerald-500' : 'bg-neutral-600'
-                        }`}
-                    />
-                    <span className="text-xs text-neutral-500 hidden md:block">
-                        {isConnected ? 'Live' : 'Offline'}
-                    </span>
-                </div>
+    const notifBtnRef = useRef(null);
+    const userBtnRef  = useRef(null);
 
-                {/* Notifications */}
-                <div className="relative" ref={notifRef}>
+    const pageInfo  = getPageInfo(pathname);
+    const avatarUrl = getAvatarUrl(user?.avatar);
+    const unread    = notifications.length;
+    const userName  = user?.firstName
+        ? `${user.firstName} ${user.lastName ?? ''}`.trim()
+        : 'Admin User';
+
+    // ── Clock ────────────────────────────────────────────────────────────────
+    useEffect(() => {
+        const tick = () => {
+            const now = new Date();
+            setTime(now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }));
+            setDate(now.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }));
+        };
+        tick();
+        const id = setInterval(tick, 30_000);
+        return () => clearInterval(id);
+    }, []);
+
+    // ── Escape key ───────────────────────────────────────────────────────────
+    useEffect(() => {
+        const handler = (e) => {
+            if (e.key === 'Escape') { setShowNotif(false); setShowUser(false); }
+        };
+        document.addEventListener('keydown', handler);
+        return () => document.removeEventListener('keydown', handler);
+    }, []);
+
+    // ── Close on route change ────────────────────────────────────────────────
+    useEffect(() => {
+        setShowNotif(false);
+        setShowUser(false);
+    }, [pathname]);
+
+    // ── Callbacks ────────────────────────────────────────────────────────────
+    const toggleNotif = useCallback(() => {
+        setShowNotif((p) => !p);
+        setShowUser(false);
+    }, []);
+
+    const toggleUser = useCallback(() => {
+        setShowUser((p) => !p);
+        setShowNotif(false);
+    }, []);
+
+    const handleLogout = useCallback(() => {
+        setShowUser(false);
+        onLogout?.();
+    }, [onLogout]);
+
+    const clearNotifications = useCallback(() => setNotifications([]), []);
+
+    // ─────────────────────────────────────────────────────────────────────────
+    return (
+        <header className="sticky top-0 z-40 border-b border-white/[0.08] bg-[#0A0A0A]/90 backdrop-blur-xl supports-[backdrop-filter]:bg-[#0A0A0A]/80">
+            <div className="flex h-14 sm:h-16 items-center justify-between gap-2 px-4 sm:px-5 lg:px-6">
+
+                {/* ── Left ─────────────────────────────────────────────────── */}
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+
+                    {/* Hamburger — mobile only */}
                     <button
-                        onClick={() => setShowNotifications(!showNotifications)}
-                        className="relative w-8 h-8 flex items-center justify-center text-neutral-500 hover:text-white transition-colors"
-                        aria-label="Notifications"
+                        onClick={onMenuClick}
+                        className="
+                            lg:hidden shrink-0 h-9 w-9 flex items-center justify-center
+                            rounded-lg border border-white/[0.08] bg-white/[0.02]
+                            text-gray-500
+                            hover:text-gray-300 hover:border-white/[0.15] hover:bg-white/[0.05]
+                            active:bg-white/[0.08]
+                            transition-all duration-200
+                        "
+                        aria-label="Open navigation menu"
                     >
-                        <Bell className="w-4 h-4" />
-                        {notifications.length > 0 && (
-                            <span className="absolute top-1 right-1 w-2 h-2 bg-white rounded-full" />
-                        )}
+                        <Menu className="w-4 h-4" strokeWidth={2} />
                     </button>
 
-                    {showNotifications && (
-                        <div className="absolute right-0 top-12 w-72 sm:w-80 bg-neutral-950 border border-neutral-800 rounded-lg shadow-2xl z-50 overflow-hidden">
-                            <div className="px-4 py-3 border-b border-neutral-800 flex items-center justify-between">
-                                <p className="text-xs font-medium text-white">
-                                    Notifications
-                                </p>
-                                {notifications.length > 0 && (
+                    {/* Mobile: logo when sidebar is hidden */}
+                    <div className="lg:hidden flex items-center gap-2 min-w-0">
+                        <div className="h-7 w-7 shrink-0 rounded-lg border border-white/[0.08] bg-white/[0.02] flex items-center justify-center">
+                            <Car className="h-3.5 w-3.5 text-gray-500" strokeWidth={2} />
+                        </div>
+                        <span className="text-sm font-semibold text-white truncate">Wash2Door</span>
+                    </div>
+
+                    {/* Desktop: page title + subtitle */}
+                    <div className="hidden lg:flex flex-col min-w-0">
+                        <h1 className="text-[17px] font-semibold text-white tracking-tight leading-tight truncate">
+                            {pageInfo.title}
+                        </h1>
+                        {pageInfo.subtitle && (
+                            <p className="text-[11px] text-gray-600 leading-tight mt-0.5 truncate">
+                                {pageInfo.subtitle}
+                            </p>
+                        )}
+                    </div>
+                </div>
+
+                {/* ── Right ────────────────────────────────────────────────── */}
+                <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+
+                    {/* Clock + date — md+ */}
+                    <div className="hidden md:flex flex-col items-end mr-2 select-none">
+                        <span className="text-[12px] font-semibold text-gray-300 tabular-nums leading-tight">
+                            {time}
+                        </span>
+                        <span className="text-[10px] text-gray-600 leading-tight mt-0.5">
+                            {date}
+                        </span>
+                    </div>
+
+                    {/* Live / offline pill — sm+ */}
+                    <div className={`
+                        hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full
+                        text-[11px] font-medium border transition-all duration-500 select-none
+                        ${isConnected
+                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                            : 'bg-white/[0.03] text-gray-600 border-white/[0.08]'
+                        }
+                    `}>
+                        {isConnected
+                            ? <Zap className="w-3 h-3 shrink-0" strokeWidth={2.5} />
+                            : <WifiOff className="w-3 h-3 shrink-0" strokeWidth={2} />
+                        }
+                        {/* label hidden on sm, visible lg+ */}
+                        <span className="hidden lg:inline">
+                            {isConnected ? 'Live' : 'Offline'}
+                        </span>
+                    </div>
+
+                    {/* ── Notifications ──────────────────────────────────── */}
+                    <div className="relative">
+                        <button
+                            ref={notifBtnRef}
+                            onClick={toggleNotif}
+                            aria-label="Notifications"
+                            aria-expanded={showNotif}
+                            aria-haspopup="true"
+                            className={`
+                                relative h-9 w-9 flex items-center justify-center rounded-lg border
+                                transition-all duration-200 ease-out
+                                ${showNotif
+                                    ? 'border-white/20 bg-white/10 text-white'
+                                    : 'border-white/[0.08] bg-white/[0.02] text-gray-500 hover:text-gray-300 hover:border-white/[0.15] hover:bg-white/[0.05] active:bg-white/[0.08]'
+                                }
+                            `}
+                        >
+                            <Bell className="w-[15px] h-[15px]" strokeWidth={2} />
+                            {/* Unread dot */}
+                            {unread > 0 && (
+                                <span className="absolute top-[7px] right-[7px] w-[7px] h-[7px] bg-white rounded-full ring-2 ring-[#0A0A0A] shadow-[0_0_5px_rgba(255,255,255,0.5)]" />
+                            )}
+                        </button>
+
+                        {/*
+                            Notification dropdown.
+                            w-[calc(100vw-2rem)] makes it fill almost full-width on small phones.
+                            max-w-[320px] caps it on wider screens.
+                            The panel is right-aligned; on very small phones the "right-0" anchor
+                            ensures it never clips off the right edge of the viewport.
+                        */}
+                        <Dropdown
+                            open={showNotif}
+                            onClose={() => setShowNotif(false)}
+                            buttonRef={notifBtnRef}
+                            className="w-[calc(100vw-2rem)] max-w-[320px]"
+                        >
+                            {/* Header row */}
+                            <div className="px-4 py-3 border-b border-white/[0.08] flex items-center justify-between gap-2">
+                                <div className="min-w-0">
+                                    <p className="text-[13px] font-semibold text-white">Notifications</p>
+                                    {unread > 0 && (
+                                        <p className="text-[11px] text-gray-600 mt-0.5">{unread} unread</p>
+                                    )}
+                                </div>
+                                {unread > 0 && (
                                     <button
-                                        onClick={() => setNotifications([])}
-                                        className="text-xs text-neutral-500 hover:text-white transition-colors"
+                                        onClick={clearNotifications}
+                                        className="shrink-0 text-[11px] text-gray-500 hover:text-white px-2 py-1 rounded-md hover:bg-white/[0.06] active:bg-white/[0.08] transition-all"
                                     >
                                         Clear all
                                     </button>
                                 )}
                             </div>
-                            {notifications.length === 0 ? (
-                                <div className="px-4 py-8 text-center">
-                                    <Bell className="w-8 h-8 text-neutral-700 mx-auto mb-2" />
-                                    <p className="text-xs text-neutral-500">
-                                        No new notifications
-                                    </p>
+
+                            {/* Body */}
+                            {unread === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-10 px-4 select-none">
+                                    <div className="w-10 h-10 rounded-full bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mb-3">
+                                        <Bell className="w-5 h-5 text-gray-700" strokeWidth={1.5} />
+                                    </div>
+                                    <p className="text-[13px] font-medium text-gray-400">All caught up</p>
+                                    <p className="text-[11px] text-gray-600 mt-1 text-center">No new notifications</p>
                                 </div>
                             ) : (
-                                <div className="max-h-80 overflow-y-auto">
-                                    {notifications.map((notif, i) => (
-                                        <div
-                                            key={i}
-                                            className="px-4 py-3 border-b border-neutral-800/50 hover:bg-neutral-900 transition-colors"
+                                <ul className="max-h-72 overflow-y-auto divide-y divide-white/[0.04]" role="list">
+                                    {notifications.map((n, i) => (
+                                        <li
+                                            key={n.id ?? i}
+                                            className="px-4 py-3.5 hover:bg-white/[0.03] transition-colors cursor-default"
                                         >
-                                            <p className="text-sm text-white">
-                                                {notif.message}
-                                            </p>
-                                            <p className="text-xs text-neutral-500 mt-1">
-                                                {notif.time}
-                                            </p>
-                                        </div>
+                                            <p className="text-[13px] text-white leading-snug">{n.message}</p>
+                                            <p className="text-[11px] text-gray-600 mt-1">{n.time}</p>
+                                        </li>
                                     ))}
-                                </div>
+                                </ul>
                             )}
-                        </div>
-                    )}
-                </div>
+                        </Dropdown>
+                    </div>
 
-                {/* Divider */}
-                <div className="w-px h-6 bg-neutral-800 hidden sm:block" />
+                    {/* Divider */}
+                    <div className="hidden sm:block w-px h-5 bg-white/[0.08] mx-0.5" aria-hidden="true" />
 
-                {/* User */}
-                <div className="flex items-center gap-2 sm:gap-3">
-                    <div className="relative w-8 h-8 rounded-full overflow-hidden bg-neutral-800 shrink-0">
-                        {avatarUrl ? (
-                            <Image
-                                src={avatarUrl}
-                                alt={user?.firstName || 'Avatar'}
-                                fill
-                                className="object-cover"
-                            />
-                        ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                                <span className="text-neutral-400 text-xs font-medium">
-                                    {user?.firstName?.[0]}
-                                    {user?.lastName?.[0]}
-                                </span>
+                    {/* ── User menu ──────────────────────────────────────── */}
+                    <div className="relative">
+                        <button
+                            ref={userBtnRef}
+                            onClick={toggleUser}
+                            aria-expanded={showUser}
+                            aria-haspopup="true"
+                            aria-label="User menu"
+                            className={`
+                                h-9 w-9 flex items-center justify-center rounded-lg border
+                                transition-all duration-200 ease-out
+                                focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20
+                                ${showUser
+                                    ? 'border-white/20 bg-white/10'
+                                    : 'border-white/[0.08] bg-white/[0.02] hover:border-white/[0.15] hover:bg-white/[0.05] active:bg-white/[0.08]'
+                                }
+                            `}
+                        >
+                            {avatarUrl ? (
+                                <div className="relative w-5 h-5 rounded-full overflow-hidden">
+                                    <Image
+                                        src={avatarUrl}
+                                        alt={userName}
+                                        fill
+                                        className="object-cover"
+                                        sizes="20px"
+                                    />
+                                </div>
+                            ) : (
+                                <User
+                                    className={`w-4 h-4 transition-colors duration-200 ${showUser ? 'text-white' : 'text-gray-500'}`}
+                                    strokeWidth={2}
+                                />
+                            )}
+                        </button>
+
+                        {/*
+                            User dropdown.
+                            max-w-[220px] — narrower than notif panel, fits fine on all phones.
+                        */}
+                        <Dropdown
+                            open={showUser}
+                            onClose={() => setShowUser(false)}
+                            buttonRef={userBtnRef}
+                            className="w-[calc(100vw-2rem)] max-w-[220px]"
+                        >
+                            {/* Profile info */}
+                            <div className="p-4 border-b border-white/[0.08]">
+                                <p className="text-[13px] font-semibold text-white truncate leading-tight">
+                                    {userName}
+                                </p>
+                                <p className="text-[11px] text-gray-600 truncate mt-0.5">
+                                    {user?.email ?? '—'}
+                                </p>
+                                <div className="mt-2.5 inline-flex items-center rounded-md bg-white/[0.04] border border-white/[0.06] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500 select-none">
+                                    Administrator
+                                </div>
                             </div>
-                        )}
+
+                            {/* Actions */}
+                            <div className="p-2">
+                                <button
+                                    onClick={handleLogout}
+                                    role="menuitem"
+                                    className="
+                                        flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5
+                                        text-sm font-medium
+                                        text-gray-500 hover:text-red-400 hover:bg-red-500/[0.08]
+                                        active:bg-red-500/[0.12]
+                                        transition-all duration-200 ease-out
+                                    "
+                                >
+                                    <LogOut className="h-4 w-4 shrink-0" strokeWidth={2} />
+                                    <span>Sign Out</span>
+                                </button>
+                            </div>
+                        </Dropdown>
                     </div>
-                    <div className="hidden md:block">
-                        <p className="text-xs font-medium text-white leading-none">
-                            {user?.firstName} {user?.lastName}
-                        </p>
-                        <p className="text-[11px] text-neutral-500 mt-0.5">
-                            Admin
-                        </p>
-                    </div>
+
                 </div>
             </div>
         </header>
