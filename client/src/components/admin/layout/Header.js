@@ -5,9 +5,8 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useSocket } from '@/context/SocketContext';
 import Image from 'next/image';
-import { Bell, User, LogOut, Zap, WifiOff, Car } from 'lucide-react';
+import { Bell, User, LogOut, Zap, WifiOff, Car, Menu, X } from 'lucide-react';
 
-// ─── Page title map ───────────────────────────────────────────────────────────
 const PAGE_TITLES = {
     '/admin/dashboard':     { title: 'Dashboard',     subtitle: 'Overview of your business' },
     '/admin/bookings':      { title: 'Bookings',       subtitle: 'Manage all bookings' },
@@ -37,7 +36,6 @@ function getPageInfo(pathname) {
     return { title: 'Admin', subtitle: '' };
 }
 
-// ─── Reusable animated dropdown shell ────────────────────────────────────────
 function Dropdown({ open, onClose, buttonRef, className = '', children }) {
     const panelRef = useRef(null);
 
@@ -85,11 +83,10 @@ function Dropdown({ open, onClose, buttonRef, className = '', children }) {
     );
 }
 
-// ─── Header ───────────────────────────────────────────────────────────────────
-export default function Header({ onLogout }) {
+export default function Header({ onLogout, onMenuClick }) {
     const pathname   = usePathname();
     const { user }   = useAuth();
-    const { isConnected } = useSocket();
+    const { isConnected, socket } = useSocket();
 
     const [notifications, setNotifications] = useState([]);
     const [showNotif, setShowNotif] = useState(false);
@@ -119,6 +116,25 @@ export default function Header({ onLogout }) {
         return () => clearInterval(id);
     }, []);
 
+    // ── Socket notifications ─────────────────────────────────────────────────
+    useEffect(() => {
+        if (!socket) return;
+
+        const handleNotification = (data) => {
+            setNotifications(prev => [
+                { 
+                    id: Math.random(),
+                    message: data?.message || 'New notification',
+                    time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+                },
+                ...prev
+            ].slice(0, 10)); // Keep only last 10 notifications
+        };
+
+        socket.on('notification', handleNotification);
+        return () => socket.off('notification', handleNotification);
+    }, [socket]);
+
     // ── Close on route change ────────────────────────────────────────────────
     useEffect(() => {
         setShowNotif(false);
@@ -127,28 +143,37 @@ export default function Header({ onLogout }) {
 
     const toggleNotif = useCallback(() => { setShowNotif((p) => !p); setShowUser(false); }, []);
     const toggleUser  = useCallback(() => { setShowUser((p) => !p); setShowNotif(false); }, []);
-    const handleLogout = useCallback(() => { setShowUser(false); onLogout?.(); }, [onLogout]);
+    const handleLogoutClick = useCallback(() => { setShowUser(false); onLogout?.(); }, [onLogout]);
     const clearNotifications = useCallback(() => setNotifications([]), []);
 
     return (
         <header className="sticky top-0 z-40 border-b border-white/[0.08] bg-[#0A0A0A]/90 backdrop-blur-xl supports-[backdrop-filter]:bg-[#0A0A0A]/80">
-            <div className="flex h-14 sm:h-16 items-center justify-between gap-2 px-4 sm:px-5 lg:px-6">
+            <div className="flex h-14 sm:h-16 items-center justify-between gap-2 sm:gap-3 px-3 sm:px-5 lg:px-6">
 
                 {/* ── Left ─────────────────────────────────────────────────── */}
-                <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
 
-                    {/* Mobile: compact logo (sidebar hidden on mobile) */}
-                    <div className="lg:hidden flex items-center gap-2 min-w-0">
-                        <div className="h-7 w-7 shrink-0 rounded-lg border border-white/[0.08] bg-white/[0.02] flex items-center justify-center">
+                    {/* Mobile: Menu Button */}
+                    <button
+                        onClick={onMenuClick}
+                        className="lg:hidden h-9 w-9 flex-shrink-0 flex items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.02] text-gray-500 hover:text-gray-300 hover:border-white/[0.15] hover:bg-white/[0.05] active:bg-white/[0.08] transition-all duration-200"
+                        aria-label="Open menu"
+                    >
+                        <Menu className="w-4 h-4" strokeWidth={2} />
+                    </button>
+
+                    {/* Mobile: compact logo */}
+                    <div className="lg:hidden flex items-center gap-1.5 min-w-0">
+                        <div className="h-7 w-7 flex-shrink-0 rounded-lg border border-white/[0.08] bg-white/[0.02] flex items-center justify-center">
                             <Car className="h-3.5 w-3.5 text-gray-500" strokeWidth={2} />
                         </div>
-                        <span className="text-sm font-semibold text-white truncate">Wash2Door</span>
+                        <div className="min-w-0 flex flex-col">
+                            <span className="text-xs sm:text-sm font-semibold text-white truncate leading-none">Wash2Door</span>
+                            <span className="text-[10px] text-gray-600 truncate leading-none mt-0.5">
+                                {pageInfo.title}
+                            </span>
+                        </div>
                     </div>
-
-                    {/* Mobile: current page name (small, muted) */}
-                    <span className="lg:hidden text-[11px] text-gray-600 truncate">
-                        {pageInfo.title}
-                    </span>
 
                     {/* Desktop: full page title + subtitle */}
                     <div className="hidden lg:flex flex-col min-w-0">
@@ -164,10 +189,10 @@ export default function Header({ onLogout }) {
                 </div>
 
                 {/* ── Right ────────────────────────────────────────────────── */}
-                <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+                <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
 
                     {/* Clock — md+ */}
-                    <div className="hidden md:flex flex-col items-end mr-2 select-none">
+                    <div className="hidden md:flex flex-col items-end mr-1 sm:mr-2 select-none">
                         <span className="text-[12px] font-semibold text-gray-300 tabular-nums leading-tight">{time}</span>
                         <span className="text-[10px] text-gray-600 leading-tight mt-0.5">{date}</span>
                     </div>
@@ -175,7 +200,7 @@ export default function Header({ onLogout }) {
                     {/* Live / offline pill — sm+ */}
                     <div className={`
                         hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full
-                        text-[11px] font-medium border transition-all duration-500 select-none
+                        text-[11px] font-medium border transition-all duration-500 flex-shrink-0
                         ${isConnected
                             ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                             : 'bg-white/[0.03] text-gray-600 border-white/[0.08]'
@@ -197,7 +222,7 @@ export default function Header({ onLogout }) {
                             aria-expanded={showNotif}
                             aria-haspopup="true"
                             className={`
-                                relative h-9 w-9 flex items-center justify-center rounded-lg border
+                                relative h-9 w-9 flex-shrink-0 flex items-center justify-center rounded-lg border
                                 transition-all duration-200 ease-out
                                 ${showNotif
                                     ? 'border-white/20 bg-white/10 text-white'
@@ -215,7 +240,7 @@ export default function Header({ onLogout }) {
                             open={showNotif}
                             onClose={() => setShowNotif(false)}
                             buttonRef={notifBtnRef}
-                            className="w-[calc(100vw-2rem)] max-w-[320px]"
+                            className="w-[calc(100vw-1.5rem)] sm:w-[320px] -right-2 sm:right-0"
                         >
                             <div className="px-4 py-3 border-b border-white/[0.08] flex items-center justify-between gap-2">
                                 <div className="min-w-0">
@@ -225,9 +250,9 @@ export default function Header({ onLogout }) {
                                 {unread > 0 && (
                                     <button
                                         onClick={clearNotifications}
-                                        className="shrink-0 text-[11px] text-gray-500 hover:text-white px-2 py-1 rounded-md hover:bg-white/[0.06] transition-all"
+                                        className="flex-shrink-0 text-[11px] text-gray-500 hover:text-white px-2 py-1 rounded-md hover:bg-white/[0.06] transition-all"
                                     >
-                                        Clear all
+                                        Clear
                                     </button>
                                 )}
                             </div>
@@ -241,8 +266,8 @@ export default function Header({ onLogout }) {
                                 </div>
                             ) : (
                                 <ul className="max-h-72 overflow-y-auto divide-y divide-white/[0.04]">
-                                    {notifications.map((n, i) => (
-                                        <li key={n.id ?? i} className="px-4 py-3.5 hover:bg-white/[0.03] transition-colors cursor-default">
+                                    {notifications.map((n) => (
+                                        <li key={n.id} className="px-4 py-3 hover:bg-white/[0.03] transition-colors cursor-default">
                                             <p className="text-[13px] text-white leading-snug">{n.message}</p>
                                             <p className="text-[11px] text-gray-600 mt-1">{n.time}</p>
                                         </li>
@@ -253,7 +278,7 @@ export default function Header({ onLogout }) {
                     </div>
 
                     {/* Divider */}
-                    <div className="hidden sm:block w-px h-5 bg-white/[0.08] mx-0.5" aria-hidden="true" />
+                    <div className="hidden sm:block w-px h-5 bg-white/[0.08] mx-0.5 flex-shrink-0" aria-hidden="true" />
 
                     {/* ── User menu ──────────────────────────────────────── */}
                     <div className="relative">
@@ -264,7 +289,7 @@ export default function Header({ onLogout }) {
                             aria-haspopup="true"
                             aria-label="User menu"
                             className={`
-                                h-9 w-9 flex items-center justify-center rounded-lg border
+                                h-9 w-9 flex-shrink-0 flex items-center justify-center rounded-lg border
                                 transition-all duration-200 ease-out
                                 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20
                                 ${showUser
@@ -286,7 +311,7 @@ export default function Header({ onLogout }) {
                             open={showUser}
                             onClose={() => setShowUser(false)}
                             buttonRef={userBtnRef}
-                            className="w-[calc(100vw-2rem)] max-w-[220px]"
+                            className="w-[calc(100vw-1.5rem)] sm:w-[220px] -right-2 sm:right-0"
                         >
                             <div className="p-4 border-b border-white/[0.08]">
                                 <p className="text-[13px] font-semibold text-white truncate leading-tight">{userName}</p>
@@ -297,7 +322,7 @@ export default function Header({ onLogout }) {
                             </div>
                             <div className="p-2">
                                 <button
-                                    onClick={handleLogout}
+                                    onClick={handleLogoutClick}
                                     role="menuitem"
                                     className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-500 hover:text-red-400 hover:bg-red-500/[0.08] active:bg-red-500/[0.12] transition-all duration-200 ease-out"
                                 >

@@ -69,12 +69,6 @@ function NavItem({ item, isActive, onClick }) {
     );
 }
 
-/**
- * Sidebar
- * @param {function} onLogout  - logout handler
- * @param {function} onClose   - close drawer (mobile only, optional)
- * @param {boolean}  isMobile  - if true, renders without hidden/show logic (parent controls visibility)
- */
 export default function Sidebar({ onLogout, onClose, isMobile = false }) {
     const pathname = usePathname();
     const { user } = useAuth();
@@ -152,7 +146,10 @@ export default function Sidebar({ onLogout, onClose, isMobile = false }) {
 
                 {/* Logout */}
                 <button
-                    onClick={onLogout}
+                    onClick={() => {
+                        handleNavClick();
+                        onLogout?.();
+                    }}
                     className="flex w-full items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
                         text-gray-500 hover:text-red-400 hover:bg-red-500/[0.08]
                         active:bg-red-500/[0.12] transition-all duration-200 ease-out"
