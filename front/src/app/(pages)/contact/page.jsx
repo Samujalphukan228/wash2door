@@ -65,6 +65,10 @@ const FAQS = [
     question: "Do I need to provide water or electricity?",
     answer: "We bring all our own equipment and supplies. Just show us where your car is parked and we handle the rest.",
   },
+  {
+    question: "What services do you offer?",
+    answer: "We offer Car Wash, Sofa Cleaning, and Water Tank Cleaning — all delivered at your doorstep using eco-friendly products.",
+  },
 ]
 
 const SOCIALS = [
@@ -190,7 +194,8 @@ const Hero = memo(function Hero() {
         }}
       />
 
-      <div className="relative z-10 w-full max-w-6xl mx-auto px-5 sm:px-8 md:px-12 pb-14 md:pb-20">
+      {/* pt-28/pt-32 offsets the fixed nav so content isn't hidden */}
+      <div className="relative z-10 w-full max-w-6xl mx-auto px-5 sm:px-8 md:px-12 pb-14 md:pb-20 pt-28 md:pt-32">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -228,8 +233,8 @@ const Hero = memo(function Hero() {
           className="text-white/40 max-w-md mb-9 leading-relaxed"
           style={{ fontSize: "15px" }}
         >
-          Have a question? Want to book a service? We're here to help. Reach out
-          through any channel that works for you.
+          Have a question? Want to book a service? We're here every day from 9AM to 5PM.
+          Reach out through any channel that works for you.
         </motion.p>
 
         <motion.div
@@ -278,7 +283,7 @@ const Hero = memo(function Hero() {
             <span className="text-white/60" style={{ fontSize: "13px" }}>Available now</span>
           </div>
           <span className="text-white/20">·</span>
-          <span className="text-white/40" style={{ fontSize: "13px" }}>Responds in minutes</span>
+          <span className="text-white/40" style={{ fontSize: "13px" }}>Mon – Sun, 9AM – 5PM</span>
         </motion.div>
       </div>
     </section>
@@ -301,7 +306,7 @@ const ContactMethods = memo(function ContactMethods() {
               Choose Your <span className="text-gray-300">Preferred Channel</span>
             </SectionHeading>
             <p className="text-gray-500 leading-relaxed mb-8 max-w-sm" style={{ fontSize: "15px" }}>
-              We're available on multiple platforms. Pick whatever works best — we respond quickly on all channels.
+              We're available on multiple platforms. WhatsApp is the fastest — we respond to all enquiries quickly.
             </p>
 
             <div className="flex gap-8 pt-6 border-t border-gray-100">
@@ -380,7 +385,7 @@ const ContactMethods = memo(function ContactMethods() {
                       )}
                     </div>
                     <p className={`truncate ${method.featured ? "text-white/50" : "text-gray-400"}`} style={{ fontSize: "12px" }}>
-                      {method.description}
+                      {method.value ?? method.description}
                     </p>
                   </div>
 
@@ -475,7 +480,7 @@ const FAQ = memo(function FAQ() {
               Common <span className="text-gray-300">Questions</span>
             </SectionHeading>
             <p className="text-gray-500 leading-relaxed mb-6" style={{ fontSize: "14px" }}>
-              Quick answers to questions you might have.
+              Quick answers to questions about our services in Duliajan.
             </p>
             <a
               href={`https://wa.me/${WHATSAPP_NUMBER}?text=Hi%2C%20I%20have%20a%20question`}
@@ -547,7 +552,7 @@ const Location = memo(function Location() {
             </div>
 
             <a
-              href="https://maps.google.com/?q=Duliajan,Assam"
+              href="https://maps.google.com/?q=Sonapur+Namghar+Duliajan+Assam"
               target="_blank"
               rel="noopener noreferrer"
               className="absolute bottom-4 left-4 right-4 flex items-center justify-center gap-2 h-11 bg-white text-black rounded-xl hover:bg-gray-50 active:scale-[0.98] transition-all duration-300 shadow-lg"
@@ -571,12 +576,14 @@ const Location = memo(function Location() {
               Based in <span className="text-gray-300">Duliajan</span>
             </SectionHeading>
             <p className="text-gray-500 leading-relaxed mb-7" style={{ fontSize: "15px" }}>
-              We're located in Duliajan, Assam. But remember — we come to you! Just share your location and we'll be there.
+              We're located near Sonapur Namghar in Duliajan, Assam. But remember — we come to you! Just share your location and we'll be there.
             </p>
 
             <div className="space-y-3 mb-6">
               {[
                 { icon: MapPin, label: "Address", value: "Near Sonapur Namghar, Duliajan, Assam" },
+                { icon: Phone, label: "Phone", value: "+91 6900706456" },
+                { icon: Mail, label: "Email", value: "Wash2Door786602@gmail.com" },
                 { icon: Clock, label: "Working Hours", value: "Monday – Sunday, 9:00 AM – 5:00 PM" },
               ].map(({ icon: Icon, label, value }) => (
                 <div key={label} className="bg-gray-50 rounded-xl p-4">

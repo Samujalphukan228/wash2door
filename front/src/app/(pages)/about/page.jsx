@@ -11,6 +11,9 @@ import {
   MapPin,
   Shield,
   Check,
+  Phone,
+  Mail,
+  Clock,
 } from "lucide-react"
 
 // ── Constants ──────────────────────────────────────────────
@@ -62,6 +65,16 @@ const IMAGES = {
   hero: "https://images.unsplash.com/photo-1607860108855-64acf2078ed9?q=80&w=2000&auto=format&fit=crop",
   story: "https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?q=80&w=1000&auto=format&fit=crop",
   services: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=80&w=1000&auto=format&fit=crop",
+}
+
+// ── Real Business Info ─────────────────────────────────────
+const BUSINESS = {
+  phone: "+91 6900706456",
+  email: "Wash2Door786602@gmail.com",
+  address: "Near Sonapur Namghar, Duliajan, Assam",
+  hours: "Monday – Sunday: 9:00 AM – 5:00 PM",
+  facebook: "https://www.facebook.com/profile.php?id=61581835752285",
+  instagram: "https://www.instagram.com/wash2door.djn",
 }
 
 // ── Typography Tokens ──────────────────────────────────────
@@ -158,8 +171,8 @@ const Hero = memo(function Hero() {
       </div>
 
       {/* Content */}
-      <div className="relative z-10 max-w-7xl mx-auto px-5 sm:px-8 md:px-12 lg:px-16 min-h-[90dvh] md:min-h-screen flex flex-col justify-end pb-14 md:pb-24">
-        
+      <div className="relative z-10 max-w-7xl mx-auto px-5 sm:px-8 md:px-12 lg:px-16 min-h-[90dvh] md:min-h-screen flex flex-col justify-end pb-14 md:pb-24 pt-28 md:pt-32">
+
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -185,9 +198,9 @@ const Hero = memo(function Hero() {
             letterSpacing: "-0.02em",
           }}
         >
-          We Bring the
+          The Shine That
           <br />
-          <span className="italic text-white/50">Clean to You</span>
+          <span className="italic text-white/50">Finds You</span>
         </motion.h1>
 
         <motion.p
@@ -197,7 +210,7 @@ const Hero = memo(function Hero() {
           className="text-white/50 max-w-lg mb-10 leading-relaxed"
           style={{ fontSize: "16px" }}
         >
-          Professional doorstep cleaning services in Duliajan. Car wash, sofa cleaning, water tank cleaning — all delivered with care.
+          Professional doorstep cleaning in Duliajan — car wash, sofa cleaning, and water tank cleaning, all delivered with care right where you are.
         </motion.p>
 
         <motion.div
@@ -331,13 +344,13 @@ const Story = memo(function Story() {
 
             <div className="space-y-5 mb-10">
               <p className="text-gray-500 leading-relaxed" style={{ fontSize: "15px" }}>
-                <span className="text-black font-medium">Your time is valuable.</span> That's the belief that started Wash2Door. We saw people spending hours at car washes, waiting in queues, dealing with inconsistent results.
+                <span className="text-black font-medium">Your time is valuable.</span> That's the belief that started Wash2Door. We saw people spending hours at car washes in Duliajan — waiting in queues, dealing with inconsistent results, juggling busy schedules.
               </p>
               <p className="text-gray-500 leading-relaxed" style={{ fontSize: "15px" }}>
-                We thought — what if we brought the car wash to you? What if cleaning your car was as simple as booking a slot on your phone?
+                We thought — what if we brought the car wash to you? What if cleaning your car, sofa, or water tank was as simple as booking a slot on your phone?
               </p>
               <p className="text-gray-500 leading-relaxed" style={{ fontSize: "15px" }}>
-                Today, we serve 100+ happy customers in Duliajan. From car washing to sofa cleaning to water tank maintenance — we handle it all at your doorstep.
+                Today, we serve 100+ happy customers across Duliajan. Our trained professionals use eco-friendly products and modern cleaning techniques to leave your home and vehicle spotless, germ-free, and shining like new.
               </p>
             </div>
 
@@ -395,7 +408,7 @@ const Features = memo(function Features() {
           </div>
           <SectionHeading className="mb-5">What Makes Us Different</SectionHeading>
           <p className="text-gray-400 max-w-lg mx-auto leading-relaxed" style={{ fontSize: "15px" }}>
-            We're not just another cleaning service. Here's why customers choose Wash2Door.
+            We're not just another cleaning service. Here's why customers in Duliajan choose Wash2Door.
           </p>
         </motion.div>
 
@@ -562,7 +575,7 @@ const ServicesPreview = memo(function ServicesPreview() {
             </SectionHeading>
 
             <p className="text-gray-500 leading-relaxed mb-10 max-w-md" style={{ fontSize: "15px" }}>
-              From cars to sofas to water tanks — we've got your cleaning needs covered. All services delivered at your doorstep.
+              Cars, sofas, water tanks — we cover it all at your doorstep. Fast, safe, and hassle-free cleaning for your home and vehicle across Duliajan.
             </p>
 
             {/* Services List */}
@@ -633,7 +646,7 @@ const ServicesPreview = memo(function ServicesPreview() {
                   </div>
                 </div>
                 <p className="text-gray-500" style={{ fontSize: "12px" }}>
-                  <span className="text-black font-medium">100+ customers</span> trust us
+                  <span className="text-black font-medium">100+ customers</span> trust us in Duliajan
                 </p>
               </div>
             </div>
@@ -650,6 +663,76 @@ const ServicesPreview = memo(function ServicesPreview() {
   )
 })
 
+// ── Contact Strip ──────────────────────────────────────────
+const ContactStrip = memo(function ContactStrip() {
+  const ref = useRef(null)
+  const inView = useInView(ref, { once: true, margin: "-60px" })
+
+  const items = [
+    { Icon: Phone, label: "Call Us", value: BUSINESS.phone, href: `tel:${BUSINESS.phone}` },
+    { Icon: Mail, label: "Email", value: BUSINESS.email, href: `mailto:${BUSINESS.email}` },
+    { Icon: MapPin, label: "Location", value: BUSINESS.address, href: null },
+    { Icon: Clock, label: "Hours", value: BUSINESS.hours, href: null },
+  ]
+
+  return (
+    <section
+      ref={ref}
+      className="w-full bg-gray-50 py-16 md:py-20"
+      style={{ fontFamily: SANS }}
+    >
+      <div className="max-w-7xl mx-auto px-5 sm:px-8 md:px-12 lg:px-16">
+        <motion.div
+          variants={fadeUp}
+          initial="hidden"
+          animate={inView ? "visible" : "hidden"}
+          className="text-center mb-10"
+        >
+          <Eyebrow>Get In Touch</Eyebrow>
+          <SectionHeading>
+            We're Just a
+            <br />
+            <span className="text-gray-300">Call Away</span>
+          </SectionHeading>
+        </motion.div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {items.map(({ Icon, label, value, href }, i) => (
+            <motion.div
+              key={i}
+              custom={i}
+              variants={fadeUp}
+              initial="hidden"
+              animate={inView ? "visible" : "hidden"}
+              className="bg-white rounded-2xl p-6 border border-gray-100"
+            >
+              <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center mb-4">
+                <Icon size={17} strokeWidth={1.4} className="text-gray-400" />
+              </div>
+              <p className="text-gray-400 tracking-wider uppercase mb-1.5" style={{ fontSize: "10px" }}>
+                {label}
+              </p>
+              {href ? (
+                <a
+                  href={href}
+                  className="text-black hover:text-gray-500 transition-colors duration-200 leading-snug block"
+                  style={{ fontSize: "13px" }}
+                >
+                  {value}
+                </a>
+              ) : (
+                <p className="text-black leading-snug" style={{ fontSize: "13px" }}>
+                  {value}
+                </p>
+              )}
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+})
+
 // ── Main Page ──────────────────────────────────────────────
 export default function AboutPage() {
   return (
@@ -659,6 +742,7 @@ export default function AboutPage() {
       <Features />
       <Process />
       <ServicesPreview />
+      <ContactStrip />
     </main>
   )
 }
