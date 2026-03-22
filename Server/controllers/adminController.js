@@ -141,6 +141,33 @@ export const getDashboardStats = async (req, res) => {
             { $sort: { count: -1 } }
         ]);
 
+        // ← WEEKLY DATA (last 7 days)
+        const weeklyData = await Booking.aggregate([
+            {
+                $match: {
+                    createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
+                }
+            },
+            {
+                $group: {
+                    _id: {
+                        $dateToString: { format: '%Y-%m-%d', date: '$createdAt' }
+                    },
+                    revenue: { $sum: '$price' },
+                    bookings: { $sum: 1 }
+                }
+            },
+            { $sort: { _id: 1 } },
+            {
+                $project: {
+                    _id: 0,
+                    day: '$_id',
+                    revenue: 1,
+                    bookings: 1
+                }
+            }
+        ]);
+
         // Upcoming bookings for today
         const upcomingToday = await Booking.find({
             bookingDate: { $gte: today, $lte: todayEnd },
@@ -149,6 +176,18 @@ export const getDashboardStats = async (req, res) => {
             .populate('customerId', 'firstName lastName email')
             .sort({ timeSlot: 1 })
             .limit(10);
+
+        // ← DEBUG LOG
+        console.log('🔍 DEBUG - Dashboard Stats:', {
+            weeklyDataCount: weeklyData?.length,
+            weeklyDataSample: weeklyData?.slice(0, 2),
+            bookingsByCategories: bookingsByCategory?.length,
+            totalBookingsInDB: totalBookings,
+            last7DaysBookings: await Booking.countDocuments({
+                createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
+            }),
+            sampleBooking: await Booking.findOne().select('bookingCode price createdAt bookingDate status')
+        });
 
         res.status(200).json({
             success: true,
@@ -190,7 +229,8 @@ export const getDashboardStats = async (req, res) => {
                 upcomingToday,
                 popularServices,
                 bookingsByCategory,
-                bookingsByTimeSlot
+                bookingsByTimeSlot,
+                weeklyData  // ← RETURN THIS
             }
         });
 
