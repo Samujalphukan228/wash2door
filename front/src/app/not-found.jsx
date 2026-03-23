@@ -8,16 +8,18 @@ import { motion } from "framer-motion"
 export default function NotFound() {
   const router = useRouter()
 
-  // Hide navbar and footer
   useEffect(() => {
     const navbar = document.querySelector("nav")
     const footer = document.querySelector("footer")
+    const topbar = document.querySelector("[role='marquee']")
     if (navbar) navbar.style.display = "none"
     if (footer) footer.style.display = "none"
+    if (topbar) topbar.style.display = "none"
 
     return () => {
       if (navbar) navbar.style.display = ""
       if (footer) footer.style.display = ""
+      if (topbar) topbar.style.display = ""
     }
   }, [])
 
@@ -91,17 +93,13 @@ export default function NotFound() {
 
         <motion.button
           onClick={() => router.push("/")}
-          className="group flex items-center gap-3 px-8 h-12 bg-white text-black rounded-full
-                     hover:bg-white/90 active:scale-[0.97] transition-all duration-300"
+          className="group flex items-center gap-3 px-8 h-12 bg-white text-black rounded-full hover:bg-white/90 active:scale-[0.97] transition-all duration-300"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
           whileTap={{ scale: 0.97 }}
         >
-          <span
-            className="tracking-[0.2em] uppercase"
-            style={{ fontSize: "10px", fontWeight: 500 }}
-          >
+          <span className="tracking-[0.2em] uppercase" style={{ fontSize: "10px", fontWeight: 500 }}>
             Back to Home
           </span>
           <ArrowRight
