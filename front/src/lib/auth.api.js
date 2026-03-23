@@ -34,6 +34,8 @@ export const login = async (email, password) => {
 // ============================================
 export const register = async (firstName, lastName, email, password, confirmPassword) => {
   try {
+    console.log('📡 Registering user:', email)
+    
     const res = await api.post('/auth/register', {
       firstName,
       lastName,
@@ -42,13 +44,19 @@ export const register = async (firstName, lastName, email, password, confirmPass
       confirmPassword
     })
     
+    console.log('✅ Registration response:', res.data)
+    
     if (res.data?.success) {
-      return res.data.data
+      return {
+        ...res.data.data,
+        email: email  // Include email for modal
+      }
     }
     
     throw new Error(res.data?.message || 'Registration failed')
     
   } catch (error) {
+    console.error('❌ Registration error:', error)
     throw new Error(
       error.response?.data?.message || error.message || 'Registration failed'
     )
@@ -60,10 +68,22 @@ export const register = async (firstName, lastName, email, password, confirmPass
 // ============================================
 export const verifyRegistration = async (token) => {
   try {
+    console.log('📡 Calling verify API with token:', token)
+    
     const res = await api.get(`/auth/verify-registration/${token}`)
+    
+    console.log('📩 API Response:', res.data)
     
     if (res.data?.success) {
       const { user, accessToken } = res.data.data
+      
+      // Validate response data
+      if (!user) {
+        throw new Error('No user data in response')
+      }
+      if (!accessToken) {
+        throw new Error('No access token in response')
+      }
       
       // Store token
       localStorage.setItem('accessToken', accessToken)
@@ -76,6 +96,8 @@ export const verifyRegistration = async (token) => {
     throw new Error(res.data?.message || 'Verification failed')
     
   } catch (error) {
+    console.error('❌ Verification error:', error)
+    console.error('❌ Error response:', error.response?.data)
     throw new Error(
       error.response?.data?.message || error.message || 'Verification failed'
     )
@@ -87,6 +109,8 @@ export const verifyRegistration = async (token) => {
 // ============================================
 export const resendRegistrationEmail = async (email) => {
   try {
+    console.log('📡 Resending registration email to:', email)
+    
     const res = await api.post('/auth/resend-registration-email', { email })
     
     if (res.data?.success) {
@@ -96,6 +120,7 @@ export const resendRegistrationEmail = async (email) => {
     throw new Error(res.data?.message || 'Failed to resend email')
     
   } catch (error) {
+    console.error('❌ Resend email error:', error)
     throw new Error(
       error.response?.data?.message || error.message || 'Failed to resend email'
     )
@@ -146,6 +171,8 @@ export const logout = async () => {
 // ============================================
 export const forgotPassword = async (email) => {
   try {
+    console.log('📡 Sending forgot password email to:', email)
+    
     const res = await api.post('/auth/forgot-password', { email })
     
     if (res.data?.success) {
@@ -155,6 +182,7 @@ export const forgotPassword = async (email) => {
     throw new Error(res.data?.message || 'Failed to send reset email')
     
   } catch (error) {
+    console.error('❌ Forgot password error:', error)
     throw new Error(
       error.response?.data?.message || error.message || 'Failed to send reset email'
     )
@@ -166,6 +194,8 @@ export const forgotPassword = async (email) => {
 // ============================================
 export const resetPassword = async (token, password) => {
   try {
+    console.log('📡 Resetting password with token:', token)
+    
     const res = await api.post(`/auth/reset-password/${token}`, { password })
     
     if (res.data?.success) {
@@ -175,6 +205,7 @@ export const resetPassword = async (token, password) => {
     throw new Error(res.data?.message || 'Password reset failed')
     
   } catch (error) {
+    console.error('❌ Reset password error:', error)
     throw new Error(
       error.response?.data?.message || error.message || 'Password reset failed'
     )
@@ -186,6 +217,8 @@ export const resetPassword = async (token, password) => {
 // ============================================
 export const changePassword = async (currentPassword, newPassword) => {
   try {
+    console.log('📡 Changing password')
+    
     const res = await api.put('/auth/change-password', {
       currentPassword,
       newPassword
@@ -199,6 +232,7 @@ export const changePassword = async (currentPassword, newPassword) => {
     throw new Error(res.data?.message || 'Password change failed')
     
   } catch (error) {
+    console.error('❌ Change password error:', error)
     throw new Error(
       error.response?.data?.message || error.message || 'Password change failed'
     )
@@ -210,6 +244,8 @@ export const changePassword = async (currentPassword, newPassword) => {
 // ============================================
 export const verifyEmail = async (token) => {
   try {
+    console.log('📡 Verifying email with token:', token)
+    
     const res = await api.get(`/auth/verify-email/${token}`)
     
     if (res.data?.success) {
@@ -219,6 +255,7 @@ export const verifyEmail = async (token) => {
     throw new Error(res.data?.message || 'Email verification failed')
     
   } catch (error) {
+    console.error('❌ Email verification error:', error)
     throw new Error(
       error.response?.data?.message || error.message || 'Email verification failed'
     )
@@ -230,6 +267,8 @@ export const verifyEmail = async (token) => {
 // ============================================
 export const resendVerificationEmail = async () => {
   try {
+    console.log('📡 Resending verification email')
+    
     const res = await api.post('/auth/resend-verification')
     
     if (res.data?.success) {
@@ -239,6 +278,7 @@ export const resendVerificationEmail = async () => {
     throw new Error(res.data?.message || 'Failed to resend verification email')
     
   } catch (error) {
+    console.error('❌ Resend verification error:', error)
     throw new Error(
       error.response?.data?.message || error.message || 'Failed to resend verification email'
     )

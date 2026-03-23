@@ -15,27 +15,69 @@ export default function VerifyRegistrationPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState(false)
+  const [debugInfo, setDebugInfo] = useState("")
 
   useEffect(() => {
     const verify = async () => {
       if (!token) {
+        console.error('❌ No token provided')
         setError("Invalid verification link")
         setLoading(false)
         return
       }
 
+      console.log('🔄 Starting verification with token:', token)
+      setDebugInfo(`Token: ${token}`)
+
       try {
+        // Call the verification API
         const result = await verifyRegistration(token)
-        if (result.user) {
-          loginSuccess(result.user)
-          setSuccess(true)
-          // Redirect to dashboard after 2 seconds
-          setTimeout(() => {
-            router.push("/dashboard")
-          }, 2000)
+        
+        console.log('✅ Full result:', result)
+        console.log('✅ User data:', result.user)
+        console.log('✅ Access token:', result.accessToken)
+        
+        // Check if we have user data
+        if (!result.user) {
+          console.error('❌ No user in result')
+          setError("User data not returned from server")
+          setLoading(false)
+          return
         }
+
+        // Check if we have access token
+        if (!result.accessToken) {
+          console.error('❌ No access token in result')
+          setError("Access token not returned from server")
+          setLoading(false)
+          return
+        }
+
+        // Make sure token is stored
+        console.log('💾 Storing token...')
+        localStorage.setItem('accessToken', result.accessToken)
+        console.log('✅ Token stored:', localStorage.getItem('accessToken'))
+
+        // Call loginSuccess with user data
+        console.log('🔐 Logging in user...')
+        loginSuccess(result.user)
+        console.log('✅ User logged in')
+
+        setSuccess(true)
+        setDebugInfo(`Success! User: ${result.user.email}`)
+        
+        // Redirect to dashboard after 2 seconds
+        setTimeout(() => {
+          console.log('🚀 Redirecting to dashboard...')
+          router.push("/dashboard")
+        }, 2000)
+
       } catch (err) {
+        console.error('❌ Verification error:', err)
+        console.error('❌ Error message:', err.message)
+        console.error('❌ Full error:', err)
         setError(err.message || "Verification failed. Please try again.")
+        setDebugInfo(`Error: ${err.message}`)
       } finally {
         setLoading(false)
       }
@@ -84,6 +126,12 @@ export default function VerifyRegistrationPage() {
           <p className="text-gray-400" style={{ fontSize: "13px" }}>
             Please wait while we verify your email address...
           </p>
+
+          {debugInfo && (
+            <p className="text-gray-500 mt-4" style={{ fontSize: "10px" }}>
+              Debug: {debugInfo}
+            </p>
+          )}
         </div>
       </div>
     )
@@ -193,9 +241,15 @@ export default function VerifyRegistrationPage() {
             Verification Failed
           </h2>
 
-          <p className="text-gray-400 mb-8" style={{ fontSize: "13px", lineHeight: 1.6 }}>
+          <p className="text-gray-400 mb-4" style={{ fontSize: "13px", lineHeight: 1.6 }}>
             {error}
           </p>
+
+          {debugInfo && (
+            <p className="text-gray-500 mb-6" style={{ fontSize: "10px" }}>
+              Debug: {debugInfo}
+            </p>
+          )}
 
           <div className="space-y-3">
             <button
