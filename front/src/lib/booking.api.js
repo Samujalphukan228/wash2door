@@ -1,4 +1,3 @@
-// src/lib/booking.api.js
 import api from './api'
 
 /**
@@ -11,7 +10,7 @@ export async function createBooking(bookingData) {
     const response = await api.post('/bookings', {
       serviceId: bookingData.serviceId,
       bookingDate: bookingData.bookingDate,
-      timeSlot: bookingData.timeSlot,
+      timeSlot: bookingData.timeSlot,  // ✅ Already in 12-hour format
       location: bookingData.location,
       specialNotes: bookingData.specialNotes || ''
     })
@@ -24,7 +23,6 @@ export async function createBooking(bookingData) {
     
     throw new Error(response.data?.message || 'Failed to create booking')
   } catch (error) {
-    // ✅ FIXED: Better error logging
     console.log('❌ Full error:', error)
     console.log('❌ Error response:', error.response)
     console.log('❌ Error data:', error.response?.data)
@@ -108,7 +106,7 @@ export async function rescheduleBooking(bookingId, newDate, newTimeSlot) {
   try {
     const response = await api.put(`/bookings/${bookingId}/reschedule`, {
       newDate,
-      newTimeSlot
+      newTimeSlot  // ✅ Already in 12-hour format
     })
     
     if (response.data?.success) {
@@ -128,7 +126,7 @@ export async function rescheduleBooking(bookingId, newDate, newTimeSlot) {
  */
 export async function checkAvailability(date) {
   try {
-    const response = await api.get('/bookings/availability', {  // ✅ FIXED
+    const response = await api.get('/bookings/availability', {
       params: { date }
     })
     
@@ -149,7 +147,7 @@ export async function checkAvailability(date) {
  */
 export async function getServicePricing(serviceId) {
   try {
-    const response = await api.get(`/bookings/service/${serviceId}/pricing`)
+    const response = await api.get(`/bookings/pricing/${serviceId}`)
     
     if (response.data?.success) {
       return response.data.data

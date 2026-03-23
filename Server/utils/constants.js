@@ -1,22 +1,20 @@
-// utils/constants.js - Centralized constants
-
 // ============================================
-// TIME SLOTS
+// TIME SLOTS - 12 HOUR FORMAT
 // ============================================
 export const TIME_SLOTS = [
-    '08:00-09:00',
-    '09:00-10:00',
-    '10:00-11:00',
-    '11:00-12:00',
-    '12:00-13:00',
-    '13:00-14:00',
-    '14:00-15:00',
-    '15:00-16:00',
-    '16:00-17:00',
-    '17:00-18:00',
-    '18:00-19:00',  // ✅ ADD
-    '19:00-20:00',  // ✅ ADD
-    '20:00-21:00',  // ✅ ADD
+    '08:00 AM-09:00 AM',
+    '09:00 AM-10:00 AM',
+    '10:00 AM-11:00 AM',
+    '11:00 AM-12:00 PM',
+    '12:00 PM-01:00 PM',
+    '01:00 PM-02:00 PM',
+    '02:00 PM-03:00 PM',
+    '03:00 PM-04:00 PM',
+    '04:00 PM-05:00 PM',
+    '05:00 PM-06:00 PM',
+    '06:00 PM-07:00 PM',
+    '07:00 PM-08:00 PM',
+    '08:00 PM-09:00 PM',
 ];
 
 // ============================================
@@ -75,6 +73,34 @@ export const isValidServiceTier = (tier) => SERVICE_TIERS.includes(tier);
 export const isValidRole = (role) => USER_ROLES.includes(role);
 
 // ============================================
+// HELPER: Convert 12-hour format to 24-hour for calculations
+// ============================================
+export const convertTo24Hour = (slot12) => {
+    // Input: "08:00 AM-09:00 AM" or "01:00 PM-02:00 PM"
+    // Output: { start: "08:00", end: "09:00" }
+    const [startPart, endPart] = slot12.split('-');
+    const start = convertTimeTo24(startPart.trim());
+    const end = convertTimeTo24(endPart.trim());
+    return { start, end };
+};
+
+// Helper to convert single time
+export const convertTimeTo24 = (time12) => {
+    // Input: "08:00 AM" or "01:00 PM"
+    // Output: "08:00" or "13:00"
+    const [time, period] = time12.split(' ');
+    let [hours, minutes] = time.split(':').map(Number);
+
+    if (period === 'PM' && hours !== 12) {
+        hours += 12;
+    } else if (period === 'AM' && hours === 12) {
+        hours = 0;
+    }
+
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+};
+
+// ============================================
 // LIMITS
 // ============================================
 export const LIMITS = {
@@ -117,5 +143,7 @@ export default {
     isValidBookingStatus,
     isValidServiceTier,
     isValidRole,
-    isClosedDay
+    isClosedDay,
+    convertTo24Hour,
+    convertTimeTo24
 };

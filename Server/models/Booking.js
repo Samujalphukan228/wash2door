@@ -1,5 +1,3 @@
-// models/Booking.js - NO VARIANTS
-
 import mongoose from 'mongoose';
 import crypto from 'crypto';
 import {
@@ -91,7 +89,8 @@ const bookingSchema = new mongoose.Schema({
     // Slot lock
     slotLockKey: {
         type: String,
-        default: null
+        default: null,
+        sparse: true
     },
 
     // Location
@@ -143,7 +142,7 @@ const bookingSchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 
-// Auto generate booking code + slot lock key
+// ✅ FIXED: Auto generate booking code + slot lock key
 bookingSchema.pre('save', function (next) {
     if (!this.bookingCode) {
         const random = crypto.randomBytes(3).toString('hex').toUpperCase();
@@ -152,17 +151,26 @@ bookingSchema.pre('save', function (next) {
         this.bookingCode = `${prefix}-${timestamp}${random}`;
     }
 
+    // ✅ FIXED: Generate unique key for cancelled bookings instead of null
     if (this.status === 'cancelled') {
-        this.slotLockKey = null;
+        // Generate a unique cancelled key that won't block future slots
+        this.slotLockKey = `CANCELLED_${this._id}_${Date.now()}`;
+        console.log(`🗑️ Cancelled booking locked with key: ${this.slotLockKey}`);
     } else {
-        const dateStr = new Date(this.bookingDate).toISOString().split('T')[0];
+        // Generate active slot lock key
+        const d = new Date(this.bookingDate);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const dateStr = `${year}-${month}-${day}`;
         this.slotLockKey = `${dateStr}|${this.timeSlot}`;
+        console.log(`📍 Booking slot locked with key: ${this.slotLockKey}`);
     }
 
     next();
 });
 
-// Indexes
+// ✅ Indexes
 bookingSchema.index({ customerId: 1 });
 bookingSchema.index({ status: 1 });
 bookingSchema.index({ bookingDate: 1 });
@@ -172,9 +180,15 @@ bookingSchema.index({ categoryId: 1 });
 bookingSchema.index({ subcategoryId: 1 });
 bookingSchema.index({ bookingType: 1 });
 bookingSchema.index({ createdAt: -1 });
+// ✅ FIXED: Unique index only for active slots (YYYY-MM-DD|HH:MM-HH:MM format)
 bookingSchema.index(
     { slotLockKey: 1 },
-    { unique: true, sparse: true }
+    { 
+        unique: true, 
+        sparse: true,
+        // Only enforce uniqueness for active bookings (slots with pipe character)
+        partialFilterExpression: { slotLockKey: { $regex: '^\\d{4}-\\d{2}-\\d{2}\\|' } }
+    }
 );
 
 // Virtuals
@@ -198,8 +212,10 @@ bookingSchema.virtual('canCancel').get(function () {
 // Static: get available slots
 bookingSchema.statics.getAvailableSlots = async function (date) {
     const dateStr = new Date(date).toISOString().split('T')[0];
+    // ✅ FIXED: Only check active bookings (exclude cancelled)
     const bookedSlots = await this.find({
-        slotLockKey: { $regex: `^${dateStr}\\|` }
+        slotLockKey: { $regex: `^${dateStr}\\|` },
+        status: { $in: ['pending', 'confirmed'] }
     }).select('timeSlot');
     const bookedSlotNames = bookedSlots.map(b => b.timeSlot);
     return TIME_SLOTS.filter(slot => !bookedSlotNames.includes(slot));

@@ -1,4 +1,3 @@
-// components/booking/ConfirmStep.jsx
 "use client"
 
 import { useRouter } from "next/navigation"
@@ -14,30 +13,30 @@ export default function ConfirmStep({ data, onBack, onSuccess }) {
     const [bookingCode, setBookingCode] = useState("")
 
     const handleConfirm = async () => {
-    try {
-        setLoading(true)
-        setError("")
+        try {
+            setLoading(true)
+            setError("")
 
-        // ✅ Debug: Log what we're sending
-        console.log('📦 Booking data:', {
-            serviceId: data.serviceId,
-            bookingDate: data.bookingDate,
-            timeSlot: data.timeSlot,
-            location: data.location,
-            specialNotes: data.specialNotes
-        })
+            // ✅ Debug: Log what we're sending
+            console.log('📦 Booking data:', {
+                serviceId: data.serviceId,
+                bookingDate: data.bookingDate,
+                timeSlot: data.timeSlot,
+                location: data.location,
+                specialNotes: data.specialNotes
+            })
 
-        const bookingPayload = {
-            serviceId: data.serviceId,
-            bookingDate: data.bookingDate,
-            timeSlot: data.timeSlot,
-            location: {
-                address: data.location.address,
-                city: data.location.city,
-                landmark: data.location.landmark || "",
-            },
-            specialNotes: data.specialNotes || "",
-        }
+            const bookingPayload = {
+                serviceId: data.serviceId,
+                bookingDate: data.bookingDate,
+                timeSlot: data.timeSlot,  // ✅ Already in 12-hour format from backend
+                location: {
+                    address: data.location.address,
+                    city: data.location.city,
+                    landmark: data.location.landmark || "",
+                },
+                specialNotes: data.specialNotes || "",
+            }
 
             const result = await createBooking(bookingPayload)
             setBookingCode(result.bookingCode || result._id)
