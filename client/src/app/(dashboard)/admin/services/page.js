@@ -260,11 +260,12 @@ export default function ServicesPage() {
                 </div>
             </div>
 
-            {/* Mobile FAB */}
-            <div className="sm:hidden fixed bottom-6 right-4 z-40">
+            {/* ✅ FIXED: Mobile FAB Button - Above mobile nav */}
+            <div className="sm:hidden fixed bottom-24 right-4 z-41">
                 <button
                     onClick={() => setShowCreateModal(true)}
-                    className="w-14 h-14 bg-white text-black rounded-2xl shadow-2xl shadow-white/10 flex items-center justify-center active:scale-95 transition-transform"
+                    className="w-14 h-14 bg-white text-black rounded-2xl shadow-2xl shadow-black/50 flex items-center justify-center active:scale-95 transition-transform hover:shadow-2xl hover:shadow-white/20"
+                    aria-label="Create new service"
                 >
                     <Plus className="w-6 h-6" strokeWidth={2.5} />
                 </button>

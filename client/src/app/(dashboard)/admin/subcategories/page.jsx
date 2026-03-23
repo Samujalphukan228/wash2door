@@ -1,4 +1,3 @@
-// src/app/(dashboard)/admin/subcategories/page.jsx
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -316,14 +315,15 @@ export default function SubcategoriesPage() {
                 </div>
             </div>
 
-            {/* Mobile FAB */}
-            <div className="sm:hidden fixed bottom-6 right-4 z-40">
+            {/* ✅ FIXED: Mobile FAB Button - Positioned above mobile nav */}
+            <div className="sm:hidden fixed bottom-24 right-4 z-41">
                 <button
                     onClick={() => setShowCreateModal(true)}
                     disabled={!selectedCategory}
-                    className="w-12 h-12 bg-white text-black rounded-xl shadow-2xl flex items-center justify-center active:scale-90 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-14 h-14 bg-white text-black rounded-2xl shadow-2xl shadow-black/50 flex items-center justify-center active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-2xl hover:shadow-white/20"
+                    aria-label="Create new subcategory"
                 >
-                    <Plus className="w-5 h-5" strokeWidth={2.5} />
+                    <Plus className="w-6 h-6" strokeWidth={2.5} />
                 </button>
             </div>
 

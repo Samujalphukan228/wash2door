@@ -1,4 +1,3 @@
-// src/app/admin/bookings/page.jsx
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -260,6 +259,7 @@ export default function BookingsPage() {
 
     return (
         <DashboardLayout>
+            {/* ✅ FIXED: Removed pb-20, let DashboardLayout handle spacing */}
             <div className="min-h-screen bg-black">
                 <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6">
 
@@ -350,11 +350,12 @@ export default function BookingsPage() {
                 </div>
             </div>
 
-            {/* Mobile FAB */}
-            <div className="sm:hidden fixed bottom-6 right-4 z-40">
+            {/* ✅ FIXED: Mobile FAB Button - Positioned above mobile nav (z-41) */}
+            <div className="lg:hidden fixed bottom-24 right-4 z-41">
                 <button
                     onClick={() => setShowCreateModal(true)}
-                    className="w-14 h-14 bg-white text-black rounded-2xl shadow-2xl shadow-white/10 flex items-center justify-center active:scale-95 transition-transform"
+                    className="w-14 h-14 bg-white text-black rounded-2xl shadow-2xl shadow-black/50 flex items-center justify-center active:scale-95 transition-transform hover:shadow-2xl hover:shadow-white/20"
+                    aria-label="Create new booking"
                 >
                     <Plus className="w-6 h-6" strokeWidth={2.5} />
                 </button>
@@ -685,14 +686,14 @@ function BookingsList({ bookings, loading, total, pages, currentPage, onPageChan
             {/* Bookings */}
             <div className="divide-y divide-white/[0.04]">
                 {bookings.map((booking, index) => (
-    <BookingRow
-        key={booking._id || `booking-${index}`}
-        booking={booking}
-        isFirst={index === 0}
-        onView={onView}
-        onUpdateStatus={onUpdateStatus}
-    />
-))}
+                    <BookingRow
+                        key={booking._id || `booking-${index}`}
+                        booking={booking}
+                        isFirst={index === 0}
+                        onView={onView}
+                        onUpdateStatus={onUpdateStatus}
+                    />
+                ))}
             </div>
 
             {/* Pagination */}
@@ -752,6 +753,7 @@ function BookingsList({ bookings, loading, total, pages, currentPage, onPageChan
     );
 }
 
+// ✅ UPDATED: BookingRow with proper 12-hour format display
 function BookingRow({ booking, isFirst, onView, onUpdateStatus }) {
     const statusMap = {
         pending: { bg: 'bg-yellow-500/10', text: 'text-yellow-500', dot: 'bg-yellow-500', label: 'Pending' },
@@ -820,7 +822,7 @@ function BookingRow({ booking, isFirst, onView, onUpdateStatus }) {
                     </div>
 
                     {/* Meta Row */}
-                    <div className="flex items-center gap-3 mt-2">
+                    <div className="flex items-center gap-3 mt-2 flex-wrap">
                         <span className="font-mono text-[10px] text-gray-600">
                             {booking.bookingCode}
                         </span>
@@ -828,6 +830,7 @@ function BookingRow({ booking, isFirst, onView, onUpdateStatus }) {
                         <span className="flex items-center gap-1 text-[10px] text-gray-600">
                             <Clock className="w-3 h-3" />
                             {isToday ? 'Today' : bookingDate?.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            {/* ✅ UPDATED: Display 12-hour format time slot directly */}
                             {booking.timeSlot && ` · ${booking.timeSlot}`}
                         </span>
                         {booking.location?.city && (
