@@ -19,7 +19,6 @@ import {
 import {
   login as loginAPI,
   register as registerAPI,
-  verifyRegistration as verifyRegistrationAPI,
   resendRegistrationEmail as resendRegistrationEmailAPI,
   forgotPassword as forgotPasswordAPI,
 } from "@/lib/auth.api"
@@ -645,6 +644,23 @@ const RegisterView = memo(function RegisterView() {
 // ── Register Success View ─────────────────────────────────
 const RegisterSuccessView = memo(function RegisterSuccessView() {
   const { switchView, authEmail } = useAuth()
+  const [resending, setResending] = useState(false)
+  const [resendSuccess, setResendSuccess] = useState(false)
+
+  const handleResendEmail = async () => {
+    if (!authEmail) return
+    
+    setResending(true)
+    try {
+      await resendRegistrationEmailAPI(authEmail)
+      setResendSuccess(true)
+      setTimeout(() => setResendSuccess(false), 3000)
+    } catch (err) {
+      console.error('Resend error:', err)
+    } finally {
+      setResending(false)
+    }
+  }
 
   return (
     <div className="space-y-8">
@@ -669,6 +685,14 @@ const RegisterSuccessView = memo(function RegisterSuccessView() {
           </p>
         </div>
 
+        {resendSuccess && (
+          <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-4">
+            <p className="text-sm text-emerald-700">
+              ✓ Verification email sent! Check your inbox.
+            </p>
+          </div>
+        )}
+
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
           <p className="text-xs text-gray-600 mb-2">
             <strong>Didn't receive the email?</strong>
@@ -677,17 +701,11 @@ const RegisterSuccessView = memo(function RegisterSuccessView() {
             Check your spam folder or request a new verification link.
           </p>
           <button
-            onClick={async () => {
-              try {
-                await resendRegistrationEmailAPI(authEmail)
-                alert("Verification email sent! Check your inbox.")
-              } catch (err) {
-                alert(err.message || "Failed to resend email")
-              }
-            }}
-            className="text-xs text-black font-medium hover:underline"
+            onClick={handleResendEmail}
+            disabled={resending}
+            className="text-xs text-black font-medium hover:underline disabled:opacity-50"
           >
-            Resend Verification Email
+            {resending ? "Sending..." : "Resend Verification Email"}
           </button>
         </div>
       </div>
