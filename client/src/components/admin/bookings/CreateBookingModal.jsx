@@ -7,11 +7,21 @@ import serviceService from '@/services/serviceService';
 import axiosInstance from '@/lib/axios';
 import toast from 'react-hot-toast';
 
+// ✅ UPDATED: 12-hour format time slots
 const TIME_SLOTS = [
-    '08:00-09:00', '09:00-10:00', '10:00-11:00', '11:00-12:00',
-    '12:00-13:00', '13:00-14:00', '14:00-15:00', '15:00-16:00',
-    '16:00-17:00', '17:00-18:00', '18:00-19:00', '19:00-20:00',
-    '20:00-21:00'
+    '08:00 AM-09:00 AM',
+    '09:00 AM-10:00 AM',
+    '10:00 AM-11:00 AM',
+    '11:00 AM-12:00 PM',
+    '12:00 PM-01:00 PM',
+    '01:00 PM-02:00 PM',
+    '02:00 PM-03:00 PM',
+    '03:00 PM-04:00 PM',
+    '04:00 PM-05:00 PM',
+    '05:00 PM-06:00 PM',
+    '06:00 PM-07:00 PM',
+    '07:00 PM-08:00 PM',
+    '08:00 PM-09:00 PM'
 ];
 
 // ✅ UPDATED: 3 steps instead of 4 (no variant selection)
@@ -33,7 +43,23 @@ const inputCls = `
 const sectionLabel = `text-[10px] text-white/25 uppercase tracking-widest font-medium mb-3 block`;
 
 /**
- * ✅ FIXED: Check if a time slot has passed
+ * ✅ FIXED: Convert 12-hour format "08:00 AM" to 24-hour (8)
+ */
+function convertTo24Hour(time12) {
+    const [time, period] = time12.split(' ');
+    let [hours] = time.split(':').map(Number);
+
+    if (period === 'PM' && hours !== 12) {
+        hours += 12;
+    } else if (period === 'AM' && hours === 12) {
+        hours = 0;
+    }
+
+    return hours;
+}
+
+/**
+ * ✅ FIXED: Check if a time slot has passed (handles 12-hour format)
  */
 function isSlotPassed(slot, selectedDate) {
     const now = new Date();
@@ -49,14 +75,15 @@ function isSlotPassed(slot, selectedDate) {
     if (selectedDate > todayStr) return false;
     if (selectedDate < todayStr) return true;
 
-    const [startTime] = slot.split('-');
-    const [startHour, startMin] = startTime.split(':').map(Number);
+    // ✅ FIXED: Extract start time from "08:00 AM-09:00 AM"
+    const startTimePart = slot.split('-')[0].trim();
+    const startHour = convertTo24Hour(startTimePart);
 
     const currentHour = now.getHours();
     const currentMin = now.getMinutes();
 
     if (currentHour > startHour) return true;
-    if (currentHour === startHour && currentMin >= startMin) return true;
+    if (currentHour === startHour && currentMin > 0) return true;
 
     return false;
 }
@@ -132,7 +159,7 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
         return () => clearTimeout(t);
     }, [customerSearch, bookingType]);
 
-    /* ✅ Check availability */
+    /* ✅ Check availability (receives 12-hour format) */
     useEffect(() => {
         if (!bookingDate) return;
         
@@ -175,7 +202,7 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                 bookingType,
                 serviceId: selectedService._id,
                 bookingDate,
-                timeSlot,
+                timeSlot,  // ✅ Already in 12-hour format
                 location,
                 specialNotes,
                 paymentMethod
@@ -200,19 +227,23 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
     const canProceed = {
         1: bookingType === 'walkin' ? walkInCustomer.name.trim() : selectedCustomer !== null,
         2: selectedService !== null,
-        3: bookingDate && timeSlot
+        3: bookingDate && timeSlot && location.address.trim() && location.city.trim()
     };
 
     return (
         <>
             {/* Backdrop */}
-            <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden sm:block" onClick={onClose} />
+            <div 
+                className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50" 
+                onClick={onClose}
+            />
 
+            {/* ✅ FIXED: Full screen on mobile, centered on desktop */}
             <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center pointer-events-none">
                 <div className="
                     pointer-events-auto
-                    w-full sm:max-w-lg sm:max-h-[92vh]
-                    h-full sm:h-auto
+                    w-full h-[100dvh] sm:h-auto
+                    sm:max-w-lg sm:max-h-[92vh]
                     flex flex-col
                     bg-[#0a0a0a]
                     sm:rounded-xl
@@ -223,7 +254,7 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                     <div className="h-px w-full bg-gradient-to-r from-transparent via-white/15 to-transparent shrink-0" />
 
                     {/* Header */}
-                    <div className="shrink-0 flex items-center gap-3 px-4 py-4">
+                    <div className="shrink-0 flex items-center gap-3 px-4 py-4 bg-[#0a0a0a]">
                         <button
                             onClick={() => step > 1 ? setStep(step - 1) : onClose()}
                             className="w-8 h-8 rounded-lg flex items-center justify-center border border-white/[0.06] bg-white/[0.03] text-white/35 hover:text-white/70 transition-all duration-150"
@@ -243,7 +274,10 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                             </p>
                         </div>
 
-                        <button onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center border border-white/[0.06] bg-white/[0.03] text-white/30 hover:text-white/70 transition-all duration-150">
+                        <button 
+                            onClick={onClose}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center border border-white/[0.06] bg-white/[0.03] text-white/30 hover:text-white/70 transition-all duration-150"
+                        >
                             <X className="w-3.5 h-3.5" />
                         </button>
                     </div>
@@ -285,8 +319,8 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
 
                     <div className="h-px bg-white/[0.05] shrink-0" />
 
-                    {/* Scrollable Content */}
-                    <div className="flex-1 overflow-y-auto px-4 py-5 space-y-6">
+                    {/* ✅ FIXED: Content with proper scrolling */}
+                    <div className="flex-1 overflow-y-auto px-4 py-5 space-y-6 pb-28 sm:pb-6">
 
                         {/* STEP 1 — Customer */}
                         {step === 1 && (
@@ -363,7 +397,7 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                                         </div>
 
                                         {customers.length > 0 && !selectedCustomer && (
-                                            <div className="rounded-lg border border-white/[0.07] bg-white/[0.02] overflow-hidden divide-y divide-white/[0.04]">
+                                            <div className="rounded-lg border border-white/[0.07] bg-white/[0.02] overflow-hidden divide-y divide-white/[0.04] max-h-48 overflow-y-auto">
                                                 {customers.map((c) => (
                                                     <button
                                                         key={c._id}
@@ -483,7 +517,7 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                                                     return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
                                                 })() && (
                                                     <span className="text-[10px] text-white/20 font-mono">
-                                                        Now {currentTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false })}
+                                                        Now {currentTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
                                                     </span>
                                                 )}
                                                 {availabilityLoading && (
@@ -507,7 +541,7 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                                                         key={slot}
                                                         onClick={() => !disabled && setTimeSlot(slot)}
                                                         disabled={disabled}
-                                                        className={`relative p-3 rounded-lg border text-xs font-mono transition-all duration-150 ${
+                                                        className={`relative p-3 rounded-lg border text-xs font-medium transition-all duration-150 ${
                                                             selected
                                                                 ? 'border-white/30 bg-white/[0.08] text-white'
                                                                 : disabled
@@ -517,12 +551,12 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                                                     >
                                                         {slot}
                                                         {passed && (
-                                                            <span className="block text-[10px] text-white/15 mt-0.5 font-sans">
+                                                            <span className="block text-[10px] text-white/15 mt-0.5">
                                                                 Passed
                                                             </span>
                                                         )}
                                                         {!passed && !available && (
-                                                            <span className="block text-[10px] text-white/15 mt-0.5 font-sans">
+                                                            <span className="block text-[10px] text-white/15 mt-0.5">
                                                                 Booked
                                                             </span>
                                                         )}
@@ -631,30 +665,41 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                         )}
                     </div>
 
-                    {/* Footer */}
+                    {/* ✅ FIXED: Footer with proper positioning for mobile */}
                     <div className="shrink-0 h-px bg-white/[0.05]" />
-                    <div className="shrink-0 px-4 py-4 flex gap-2">
+                    <div className="shrink-0 px-4 py-4 flex gap-2 bg-[#0a0a0a] border-t border-white/[0.05]">
                         {step > 1 && (
                             <button
                                 onClick={() => setStep(step - 1)}
-                                className="hidden sm:flex items-center px-4 py-2.5 rounded-lg border border-white/[0.08] bg-white/[0.03] text-xs text-white/40 hover:text-white/70 hover:border-white/[0.14] hover:bg-white/[0.05] transition-all duration-150"
+                                disabled={loading}
+                                className="hidden sm:flex items-center px-4 py-2.5 rounded-lg border border-white/[0.08] bg-white/[0.03] text-xs text-white/40 hover:text-white/70 hover:border-white/[0.14] hover:bg-white/[0.05] transition-all duration-150 disabled:opacity-50"
                             >
                                 Back
                             </button>
                         )}
 
+                        {/* ✅ FIXED: Button visible on all screen sizes */}
                         <button
-                            onClick={() => step < 3 ? setStep(step + 1) : handleSubmit()}
+                            onClick={() => {
+                                if (step < 3) {
+                                    setStep(step + 1);
+                                } else {
+                                    handleSubmit();
+                                }
+                            }}
                             disabled={loading || !canProceed[step]}
-                            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg bg-white text-black text-sm font-medium hover:bg-white/90 active:bg-white/80 disabled:bg-white/10 disabled:text-white/20 disabled:cursor-not-allowed shadow-lg shadow-white/10 transition-all duration-150"
+                            className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-white text-black text-sm font-medium hover:bg-white/90 active:bg-white/80 disabled:bg-white/10 disabled:text-white/20 disabled:cursor-not-allowed shadow-lg shadow-white/10 transition-all duration-150"
                         >
                             {loading ? (
                                 <>
                                     <Loader2 className="w-4 h-4 animate-spin" />
-                                    <span>Creating…</span>
+                                    <span className="hidden sm:inline">Creating…</span>
                                 </>
                             ) : step < 3 ? (
-                                'Continue'
+                                <>
+                                    <span>Next</span>
+                                    <ChevronLeft className="w-4 h-4 rotate-180" />
+                                </>
                             ) : (
                                 'Create Booking'
                             )}

@@ -1,5 +1,3 @@
-// src/services/bookingService.js - FIXED
-
 import axiosInstance from '@/lib/axios';
 
 const bookingService = {
@@ -9,7 +7,7 @@ const bookingService = {
         return response.data;
     },
 
-    // ✅ FIXED: Check availability (no serviceId needed)
+    // ✅ Check availability (returns 12-hour format slots)
     checkAvailability: async (date) => {
         const response = await axiosInstance.get('/bookings/availability', {
             params: { date }
@@ -17,7 +15,7 @@ const bookingService = {
         return response.data;
     },
 
-    // Create booking (requires auth)
+    // Create booking (NO VARIANTS - sends 12-hour format)
     create: async (bookingData) => {
         const response = await axiosInstance.post('/bookings', bookingData);
         return response.data;
@@ -44,11 +42,11 @@ const bookingService = {
         return response.data;
     },
 
-    // Reschedule booking
+    // Reschedule booking (timeSlot already in 12-hour format)
     reschedule: async (bookingId, newDate, newTimeSlot) => {
         const response = await axiosInstance.put(
             `/bookings/${bookingId}/reschedule`,
-            { newDate, newTimeSlot }
+            { newDate, newTimeSlot }  // ✅ Already in 12-hour format
         );
         return response.data;
     }
