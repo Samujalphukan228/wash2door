@@ -11,9 +11,9 @@ import {
 } from '../utils/constants.js';
 import {
     sendBookingConfirmationEmail,
-    sendAdminNewBookingEmail,
     sendBookingCancellationEmail
 } from '../utils/sendEmail.js';
+import { sendNewBookingTelegram } from '../utils/telegram.js';
 import {
     emitNewBooking,
     emitBookingCancelled
@@ -75,7 +75,7 @@ export const getServiceWithPricing = async (req, res) => {
 };
 
 // ============================================
-// CHECK AVAILABILITY - ✅ FIXED TIMEZONE, CANCELLED BOOKINGS & 12-HOUR FORMAT
+// CHECK AVAILABILITY
 // ============================================
 export const checkAvailability = async (req, res) => {
     try {
@@ -85,7 +85,6 @@ export const checkAvailability = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Date is required' });
         }
 
-        // ✅ Validate format
         if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
             return res.status(400).json({ success: false, message: 'Invalid date format. Use YYYY-MM-DD' });
         }
@@ -98,7 +97,6 @@ export const checkAvailability = async (req, res) => {
         console.log('📅 Server today:', todayStr)
         console.log('📅 Server time:', now.toLocaleString())
 
-        // ✅ FIXED: Parse date at noon local time to avoid UTC conversion issues
         const [year, month, day] = date.split('-').map(Number)
         const bookingDate = new Date(year, month - 1, day, 12, 0, 0, 0)
 
@@ -109,7 +107,6 @@ export const checkAvailability = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Invalid date' });
         }
 
-        // ✅ Compare date strings not Date objects
         if (date < todayStr) {
             return res.status(400).json({ success: false, message: 'Cannot check availability for past dates' });
         }
@@ -129,7 +126,6 @@ export const checkAvailability = async (req, res) => {
             });
         }
 
-        // ✅ FIXED: Only get ACTIVE bookings (exclude cancelled/completed)
         const lockedBookings = await Booking.find({
             slotLockKey: { $regex: `^${date}\\|` },
             status: { $in: ['pending', 'confirmed'] }
@@ -145,7 +141,6 @@ export const checkAvailability = async (req, res) => {
         const isToday = date === todayStr
 
         const slots = TIME_SLOTS.map(slot => {
-            // ✅ FIXED: Convert 12-hour format to 24-hour for calculation
             const { start } = convertTo24Hour(slot);
             const [hours, minutes] = start.split(':').map(Number);
 
@@ -153,7 +148,6 @@ export const checkAvailability = async (req, res) => {
             let isPast = false;
 
             if (isToday) {
-                // ✅ FIXED: Create actual slot datetime and compare timestamps
                 const slotDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0)
                 isPast = now.getTime() >= slotDateTime.getTime()
             }
@@ -190,7 +184,7 @@ export const checkAvailability = async (req, res) => {
 };
 
 // ============================================
-// CREATE BOOKING - ✅ FIXED RACE CONDITION, TIMEZONE & 12-HOUR FORMAT
+// CREATE BOOKING
 // ============================================
 export const createBooking = async (req, res) => {
     try {
@@ -218,7 +212,6 @@ export const createBooking = async (req, res) => {
             });
         }
 
-        // ✅ FIXED: Parse date from local string
         const [year, month, day] = bookingDate.split('-').map(Number)
         const requestedDate = new Date(year, month - 1, day, 12, 0, 0, 0)
 
@@ -250,7 +243,6 @@ export const createBooking = async (req, res) => {
 
         const isToday = bookingDate === todayStr
         if (isToday) {
-            // ✅ FIXED: Convert 12-hour format to 24-hour
             const { start } = convertTo24Hour(timeSlot);
             const [hours, minutes] = start.split(':').map(Number);
             if (now.getHours() > hours || (now.getHours() === hours && now.getMinutes() >= minutes)) {
@@ -285,11 +277,8 @@ export const createBooking = async (req, res) => {
             });
         }
 
-        // ✅ Generate the slot lock key
         const slotLockKey = `${bookingDate}|${timeSlot}`;
 
-        // ✅ FIXED: Check if slot is available before creating
-        // Only check ACTIVE bookings, exclude cancelled
         const existingBooking = await Booking.findOne({
             slotLockKey,
             status: { $in: ['pending', 'confirmed'] }
@@ -307,7 +296,6 @@ export const createBooking = async (req, res) => {
 
         console.log(`📦 Creating booking for ${service.name}. Price: ${finalPrice}, Duration: ${duration}`);
 
-        // ✅ FIXED: Try to create and handle race condition
         let booking;
         try {
             booking = await Booking.create({
@@ -333,7 +321,6 @@ export const createBooking = async (req, res) => {
                 paymentMethod: 'cash'
             });
         } catch (createError) {
-            // ✅ FIXED: Catch duplicate slot error from unique index
             if (createError.code === 11000) {
                 console.warn(`⚠️ Duplicate booking attempt for slot: ${slotLockKey}`);
                 return res.status(400).json({
@@ -361,11 +348,13 @@ export const createBooking = async (req, res) => {
             specialNotes: booking.specialNotes
         };
 
+        // Send email to customer
         try { await sendBookingConfirmationEmail(req.user, emailData); }
         catch (e) { console.error('Customer email failed:', e.message); }
 
-        try { await sendAdminNewBookingEmail(emailData, req.user); }
-        catch (e) { console.error('Admin email failed:', e.message); }
+        // Send Telegram notification to admin (instead of email)
+        try { await sendNewBookingTelegram(booking, req.user); }
+        catch (e) { console.error('Telegram notification failed:', e.message); }
 
         res.status(201).json({
             success: true,
@@ -431,7 +420,6 @@ export const getMyBookings = async (req, res) => {
             const bookingObj = booking.toObject();
             const bookingDateTime = new Date(booking.bookingDate);
             
-            // ✅ FIXED: Convert 12-hour format to 24-hour
             const { start } = convertTo24Hour(booking.timeSlot);
             const [startHour] = start.split(':').map(Number);
             bookingDateTime.setHours(parseInt(startHour), 0, 0, 0);
@@ -484,7 +472,6 @@ export const getBookingById = async (req, res) => {
         const bookingObj = booking.toObject();
         const bookingDateTime = new Date(booking.bookingDate);
         
-        // ✅ FIXED: Convert 12-hour format to 24-hour
         const { start } = convertTo24Hour(booking.timeSlot);
         const [startHour] = start.split(':').map(Number);
         bookingDateTime.setHours(parseInt(startHour), 0, 0, 0);
@@ -509,7 +496,7 @@ export const getBookingById = async (req, res) => {
 };
 
 // ============================================
-// CANCEL BOOKING - ✅ FIXED
+// CANCEL BOOKING
 // ============================================
 export const cancelBooking = async (req, res) => {
     try {
@@ -535,7 +522,6 @@ export const cancelBooking = async (req, res) => {
 
         const bookingDateTime = new Date(booking.bookingDate);
         
-        // ✅ FIXED: Convert 12-hour format to 24-hour
         const { start } = convertTo24Hour(booking.timeSlot);
         const [startHour] = start.split(':').map(Number);
         bookingDateTime.setHours(parseInt(startHour), 0, 0, 0);
@@ -551,7 +537,6 @@ export const cancelBooking = async (req, res) => {
             });
         }
 
-        // ✅ FIXED: Save old slot info before cancelling
         const oldDate = getLocalDateStr(new Date(booking.bookingDate));
         const oldSlot = booking.timeSlot;
 
@@ -590,7 +575,7 @@ export const cancelBooking = async (req, res) => {
 };
 
 // ============================================
-// RESCHEDULE BOOKING - ✅ FIXED RACE CONDITION, TIMEZONE & 12-HOUR FORMAT
+// RESCHEDULE BOOKING
 // ============================================
 export const rescheduleBooking = async (req, res) => {
     try {
@@ -622,7 +607,6 @@ export const rescheduleBooking = async (req, res) => {
             });
         }
 
-        // ✅ FIXED: Parse date from local string
         const [year, month, day] = newDate.split('-').map(Number)
         const requestedDate = new Date(year, month - 1, day, 12, 0, 0, 0)
 
@@ -654,7 +638,6 @@ export const rescheduleBooking = async (req, res) => {
 
         const isToday = newDate === todayStr
         if (isToday) {
-            // ✅ FIXED: Convert 12-hour format to 24-hour
             const { start } = convertTo24Hour(newTimeSlot);
             const [hours, minutes] = start.split(':').map(Number);
             if (now.getHours() > hours || (now.getHours() === hours && now.getMinutes() >= minutes)) {
@@ -664,7 +647,6 @@ export const rescheduleBooking = async (req, res) => {
 
         const newSlotLockKey = `${newDate}|${newTimeSlot}`;
 
-        // ✅ FIXED: Check if new slot is available (only check ACTIVE bookings)
         const slotTaken = await Booking.findOne({
             _id: { $ne: bookingId },
             slotLockKey: newSlotLockKey,
@@ -678,19 +660,16 @@ export const rescheduleBooking = async (req, res) => {
             });
         }
 
-        // ✅ FIXED: Save old slot info before rescheduling
         const oldDate = booking.bookingDate;
         const oldTimeSlot = booking.timeSlot;
 
         try {
-            // Update the booking
             booking.bookingDate = requestedDate;
             booking.timeSlot = newTimeSlot;
             await booking.save();
 
             console.log(`📅 Booking rescheduled from ${getLocalDateStr(new Date(oldDate))} ${oldTimeSlot} to ${newDate} ${newTimeSlot}`);
 
-            // Emit events
             emitBookingCancelled({ ...booking.toObject(), bookingDate: oldDate, timeSlot: oldTimeSlot }, 'reschedule');
             emitNewBooking(booking, `${req.user.firstName} ${req.user.lastName}`);
 
@@ -701,7 +680,6 @@ export const rescheduleBooking = async (req, res) => {
             });
 
         } catch (updateError) {
-            // ✅ FIXED: Catch duplicate slot error during update
             if (updateError.code === 11000) {
                 console.warn(`⚠️ Duplicate booking attempt for slot: ${newSlotLockKey}`);
                 return res.status(400).json({
@@ -714,7 +692,6 @@ export const rescheduleBooking = async (req, res) => {
 
     } catch (error) {
         console.error('rescheduleBooking error:', error);
-
         res.status(500).json({ success: false, message: 'Failed to reschedule booking' });
     }
 };
