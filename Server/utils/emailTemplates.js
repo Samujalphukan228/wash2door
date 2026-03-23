@@ -1,13 +1,16 @@
 // utils/emailTemplates.js
 
-export const getOTPEmailTemplate = (userName, otp) => {
+// ============================================
+// REGISTRATION VERIFICATION (NEW - Link Based)
+// ============================================
+export const getRegistrationVerificationEmailTemplate = (userName, verificationLink) => {
     return `
     <!DOCTYPE html>
     <html lang="en">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Your OTP Code</title>
+        <title>Verify Your Registration</title>
         <style>
             body { 
                 font-family: 'Helvetica Neue', Arial, sans-serif; 
@@ -37,39 +40,32 @@ export const getOTPEmailTemplate = (userName, otp) => {
             }
             .content { 
                 padding: 50px 40px; 
-                text-align: center; 
+                text-align: center;
             }
             .greeting { 
                 color: #333333; 
                 font-size: 20px;
                 font-weight: 400;
-                margin-bottom: 10px;
+                margin-bottom: 20px;
             }
-            .subtitle { 
+            .message { 
                 color: #666666; 
                 font-size: 15px;
                 margin-bottom: 40px;
+                max-width: 400px;
+                margin-left: auto;
+                margin-right: auto;
             }
-            .otp-box { 
+            .button { 
+                display: inline-block; 
                 background-color: #000000; 
-                padding: 30px 40px; 
-                margin: 30px 0; 
-                display: inline-block;
-            }
-            .otp-code { 
-                font-size: 42px; 
-                font-weight: 300; 
                 color: #ffffff; 
-                letter-spacing: 12px; 
-                margin: 0;
-                font-family: 'Courier New', monospace;
-            }
-            .validity { 
-                color: #999999; 
-                font-size: 13px; 
-                margin-top: 30px;
+                padding: 18px 50px; 
+                text-decoration: none; 
+                font-size: 13px;
                 text-transform: uppercase;
                 letter-spacing: 1px;
+                margin: 20px 0;
             }
             .divider {
                 width: 60px;
@@ -77,21 +73,44 @@ export const getOTPEmailTemplate = (userName, otp) => {
                 background-color: #e0e0e0;
                 margin: 40px auto;
             }
-            .security-note { 
-                color: #888888; 
-                font-size: 13px;
-                line-height: 1.8;
+            .link-section {
                 text-align: left;
-                max-width: 400px;
+                max-width: 450px;
                 margin: 0 auto;
             }
-            .security-note strong {
-                color: #333333;
-                display: block;
-                margin-bottom: 10px;
+            .link-label {
+                font-size: 11px;
                 text-transform: uppercase;
                 letter-spacing: 1px;
+                color: #999999;
+                margin-bottom: 10px;
+            }
+            .link-box { 
+                background-color: #fafafa; 
+                border: 1px solid #e0e0e0;
+                padding: 15px; 
+                word-break: break-all;
                 font-size: 12px;
+                color: #666666;
+                font-family: 'Courier New', monospace;
+            }
+            .validity {
+                color: #999999;
+                font-size: 13px;
+                margin-top: 30px;
+            }
+            .security-note {
+                background-color: #fafafa;
+                border-left: 3px solid #000000;
+                padding: 15px 20px;
+                margin: 30px auto;
+                max-width: 400px;
+                text-align: left;
+            }
+            .security-note p {
+                margin: 0;
+                color: #666666;
+                font-size: 13px;
             }
             .footer { 
                 background-color: #fafafa; 
@@ -113,23 +132,25 @@ export const getOTPEmailTemplate = (userName, otp) => {
     <body>
         <div class="container">
             <div class="header">
-                <h1>Verification Code</h1>
+                <h1>Verify Your Email</h1>
             </div>
             <div class="content">
                 <p class="greeting">Hello, ${userName}</p>
-                <p class="subtitle">Your one-time verification code is ready</p>
+                <p class="message">Thank you for registering with Wash2Door! Please click the button below to verify your email address and complete your registration.</p>
                 
-                <div class="otp-box">
-                    <div class="otp-code">${otp}</div>
-                </div>
-                
-                <p class="validity">Valid for 10 minutes</p>
+                <a href="${verificationLink}" class="button">Verify & Complete Registration</a>
                 
                 <div class="divider"></div>
                 
+                <div class="link-section">
+                    <p class="link-label">Or copy this link to your browser</p>
+                    <div class="link-box">${verificationLink}</div>
+                </div>
+                
+                <p class="validity">This link will expire in 1 hour</p>
+                
                 <div class="security-note">
-                    <strong>Security Notice</strong>
-                    Never share this code with anyone. Wash2Door will never ask for your OTP via phone or email. If you did not request this code, please ignore this email.
+                    <p><strong>Didn't sign up?</strong> If you didn't create an account with Wash2Door, please ignore this email.</p>
                 </div>
             </div>
             <div class="footer">
@@ -142,6 +163,9 @@ export const getOTPEmailTemplate = (userName, otp) => {
     `;
 };
 
+// ============================================
+// ADMIN WELCOME
+// ============================================
 export const getAdminWelcomeEmailTemplate = (firstName, tempPassword, adminEmail) => {
     return `
     <!DOCTYPE html>
@@ -345,6 +369,9 @@ export const getAdminWelcomeEmailTemplate = (firstName, tempPassword, adminEmail
     `;
 };
 
+// ============================================
+// ADMIN PASSWORD RESET
+// ============================================
 export const getAdminPasswordResetEmailTemplate = (firstName, tempPassword) => {
     return `
     <!DOCTYPE html>
@@ -515,6 +542,9 @@ export const getAdminPasswordResetEmailTemplate = (firstName, tempPassword) => {
     `;
 };
 
+// ============================================
+// EMAIL VERIFICATION (For existing users)
+// ============================================
 export const getVerificationEmailTemplate = (userName, verificationLink) => {
     return `
     <!DOCTYPE html>
@@ -635,7 +665,7 @@ export const getVerificationEmailTemplate = (userName, verificationLink) => {
             </div>
             <div class="content">
                 <p class="greeting">Hello, ${userName}</p>
-                <p class="message">Thank you for signing up. Please verify your email address to complete your registration and access all features.</p>
+                <p class="message">Please verify your email address to access all features.</p>
                 
                 <a href="${verificationLink}" class="button">Verify Email Address</a>
                 
@@ -658,6 +688,9 @@ export const getVerificationEmailTemplate = (userName, verificationLink) => {
     `;
 };
 
+// ============================================
+// PASSWORD RESET
+// ============================================
 export const getPasswordResetEmailTemplate = (userName, resetLink) => {
     return `
     <!DOCTYPE html>
@@ -820,6 +853,9 @@ export const getPasswordResetEmailTemplate = (userName, resetLink) => {
     `;
 };
 
+// ============================================
+// WELCOME EMAIL
+// ============================================
 export const getWelcomeEmailTemplate = (userName) => {
     return `
     <!DOCTYPE html>
@@ -967,6 +1003,9 @@ export const getWelcomeEmailTemplate = (userName) => {
     `;
 };
 
+// ============================================
+// PASSWORD CHANGE CONFIRMATION
+// ============================================
 export const getPasswordChangeConfirmationTemplate = (userName) => {
     return `
     <!DOCTYPE html>
@@ -1099,6 +1138,261 @@ export const getPasswordChangeConfirmationTemplate = (userName) => {
     `;
 };
 
+// ============================================
+// BOOKING CONFIRMATION (For Customer)
+// ============================================
+export const getBookingConfirmationTemplate = (userName, booking) => {
+    const bookingDateFormatted = new Date(booking.bookingDate).toLocaleDateString('en-IN', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+
+    return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Booking Confirmed</title>
+        <style>
+            body { 
+                font-family: 'Helvetica Neue', Arial, sans-serif; 
+                margin: 0; 
+                padding: 0; 
+                background-color: #f5f5f5; 
+                line-height: 1.6;
+            }
+            .container { 
+                max-width: 600px; 
+                margin: 40px auto; 
+                background-color: #ffffff; 
+                border: 1px solid #e0e0e0;
+            }
+            .header { 
+                background-color: #000000; 
+                padding: 50px 30px; 
+                text-align: center; 
+            }
+            .header h1 { 
+                color: #ffffff; 
+                margin: 0; 
+                font-size: 24px; 
+                font-weight: 300;
+                letter-spacing: 2px;
+                text-transform: uppercase;
+            }
+            .header p { 
+                color: #888888; 
+                margin: 15px 0 0; 
+                font-size: 14px;
+                letter-spacing: 1px;
+            }
+            .content { 
+                padding: 50px 40px; 
+            }
+            .greeting { 
+                color: #333333; 
+                font-size: 18px;
+                font-weight: 400;
+                margin-bottom: 10px;
+            }
+            .subtitle { 
+                color: #666666; 
+                font-size: 15px;
+                margin-bottom: 40px;
+            }
+            .booking-code-box {
+                background-color: #000000;
+                padding: 30px;
+                text-align: center;
+                margin: 30px 0;
+            }
+            .booking-code-label { 
+                color: #888888; 
+                font-size: 11px;
+                text-transform: uppercase;
+                letter-spacing: 2px;
+                margin-bottom: 15px;
+            }
+            .booking-code { 
+                color: #ffffff; 
+                font-size: 32px; 
+                font-weight: 300; 
+                letter-spacing: 6px;
+                font-family: 'Courier New', monospace;
+            }
+            .section { 
+                background-color: #fafafa; 
+                padding: 25px; 
+                margin: 25px 0;
+            }
+            .section-title { 
+                font-size: 12px;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+                color: #333333;
+                margin: 0 0 20px 0;
+                font-weight: 600;
+                padding-bottom: 10px;
+                border-bottom: 1px solid #e0e0e0;
+            }
+            .info-row { 
+                display: flex; 
+                justify-content: space-between; 
+                padding: 10px 0; 
+                border-bottom: 1px solid #e8e8e8;
+            }
+            .info-row:last-child { 
+                border-bottom: none; 
+            }
+            .info-label { 
+                color: #888888;
+                font-size: 13px;
+            }
+            .info-value { 
+                color: #333333; 
+                font-size: 13px;
+                font-weight: 500;
+                text-align: right;
+            }
+            .highlight {
+                color: #000000;
+                font-weight: 600;
+            }
+            .note-box { 
+                background-color: #ffffff; 
+                border: 1px solid #e0e0e0;
+                padding: 25px; 
+                margin: 30px 0;
+            }
+            .note-title {
+                font-size: 12px;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+                color: #333333;
+                margin: 0 0 15px 0;
+                font-weight: 600;
+            }
+            .note-box ul {
+                margin: 0;
+                padding-left: 20px;
+                color: #666666;
+                font-size: 13px;
+            }
+            .note-box li {
+                margin: 8px 0;
+            }
+            .footer { 
+                background-color: #fafafa; 
+                padding: 30px; 
+                text-align: center; 
+                border-top: 1px solid #e0e0e0;
+            }
+            .footer p { 
+                color: #999999; 
+                font-size: 12px; 
+                margin: 5px 0;
+            }
+            .brand {
+                font-weight: 600;
+                color: #333333;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>Booking Confirmed</h1>
+                <p>Your service has been scheduled successfully</p>
+            </div>
+            <div class="content">
+                <p class="greeting">Hello, ${userName}</p>
+                <p class="subtitle">Your booking is confirmed. Here are your booking details.</p>
+
+                <div class="booking-code-box">
+                    <p class="booking-code-label">Your Booking Code</p>
+                    <p class="booking-code">${booking.bookingCode}</p>
+                </div>
+
+                <div class="section">
+                    <p class="section-title">Service Details</p>
+                    <div class="info-row">
+                        <span class="info-label">Service</span>
+                        <span class="info-value highlight">${booking.serviceName}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Category</span>
+                        <span class="info-value">${booking.serviceCategory}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Duration</span>
+                        <span class="info-value">${booking.duration} minutes</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Price</span>
+                        <span class="info-value highlight">Rs. ${booking.price}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Payment</span>
+                        <span class="info-value">Cash on Service</span>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <p class="section-title">Schedule</p>
+                    <div class="info-row">
+                        <span class="info-label">Date</span>
+                        <span class="info-value highlight">${bookingDateFormatted}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Time Slot</span>
+                        <span class="info-value highlight">${booking.timeSlot}</span>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <p class="section-title">Location</p>
+                    <div class="info-row">
+                        <span class="info-label">Address</span>
+                        <span class="info-value">${booking.location.address}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">City</span>
+                        <span class="info-value">${booking.location.city}</span>
+                    </div>
+                    ${booking.location.landmark ? `
+                    <div class="info-row">
+                        <span class="info-label">Landmark</span>
+                        <span class="info-value">${booking.location.landmark}</span>
+                    </div>` : ''}
+                </div>
+
+                <div class="note-box">
+                    <p class="note-title">Important</p>
+                    <ul>
+                        <li>Please be available at the location during your time slot</li>
+                        <li>Keep your booking code <strong>${booking.bookingCode}</strong> handy</li>
+                        <li>Payment: Cash on service completion</li>
+                        <li>To cancel, please do so at least 2 hours before the slot</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer">
+                <p class="brand">Wash2Door</p>
+                <p>&copy; ${new Date().getFullYear()} All rights reserved</p>
+                <p>Questions? Contact us at support@wash2door.com</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    `;
+};
+
+// ============================================
+// BOOKING CANCELLATION
+// ============================================
 export const getBookingCancellationTemplate = (userName, booking) => {
     return `
     <!DOCTYPE html>
@@ -1277,6 +1571,9 @@ export const getBookingCancellationTemplate = (userName, booking) => {
     `;
 };
 
+// ============================================
+// BOOKING STATUS UPDATE
+// ============================================
 export const getBookingStatusTemplate = (userName, booking) => {
     return `
     <!DOCTYPE html>
@@ -1424,521 +1721,6 @@ export const getBookingStatusTemplate = (userName, booking) => {
             <div class="footer">
                 <p class="brand">Wash2Door</p>
                 <p>&copy; ${new Date().getFullYear()} All rights reserved</p>
-            </div>
-        </div>
-    </body>
-    </html>
-    `;
-};
-
-export const getBookingConfirmationTemplate = (userName, booking) => {
-    const bookingDateFormatted = new Date(booking.bookingDate).toLocaleDateString('en-IN', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-    });
-
-    return `
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Booking Confirmed</title>
-        <style>
-            body { 
-                font-family: 'Helvetica Neue', Arial, sans-serif; 
-                margin: 0; 
-                padding: 0; 
-                background-color: #f5f5f5; 
-                line-height: 1.6;
-            }
-            .container { 
-                max-width: 600px; 
-                margin: 40px auto; 
-                background-color: #ffffff; 
-                border: 1px solid #e0e0e0;
-            }
-            .header { 
-                background-color: #000000; 
-                padding: 50px 30px; 
-                text-align: center; 
-            }
-            .header h1 { 
-                color: #ffffff; 
-                margin: 0; 
-                font-size: 24px; 
-                font-weight: 300;
-                letter-spacing: 2px;
-                text-transform: uppercase;
-            }
-            .header p { 
-                color: #888888; 
-                margin: 15px 0 0; 
-                font-size: 14px;
-                letter-spacing: 1px;
-            }
-            .content { 
-                padding: 50px 40px; 
-            }
-            .greeting { 
-                color: #333333; 
-                font-size: 18px;
-                font-weight: 400;
-                margin-bottom: 10px;
-            }
-            .subtitle { 
-                color: #666666; 
-                font-size: 15px;
-                margin-bottom: 40px;
-            }
-            .booking-code-box {
-                background-color: #000000;
-                padding: 30px;
-                text-align: center;
-                margin: 30px 0;
-            }
-            .booking-code-label { 
-                color: #888888; 
-                font-size: 11px;
-                text-transform: uppercase;
-                letter-spacing: 2px;
-                margin-bottom: 15px;
-            }
-            .booking-code { 
-                color: #ffffff; 
-                font-size: 32px; 
-                font-weight: 300; 
-                letter-spacing: 6px;
-                font-family: 'Courier New', monospace;
-            }
-            .section { 
-                background-color: #fafafa; 
-                padding: 25px; 
-                margin: 25px 0;
-            }
-            .section-title { 
-                font-size: 12px;
-                text-transform: uppercase;
-                letter-spacing: 1px;
-                color: #333333;
-                margin: 0 0 20px 0;
-                font-weight: 600;
-                padding-bottom: 10px;
-                border-bottom: 1px solid #e0e0e0;
-            }
-            .info-row { 
-                display: flex; 
-                justify-content: space-between; 
-                padding: 10px 0; 
-                border-bottom: 1px solid #e8e8e8;
-            }
-            .info-row:last-child { 
-                border-bottom: none; 
-            }
-            .info-label { 
-                color: #888888;
-                font-size: 13px;
-            }
-            .info-value { 
-                color: #333333; 
-                font-size: 13px;
-                font-weight: 500;
-                text-align: right;
-            }
-            .highlight {
-                color: #000000;
-                font-weight: 600;
-            }
-            .note-box { 
-                background-color: #ffffff; 
-                border: 1px solid #e0e0e0;
-                padding: 25px; 
-                margin: 30px 0;
-            }
-            .note-title {
-                font-size: 12px;
-                text-transform: uppercase;
-                letter-spacing: 1px;
-                color: #333333;
-                margin: 0 0 15px 0;
-                font-weight: 600;
-            }
-            .note-box ul {
-                margin: 0;
-                padding-left: 20px;
-                color: #666666;
-                font-size: 13px;
-            }
-            .note-box li {
-                margin: 8px 0;
-            }
-            .footer { 
-                background-color: #fafafa; 
-                padding: 30px; 
-                text-align: center; 
-                border-top: 1px solid #e0e0e0;
-            }
-            .footer p { 
-                color: #999999; 
-                font-size: 12px; 
-                margin: 5px 0;
-            }
-            .brand {
-                font-weight: 600;
-                color: #333333;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <div class="header">
-                <h1>Booking Confirmed</h1>
-                <p>Your car wash has been scheduled successfully</p>
-            </div>
-            <div class="content">
-                <p class="greeting">Hello, ${userName}</p>
-                <p class="subtitle">Your booking is confirmed. Here are your booking details.</p>
-
-                <div class="booking-code-box">
-                    <p class="booking-code-label">Your Booking Code</p>
-                    <p class="booking-code">${booking.bookingCode}</p>
-                </div>
-
-                <div class="section">
-                    <p class="section-title">Service Details</p>
-                    <div class="info-row">
-                        <span class="info-label">Service</span>
-                        <span class="info-value highlight">${booking.serviceName}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Package</span>
-                        <span class="info-value">${booking.serviceCategory.toUpperCase()}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Vehicle Type</span>
-                        <span class="info-value">${booking.vehicleTypeName}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Duration</span>
-                        <span class="info-value">${booking.duration} minutes</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Price</span>
-                        <span class="info-value highlight">Rs. ${booking.price}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Payment</span>
-                        <span class="info-value">Cash on Service</span>
-                    </div>
-                </div>
-
-                <div class="section">
-                    <p class="section-title">Schedule</p>
-                    <div class="info-row">
-                        <span class="info-label">Date</span>
-                        <span class="info-value highlight">${bookingDateFormatted}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Time Slot</span>
-                        <span class="info-value highlight">${booking.timeSlot}</span>
-                    </div>
-                </div>
-
-                <div class="section">
-                    <p class="section-title">Location</p>
-                    <div class="info-row">
-                        <span class="info-label">Address</span>
-                        <span class="info-value">${booking.location.address}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">City</span>
-                        <span class="info-value">${booking.location.city}</span>
-                    </div>
-                    ${booking.location.landmark ? `
-                    <div class="info-row">
-                        <span class="info-label">Landmark</span>
-                        <span class="info-value">${booking.location.landmark}</span>
-                    </div>` : ''}
-                </div>
-
-                <div class="section">
-                    <p class="section-title">Vehicle Details</p>
-                    <div class="info-row">
-                        <span class="info-label">Vehicle</span>
-                        <span class="info-value">${booking.vehicleDetails.brand} ${booking.vehicleDetails.model}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Color</span>
-                        <span class="info-value">${booking.vehicleDetails.color || 'Not specified'}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Plate Number</span>
-                        <span class="info-value">${booking.vehicleDetails.plateNumber || 'Not specified'}</span>
-                    </div>
-                </div>
-
-                <div class="note-box">
-                    <p class="note-title">Important</p>
-                    <ul>
-                        <li>Please be available at the location during your time slot</li>
-                        <li>Keep your booking code <strong>${booking.bookingCode}</strong> handy</li>
-                        <li>Payment: Cash on service completion</li>
-                        <li>To cancel, please do so at least 2 hours before the slot</li>
-                    </ul>
-                </div>
-            </div>
-            <div class="footer">
-                <p class="brand">Wash2Door</p>
-                <p>&copy; ${new Date().getFullYear()} All rights reserved</p>
-                <p>Questions? Contact us at support@wash2door.com</p>
-            </div>
-        </div>
-    </body>
-    </html>
-    `;
-};
-
-export const getAdminNewBookingTemplate = (booking, customer) => {
-    const bookingDateFormatted = new Date(booking.bookingDate).toLocaleDateString('en-IN', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-    });
-
-    return `
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>New Booking Alert</title>
-        <style>
-            body { 
-                font-family: 'Helvetica Neue', Arial, sans-serif; 
-                margin: 0; 
-                padding: 0; 
-                background-color: #f5f5f5; 
-                line-height: 1.6;
-            }
-            .container { 
-                max-width: 600px; 
-                margin: 40px auto; 
-                background-color: #ffffff; 
-                border: 1px solid #e0e0e0;
-            }
-            .header { 
-                background-color: #000000; 
-                padding: 40px 30px; 
-                text-align: center; 
-            }
-            .header h1 { 
-                color: #ffffff; 
-                margin: 0; 
-                font-size: 24px; 
-                font-weight: 300;
-                letter-spacing: 2px;
-                text-transform: uppercase;
-            }
-            .alert-badge { 
-                background-color: #ffffff; 
-                color: #000000; 
-                padding: 8px 20px; 
-                font-size: 11px;
-                text-transform: uppercase;
-                letter-spacing: 1px;
-                font-weight: 600; 
-                display: inline-block; 
-                margin-top: 15px;
-            }
-            .content { 
-                padding: 40px; 
-            }
-            .intro { 
-                color: #666666; 
-                font-size: 15px;
-                margin-bottom: 30px;
-            }
-            .booking-code-box {
-                background-color: #000000;
-                padding: 25px;
-                text-align: center;
-                margin: 25px 0;
-            }
-            .booking-code-label { 
-                color: #888888; 
-                font-size: 11px;
-                text-transform: uppercase;
-                letter-spacing: 2px;
-                margin-bottom: 10px;
-            }
-            .booking-code { 
-                color: #ffffff; 
-                font-size: 28px; 
-                font-weight: 300; 
-                letter-spacing: 5px;
-                font-family: 'Courier New', monospace;
-            }
-            .section { 
-                background-color: #fafafa; 
-                padding: 25px; 
-                margin: 20px 0;
-                border-left: 3px solid #000000;
-            }
-            .section-title { 
-                font-size: 12px;
-                text-transform: uppercase;
-                letter-spacing: 1px;
-                color: #333333;
-                margin: 0 0 20px 0;
-                font-weight: 600;
-            }
-            .info-row { 
-                display: flex; 
-                justify-content: space-between; 
-                padding: 8px 0; 
-                border-bottom: 1px solid #e8e8e8;
-            }
-            .info-row:last-child { 
-                border-bottom: none; 
-            }
-            .info-label { 
-                color: #888888;
-                font-size: 13px;
-            }
-            .info-value { 
-                color: #333333; 
-                font-size: 13px;
-                font-weight: 500;
-            }
-            .highlight {
-                color: #000000;
-                font-weight: 600;
-            }
-            .notes-section {
-                background-color: #fafafa;
-                padding: 20px 25px;
-                margin: 20px 0;
-            }
-            .notes-section p {
-                margin: 0;
-                color: #666666;
-                font-size: 14px;
-                font-style: italic;
-            }
-            .footer { 
-                background-color: #fafafa; 
-                padding: 30px; 
-                text-align: center; 
-                border-top: 1px solid #e0e0e0;
-            }
-            .footer p { 
-                color: #999999; 
-                font-size: 12px; 
-                margin: 5px 0;
-            }
-            .brand {
-                font-weight: 600;
-                color: #333333;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <div class="header">
-                <h1>New Booking</h1>
-                <span class="alert-badge">Action Required</span>
-            </div>
-            <div class="content">
-                <p class="intro">A new booking has been placed. Here are the details:</p>
-
-                <div class="booking-code-box">
-                    <p class="booking-code-label">Booking Code</p>
-                    <p class="booking-code">${booking.bookingCode}</p>
-                </div>
-
-                <div class="section">
-                    <p class="section-title">Booking Schedule</p>
-                    <div class="info-row">
-                        <span class="info-label">Date</span>
-                        <span class="info-value highlight">${bookingDateFormatted}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Time Slot</span>
-                        <span class="info-value highlight">${booking.timeSlot}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Service</span>
-                        <span class="info-value">${booking.serviceName}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Vehicle Type</span>
-                        <span class="info-value">${booking.vehicleTypeName}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Duration</span>
-                        <span class="info-value">${booking.duration} minutes</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Amount</span>
-                        <span class="info-value">Rs. ${booking.price} (Cash)</span>
-                    </div>
-                </div>
-
-                <div class="section">
-                    <p class="section-title">Service Location</p>
-                    <div class="info-row">
-                        <span class="info-label">Address</span>
-                        <span class="info-value">${booking.location.address}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">City</span>
-                        <span class="info-value">${booking.location.city}</span>
-                    </div>
-                    ${booking.location.state ? `
-                    <div class="info-row">
-                        <span class="info-label">State</span>
-                        <span class="info-value">${booking.location.state}</span>
-                    </div>` : ''}
-                    ${booking.location.landmark ? `
-                    <div class="info-row">
-                        <span class="info-label">Landmark</span>
-                        <span class="info-value">${booking.location.landmark}</span>
-                    </div>` : ''}
-                </div>
-
-                <div class="section">
-                    <p class="section-title">Customer Details</p>
-                    <div class="info-row">
-                        <span class="info-label">Name</span>
-                        <span class="info-value">${customer.firstName} ${customer.lastName}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Email</span>
-                        <span class="info-value">${customer.email}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Vehicle</span>
-                        <span class="info-value">${booking.vehicleDetails.brand} ${booking.vehicleDetails.model} - ${booking.vehicleDetails.color}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Plate Number</span>
-                        <span class="info-value">${booking.vehicleDetails.plateNumber || 'Not provided'}</span>
-                    </div>
-                </div>
-
-                ${booking.specialNotes ? `
-                <div class="notes-section">
-                    <p class="section-title" style="margin-bottom: 10px;">Special Notes from Customer</p>
-                    <p>${booking.specialNotes}</p>
-                </div>` : ''}
-            </div>
-            <div class="footer">
-                <p class="brand">Wash2Door Admin</p>
-                <p>&copy; ${new Date().getFullYear()} All rights reserved</p>
-                <p>Login to admin panel to manage this booking</p>
             </div>
         </div>
     </body>

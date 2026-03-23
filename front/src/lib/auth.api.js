@@ -1,7 +1,8 @@
-// lib/auth.api.js
 import api from './api'
 
-// Login - NOW STORES TOKEN
+// ============================================
+// LOGIN
+// ============================================
 export const login = async (email, password) => {
   try {
     const res = await api.post('/auth/login', { email, password })
@@ -9,10 +10,10 @@ export const login = async (email, password) => {
     if (res.data?.success) {
       const { user, accessToken } = res.data.data
       
-      // ✅ STORE TOKEN IMMEDIATELY
+      // Store token
       localStorage.setItem('accessToken', accessToken)
       
-      console.log('✅ Token stored, user logged in:', user)
+      console.log('✅ Login successful:', user.email)
       
       return { user, accessToken }
     }
@@ -28,34 +29,9 @@ export const login = async (email, password) => {
   }
 }
 
-// Verify OTP - ALSO STORE TOKEN
-export const verifyOTP = async (email, otp) => {
-  try {
-    const res = await api.post('/auth/verify-otp', { email, otp })
-    
-    if (res.data?.success) {
-      const { user, accessToken } = res.data.data
-      
-      // ✅ STORE TOKEN
-      localStorage.setItem('accessToken', accessToken)
-      
-      console.log('✅ OTP verified, token stored:', user)
-      
-      return { user, accessToken }
-    }
-    
-    throw new Error(res.data?.message || 'OTP verification failed')
-    
-  } catch (error) {
-    const err = new Error(
-      error.response?.data?.message || error.message || 'OTP verification failed'
-    )
-    err.attemptsRemaining = error.response?.data?.attemptsRemaining
-    throw err
-  }
-}
-
-// Register
+// ============================================
+// REGISTER (Link-Based - NEW)
+// ============================================
 export const register = async (firstName, lastName, email, password, confirmPassword) => {
   try {
     const res = await api.post('/auth/register', {
@@ -79,30 +55,59 @@ export const register = async (firstName, lastName, email, password, confirmPass
   }
 }
 
-// Resend OTP
-export const resendOTP = async (email) => {
+// ============================================
+// VERIFY REGISTRATION (Link-Based - NEW)
+// ============================================
+export const verifyRegistration = async (token) => {
   try {
-    const res = await api.post('/auth/resend-otp', { email })
+    const res = await api.get(`/auth/verify-registration/${token}`)
+    
+    if (res.data?.success) {
+      const { user, accessToken } = res.data.data
+      
+      // Store token
+      localStorage.setItem('accessToken', accessToken)
+      
+      console.log('✅ Registration verified:', user.email)
+      
+      return { user, accessToken }
+    }
+    
+    throw new Error(res.data?.message || 'Verification failed')
+    
+  } catch (error) {
+    throw new Error(
+      error.response?.data?.message || error.message || 'Verification failed'
+    )
+  }
+}
+
+// ============================================
+// RESEND REGISTRATION EMAIL (Link-Based - NEW)
+// ============================================
+export const resendRegistrationEmail = async (email) => {
+  try {
+    const res = await api.post('/auth/resend-registration-email', { email })
     
     if (res.data?.success) {
       return res.data.data
     }
     
-    throw new Error(res.data?.message || 'Failed to resend OTP')
+    throw new Error(res.data?.message || 'Failed to resend email')
     
   } catch (error) {
     throw new Error(
-      error.response?.data?.message || error.message || 'Failed to resend OTP'
+      error.response?.data?.message || error.message || 'Failed to resend email'
     )
   }
 }
 
-// Get current user
+// ============================================
+// GET CURRENT USER
+// ============================================
 export const getMe = async () => {
   try {
     const res = await api.get('/auth/me')
-    
-    console.log('📡 getMe response:', res.data)
     
     if (res.data?.success && res.data?.data?.user) {
       return res.data.data.user
@@ -121,7 +126,9 @@ export const getMe = async () => {
   }
 }
 
-// Logout
+// ============================================
+// LOGOUT
+// ============================================
 export const logout = async () => {
   try {
     await api.post('/auth/logout')
@@ -134,7 +141,9 @@ export const logout = async () => {
   }
 }
 
-// Forgot password
+// ============================================
+// FORGOT PASSWORD
+// ============================================
 export const forgotPassword = async (email) => {
   try {
     const res = await api.post('/auth/forgot-password', { email })
@@ -152,13 +161,12 @@ export const forgotPassword = async (email) => {
   }
 }
 
-// Reset password
-export const resetPassword = async (token, password, confirmPassword) => {
+// ============================================
+// RESET PASSWORD
+// ============================================
+export const resetPassword = async (token, password) => {
   try {
-    const res = await api.post(`/auth/reset-password/${token}`, {
-      password,
-      confirmPassword
-    })
+    const res = await api.post(`/auth/reset-password/${token}`, { password })
     
     if (res.data?.success) {
       return res.data.message
@@ -169,6 +177,70 @@ export const resetPassword = async (token, password, confirmPassword) => {
   } catch (error) {
     throw new Error(
       error.response?.data?.message || error.message || 'Password reset failed'
+    )
+  }
+}
+
+// ============================================
+// CHANGE PASSWORD
+// ============================================
+export const changePassword = async (currentPassword, newPassword) => {
+  try {
+    const res = await api.put('/auth/change-password', {
+      currentPassword,
+      newPassword
+    })
+    
+    if (res.data?.success) {
+      localStorage.setItem('accessToken', res.data.data.accessToken)
+      return res.data.data
+    }
+    
+    throw new Error(res.data?.message || 'Password change failed')
+    
+  } catch (error) {
+    throw new Error(
+      error.response?.data?.message || error.message || 'Password change failed'
+    )
+  }
+}
+
+// ============================================
+// VERIFY EMAIL (For existing users)
+// ============================================
+export const verifyEmail = async (token) => {
+  try {
+    const res = await api.get(`/auth/verify-email/${token}`)
+    
+    if (res.data?.success) {
+      return res.data.message
+    }
+    
+    throw new Error(res.data?.message || 'Email verification failed')
+    
+  } catch (error) {
+    throw new Error(
+      error.response?.data?.message || error.message || 'Email verification failed'
+    )
+  }
+}
+
+// ============================================
+// RESEND VERIFICATION EMAIL
+// ============================================
+export const resendVerificationEmail = async () => {
+  try {
+    const res = await api.post('/auth/resend-verification')
+    
+    if (res.data?.success) {
+      return res.data.message
+    }
+    
+    throw new Error(res.data?.message || 'Failed to resend verification email')
+    
+  } catch (error) {
+    throw new Error(
+      error.response?.data?.message || error.message || 'Failed to resend verification email'
     )
   }
 }

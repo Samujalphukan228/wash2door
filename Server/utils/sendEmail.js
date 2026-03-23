@@ -2,7 +2,7 @@
 
 import brevoAPI, { emailConfig } from '../config/email.js';
 import {
-    getOTPEmailTemplate,
+    getRegistrationVerificationEmailTemplate,
     getAdminWelcomeEmailTemplate,
     getAdminPasswordResetEmailTemplate,
     getVerificationEmailTemplate,
@@ -10,7 +10,6 @@ import {
     getWelcomeEmailTemplate,
     getPasswordChangeConfirmationTemplate,
     getBookingConfirmationTemplate,
-    getAdminNewBookingTemplate,
     getBookingCancellationTemplate,
     getBookingStatusTemplate
 } from './emailTemplates.js';
@@ -54,15 +53,22 @@ const sendEmail = async (options, retries = 2) => {
     }
 };
 
-// OTP Email
-export const sendOTPEmail = async (user, otp) => {
+// ============================================
+// REGISTRATION (NEW - Link Based)
+// ============================================
+export const sendRegistrationVerificationEmail = async (user, verificationToken) => {
+    const verificationLink = `${process.env.FRONTEND_URL}/verify-registration/${verificationToken}`;
     return await sendEmail({
         email: user.email,
         name: `${user.firstName} ${user.lastName}`,
-        subject: '🔐 Your Verification Code - Wash2Door',
-        html: getOTPEmailTemplate(user.firstName, otp)
+        subject: '✅ Verify Your Email - Wash2Door',
+        html: getRegistrationVerificationEmailTemplate(user.firstName, verificationLink)
     });
 };
+
+// ============================================
+// ADMIN EMAILS
+// ============================================
 
 // Admin Welcome Email
 export const sendAdminWelcomeEmail = async (user, tempPassword) => {
@@ -70,7 +76,7 @@ export const sendAdminWelcomeEmail = async (user, tempPassword) => {
         email: user.email,
         name: `${user.firstName} ${user.lastName}`,
         subject: '🎉 Welcome Admin! - Wash2Door',
-        html: getAdminWelcomeEmailTemplate(user.firstName, tempPassword)
+        html: getAdminWelcomeEmailTemplate(user.firstName, tempPassword, user.email)
     });
 };
 
@@ -84,7 +90,11 @@ export const sendAdminPasswordResetEmail = async (user, tempPassword) => {
     });
 };
 
-// Email Verification
+// ============================================
+// USER EMAILS
+// ============================================
+
+// Email Verification (for existing users)
 export const sendVerificationEmail = async (user, verificationToken) => {
     const verificationLink = `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
     return await sendEmail({
@@ -127,7 +137,7 @@ export const sendPasswordChangeConfirmation = async (user) => {
 };
 
 // ============================================
-// BOOKING EMAILS
+// BOOKING EMAILS (Customer Only)
 // ============================================
 
 // Customer Booking Confirmation
@@ -137,16 +147,6 @@ export const sendBookingConfirmationEmail = async (user, booking) => {
         name: `${user.firstName} ${user.lastName}`,
         subject: `✅ Booking Confirmed - ${booking.bookingCode} | Wash2Door`,
         html: getBookingConfirmationTemplate(user.firstName, booking)
-    });
-};
-
-// Admin New Booking Notification
-export const sendAdminNewBookingEmail = async (booking, customer) => {
-    return await sendEmail({
-        email: emailConfig.adminEmail,
-        name: 'Admin',
-        subject: `🔔 New Booking - ${booking.bookingCode} | ${booking.timeSlot} | Wash2Door`,
-        html: getAdminNewBookingTemplate(booking, customer)
     });
 };
 

@@ -8,7 +8,6 @@ const AuthContext = createContext(null)
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
-
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [modalView, setModalView] = useState('login')
   const [authEmail, setAuthEmail] = useState('')

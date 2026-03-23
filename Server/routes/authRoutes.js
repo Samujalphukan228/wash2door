@@ -1,10 +1,10 @@
-// routes/authRoutes.js - UPDATED with protected setup-admin
+// routes/authRoutes.js - Link-Based Registration with All Features
 
 import express from 'express';
 import {
     register,
-    verifyOTP,
-    resendOTP,
+    verifyRegistration,
+    resendRegistrationEmail,
     login,
     logout,
     refreshToken,
@@ -18,9 +18,7 @@ import {
     updateAvatar,
     deactivateAccount,
     getUserStats,
-    checkRegistrationStatus,
-    debugUserStatus,
-    deleteUserCompletely
+    checkRegistrationStatus
 } from '../controllers/authController.js';
 
 import { protect } from '../middleware/auth.js';
@@ -43,11 +41,11 @@ import User from '../models/User.js';
 const router = express.Router();
 
 // ============================================
-// REGISTRATION
+// REGISTRATION (Link-Based - NEW)
 // ============================================
 router.post('/register', authLimiter, registerValidator, register);
-router.post('/verify-otp', authLimiter, verifyOTP);
-router.post('/resend-otp', authLimiter, resendOTP);
+router.get('/verify-registration/:token', emailVerificationLimiter, verifyRegistration);
+router.post('/resend-registration-email', authLimiter, resendRegistrationEmail);
 
 // ============================================
 // AUTHENTICATION
@@ -57,7 +55,7 @@ router.post('/logout', protect, logout);
 router.post('/refresh-token', refreshToken);
 
 // ============================================
-// EMAIL VERIFICATION
+// EMAIL VERIFICATION (For existing users)
 // ============================================
 router.get(
     '/verify-email/:token',
@@ -195,8 +193,80 @@ if (process.env.NODE_ENV === 'development' || process.env.ALLOW_ADMIN_SETUP === 
 // DEBUG ROUTES (Development only)
 // ============================================
 if (process.env.NODE_ENV === 'development') {
-    router.get('/debug/:email', debugUserStatus);
-    router.delete('/delete-user/:email', deleteUserCompletely);
+    // Debug user status
+    router.get('/debug/:email', async (req, res) => {
+        try {
+            const { email } = req.params;
+            const user = await User.findOne({ email: email.toLowerCase() });
+
+            if (!user) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'User not found',
+                    debug: { email, exists: false }
+                });
+            }
+
+            res.status(200).json({
+                success: true,
+                debug: {
+                    id: user._id,
+                    email: user.email,
+                    firstName: user.firstName,
+                    lastName: user.lastName,
+                    registrationStatus: user.registrationStatus,
+                    isEmailVerified: user.isEmailVerified,
+                    isActive: user.isActive,
+                    isBlocked: user.isBlocked,
+                    role: user.role,
+                    createdAt: user.createdAt
+                }
+            });
+        } catch (error) {
+            res.status(500).json({
+                success: false,
+                message: 'Debug failed',
+                error: error.message
+            });
+        }
+    });
+
+    // Delete user completely
+    router.delete('/delete-user/:email', async (req, res) => {
+        try {
+            const { email } = req.params;
+            const { confirm } = req.query;
+
+            if (confirm !== 'yes') {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Add ?confirm=yes to confirm deletion'
+                });
+            }
+
+            const user = await User.findOne({ email: email.toLowerCase() });
+
+            if (!user) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'User not found'
+                });
+            }
+
+            await User.deleteOne({ _id: user._id });
+
+            res.status(200).json({
+                success: true,
+                message: `User ${email} deleted successfully`
+            });
+        } catch (error) {
+            res.status(500).json({
+                success: false,
+                message: 'Failed to delete user',
+                error: error.message
+            });
+        }
+    });
 }
 
 export default router;

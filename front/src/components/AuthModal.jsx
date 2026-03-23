@@ -19,8 +19,8 @@ import {
 import {
   login as loginAPI,
   register as registerAPI,
-  verifyOTP as verifyOTPAPI,
-  resendOTP as resendOTPAPI,
+  verifyRegistration as verifyRegistrationAPI,
+  resendRegistrationEmail as resendRegistrationEmailAPI,
   forgotPassword as forgotPasswordAPI,
 } from "@/lib/auth.api"
 
@@ -304,7 +304,7 @@ const ViewSwitcher = memo(function ViewSwitcher({ view }) {
     <div ref={containerRef} className="opacity-0">
       {view === "login" && <LoginView />}
       {view === "register" && <RegisterView />}
-      {view === "otp" && <OTPView />}
+      {view === "register-success" && <RegisterSuccessView />}
       {view === "forgot" && <ForgotPasswordView />}
       {view === "reset-success" && <ResetSuccessView />}
     </div>
@@ -530,7 +530,7 @@ const RegisterView = memo(function RegisterView() {
           formData.password,
           formData.confirmPassword
         )
-        switchView("otp", formData.email)
+        switchView("register-success", formData.email)
       } catch (err) {
         setServerError(err.message || "Registration failed. Please try again.")
       } finally {
@@ -642,130 +642,9 @@ const RegisterView = memo(function RegisterView() {
   )
 })
 
-// ── OTP View ──────────────────────────────────────────────
-const OTPView = memo(function OTPView() {
-  const { switchView, authEmail, loginSuccess } = useAuth()
-
-  const [otp, setOtp] = useState(["", "", "", "", "", ""])
-  const [errors, setErrors] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [resending, setResending] = useState(false)
-  const [attemptsRemaining, setAttemptsRemaining] = useState(null)
-  const [resendTimer, setResendTimer] = useState(0)
-
-  const inputRefs = useRef([])
-
-  useEffect(() => {
-    if (resendTimer > 0) {
-      const timer = setTimeout(() => setResendTimer(resendTimer - 1), 1000)
-      return () => clearTimeout(timer)
-    }
-  }, [resendTimer])
-
-  useEffect(() => {
-    inputRefs.current[0]?.focus()
-  }, [])
-
-  const handleChange = useCallback((index, value) => {
-    if (!/^\d*$/.test(value)) return
-
-    const newOtp = [...otp]
-    newOtp[index] = value.slice(-1)
-    setOtp(newOtp)
-    setErrors("")
-
-    if (value && index < 5) {
-      inputRefs.current[index + 1]?.focus()
-    }
-  }, [otp])
-
-  const handleKeyDown = useCallback(
-    (index, e) => {
-      if (e.key === "Backspace" && !otp[index] && index > 0) {
-        inputRefs.current[index - 1]?.focus()
-      }
-    },
-    [otp]
-  )
-
-  const handlePaste = useCallback((e) => {
-    e.preventDefault()
-    const pasteData = e.clipboardData?.getData("text").slice(0, 6) || ""
-    if (!/^\d+$/.test(pasteData)) return
-
-    const newOtp = ["", "", "", "", "", ""]
-    pasteData.split("").forEach((char, i) => {
-      if (i < 6) newOtp[i] = char
-    })
-    setOtp(newOtp)
-
-    const lastIndex = Math.min(pasteData.length, 6) - 1
-    inputRefs.current[lastIndex]?.focus()
-  }, [])
-
-  const handleSubmit = useCallback(
-    async (e) => {
-      e.preventDefault()
-      setErrors("")
-
-      const otpString = otp.join("")
-      if (otpString.length !== 6) {
-        setErrors("Please enter all 6 digits")
-        return
-      }
-
-      setLoading(true)
-
-      try {
-        const response = await verifyOTPAPI(authEmail, otpString)
-        if (response.user) {
-          loginSuccess(response.user)
-        }
-      } catch (err) {
-        setErrors(err.message || "OTP verification failed")
-        if (err.attemptsRemaining !== undefined) {
-          setAttemptsRemaining(err.attemptsRemaining)
-        }
-        setOtp(["", "", "", "", "", ""])
-        inputRefs.current[0]?.focus()
-      } finally {
-        setLoading(false)
-      }
-    },
-    [otp, authEmail, loginSuccess]
-  )
-
-  const handleResend = useCallback(async () => {
-    if (resendTimer > 0) return
-
-    setResending(true)
-    setErrors("")
-
-    try {
-      await resendOTPAPI(authEmail)
-      setResendTimer(30)
-      setOtp(["", "", "", "", "", ""])
-      inputRefs.current[0]?.focus()
-    } catch (err) {
-      setErrors(err.message || "Failed to resend OTP")
-    } finally {
-      setResending(false)
-    }
-  }, [resendTimer, authEmail])
-
-  if (!authEmail) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-gray-600 mb-4">Invalid session</p>
-        <button
-          onClick={() => switchView("login")}
-          className="text-blue-600 hover:underline text-sm"
-        >
-          Back to login
-        </button>
-      </div>
-    )
-  }
+// ── Register Success View ─────────────────────────────────
+const RegisterSuccessView = memo(function RegisterSuccessView() {
+  const { switchView, authEmail } = useAuth()
 
   return (
     <div className="space-y-8">
@@ -774,67 +653,47 @@ const OTPView = memo(function OTPView() {
         <div className="w-16 h-16 mx-auto mb-6 bg-blue-50 border border-blue-100 rounded-full flex items-center justify-center">
           <Mail size={28} className="text-blue-500" />
         </div>
-        <h2 className="text-3xl font-light text-black mb-2">Verify Email</h2>
+        <h2 className="text-3xl font-light text-black mb-2">Check Your Email</h2>
         <p className="text-sm text-gray-500">
-          Enter the 6-digit code sent to
+          We've sent a verification link to
           <br />
           <span className="text-black font-medium">{authEmail}</span>
         </p>
       </div>
 
-      {/* Form */}
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {errors && <ErrorAlert message={errors} attempts={attemptsRemaining} />}
-
-        {/* OTP Inputs */}
-        <div className="flex justify-center gap-2">
-          {otp.map((digit, index) => (
-            <input
-              key={index}
-              ref={(el) => (inputRefs.current[index] = el)}
-              type="text"
-              inputMode="numeric"
-              maxLength={1}
-              value={digit}
-              onChange={(e) => handleChange(index, e.target.value)}
-              onKeyDown={(e) => handleKeyDown(index, e)}
-              onPaste={handlePaste}
-              disabled={loading}
-              className="w-12 h-14 text-center text-lg font-semibold border-2 border-gray-200 
-                         rounded-lg focus:border-black focus:outline-none transition-colors
-                         disabled:bg-gray-100"
-            />
-          ))}
-        </div>
-
-        <Button loading={loading} disabled={loading || otp.join("").length !== 6}>
-          Verify
-        </Button>
-
-        {/* Resend */}
-        <div className="text-center">
-          <p className="text-sm text-gray-600">
-            Didn&apos;t receive code?{" "}
-            <button
-              type="button"
-              onClick={handleResend}
-              disabled={resendTimer > 0 || resending}
-              className={`font-medium transition-colors ${
-                resendTimer > 0 ? "text-gray-400 cursor-not-allowed" : "text-black hover:underline"
-              }`}
-            >
-              {resending
-                ? "Sending..."
-                : resendTimer > 0
-                ? `Resend in ${resendTimer}s`
-                : "Resend"}
-            </button>
+      {/* Content */}
+      <div className="space-y-4">
+        <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
+          <p className="text-sm text-blue-700">
+            Click the link in your email to verify your account and start using Wash2Door.
           </p>
         </div>
-      </form>
 
-      {/* Back */}
-      <div className="border-t border-gray-100 pt-6">
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <p className="text-xs text-gray-600 mb-2">
+            <strong>Didn't receive the email?</strong>
+          </p>
+          <p className="text-xs text-gray-500 mb-4">
+            Check your spam folder or request a new verification link.
+          </p>
+          <button
+            onClick={async () => {
+              try {
+                await resendRegistrationEmailAPI(authEmail)
+                alert("Verification email sent! Check your inbox.")
+              } catch (err) {
+                alert(err.message || "Failed to resend email")
+              }
+            }}
+            className="text-xs text-black font-medium hover:underline"
+          >
+            Resend Verification Email
+          </button>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="border-t border-gray-100 pt-6 space-y-3">
         <button
           onClick={() => switchView("login")}
           className="flex items-center justify-center gap-2 w-full text-gray-600 hover:text-black transition-colors"

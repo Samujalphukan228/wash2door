@@ -1,4 +1,4 @@
-// controllers/authController.js - FIXED getUserStats
+// controllers/authController.js - Link-Based Registration
 
 import crypto from 'crypto';
 import { validationResult } from 'express-validator';
@@ -14,7 +14,7 @@ import {
     verifyRefreshToken
 } from '../utils/generateToken.js';
 import {
-    sendOTPEmail,
+    sendRegistrationVerificationEmail,
     sendVerificationEmail,
     sendPasswordResetEmail,
     sendWelcomeEmail,
@@ -22,7 +22,7 @@ import {
 } from '../utils/sendEmail.js';
 
 // ============================================
-// REGISTER
+// REGISTER (Link-Based)
 // ============================================
 
 export const register = async (req, res) => {
@@ -54,7 +54,7 @@ export const register = async (req, res) => {
             });
         }
 
-        // 3. Proceed with fresh registration
+        // 3. Create new user
         let user;
         try {
             user = await User.create({
@@ -65,42 +65,42 @@ export const register = async (req, res) => {
                 registrationStatus: 'pending'
             });
         } catch (createError) {
-            // Handle duplicate key error (race condition)
             if (createError.code === 11000) {
                 return res.status(409).json({
                     success: false,
                     message: 'Email already in use. Please try again.'
                 });
             }
-            throw createError; // Re-throw other errors
+            throw createError;
         }
 
-        const otp = user.generateOTP();
+        // 4. Generate verification token
+        const verificationToken = user.generateEmailVerificationToken();
+        user.registrationStatus = 'verification-sent';
         await user.save({ validateBeforeSave: false });
 
+        // 5. Send verification email with link
         try {
-            await sendOTPEmail(user, otp);
-            user.registrationStatus = 'otp-sent';
-            await user.save({ validateBeforeSave: false });
+            await sendRegistrationVerificationEmail(user, verificationToken);
         } catch (emailError) {
-            console.error('OTP email failed:', emailError.message);
+            console.error('Verification email failed:', emailError.message);
             user.registrationStatus = 'failed';
             await user.save({ validateBeforeSave: false });
 
             return res.status(503).json({
                 success: false,
-                message: 'Failed to send OTP. Please try again.',
+                message: 'Failed to send verification email. Please try again.',
                 error: 'email_failed'
             });
         }
 
         res.status(201).json({
             success: true,
-            message: 'Registration initiated! Check your email for OTP.',
+            message: 'Registration initiated! Check your email for verification link.',
             data: {
                 email: user.email,
-                nextStep: 'verify-otp',
-                otpExpiresIn: '10 minutes'
+                nextStep: 'verify-email',
+                linkExpiresIn: '1 hour'
             }
         });
 
@@ -112,58 +112,53 @@ export const register = async (req, res) => {
         });
     }
 };
+
 // ============================================
-// VERIFY OTP
+// VERIFY REGISTRATION (Link-Based)
 // ============================================
 
-export const verifyOTP = async (req, res) => {
+export const verifyRegistration = async (req, res) => {
     try {
-        const { email, otp } = req.body;
+        const { token } = req.params;
 
-        if (!email || !otp) {
+        if (!token) {
             return res.status(400).json({
                 success: false,
-                message: 'Email and OTP are required'
+                message: 'Verification token is required'
             });
         }
 
-        const user = await User.findOne({ email: email.toLowerCase() });
+        const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+        const user = await User.findOne({
+            emailVerificationToken: hashedToken,
+            emailVerificationExpire: { $gt: Date.now() },
+            registrationStatus: { $ne: 'completed' }
+        });
 
         if (!user) {
-            return res.status(404).json({
-                success: false,
-                message: 'User not found. Please register first.'
-            });
-        }
-
-        if (user.registrationStatus === 'completed') {
             return res.status(400).json({
                 success: false,
-                message: 'This account is already registered.'
+                message: 'Invalid or expired verification link. Please register again.'
             });
         }
 
-        const otpResult = await user.verifyOTP(otp);
-
-        if (!otpResult.success) {
-            return res.status(400).json({
-                success: false,
-                message: otpResult.message,
-                attemptsRemaining: otpResult.attemptsRemaining
-            });
-        }
-
+        // Complete registration
         user.isEmailVerified = true;
-        user.registrationStatus = 'otp-verified';
+        user.emailVerificationToken = undefined;
+        user.emailVerificationExpire = undefined;
+        user.registrationStatus = 'completed';
+        user.registrationCompletedAt = new Date();
         await user.save({ validateBeforeSave: false });
 
+        // Generate tokens and log user in
         const { accessToken, refreshToken } = generateTokens(user._id);
         user.refreshToken = refreshToken;
-        user.registrationStatus = 'completed';
         await user.save({ validateBeforeSave: false });
 
         setTokenCookies(res, accessToken, refreshToken);
 
+        // Send welcome email
         try {
             await sendWelcomeEmail(user);
         } catch (emailError) {
@@ -172,7 +167,7 @@ export const verifyOTP = async (req, res) => {
 
         res.status(200).json({
             success: true,
-            message: 'OTP verified! Registration complete.',
+            message: 'Email verified! Registration complete.',
             data: {
                 user: {
                     id: user._id,
@@ -187,19 +182,19 @@ export const verifyOTP = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('OTP verification error:', error);
+        console.error('Verify registration error:', error);
         res.status(500).json({
             success: false,
-            message: 'OTP verification failed.'
+            message: 'Verification failed. Please try again.'
         });
     }
 };
 
 // ============================================
-// RESEND OTP
+// RESEND REGISTRATION EMAIL
 // ============================================
 
-export const resendOTP = async (req, res) => {
+export const resendRegistrationEmail = async (req, res) => {
     try {
         const { email } = req.body;
 
@@ -215,43 +210,46 @@ export const resendOTP = async (req, res) => {
         if (!user) {
             return res.status(404).json({
                 success: false,
-                message: 'User not found.'
+                message: 'User not found. Please register first.'
             });
         }
 
         if (user.registrationStatus === 'completed') {
             return res.status(400).json({
                 success: false,
-                message: 'This account is already registered.'
+                message: 'This account is already registered. Please login.'
             });
         }
 
-        const otp = user.generateOTP();
+        // Generate new verification token
+        const verificationToken = user.generateEmailVerificationToken();
+        user.registrationStatus = 'verification-sent';
         await user.save({ validateBeforeSave: false });
 
+        // Send verification email
         try {
-            await sendOTPEmail(user, otp);
+            await sendRegistrationVerificationEmail(user, verificationToken);
         } catch (emailError) {
             return res.status(503).json({
                 success: false,
-                message: 'Failed to send OTP. Please try again.'
+                message: 'Failed to send verification email. Please try again.'
             });
         }
 
         res.status(200).json({
             success: true,
-            message: 'New OTP sent to your email',
+            message: 'New verification link sent to your email',
             data: {
                 email: user.email,
-                otpExpiresIn: '10 minutes'
+                linkExpiresIn: '1 hour'
             }
         });
 
     } catch (error) {
-        console.error('Resend OTP error:', error);
+        console.error('Resend registration email error:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to resend OTP.'
+            message: 'Failed to resend verification email.'
         });
     }
 };
@@ -285,9 +283,9 @@ export const login = async (req, res) => {
         if (user.registrationStatus !== 'completed') {
             return res.status(403).json({
                 success: false,
-                message: 'Registration incomplete. Please verify OTP.',
+                message: 'Registration incomplete. Please verify your email.',
                 registrationStatus: user.registrationStatus,
-                nextStep: 'verify-otp'
+                nextStep: 'verify-email'
             });
         }
 
@@ -451,7 +449,7 @@ export const refreshToken = async (req, res) => {
 };
 
 // ============================================
-// VERIFY EMAIL
+// VERIFY EMAIL (For existing users)
 // ============================================
 
 export const verifyEmail = async (req, res) => {
@@ -500,7 +498,7 @@ export const verifyEmail = async (req, res) => {
 };
 
 // ============================================
-// RESEND VERIFICATION EMAIL
+// RESEND VERIFICATION EMAIL (For existing users)
 // ============================================
 
 export const resendVerificationEmail = async (req, res) => {
@@ -852,7 +850,6 @@ export const updateAvatar = async (req, res) => {
         const user = await User.findById(req.user._id);
 
         if (!user) {
-            // Delete uploaded file if user not found
             if (req.file.filename) {
                 await deleteCloudinaryImage(req.file.filename);
             }
@@ -862,9 +859,8 @@ export const updateAvatar = async (req, res) => {
             });
         }
 
-        // Delete old avatar if it exists and is not default
+        // Delete old avatar if exists
         if (user.avatar && !user.avatar.includes('default')) {
-            // Try to extract publicId from URL or use directly if it's already a publicId
             const publicId = user.avatar.startsWith('http') 
                 ? getPublicIdFromUrl(user.avatar)
                 : user.avatar;
@@ -874,7 +870,6 @@ export const updateAvatar = async (req, res) => {
             }
         }
 
-        // Update with new avatar URL
         const updatedUser = await User.findByIdAndUpdate(
             req.user._id,
             { avatar: req.file.path },
@@ -886,14 +881,13 @@ export const updateAvatar = async (req, res) => {
             message: 'Avatar updated successfully',
             data: { 
                 avatar: updatedUser.avatar,
-                avatarPublicId: req.file.filename // Return publicId for reference
+                avatarPublicId: req.file.filename
             }
         });
 
     } catch (error) {
         console.error('Update avatar error:', error);
         
-        // Clean up uploaded file on error
         if (req.file?.filename) {
             await deleteCloudinaryImage(req.file.filename);
         }
@@ -904,7 +898,6 @@ export const updateAvatar = async (req, res) => {
         });
     }
 };
-
 
 // ============================================
 // DEACTIVATE ACCOUNT
@@ -959,7 +952,7 @@ export const deactivateAccount = async (req, res) => {
 };
 
 // ============================================
-// GET USER STATS - FIXED
+// GET USER STATS
 // ============================================
 
 export const getUserStats = async (req, res) => {
@@ -1012,34 +1005,17 @@ export const getUserStats = async (req, res) => {
             { $limit: 1 }
         ]);
 
-        const mostUsedVariant = await Booking.aggregate([
-            {
-                $match: {
-                    customerId: new mongoose.Types.ObjectId(userId),
-                    status: { $ne: 'cancelled' }
-                }
-            },
-            {
-                $group: {
-                    _id: '$variantName',
-                    count: { $sum: 1 }
-                }
-            },
-            { $sort: { count: -1 } },
-            { $limit: 1 }
-        ]);
-
         const recentBookings = await Booking.find({ customerId: userId })
             .sort({ createdAt: -1 })
             .limit(5)
-            .select('bookingCode serviceName variantName bookingDate timeSlot status price');
+            .select('bookingCode serviceName bookingDate timeSlot status price');
 
         const activeBookings = await Booking.find({
             customerId: userId,
             status: { $in: ['pending', 'confirmed', 'in-progress'] }
         })
             .sort({ bookingDate: 1 })
-            .select('bookingCode serviceName variantName bookingDate timeSlot status price location');
+            .select('bookingCode serviceName bookingDate timeSlot status price location');
 
         res.status(200).json({
             success: true,
@@ -1055,7 +1031,6 @@ export const getUserStats = async (req, res) => {
                 totalSpent: totalSpentData[0]?.total || 0,
                 totalReviews,
                 mostUsedService: mostUsedService[0] || null,
-                mostUsedVariant: mostUsedVariant[0] || null,
                 recentBookings,
                 activeBookings
             }
@@ -1109,87 +1084,6 @@ export const checkRegistrationStatus = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to check registration status'
-        });
-    }
-};
-
-// ============================================
-// DEBUG ROUTES (Development only)
-// ============================================
-
-export const debugUserStatus = async (req, res) => {
-    try {
-        const { email } = req.params;
-
-        const user = await User.findOne({ email: email.toLowerCase() });
-
-        if (!user) {
-            return res.status(404).json({
-                success: false,
-                message: 'User not found',
-                debug: { email, exists: false }
-            });
-        }
-
-        res.status(200).json({
-            success: true,
-            debug: {
-                id: user._id,
-                email: user.email,
-                firstName: user.firstName,
-                lastName: user.lastName,
-                registrationStatus: user.registrationStatus,
-                otpVerified: user.otpVerified,
-                isEmailVerified: user.isEmailVerified,
-                isActive: user.isActive,
-                isBlocked: user.isBlocked,
-                role: user.role,
-                createdAt: user.createdAt
-            }
-        });
-
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'Debug failed',
-            error: error.message
-        });
-    }
-};
-
-export const deleteUserCompletely = async (req, res) => {
-    try {
-        const { email } = req.params;
-        const { confirm } = req.query;
-
-        if (confirm !== 'yes') {
-            return res.status(400).json({
-                success: false,
-                message: 'Add ?confirm=yes to confirm deletion'
-            });
-        }
-
-        const user = await User.findOne({ email: email.toLowerCase() });
-
-        if (!user) {
-            return res.status(404).json({
-                success: false,
-                message: 'User not found'
-            });
-        }
-
-        await User.deleteOne({ _id: user._id });
-
-        res.status(200).json({
-            success: true,
-            message: `User ${email} deleted successfully`
-        });
-
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'Failed to delete user',
-            error: error.message
         });
     }
 };
