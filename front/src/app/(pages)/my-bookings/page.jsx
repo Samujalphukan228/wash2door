@@ -5,57 +5,23 @@ import { useRouter } from "next/navigation"
 import { useAuth } from "@/context/AuthContext"
 import { motion, AnimatePresence } from "framer-motion"
 import {
-  Calendar,
-  Clock,
-  MapPin,
-  Car,
   Search,
   ChevronRight,
   ChevronLeft,
   Loader2,
   AlertCircle,
-  CheckCircle,
-  XCircle,
-  RotateCcw,
-  X,
   Phone,
   ArrowRight,
-  Timer,
+  Car,
   Sparkles,
+  X,
 } from "lucide-react"
 import { getUserBookings, cancelBooking } from "@/lib/booking.api"
+import OrderCard from "@/components/OrderCard"
 
 // ── Constants ──────────────────────────────────────────────
 const PHONE_NUMBER = "6900706456"
 const ITEMS_PER_PAGE = 10
-
-const STATUS_CONFIG = {
-  pending: {
-    label: "Pending",
-    dot: "bg-yellow-400",
-    icon: Clock,
-  },
-  confirmed: {
-    label: "Confirmed",
-    dot: "bg-blue-400",
-    icon: CheckCircle,
-  },
-  "in-progress": {
-    label: "In Progress",
-    dot: "bg-purple-400",
-    icon: RotateCcw,
-  },
-  completed: {
-    label: "Completed",
-    dot: "bg-emerald-500",
-    icon: CheckCircle,
-  },
-  cancelled: {
-    label: "Cancelled",
-    dot: "bg-red-400",
-    icon: XCircle,
-  },
-}
 
 const FILTER_OPTIONS = [
   { value: "", label: "All" },
@@ -67,37 +33,17 @@ const FILTER_OPTIONS = [
 ]
 
 // ── Utility Functions ──────────────────────────────────────
-function formatDate(date) {
-  const d = new Date(date)
-  const today = new Date()
-  const tomorrow = new Date(today)
-  tomorrow.setDate(tomorrow.getDate() + 1)
-  
-  today.setHours(0, 0, 0, 0)
-  tomorrow.setHours(0, 0, 0, 0)
-  d.setHours(0, 0, 0, 0)
-  
-  if (d.getTime() === today.getTime()) return "Today"
-  if (d.getTime() === tomorrow.getTime()) return "Tomorrow"
-  
-  return d.toLocaleDateString("en-IN", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-  })
-}
-
 function isUpcomingBooking(booking) {
   const bookingDate = new Date(booking.bookingDate)
   return (
-    bookingDate > new Date() && 
+    bookingDate > new Date() &&
     !["cancelled", "completed"].includes(booking.status)
   )
 }
 
 function canCancelBooking(booking) {
   return (
-    ["pending", "confirmed"].includes(booking.status) && 
+    ["pending", "confirmed"].includes(booking.status) &&
     isUpcomingBooking(booking)
   )
 }
@@ -109,7 +55,7 @@ function useScrollLock(isLocked) {
 
     const scrollY = window.scrollY
     const body = document.body
-    
+
     body.style.position = "fixed"
     body.style.top = `-${scrollY}px`
     body.style.left = "0"
@@ -135,10 +81,10 @@ const fadeUp = {
   visible: (i = 0) => ({
     opacity: 1,
     y: 0,
-    transition: { 
-      duration: 0.5, 
-      delay: i * 0.08, 
-      ease: [0.16, 1, 0.3, 1] 
+    transition: {
+      duration: 0.5,
+      delay: i * 0.08,
+      ease: [0.16, 1, 0.3, 1],
     },
   }),
 }
@@ -151,187 +97,17 @@ const overlayVariants = {
 
 const modalVariants = {
   hidden: { opacity: 0, y: 60 },
-  visible: { 
-    opacity: 1, 
-    y: 0, 
-    transition: { duration: 0.3, ease: [0.16, 1, 0.3, 1] } 
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.3, ease: [0.16, 1, 0.3, 1] },
   },
-  exit: { 
-    opacity: 0, 
-    y: 40, 
-    transition: { duration: 0.2 } 
+  exit: {
+    opacity: 0,
+    y: 40,
+    transition: { duration: 0.2 },
   },
 }
-
-// ── Status Badge ───────────────────────────────────────────
-const StatusBadge = memo(function StatusBadge({ status }) {
-  const config = STATUS_CONFIG[status] || STATUS_CONFIG.pending
-
-  return (
-    <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-50 border border-gray-100 rounded-full">
-      <span className={`w-1.5 h-1.5 rounded-full ${config.dot}`} />
-      <span 
-        className="text-gray-600 tracking-wider uppercase" 
-        style={{ fontSize: "9px", fontWeight: 500 }}
-      >
-        {config.label}
-      </span>
-    </span>
-  )
-})
-
-// ── Info Pill ──────────────────────────────────────────────
-const InfoPill = memo(function InfoPill({ icon: Icon, children }) {
-  return (
-    <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 border border-gray-100 rounded-lg">
-      <Icon size={11} strokeWidth={1.5} className="text-gray-400 shrink-0" />
-      <span className="text-black truncate" style={{ fontSize: "11px" }}>
-        {children}
-      </span>
-    </div>
-  )
-})
-
-// ── Booking Card ───────────────────────────────────────────
-const BookingCard = memo(function BookingCard({ booking, index, onViewDetails, onCancel }) {
-  const isUpcoming = isUpcomingBooking(booking)
-  const canBeCancelled = canCancelBooking(booking)
-
-  return (
-    <motion.div
-      custom={index}
-      variants={fadeUp}
-      initial="hidden"
-      animate="visible"
-      layout
-      className="group relative bg-white border border-gray-200 rounded-2xl overflow-hidden
-                 hover:border-gray-400 hover:shadow-md transition-all duration-300"
-    >
-      {/* Upcoming pulse indicator */}
-      {isUpcoming && (
-        <div className="absolute top-4 right-4 z-10">
-          <span className="relative flex h-2.5 w-2.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-full w-full bg-emerald-500" />
-          </span>
-        </div>
-      )}
-
-      <div className="p-4 sm:p-5">
-        {/* Header */}
-        <div className="flex items-center justify-between gap-2 mb-4">
-          <StatusBadge status={booking.status} />
-          <span 
-            className="text-gray-300 font-mono uppercase truncate max-w-[120px]"
-            style={{ fontSize: "10px", letterSpacing: "0.08em" }}
-          >
-            {booking.bookingCode}
-          </span>
-        </div>
-
-        {/* Service & Price */}
-        <div className="flex items-start justify-between gap-3 mb-4">
-          <div className="flex-1 min-w-0">
-            <h3
-              className="text-black truncate mb-0.5"
-              style={{
-                fontFamily: 'Georgia, "Times New Roman", serif',
-                fontWeight: 400,
-                fontSize: "clamp(16px, 4vw, 20px)",
-              }}
-            >
-              {booking.serviceName}
-            </h3>
-            <p 
-              className="text-gray-400 tracking-wider uppercase" 
-              style={{ fontSize: "9px" }}
-            >
-              {booking.vehicleTypeName}
-            </p>
-          </div>
-          <div className="text-right shrink-0">
-            <p
-              className="text-black leading-none"
-              style={{
-                fontFamily: 'Georgia, "Times New Roman", serif',
-                fontWeight: 300,
-                fontSize: "clamp(20px, 5vw, 28px)",
-              }}
-            >
-              ₹{booking.price?.toLocaleString("en-IN")}
-            </p>
-          </div>
-        </div>
-
-        {/* Info Pills */}
-        <div className="flex gap-1.5 mb-4 overflow-x-auto pb-0.5 no-scrollbar">
-          <div className="flex gap-1.5">
-            <InfoPill icon={Calendar}>
-              {formatDate(booking.bookingDate)}
-            </InfoPill>
-            <InfoPill icon={Clock}>{booking.timeSlot}</InfoPill>
-            <InfoPill icon={Timer}>{booking.duration}m</InfoPill>
-            {booking.location?.city && (
-              <InfoPill icon={MapPin}>{booking.location.city}</InfoPill>
-            )}
-          </div>
-        </div>
-
-        <div className="h-px bg-gray-100 mb-4" />
-
-        {/* Actions */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <motion.button
-            whileTap={{ scale: 0.96 }}
-            onClick={() => onViewDetails(booking)}
-            className="inline-flex items-center gap-1.5 h-9 px-4
-                       bg-black text-white rounded-full
-                       hover:bg-gray-800 transition-colors duration-200"
-          >
-            <span 
-              className="tracking-wider uppercase" 
-              style={{ fontSize: "10px", fontWeight: 500 }}
-            >
-              Details
-            </span>
-            <ChevronRight size={12} strokeWidth={2} />
-          </motion.button>
-
-          {booking.status === "completed" && (
-            <span className="inline-flex items-center gap-1.5 h-9 px-4
-                           border border-emerald-200 text-emerald-600 rounded-full">
-              <CheckCircle size={11} strokeWidth={2} />
-              <span 
-                className="tracking-wider uppercase" 
-                style={{ fontSize: "10px", fontWeight: 500 }}
-              >
-                Done
-              </span>
-            </span>
-          )}
-
-          {canBeCancelled && (
-            <motion.button
-              whileTap={{ scale: 0.96 }}
-              onClick={() => onCancel(booking)}
-              className="inline-flex items-center gap-1.5 h-9 px-4 ml-auto
-                         text-red-500 hover:bg-red-50 rounded-full
-                         transition-colors duration-200"
-            >
-              <XCircle size={11} strokeWidth={2} />
-              <span 
-                className="tracking-wider uppercase" 
-                style={{ fontSize: "10px", fontWeight: 500 }}
-              >
-                Cancel
-              </span>
-            </motion.button>
-          )}
-        </div>
-      </div>
-    </motion.div>
-  )
-})
 
 // ── Modal Wrapper ──────────────────────────────────────────
 const ModalWrapper = memo(function ModalWrapper({ isOpen, onClose, children }) {
@@ -379,7 +155,11 @@ const ModalWrapper = memo(function ModalWrapper({ isOpen, onClose, children }) {
 })
 
 // ── Details Modal ──────────────────────────────────────────
-const BookingDetailsModal = memo(function BookingDetailsModal({ booking, isOpen, onClose }) {
+const BookingDetailsModal = memo(function BookingDetailsModal({
+  booking,
+  isOpen,
+  onClose,
+}) {
   const bookingDateFormatted = useMemo(() => {
     if (!booking) return ""
     return new Date(booking.bookingDate).toLocaleDateString("en-IN", {
@@ -398,7 +178,6 @@ const BookingDetailsModal = memo(function BookingDetailsModal({ booking, isOpen,
       <div className="px-5 pt-5 pb-4 border-b border-gray-100">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
-            <StatusBadge status={booking.status} />
             <h2
               className="text-black mt-3 leading-tight"
               style={{
@@ -409,8 +188,8 @@ const BookingDetailsModal = memo(function BookingDetailsModal({ booking, isOpen,
             >
               {booking.serviceName}
             </h2>
-            <p 
-              className="text-gray-400 tracking-wider uppercase mt-1" 
+            <p
+              className="text-gray-400 tracking-wider uppercase mt-1"
               style={{ fontSize: "9px" }}
             >
               {booking.bookingCode}
@@ -429,18 +208,18 @@ const BookingDetailsModal = memo(function BookingDetailsModal({ booking, isOpen,
         </div>
 
         <div className="mt-4 flex items-baseline gap-2">
-          <span 
-            className="text-gray-400 tracking-wider uppercase" 
+          <span
+            className="text-gray-400 tracking-wider uppercase"
             style={{ fontSize: "9px" }}
           >
             Total
           </span>
           <span
             className="text-black"
-            style={{ 
-              fontFamily: 'Georgia, "Times New Roman", serif', 
-              fontWeight: 300, 
-              fontSize: "30px" 
+            style={{
+              fontFamily: 'Georgia, "Times New Roman", serif',
+              fontWeight: 300,
+              fontSize: "30px",
             }}
           >
             ₹{booking.price?.toLocaleString("en-IN")}
@@ -452,64 +231,52 @@ const BookingDetailsModal = memo(function BookingDetailsModal({ booking, isOpen,
       <div className="px-5 py-5 space-y-3">
         {/* Schedule */}
         <div className="border border-gray-100 rounded-xl p-4">
-          <p 
-            className="text-gray-400 tracking-wider uppercase mb-3" 
+          <p
+            className="text-gray-400 tracking-wider uppercase mb-3"
             style={{ fontSize: "9px" }}
           >
             Schedule
           </p>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 border border-gray-200 rounded-xl flex items-center justify-center shrink-0">
-              <Calendar size={16} strokeWidth={1.5} className="text-gray-400" />
-            </div>
-            <div>
-              <p 
-                className="text-black" 
-                style={{ 
-                  fontFamily: 'Georgia, "Times New Roman", serif', 
-                  fontSize: "13px" 
-                }}
-              >
-                {bookingDateFormatted}
-              </p>
-              <p 
-                className="text-gray-500 mt-0.5 flex items-center gap-1.5" 
-                style={{ fontSize: "11px" }}
-              >
-                <Clock size={10} strokeWidth={2} />
-                {booking.timeSlot} · {booking.duration} minutes
-              </p>
-            </div>
+          <div>
+            <p
+              className="text-black"
+              style={{
+                fontFamily: 'Georgia, "Times New Roman", serif',
+                fontSize: "13px",
+              }}
+            >
+              {bookingDateFormatted}
+            </p>
+            <p
+              className="text-gray-500 mt-0.5"
+              style={{ fontSize: "11px" }}
+            >
+              {booking.timeSlot} · {booking.duration} minutes
+            </p>
           </div>
         </div>
 
         {/* Location */}
-        <div className="border border-gray-100 rounded-xl p-4">
-          <p 
-            className="text-gray-400 tracking-wider uppercase mb-3" 
-            style={{ fontSize: "9px" }}
-          >
-            Location
-          </p>
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 border border-gray-200 rounded-xl flex items-center justify-center shrink-0">
-              <MapPin size={16} strokeWidth={1.5} className="text-gray-400" />
-            </div>
+        {booking.location && (
+          <div className="border border-gray-100 rounded-xl p-4">
+            <p
+              className="text-gray-400 tracking-wider uppercase mb-3"
+              style={{ fontSize: "9px" }}
+            >
+              Location
+            </p>
             <div className="min-w-0">
-              <p 
-                className="text-black" 
-                style={{ 
-                  fontFamily: 'Georgia, "Times New Roman", serif', 
-                  fontSize: "13px" 
+              <p
+                className="text-black"
+                style={{
+                  fontFamily: 'Georgia, "Times New Roman", serif',
+                  fontSize: "13px",
                 }}
               >
                 {booking.location?.address || "Address not provided"}
               </p>
               {booking.location?.landmark && (
-                <p 
-                  className="text-gray-500 mt-0.5" 
-                  style={{ fontSize: "11px" }}
-                >
+                <p className="text-gray-500 mt-0.5" style={{ fontSize: "11px" }}>
                   Near {booking.location.landmark}
                 </p>
               )}
@@ -520,68 +287,19 @@ const BookingDetailsModal = memo(function BookingDetailsModal({ booking, isOpen,
               </p>
             </div>
           </div>
-        </div>
-
-        {/* Vehicle */}
-        {(booking.vehicleDetails?.brand || booking.vehicleDetails?.type) && (
-          <div className="border border-gray-100 rounded-xl p-4">
-            <p 
-              className="text-gray-400 tracking-wider uppercase mb-3" 
-              style={{ fontSize: "9px" }}
-            >
-              Vehicle
-            </p>
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 border border-gray-200 rounded-xl flex items-center justify-center shrink-0">
-                <Car size={16} strokeWidth={1.5} className="text-gray-400" />
-              </div>
-              <div>
-                <p 
-                  className="text-black" 
-                  style={{ 
-                    fontFamily: 'Georgia, "Times New Roman", serif', 
-                    fontSize: "13px" 
-                  }}
-                >
-                  {booking.vehicleTypeName}
-                </p>
-                {booking.vehicleDetails?.brand && (
-                  <p 
-                    className="text-gray-500 mt-0.5" 
-                    style={{ fontSize: "11px" }}
-                  >
-                    {booking.vehicleDetails.brand} {booking.vehicleDetails.model}
-                  </p>
-                )}
-                <div 
-                  className="flex items-center gap-3 mt-1 text-gray-400" 
-                  style={{ fontSize: "10px" }}
-                >
-                  {booking.vehicleDetails?.color && (
-                    <span>{booking.vehicleDetails.color}</span>
-                  )}
-                  {booking.vehicleDetails?.plateNumber && (
-                    <span className="font-mono uppercase">
-                      {booking.vehicleDetails.plateNumber}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
         )}
 
         {/* Special Notes */}
         {booking.specialNotes && (
           <div className="border border-gray-200 bg-gray-50 rounded-xl p-4">
-            <p 
-              className="text-gray-500 tracking-wider uppercase mb-2" 
+            <p
+              className="text-gray-500 tracking-wider uppercase mb-2"
               style={{ fontSize: "9px" }}
             >
               Special Instructions
             </p>
-            <p 
-              className="text-gray-600 leading-relaxed" 
+            <p
+              className="text-gray-600 leading-relaxed"
               style={{ fontSize: "12px" }}
             >
               {booking.specialNotes}
@@ -592,8 +310,8 @@ const BookingDetailsModal = memo(function BookingDetailsModal({ booking, isOpen,
         {/* Cancellation */}
         {booking.status === "cancelled" && (
           <div className="border border-red-200 bg-red-50 rounded-xl p-4">
-            <p 
-              className="text-red-500 tracking-wider uppercase mb-2" 
+            <p
+              className="text-red-500 tracking-wider uppercase mb-2"
               style={{ fontSize: "9px" }}
             >
               Cancellation Details
@@ -602,8 +320,8 @@ const BookingDetailsModal = memo(function BookingDetailsModal({ booking, isOpen,
               Cancelled by: {booking.cancelledBy || "User"}
             </p>
             {booking.cancellationReason && (
-              <p 
-                className="text-red-500 mt-1" 
+              <p
+                className="text-red-500 mt-1"
                 style={{ fontSize: "12px" }}
               >
                 Reason: {booking.cancellationReason}
@@ -616,20 +334,20 @@ const BookingDetailsModal = memo(function BookingDetailsModal({ booking, isOpen,
         <div className="flex items-center justify-between py-3 border-t border-gray-100">
           <div>
             <p className="text-black" style={{ fontSize: "12px" }}>
-              {booking.paymentMethod === "cash" 
-                ? "Cash on Service" 
+              {booking.paymentMethod === "cash"
+                ? "Cash on Service"
                 : booking.paymentMethod}
             </p>
             <p
               className={`mt-0.5 ${
-                booking.paymentStatus === "completed" 
-                  ? "text-emerald-600" 
+                booking.paymentStatus === "completed"
+                  ? "text-emerald-600"
                   : "text-yellow-600"
               }`}
               style={{ fontSize: "11px" }}
             >
-              {booking.paymentStatus === "completed" 
-                ? "✓ Paid" 
+              {booking.paymentStatus === "completed"
+                ? "✓ Paid"
                 : "○ Payment Pending"}
             </p>
           </div>
@@ -651,8 +369,8 @@ const BookingDetailsModal = memo(function BookingDetailsModal({ booking, isOpen,
           onClick={onClose}
           className="h-10 px-6 bg-black text-white rounded-full hover:bg-gray-800 transition-colors duration-200"
         >
-          <span 
-            className="tracking-wider uppercase" 
+          <span
+            className="tracking-wider uppercase"
             style={{ fontSize: "10px", fontWeight: 500 }}
           >
             Close
@@ -694,36 +412,37 @@ const CancelBookingModal = memo(function CancelBookingModal({
 
         <h2
           className="text-black mb-2"
-          style={{ 
-            fontFamily: 'Georgia, "Times New Roman", serif', 
-            fontWeight: 300, 
-            fontSize: "20px" 
+          style={{
+            fontFamily: 'Georgia, "Times New Roman", serif',
+            fontWeight: 300,
+            fontSize: "20px",
           }}
         >
           Cancel Booking?
         </h2>
 
         <div className="border border-gray-100 rounded-xl p-4 mb-5">
-          <p 
-            className="text-black" 
-            style={{ 
-              fontFamily: 'Georgia, "Times New Roman", serif', 
-              fontSize: "14px" 
+          <p
+            className="text-black"
+            style={{
+              fontFamily: 'Georgia, "Times New Roman", serif',
+              fontSize: "14px",
             }}
           >
             {booking.serviceName}
           </p>
-          <p 
-            className="text-gray-400 tracking-wider uppercase mt-1" 
+          <p
+            className="text-gray-400 tracking-wider uppercase mt-1"
             style={{ fontSize: "9px" }}
           >
-            {formatDate(new Date(booking.bookingDate))} at {booking.timeSlot}
+            {new Date(booking.bookingDate).toLocaleDateString("en-IN")} at{" "}
+            {booking.timeSlot}
           </p>
         </div>
 
         <div className="mb-5">
-          <label 
-            className="block text-gray-400 tracking-wider uppercase mb-2" 
+          <label
+            className="block text-gray-400 tracking-wider uppercase mb-2"
             style={{ fontSize: "9px" }}
           >
             Reason (optional)
@@ -767,15 +486,12 @@ const CancelBookingModal = memo(function CancelBookingModal({
             {loading ? (
               <Loader2 size={16} className="animate-spin" />
             ) : (
-              <>
-                <XCircle size={13} strokeWidth={2} />
-                <span 
-                  className="tracking-wider uppercase" 
-                  style={{ fontSize: "10px", fontWeight: 500 }}
-                >
-                  Cancel
-                </span>
-              </>
+              <span
+                className="tracking-wider uppercase"
+                style={{ fontSize: "10px", fontWeight: 500 }}
+              >
+                Cancel
+              </span>
             )}
           </motion.button>
         </div>
@@ -798,20 +514,20 @@ const EmptyState = memo(function EmptyState({ hasFilters }) {
       </div>
       <h3
         className="text-black mb-2"
-        style={{ 
-          fontFamily: 'Georgia, "Times New Roman", serif', 
-          fontWeight: 300, 
-          fontSize: "18px" 
+        style={{
+          fontFamily: 'Georgia, "Times New Roman", serif',
+          fontWeight: 300,
+          fontSize: "18px",
         }}
       >
         {hasFilters ? "No bookings found" : "No bookings yet"}
       </h3>
-      <p 
-        className="text-gray-400 mb-7 max-w-xs leading-relaxed" 
+      <p
+        className="text-gray-400 mb-7 max-w-xs leading-relaxed"
         style={{ fontSize: "13px" }}
       >
-        {hasFilters 
-          ? "Try adjusting your filters" 
+        {hasFilters
+          ? "Try adjusting your filters"
           : "Book your first service today"}
       </p>
       {!hasFilters && (
@@ -820,8 +536,8 @@ const EmptyState = memo(function EmptyState({ hasFilters }) {
           href="/bookings"
           className="inline-flex items-center gap-2 h-11 px-6 bg-black text-white rounded-full hover:bg-gray-800 transition-colors"
         >
-          <span 
-            className="tracking-wider uppercase" 
+          <span
+            className="tracking-wider uppercase"
             style={{ fontSize: "11px", fontWeight: 500 }}
           >
             Book Now
@@ -868,7 +584,7 @@ const HeroSection = memo(function HeroSection({ total }) {
               className="flex items-center gap-3 mb-4"
             >
               <span className="w-8 h-px bg-white/30" aria-hidden="true" />
-              <span 
+              <span
                 className="tracking-[0.3em] uppercase text-white/50"
                 style={{ fontFamily: "Georgia, serif", fontSize: "9px" }}
               >
@@ -907,7 +623,11 @@ const HeroSection = memo(function HeroSection({ total }) {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            transition={{
+              duration: 0.6,
+              delay: 0.25,
+              ease: [0.16, 1, 0.3, 1],
+            }}
             className="hidden sm:block"
           >
             <motion.a
@@ -918,8 +638,8 @@ const HeroSection = memo(function HeroSection({ total }) {
                          hover:bg-gray-100 transition-colors duration-200"
             >
               <Sparkles size={13} />
-              <span 
-                className="tracking-wider uppercase" 
+              <span
+                className="tracking-wider uppercase"
                 style={{ fontSize: "10px", fontWeight: 500 }}
               >
                 Book New
@@ -946,10 +666,10 @@ const FilterBar = memo(function FilterBar({
         <div className="flex flex-col gap-2.5">
           {/* Search */}
           <div className="relative">
-            <Search 
-              size={15} 
-              strokeWidth={1.5} 
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none" 
+            <Search
+              size={15}
+              strokeWidth={1.5}
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none"
             />
             <input
               type="text"
@@ -1058,7 +778,7 @@ const Pagination = memo(function Pagination({
 // ── Mobile Bottom CTA ──────────────────────────────────────
 const MobileCTA = memo(function MobileCTA() {
   return (
-    <div 
+    <div
       className="sm:hidden fixed bottom-0 left-0 right-0 z-20
                   bg-white/95 backdrop-blur-sm border-t border-gray-100 p-3 pb-safe"
     >
@@ -1069,8 +789,8 @@ const MobileCTA = memo(function MobileCTA() {
                    bg-black text-white rounded-full hover:bg-gray-800 transition-colors"
       >
         <Sparkles size={13} />
-        <span 
-          className="tracking-wider uppercase" 
+        <span
+          className="tracking-wider uppercase"
           style={{ fontSize: "11px", fontWeight: 500 }}
         >
           Book New Service
@@ -1116,12 +836,17 @@ export default function MyBookingsPage() {
       try {
         setLoading(true)
         setError("")
-        const result = await getUserBookings(statusFilter, currentPage, ITEMS_PER_PAGE)
+        const result = await getUserBookings(
+          statusFilter,
+          currentPage,
+          ITEMS_PER_PAGE
+        )
         setBookings(result.bookings || [])
         setTotalPages(result.pages || 1)
         setTotal(result.total || 0)
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Failed to fetch bookings"
+        const errorMessage =
+          err instanceof Error ? err.message : "Failed to fetch bookings"
         if (process.env.NODE_ENV === "development") {
           console.error("Fetch bookings error:", err)
         }
@@ -1148,14 +873,19 @@ export default function MyBookingsPage() {
         setActionLoading(true)
         await cancelBooking(bookingId, reason)
         closeModals()
-        
+
         // Refresh bookings
-        const result = await getUserBookings(statusFilter, currentPage, ITEMS_PER_PAGE)
+        const result = await getUserBookings(
+          statusFilter,
+          currentPage,
+          ITEMS_PER_PAGE
+        )
         setBookings(result.bookings || [])
         setTotalPages(result.pages || 1)
         setTotal(result.total || 0)
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Failed to cancel booking"
+        const errorMessage =
+          err instanceof Error ? err.message : "Failed to cancel booking"
         setError(errorMessage)
       } finally {
         setActionLoading(false)
@@ -1247,9 +977,9 @@ export default function MyBookingsPage() {
               <>
                 <motion.div layout className="space-y-3">
                   {filteredBookings.map((booking, index) => (
-                    <BookingCard
+                    <OrderCard
                       key={booking._id}
-                      booking={booking}
+                      {...booking}
                       index={index}
                       onViewDetails={(b) => {
                         setSelectedBooking(b)
@@ -1259,6 +989,8 @@ export default function MyBookingsPage() {
                         setSelectedBooking(b)
                         setShowCancelModal(true)
                       }}
+                      isUpcoming={isUpcomingBooking(booking)}
+                      canCancel={canCancelBooking(booking)}
                     />
                   ))}
                 </motion.div>
