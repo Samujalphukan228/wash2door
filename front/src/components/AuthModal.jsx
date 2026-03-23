@@ -14,6 +14,7 @@ import {
   Loader2,
   CheckCircle,
   Droplets,
+  AlertCircle,
 } from "lucide-react"
 import {
   login as loginAPI,
@@ -40,37 +41,159 @@ function makeFallbackVisible(element) {
   element.style.transform = "none"
 }
 
+// ── Reusable Components ───────────────────────────────────
+
+const ErrorAlert = memo(({ message, attempts }) => (
+  <div className="bg-red-50 border border-red-200 px-4 py-3 rounded-lg flex gap-3">
+    <AlertCircle size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
+    <div className="flex-1">
+      <p className="text-red-600 text-sm font-medium">{message}</p>
+      {attempts !== null && attempts > 0 && (
+        <p className="text-red-500 text-xs mt-1">
+          {attempts} attempt{attempts !== 1 ? "s" : ""} remaining
+        </p>
+      )}
+    </div>
+  </div>
+))
+
+ErrorAlert.displayName = "ErrorAlert"
+
+const InputField = memo(({ icon: Icon, label, error, ...props }) => (
+  <div className="space-y-2">
+    <label className="block text-xs font-medium text-gray-600 uppercase tracking-wider">
+      {label}
+    </label>
+    <div className="relative">
+      {Icon && (
+        <Icon
+          size={16}
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+        />
+      )}
+      <input
+        className={`w-full ${Icon ? "pl-10" : "pl-4"} pr-4 py-3 text-sm border rounded-lg
+          bg-white transition-all duration-200
+          ${
+            error
+              ? "border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-200"
+              : "border-gray-200 focus:border-black focus:ring-1 focus:ring-black/10"
+          }
+          focus:outline-none placeholder-gray-400`}
+        {...props}
+      />
+    </div>
+    {error && <p className="text-xs text-red-600 font-medium">{error}</p>}
+  </div>
+))
+
+InputField.displayName = "InputField"
+
+const PasswordField = memo(
+  ({ label, showPassword, onToggle, error, ...props }) => (
+    <div className="space-y-2">
+      <label className="block text-xs font-medium text-gray-600 uppercase tracking-wider">
+        {label}
+      </label>
+      <div className="relative">
+        <Lock
+          size={16}
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+        />
+        <input
+          type={showPassword ? "text" : "password"}
+          className={`w-full pl-10 pr-10 py-3 text-sm border rounded-lg
+            bg-white transition-all duration-200
+            ${
+              error
+                ? "border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-200"
+                : "border-gray-200 focus:border-black focus:ring-1 focus:ring-black/10"
+            }
+            focus:outline-none placeholder-gray-400`}
+          {...props}
+        />
+        <button
+          type="button"
+          onClick={onToggle}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+          aria-label={showPassword ? "Hide password" : "Show password"}
+        >
+          {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+        </button>
+      </div>
+      {error && <p className="text-xs text-red-600 font-medium">{error}</p>}
+    </div>
+  )
+)
+
+PasswordField.displayName = "PasswordField"
+
+const Button = memo(
+  ({ children, loading, disabled, variant = "primary", ...props }) => {
+    const baseStyles =
+      "w-full flex items-center justify-center gap-2 py-3 rounded-lg font-medium text-sm uppercase tracking-wider transition-all duration-200"
+
+    const variants = {
+      primary:
+        "bg-black text-white hover:bg-gray-900 active:scale-[0.98] disabled:opacity-50",
+      secondary:
+        "border border-gray-200 text-black hover:bg-gray-50 active:scale-[0.98] disabled:opacity-50",
+    }
+
+    return (
+      <button
+        disabled={loading || disabled}
+        className={`${baseStyles} ${variants[variant]}`}
+        {...props}
+      >
+        {loading ? (
+          <Loader2 size={16} className="animate-spin" />
+        ) : (
+          <>
+            {children}
+            <ArrowRight size={14} />
+          </>
+        )}
+      </button>
+    )
+  }
+)
+
+Button.displayName = "Button"
+
+const Logo = memo(() => (
+  <div className="flex items-center gap-2">
+    <Droplets size={24} className="text-blue-500" />
+    <span className="text-xl font-light text-black">
+      Wash<span className="text-blue-500 font-normal">2</span>Door
+    </span>
+  </div>
+))
+
+Logo.displayName = "Logo"
+
 // ── Main Modal Component ──────────────────────────────────
 export default function AuthModal() {
   const { isModalOpen, modalView, closeModal } = useAuth()
   const overlayRef = useRef(null)
   const contentRef = useRef(null)
 
-  // Lock body scroll when modal is open
   useEffect(() => {
     if (!isModalOpen) return
 
     const scrollY = window.scrollY
-
     document.body.style.position = "fixed"
     document.body.style.top = `-${scrollY}px`
-    document.body.style.left = "0"
-    document.body.style.right = "0"
     document.body.style.overflow = "hidden"
-    document.body.style.width = "100%"
 
     return () => {
       document.body.style.position = ""
       document.body.style.top = ""
-      document.body.style.left = ""
-      document.body.style.right = ""
       document.body.style.overflow = ""
-      document.body.style.width = ""
       window.scrollTo(0, scrollY)
     }
   }, [isModalOpen])
 
-  // Close on escape
   useEffect(() => {
     if (!isModalOpen) return
 
@@ -82,7 +205,6 @@ export default function AuthModal() {
     return () => window.removeEventListener("keydown", handleEscape)
   }, [isModalOpen, closeModal])
 
-  // Animate modal entrance
   useEffect(() => {
     if (!isModalOpen) return
 
@@ -105,66 +227,44 @@ export default function AuthModal() {
           gsap.fromTo(
             contentRef.current,
             { opacity: 0, y: 50, scale: 0.95 },
-            {
-              opacity: 1,
-              y: 0,
-              scale: 1,
-              duration: 0.4,
-              ease: "power3.out",
-            }
+            { opacity: 1, y: 0, scale: 1, duration: 0.4, ease: "power3.out" }
           )
         }
       } catch {
         if (overlayRef.current) overlayRef.current.style.opacity = "1"
-        if (contentRef.current) {
-          contentRef.current.style.opacity = "1"
-          contentRef.current.style.transform = "none"
-        }
+        if (contentRef.current) makeFallbackVisible(contentRef.current)
       }
     }
 
     animate()
-
     return () => {
       mounted = false
     }
   }, [isModalOpen])
-
-  const handleOverlayClick = (e) => {
-    if (e.target === overlayRef.current) closeModal()
-  }
 
   if (!isModalOpen) return null
 
   return (
     <div
       ref={overlayRef}
-      onClick={handleOverlayClick}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 
-                 bg-black/60 backdrop-blur-sm"
-      style={{
-        fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
-      }}
+      onClick={(e) => e.target === overlayRef.current && closeModal()}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
     >
       <div
         ref={contentRef}
-        className="relative w-full max-w-md bg-white overflow-hidden rounded-2xl 
-                   max-h-[90vh] overflow-y-auto"
+        className="relative w-full max-w-md bg-white rounded-2xl max-h-[90vh] overflow-y-auto shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Close Button */}
         <button
           onClick={closeModal}
           className="absolute top-4 right-4 z-10 w-10 h-10 flex items-center justify-center 
-                     text-gray-400 hover:text-black rounded-full hover:bg-gray-100
-                     transition-all duration-300"
-          aria-label="Close"
+                     text-gray-400 hover:text-black hover:bg-gray-100 rounded-full transition-all"
+          aria-label="Close modal"
         >
-          <X size={20} strokeWidth={1.5} />
+          <X size={20} />
         </button>
 
-        {/* Content */}
-        <div className="p-8 md:p-10">
+        <div className="p-6 md:p-8">
           <ViewSwitcher view={modalView} />
         </div>
       </div>
@@ -195,7 +295,6 @@ const ViewSwitcher = memo(function ViewSwitcher({ view }) {
     }
 
     animate()
-
     return () => {
       mounted = false
     }
@@ -217,33 +316,56 @@ const LoginView = memo(function LoginView() {
   const { switchView, loginSuccess } = useAuth()
 
   const [formData, setFormData] = useState({ email: "", password: "" })
+  const [errors, setErrors] = useState({})
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
+  const [serverError, setServerError] = useState("")
   const [remainingAttempts, setRemainingAttempts] = useState(null)
 
+  const validateForm = useCallback(() => {
+    const newErrors = {}
+
+    if (!formData.email?.trim()) {
+      newErrors.email = "Email is required"
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = "Invalid email format"
+    }
+
+    if (!formData.password) {
+      newErrors.password = "Password is required"
+    } else if (formData.password.length < 6) {
+      newErrors.password = "Password must be at least 6 characters"
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }, [formData])
+
   const handleChange = useCallback((e) => {
-    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }))
-    setError("")
-  }, [])
+    const { name, value } = e.target
+    setFormData((prev) => ({ ...prev, [name]: value }))
+    if (errors[name]) {
+      setErrors((prev) => ({ ...prev, [name]: "" }))
+    }
+    setServerError("")
+  }, [errors])
 
   const handleSubmit = useCallback(
     async (e) => {
       e.preventDefault()
-      setError("")
 
-      if (!formData.email || !formData.password) {
-        setError("Please fill in all fields")
-        return
-      }
+      if (!validateForm()) return
 
       setLoading(true)
+      setServerError("")
 
       try {
         const response = await loginAPI(formData.email, formData.password)
-        loginSuccess(response.user)
+        if (response.user) {
+          loginSuccess(response.user)
+        }
       } catch (err) {
-        setError(err.message)
+        setServerError(err.message || "Login failed. Please try again.")
         if (err.remainingAttempts !== undefined) {
           setRemainingAttempts(err.remainingAttempts)
         }
@@ -251,194 +373,74 @@ const LoginView = memo(function LoginView() {
         setLoading(false)
       }
     },
-    [formData, loginSuccess]
+    [formData, validateForm, loginSuccess]
   )
 
   return (
-    <div>
+    <div className="space-y-8">
       {/* Header */}
-      <div className="text-center mb-8">
-        <div className="inline-flex items-center gap-2 mb-6">
-          <Droplets size={24} strokeWidth={1.5} className="text-blue-500" />
-          <span
-            className="text-black"
-            style={{
-              fontFamily: 'Georgia, "Times New Roman", serif',
-              fontSize: "20px",
-              fontWeight: 300,
-            }}
-          >
-            Wash<span className="text-blue-500">2</span>Door
-          </span>
+      <div className="text-center">
+        <div className="mb-6 flex justify-center">
+          <Logo />
         </div>
-
-        <h2
-          className="text-black mb-2"
-          style={{
-            fontFamily: 'Georgia, "Times New Roman", serif',
-            fontWeight: 300,
-            fontSize: "28px",
-            lineHeight: 1.2,
-          }}
-        >
-          Welcome Back
-        </h2>
-
-        <p
-          className="text-gray-400 tracking-wider uppercase"
-          style={{ fontSize: "10px" }}
-        >
-          Sign in to continue
-        </p>
+        <h2 className="text-3xl font-light text-black mb-2">Welcome Back</h2>
+        <p className="text-sm text-gray-500">Sign in to your account</p>
       </div>
 
       {/* Form */}
-      <form onSubmit={handleSubmit} className="space-y-5">
-        {/* Error */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 px-4 py-3 rounded-xl">
-            <p
-              className="text-red-600 tracking-wider uppercase"
-              style={{ fontSize: "10px" }}
-            >
-              {error}
-            </p>
-            {remainingAttempts !== null && remainingAttempts > 0 && (
-              <p
-                className="text-red-400 tracking-wider uppercase mt-1"
-                style={{ fontSize: "9px" }}
-              >
-                {remainingAttempts} attempt{remainingAttempts !== 1 ? "s" : ""}{" "}
-                remaining
-              </p>
-            )}
-          </div>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {serverError && (
+          <ErrorAlert message={serverError} attempts={remainingAttempts} />
         )}
 
-        {/* Email */}
-        <div>
-          <label
-            className="block text-gray-400 tracking-wider uppercase mb-2"
-            style={{ fontSize: "9px", letterSpacing: "0.3em" }}
-          >
-            Email
-          </label>
-          <div className="relative">
-            <Mail
-              size={16}
-              strokeWidth={1.5}
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300"
-            />
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              placeholder="you@example.com"
-              className="w-full bg-gray-50 border border-gray-200 pl-12 pr-4 h-12 
-                         text-black placeholder-gray-300 rounded-xl
-                         focus:outline-none focus:border-black 
-                         transition-colors duration-300"
-              style={{ fontSize: "13px" }}
-            />
-          </div>
-        </div>
+        <InputField
+          icon={Mail}
+          label="Email"
+          type="email"
+          name="email"
+          value={formData.email}
+          onChange={handleChange}
+          placeholder="you@example.com"
+          error={errors.email}
+          disabled={loading}
+        />
 
-        {/* Password */}
-        <div>
-          <label
-            className="block text-gray-400 tracking-wider uppercase mb-2"
-            style={{ fontSize: "9px", letterSpacing: "0.3em" }}
-          >
-            Password
-          </label>
-          <div className="relative">
-            <Lock
-              size={16}
-              strokeWidth={1.5}
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300"
-            />
-            <input
-              type={showPassword ? "text" : "password"}
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              placeholder="••••••••"
-              className="w-full bg-gray-50 border border-gray-200 pl-12 pr-12 h-12 
-                         text-black placeholder-gray-300 rounded-xl
-                         focus:outline-none focus:border-black 
-                         transition-colors duration-300"
-              style={{ fontSize: "13px" }}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 
-                         hover:text-gray-500 transition-colors"
-            >
-              {showPassword ? (
-                <EyeOff size={16} strokeWidth={1.5} />
-              ) : (
-                <Eye size={16} strokeWidth={1.5} />
-              )}
-            </button>
-          </div>
-        </div>
+        <PasswordField
+          label="Password"
+          name="password"
+          value={formData.password}
+          onChange={handleChange}
+          showPassword={showPassword}
+          onToggle={() => setShowPassword(!showPassword)}
+          placeholder="••••••••"
+          error={errors.password}
+          disabled={loading}
+        />
 
-        {/* Forgot Password */}
         <div className="flex justify-end">
           <button
             type="button"
             onClick={() => switchView("forgot")}
-            className="text-gray-400 hover:text-black tracking-wider uppercase
-                       transition-colors duration-300"
-            style={{ fontSize: "9px" }}
+            className="text-xs text-gray-600 hover:text-black transition-colors"
           >
-            Forgot Password?
+            Forgot password?
           </button>
         </div>
 
-        {/* Submit */}
-        <button
-          type="submit"
-          disabled={loading}
-          className="group w-full flex items-center justify-center gap-2 h-12
-                     bg-black text-white rounded-full
-                     hover:bg-gray-800 active:scale-[0.97]
-                     disabled:opacity-50 transition-all duration-300"
-        >
-          {loading ? (
-            <Loader2 size={16} className="animate-spin" />
-          ) : (
-            <>
-              <span
-                className="tracking-wider uppercase"
-                style={{ fontSize: "10px", fontWeight: 500 }}
-              >
-                Sign In
-              </span>
-              <ArrowRight
-                size={14}
-                strokeWidth={1.5}
-                className="group-hover:translate-x-0.5 transition-transform duration-300"
-              />
-            </>
-          )}
-        </button>
+        <Button loading={loading} disabled={loading}>
+          Sign In
+        </Button>
       </form>
 
-      {/* Switch to Register */}
-      <div className="mt-8 pt-6 border-t border-gray-100 text-center">
-        <p
-          className="text-gray-400 tracking-wider uppercase"
-          style={{ fontSize: "10px" }}
-        >
+      {/* Footer */}
+      <div className="border-t border-gray-100 pt-6 text-center">
+        <p className="text-sm text-gray-600">
           Don&apos;t have an account?{" "}
           <button
             onClick={() => switchView("register")}
-            className="text-black hover:underline"
+            className="text-black font-medium hover:underline"
           >
-            Create Account
+            Create one
           </button>
         </p>
       </div>
@@ -457,316 +459,182 @@ const RegisterView = memo(function RegisterView() {
     password: "",
     confirmPassword: "",
   })
+  const [errors, setErrors] = useState({})
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
+  const [serverError, setServerError] = useState("")
+
+  const validateForm = useCallback(() => {
+    const newErrors = {}
+
+    if (!formData.firstName?.trim()) {
+      newErrors.firstName = "First name is required"
+    }
+
+    if (!formData.lastName?.trim()) {
+      newErrors.lastName = "Last name is required"
+    }
+
+    if (!formData.email?.trim()) {
+      newErrors.email = "Email is required"
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = "Invalid email format"
+    }
+
+    if (!formData.password) {
+      newErrors.password = "Password is required"
+    } else if (formData.password.length < 8) {
+      newErrors.password = "Password must be at least 8 characters"
+    } else if (
+      !/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])/.test(
+        formData.password
+      )
+    ) {
+      newErrors.password =
+        "Password must contain uppercase, lowercase, number & special character"
+    }
+
+    if (!formData.confirmPassword) {
+      newErrors.confirmPassword = "Please confirm password"
+    } else if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = "Passwords do not match"
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }, [formData])
 
   const handleChange = useCallback((e) => {
-    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }))
-    setError("")
-  }, [])
+    const { name, value } = e.target
+    setFormData((prev) => ({ ...prev, [name]: value }))
+    if (errors[name]) {
+      setErrors((prev) => ({ ...prev, [name]: "" }))
+    }
+    setServerError("")
+  }, [errors])
 
   const handleSubmit = useCallback(
     async (e) => {
       e.preventDefault()
-      setError("")
 
-      const { firstName, lastName, email, password, confirmPassword } =
-        formData
-
-      if (!firstName || !lastName || !email || !password || !confirmPassword) {
-        setError("Please fill in all fields")
-        return
-      }
-
-      if (password.length < 8) {
-        setError("Password must be at least 8 characters")
-        return
-      }
-
-      if (password !== confirmPassword) {
-        setError("Passwords do not match")
-        return
-      }
-
-      const passwordRegex =
-        /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/
-      if (!passwordRegex.test(password)) {
-        setError(
-          "Password must contain uppercase, lowercase, number, and special character"
-        )
-        return
-      }
+      if (!validateForm()) return
 
       setLoading(true)
+      setServerError("")
 
       try {
         await registerAPI(
-          firstName,
-          lastName,
-          email,
-          password,
-          confirmPassword
+          formData.firstName,
+          formData.lastName,
+          formData.email,
+          formData.password,
+          formData.confirmPassword
         )
-        switchView("otp", email)
+        switchView("otp", formData.email)
       } catch (err) {
-        setError(err.message)
+        setServerError(err.message || "Registration failed. Please try again.")
       } finally {
         setLoading(false)
       }
     },
-    [formData, switchView]
+    [formData, validateForm, switchView]
   )
 
   return (
-    <div>
+    <div className="space-y-8">
       {/* Header */}
-      <div className="text-center mb-8">
-        <div className="inline-flex items-center gap-2 mb-6">
-          <Droplets size={24} strokeWidth={1.5} className="text-blue-500" />
-          <span
-            className="text-black"
-            style={{
-              fontFamily: 'Georgia, "Times New Roman", serif',
-              fontSize: "20px",
-              fontWeight: 300,
-            }}
-          >
-            Wash<span className="text-blue-500">2</span>Door
-          </span>
+      <div className="text-center">
+        <div className="mb-6 flex justify-center">
+          <Logo />
         </div>
-
-        <h2
-          className="text-black mb-2"
-          style={{
-            fontFamily: 'Georgia, "Times New Roman", serif',
-            fontWeight: 300,
-            fontSize: "28px",
-            lineHeight: 1.2,
-          }}
-        >
-          Create Account
-        </h2>
-
-        <p
-          className="text-gray-400 tracking-wider uppercase"
-          style={{ fontSize: "10px" }}
-        >
-          Join us today
-        </p>
+        <h2 className="text-3xl font-light text-black mb-2">Create Account</h2>
+        <p className="text-sm text-gray-500">Join us today</p>
       </div>
 
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Error */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 px-4 py-3 rounded-xl">
-            <p
-              className="text-red-600 tracking-wider uppercase"
-              style={{ fontSize: "10px" }}
-            >
-              {error}
-            </p>
-          </div>
+        {serverError && (
+          <ErrorAlert message={serverError} attempts={null} />
         )}
 
-        {/* Name Fields */}
         <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label
-              className="block text-gray-400 tracking-wider uppercase mb-2"
-              style={{ fontSize: "9px", letterSpacing: "0.3em" }}
-            >
-              First Name
-            </label>
-            <div className="relative">
-              <User
-                size={16}
-                strokeWidth={1.5}
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300"
-              />
-              <input
-                type="text"
-                name="firstName"
-                value={formData.firstName}
-                onChange={handleChange}
-                placeholder="John"
-                className="w-full bg-gray-50 border border-gray-200 pl-12 pr-4 h-12 
-                           text-black placeholder-gray-300 rounded-xl
-                           focus:outline-none focus:border-black 
-                           transition-colors duration-300"
-                style={{ fontSize: "13px" }}
-              />
-            </div>
-          </div>
-          <div>
-            <label
-              className="block text-gray-400 tracking-wider uppercase mb-2"
-              style={{ fontSize: "9px", letterSpacing: "0.3em" }}
-            >
-              Last Name
-            </label>
-            <input
-              type="text"
-              name="lastName"
-              value={formData.lastName}
-              onChange={handleChange}
-              placeholder="Doe"
-              className="w-full bg-gray-50 border border-gray-200 px-4 h-12 
-                         text-black placeholder-gray-300 rounded-xl
-                         focus:outline-none focus:border-black 
-                         transition-colors duration-300"
-              style={{ fontSize: "13px" }}
-            />
-          </div>
+          <InputField
+            icon={User}
+            label="First Name"
+            type="text"
+            name="firstName"
+            value={formData.firstName}
+            onChange={handleChange}
+            placeholder="John"
+            error={errors.firstName}
+            disabled={loading}
+          />
+          <InputField
+            label="Last Name"
+            type="text"
+            name="lastName"
+            value={formData.lastName}
+            onChange={handleChange}
+            placeholder="Doe"
+            error={errors.lastName}
+            disabled={loading}
+          />
         </div>
 
-        {/* Email */}
-        <div>
-          <label
-            className="block text-gray-400 tracking-wider uppercase mb-2"
-            style={{ fontSize: "9px", letterSpacing: "0.3em" }}
-          >
-            Email
-          </label>
-          <div className="relative">
-            <Mail
-              size={16}
-              strokeWidth={1.5}
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300"
-            />
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              placeholder="you@example.com"
-              className="w-full bg-gray-50 border border-gray-200 pl-12 pr-4 h-12 
-                         text-black placeholder-gray-300 rounded-xl
-                         focus:outline-none focus:border-black 
-                         transition-colors duration-300"
-              style={{ fontSize: "13px" }}
-            />
-          </div>
-        </div>
-
-        {/* Password */}
-        <div>
-          <label
-            className="block text-gray-400 tracking-wider uppercase mb-2"
-            style={{ fontSize: "9px", letterSpacing: "0.3em" }}
-          >
-            Password
-          </label>
-          <div className="relative">
-            <Lock
-              size={16}
-              strokeWidth={1.5}
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300"
-            />
-            <input
-              type={showPassword ? "text" : "password"}
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              placeholder="Min 8 characters"
-              className="w-full bg-gray-50 border border-gray-200 pl-12 pr-12 h-12 
-                         text-black placeholder-gray-300 rounded-xl
-                         focus:outline-none focus:border-black 
-                         transition-colors duration-300"
-              style={{ fontSize: "13px" }}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 
-                         hover:text-gray-500 transition-colors"
-            >
-              {showPassword ? (
-                <EyeOff size={16} strokeWidth={1.5} />
-              ) : (
-                <Eye size={16} strokeWidth={1.5} />
-              )}
-            </button>
-          </div>
-          <p
-            className="text-gray-300 mt-2"
-            style={{ fontSize: "9px", letterSpacing: "0.05em" }}
-          >
-            Must contain uppercase, lowercase, number & special character
-          </p>
-        </div>
-
-        {/* Confirm Password */}
-        <div>
-          <label
-            className="block text-gray-400 tracking-wider uppercase mb-2"
-            style={{ fontSize: "9px", letterSpacing: "0.3em" }}
-          >
-            Confirm Password
-          </label>
-          <div className="relative">
-            <Lock
-              size={16}
-              strokeWidth={1.5}
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300"
-            />
-            <input
-              type={showPassword ? "text" : "password"}
-              name="confirmPassword"
-              value={formData.confirmPassword}
-              onChange={handleChange}
-              placeholder="••••••••"
-              className="w-full bg-gray-50 border border-gray-200 pl-12 pr-4 h-12 
-                         text-black placeholder-gray-300 rounded-xl
-                         focus:outline-none focus:border-black 
-                         transition-colors duration-300"
-              style={{ fontSize: "13px" }}
-            />
-          </div>
-        </div>
-
-        {/* Submit */}
-        <button
-          type="submit"
+        <InputField
+          icon={Mail}
+          label="Email"
+          type="email"
+          name="email"
+          value={formData.email}
+          onChange={handleChange}
+          placeholder="you@example.com"
+          error={errors.email}
           disabled={loading}
-          className="group w-full flex items-center justify-center gap-2 h-12 mt-6
-                     bg-black text-white rounded-full
-                     hover:bg-gray-800 active:scale-[0.97]
-                     disabled:opacity-50 transition-all duration-300"
-        >
-          {loading ? (
-            <Loader2 size={16} className="animate-spin" />
-          ) : (
-            <>
-              <span
-                className="tracking-wider uppercase"
-                style={{ fontSize: "10px", fontWeight: 500 }}
-              >
-                Create Account
-              </span>
-              <ArrowRight
-                size={14}
-                strokeWidth={1.5}
-                className="group-hover:translate-x-0.5 transition-transform duration-300"
-              />
-            </>
-          )}
-        </button>
+        />
+
+        <PasswordField
+          label="Password"
+          name="password"
+          value={formData.password}
+          onChange={handleChange}
+          showPassword={showPassword}
+          onToggle={() => setShowPassword(!showPassword)}
+          placeholder="Min 8 characters"
+          error={errors.password}
+          disabled={loading}
+        />
+
+        {formData.password && !errors.password && (
+          <p className="text-xs text-emerald-600 font-medium">✓ Strong password</p>
+        )}
+
+        <PasswordField
+          label="Confirm Password"
+          name="confirmPassword"
+          value={formData.confirmPassword}
+          onChange={handleChange}
+          showPassword={showPassword}
+          onToggle={() => setShowPassword(!showPassword)}
+          placeholder="••••••••"
+          error={errors.confirmPassword}
+          disabled={loading}
+        />
+
+        <Button loading={loading} disabled={loading}>
+          Create Account
+        </Button>
       </form>
 
-      {/* Switch to Login */}
-      <div className="mt-6 pt-6 border-t border-gray-100 text-center">
-        <p
-          className="text-gray-400 tracking-wider uppercase"
-          style={{ fontSize: "10px" }}
-        >
+      {/* Footer */}
+      <div className="border-t border-gray-100 pt-6 text-center">
+        <p className="text-sm text-gray-600">
           Already have an account?{" "}
           <button
             onClick={() => switchView("login")}
-            className="text-black hover:underline"
+            className="text-black font-medium hover:underline"
           >
-            Sign In
+            Sign in
           </button>
         </p>
       </div>
@@ -779,11 +647,11 @@ const OTPView = memo(function OTPView() {
   const { switchView, authEmail, loginSuccess } = useAuth()
 
   const [otp, setOtp] = useState(["", "", "", "", "", ""])
+  const [errors, setErrors] = useState("")
   const [loading, setLoading] = useState(false)
   const [resending, setResending] = useState(false)
-  const [error, setError] = useState("")
   const [attemptsRemaining, setAttemptsRemaining] = useState(null)
-  const [resendTimer, setResendTimer] = useState(30)
+  const [resendTimer, setResendTimer] = useState(0)
 
   const inputRefs = useRef([])
 
@@ -794,21 +662,22 @@ const OTPView = memo(function OTPView() {
     }
   }, [resendTimer])
 
-  const handleChange = useCallback(
-    (index, value) => {
-      if (!/^\d*$/.test(value)) return
+  useEffect(() => {
+    inputRefs.current[0]?.focus()
+  }, [])
 
-      const newOtp = [...otp]
-      newOtp[index] = value.slice(-1)
-      setOtp(newOtp)
-      setError("")
+  const handleChange = useCallback((index, value) => {
+    if (!/^\d*$/.test(value)) return
 
-      if (value && index < 5) {
-        inputRefs.current[index + 1]?.focus()
-      }
-    },
-    [otp]
-  )
+    const newOtp = [...otp]
+    newOtp[index] = value.slice(-1)
+    setOtp(newOtp)
+    setErrors("")
+
+    if (value && index < 5) {
+      inputRefs.current[index + 1]?.focus()
+    }
+  }, [otp])
 
   const handleKeyDown = useCallback(
     (index, e) => {
@@ -821,7 +690,7 @@ const OTPView = memo(function OTPView() {
 
   const handlePaste = useCallback((e) => {
     e.preventDefault()
-    const pasteData = e.clipboardData.getData("text").slice(0, 6)
+    const pasteData = e.clipboardData?.getData("text").slice(0, 6) || ""
     if (!/^\d+$/.test(pasteData)) return
 
     const newOtp = ["", "", "", "", "", ""]
@@ -837,11 +706,11 @@ const OTPView = memo(function OTPView() {
   const handleSubmit = useCallback(
     async (e) => {
       e.preventDefault()
-      setError("")
+      setErrors("")
 
       const otpString = otp.join("")
       if (otpString.length !== 6) {
-        setError("Please enter complete OTP")
+        setErrors("Please enter all 6 digits")
         return
       }
 
@@ -849,9 +718,11 @@ const OTPView = memo(function OTPView() {
 
       try {
         const response = await verifyOTPAPI(authEmail, otpString)
-        loginSuccess(response.user)
+        if (response.user) {
+          loginSuccess(response.user)
+        }
       } catch (err) {
-        setError(err.message)
+        setErrors(err.message || "OTP verification failed")
         if (err.attemptsRemaining !== undefined) {
           setAttemptsRemaining(err.attemptsRemaining)
         }
@@ -868,7 +739,7 @@ const OTPView = memo(function OTPView() {
     if (resendTimer > 0) return
 
     setResending(true)
-    setError("")
+    setErrors("")
 
     try {
       await resendOTPAPI(authEmail)
@@ -876,68 +747,47 @@ const OTPView = memo(function OTPView() {
       setOtp(["", "", "", "", "", ""])
       inputRefs.current[0]?.focus()
     } catch (err) {
-      setError(err.message)
+      setErrors(err.message || "Failed to resend OTP")
     } finally {
       setResending(false)
     }
   }, [resendTimer, authEmail])
 
+  if (!authEmail) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-gray-600 mb-4">Invalid session</p>
+        <button
+          onClick={() => switchView("login")}
+          className="text-blue-600 hover:underline text-sm"
+        >
+          Back to login
+        </button>
+      </div>
+    )
+  }
+
   return (
-    <div>
+    <div className="space-y-8">
       {/* Header */}
-      <div className="text-center mb-8">
+      <div className="text-center">
         <div className="w-16 h-16 mx-auto mb-6 bg-blue-50 border border-blue-100 rounded-full flex items-center justify-center">
-          <Mail size={28} strokeWidth={1.5} className="text-blue-500" />
+          <Mail size={28} className="text-blue-500" />
         </div>
-
-        <h2
-          className="text-black mb-2"
-          style={{
-            fontFamily: 'Georgia, "Times New Roman", serif',
-            fontWeight: 300,
-            fontSize: "28px",
-            lineHeight: 1.2,
-          }}
-        >
-          Verify Email
-        </h2>
-
-        <p
-          className="text-gray-400 tracking-wider uppercase"
-          style={{ fontSize: "10px" }}
-        >
+        <h2 className="text-3xl font-light text-black mb-2">Verify Email</h2>
+        <p className="text-sm text-gray-500">
           Enter the 6-digit code sent to
-        </p>
-        <p className="text-black mt-1" style={{ fontSize: "12px" }}>
-          {authEmail}
+          <br />
+          <span className="text-black font-medium">{authEmail}</span>
         </p>
       </div>
 
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Error */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 px-4 py-3 rounded-xl">
-            <p
-              className="text-red-600 tracking-wider uppercase"
-              style={{ fontSize: "10px" }}
-            >
-              {error}
-            </p>
-            {attemptsRemaining !== null && attemptsRemaining > 0 && (
-              <p
-                className="text-red-400 tracking-wider uppercase mt-1"
-                style={{ fontSize: "9px" }}
-              >
-                {attemptsRemaining} attempt{attemptsRemaining !== 1 ? "s" : ""}{" "}
-                remaining
-              </p>
-            )}
-          </div>
-        )}
+        {errors && <ErrorAlert message={errors} attempts={attemptsRemaining} />}
 
         {/* OTP Inputs */}
-        <div className="flex justify-center gap-3">
+        <div className="flex justify-center gap-2">
           {otp.map((digit, index) => (
             <input
               key={index}
@@ -949,55 +799,28 @@ const OTPView = memo(function OTPView() {
               onChange={(e) => handleChange(index, e.target.value)}
               onKeyDown={(e) => handleKeyDown(index, e)}
               onPaste={handlePaste}
-              className="w-12 h-14 text-center bg-gray-50 border border-gray-200 
-                         rounded-xl focus:border-black focus:outline-none 
-                         transition-colors duration-300"
-              style={{ fontSize: "18px", fontWeight: 500 }}
+              disabled={loading}
+              className="w-12 h-14 text-center text-lg font-semibold border-2 border-gray-200 
+                         rounded-lg focus:border-black focus:outline-none transition-colors
+                         disabled:bg-gray-100"
             />
           ))}
         </div>
 
-        {/* Submit */}
-        <button
-          type="submit"
-          disabled={loading || otp.join("").length !== 6}
-          className="group w-full flex items-center justify-center gap-2 h-12
-                     bg-black text-white rounded-full
-                     hover:bg-gray-800 active:scale-[0.97]
-                     disabled:opacity-50 transition-all duration-300"
-        >
-          {loading ? (
-            <Loader2 size={16} className="animate-spin" />
-          ) : (
-            <>
-              <span
-                className="tracking-wider uppercase"
-                style={{ fontSize: "10px", fontWeight: 500 }}
-              >
-                Verify
-              </span>
-              <ArrowRight
-                size={14}
-                strokeWidth={1.5}
-                className="group-hover:translate-x-0.5 transition-transform duration-300"
-              />
-            </>
-          )}
-        </button>
+        <Button loading={loading} disabled={loading || otp.join("").length !== 6}>
+          Verify
+        </Button>
 
         {/* Resend */}
         <div className="text-center">
-          <p
-            className="text-gray-400 tracking-wider uppercase"
-            style={{ fontSize: "10px" }}
-          >
+          <p className="text-sm text-gray-600">
             Didn&apos;t receive code?{" "}
             <button
               type="button"
               onClick={handleResend}
               disabled={resendTimer > 0 || resending}
-              className={`${
-                resendTimer > 0 ? "text-gray-300" : "text-black hover:underline"
+              className={`font-medium transition-colors ${
+                resendTimer > 0 ? "text-gray-400 cursor-not-allowed" : "text-black hover:underline"
               }`}
             >
               {resending
@@ -1010,16 +833,14 @@ const OTPView = memo(function OTPView() {
         </div>
       </form>
 
-      {/* Back to Login */}
-      <div className="mt-6 pt-6 border-t border-gray-100">
+      {/* Back */}
+      <div className="border-t border-gray-100 pt-6">
         <button
           onClick={() => switchView("login")}
-          className="flex items-center gap-2 text-gray-400 hover:text-black 
-                     tracking-wider uppercase transition-colors mx-auto"
-          style={{ fontSize: "10px" }}
+          className="flex items-center justify-center gap-2 w-full text-gray-600 hover:text-black transition-colors"
         >
-          <ArrowLeft size={14} strokeWidth={1.5} />
-          Back to Sign In
+          <ArrowLeft size={16} />
+          Back to sign in
         </button>
       </div>
     </div>
@@ -1031,19 +852,28 @@ const ForgotPasswordView = memo(function ForgotPasswordView() {
   const { switchView } = useAuth()
 
   const [email, setEmail] = useState("")
+  const [errors, setErrors] = useState("")
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
   const [success, setSuccess] = useState(false)
+
+  const validateEmail = useCallback(() => {
+    if (!email?.trim()) {
+      setErrors("Email is required")
+      return false
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setErrors("Invalid email format")
+      return false
+    }
+    return true
+  }, [email])
 
   const handleSubmit = useCallback(
     async (e) => {
       e.preventDefault()
-      setError("")
+      setErrors("")
 
-      if (!email) {
-        setError("Please enter your email")
-        return
-      }
+      if (!validateEmail()) return
 
       setLoading(true)
 
@@ -1051,166 +881,84 @@ const ForgotPasswordView = memo(function ForgotPasswordView() {
         await forgotPasswordAPI(email)
         setSuccess(true)
       } catch (err) {
-        setError(err.message)
+        setErrors(err.message || "Failed to send reset link")
       } finally {
         setLoading(false)
       }
     },
-    [email]
+    [email, validateEmail]
   )
 
   if (success) {
     return (
-      <div className="text-center py-8">
-        <div className="w-16 h-16 mx-auto mb-6 bg-emerald-50 border border-emerald-200 rounded-full flex items-center justify-center">
-          <CheckCircle size={28} strokeWidth={1.5} className="text-emerald-600" />
+      <div className="text-center space-y-6 py-8">
+        <div className="w-16 h-16 mx-auto bg-emerald-50 border border-emerald-200 rounded-full flex items-center justify-center">
+          <CheckCircle size={28} className="text-emerald-600" />
         </div>
 
-        <h2
-          className="text-black mb-3"
-          style={{
-            fontFamily: 'Georgia, "Times New Roman", serif',
-            fontWeight: 300,
-            fontSize: "24px",
-            lineHeight: 1.2,
-          }}
-        >
-          Check Your Email
-        </h2>
-
-        <p
-          className="text-gray-400 mb-8 max-w-xs mx-auto"
-          style={{ fontSize: "13px", lineHeight: 1.6 }}
-        >
-          If an account exists for {email}, you will receive a password reset
-          link
-        </p>
+        <div>
+          <h2 className="text-2xl font-light text-black mb-2">Check Your Email</h2>
+          <p className="text-sm text-gray-600">
+            If an account exists for <strong>{email}</strong>, you will receive a
+            password reset link.
+          </p>
+        </div>
 
         <button
           onClick={() => switchView("login")}
-          className="flex items-center gap-2 text-gray-400 hover:text-black 
-                     tracking-wider uppercase transition-colors mx-auto"
-          style={{ fontSize: "10px" }}
+          className="flex items-center justify-center gap-2 w-full text-gray-600 hover:text-black transition-colors"
         >
-          <ArrowLeft size={14} strokeWidth={1.5} />
-          Back to Sign In
+          <ArrowLeft size={16} />
+          Back to sign in
         </button>
       </div>
     )
   }
 
   return (
-    <div>
+    <div className="space-y-8">
       {/* Header */}
-      <div className="text-center mb-8">
+      <div className="text-center">
         <div className="w-16 h-16 mx-auto mb-6 bg-gray-50 border border-gray-100 rounded-full flex items-center justify-center">
-          <Lock size={28} strokeWidth={1.5} className="text-gray-400" />
+          <Lock size={28} className="text-gray-400" />
         </div>
-
-        <h2
-          className="text-black mb-2"
-          style={{
-            fontFamily: 'Georgia, "Times New Roman", serif',
-            fontWeight: 300,
-            fontSize: "28px",
-            lineHeight: 1.2,
-          }}
-        >
-          Forgot Password?
-        </h2>
-
-        <p
-          className="text-gray-400 max-w-xs mx-auto"
-          style={{ fontSize: "13px", lineHeight: 1.6 }}
-        >
-          Enter your email and we will send you a reset link
+        <h2 className="text-3xl font-light text-black mb-2">Reset Password</h2>
+        <p className="text-sm text-gray-600">
+          Enter your email and we&apos;ll send you a reset link
         </p>
       </div>
 
       {/* Form */}
-      <form onSubmit={handleSubmit} className="space-y-5">
-        {/* Error */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 px-4 py-3 rounded-xl">
-            <p
-              className="text-red-600 tracking-wider uppercase"
-              style={{ fontSize: "10px" }}
-            >
-              {error}
-            </p>
-          </div>
-        )}
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {errors && <ErrorAlert message={errors} attempts={null} />}
 
-        {/* Email */}
-        <div>
-          <label
-            className="block text-gray-400 tracking-wider uppercase mb-2"
-            style={{ fontSize: "9px", letterSpacing: "0.3em" }}
-          >
-            Email Address
-          </label>
-          <div className="relative">
-            <Mail
-              size={16}
-              strokeWidth={1.5}
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300"
-            />
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value)
-                setError("")
-              }}
-              placeholder="you@example.com"
-              className="w-full bg-gray-50 border border-gray-200 pl-12 pr-4 h-12 
-                         text-black placeholder-gray-300 rounded-xl
-                         focus:outline-none focus:border-black 
-                         transition-colors duration-300"
-              style={{ fontSize: "13px" }}
-            />
-          </div>
-        </div>
-
-        {/* Submit */}
-        <button
-          type="submit"
+        <InputField
+          icon={Mail}
+          label="Email Address"
+          type="email"
+          value={email}
+          onChange={(e) => {
+            setEmail(e.target.value)
+            setErrors("")
+          }}
+          placeholder="you@example.com"
+          error={errors}
           disabled={loading}
-          className="group w-full flex items-center justify-center gap-2 h-12
-                     bg-black text-white rounded-full
-                     hover:bg-gray-800 active:scale-[0.97]
-                     disabled:opacity-50 transition-all duration-300"
-        >
-          {loading ? (
-            <Loader2 size={16} className="animate-spin" />
-          ) : (
-            <>
-              <span
-                className="tracking-wider uppercase"
-                style={{ fontSize: "10px", fontWeight: 500 }}
-              >
-                Send Reset Link
-              </span>
-              <ArrowRight
-                size={14}
-                strokeWidth={1.5}
-                className="group-hover:translate-x-0.5 transition-transform duration-300"
-              />
-            </>
-          )}
-        </button>
+        />
+
+        <Button loading={loading} disabled={loading}>
+          Send Reset Link
+        </Button>
       </form>
 
-      {/* Back to Login */}
-      <div className="mt-6 pt-6 border-t border-gray-100">
+      {/* Back */}
+      <div className="border-t border-gray-100 pt-6">
         <button
           onClick={() => switchView("login")}
-          className="flex items-center gap-2 text-gray-400 hover:text-black 
-                     tracking-wider uppercase transition-colors mx-auto"
-          style={{ fontSize: "10px" }}
+          className="flex items-center justify-center gap-2 w-full text-gray-600 hover:text-black transition-colors"
         >
-          <ArrowLeft size={14} strokeWidth={1.5} />
-          Back to Sign In
+          <ArrowLeft size={16} />
+          Back to sign in
         </button>
       </div>
     </div>
@@ -1222,49 +970,25 @@ const ResetSuccessView = memo(function ResetSuccessView() {
   const { switchView } = useAuth()
 
   return (
-    <div className="text-center py-8">
-      <div className="w-16 h-16 mx-auto mb-6 bg-emerald-50 border border-emerald-200 rounded-full flex items-center justify-center">
-        <CheckCircle size={28} strokeWidth={1.5} className="text-emerald-600" />
+    <div className="text-center space-y-6 py-8">
+      <div className="w-16 h-16 mx-auto bg-emerald-50 border border-emerald-200 rounded-full flex items-center justify-center">
+        <CheckCircle size={28} className="text-emerald-600" />
       </div>
 
-      <h2
-        className="text-black mb-3"
-        style={{
-          fontFamily: 'Georgia, "Times New Roman", serif',
-          fontWeight: 300,
-          fontSize: "24px",
-          lineHeight: 1.2,
-        }}
-      >
-        Password Reset!
-      </h2>
-
-      <p
-        className="text-gray-400 mb-8 max-w-xs mx-auto"
-        style={{ fontSize: "13px", lineHeight: 1.6 }}
-      >
-        Your password has been successfully reset. You can now sign in with
-        your new password.
-      </p>
+      <div>
+        <h2 className="text-2xl font-light text-black mb-2">Password Reset!</h2>
+        <p className="text-sm text-gray-600">
+          Your password has been successfully reset. You can now sign in with your new password.
+        </p>
+      </div>
 
       <button
         onClick={() => switchView("login")}
-        className="group inline-flex items-center justify-center gap-2 h-12 px-8
-                   bg-black text-white rounded-full
-                   hover:bg-gray-800 active:scale-[0.97]
-                   transition-all duration-300"
+        className="inline-flex items-center justify-center gap-2 px-8 py-3 bg-black text-white 
+                   rounded-lg hover:bg-gray-900 transition-colors font-medium text-sm"
       >
-        <span
-          className="tracking-wider uppercase"
-          style={{ fontSize: "10px", fontWeight: 500 }}
-        >
-          Sign In
-        </span>
-        <ArrowRight
-          size={14}
-          strokeWidth={1.5}
-          className="group-hover:translate-x-0.5 transition-transform duration-300"
-        />
+        Sign In
+        <ArrowRight size={16} />
       </button>
     </div>
   )
