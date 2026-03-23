@@ -1,7 +1,7 @@
 // app/profile/page.jsx
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -16,16 +16,48 @@ import {
   getUserBookings, getUserStats, deactivateAccount
 } from '@/lib/user.api'
 
-// ─── Constants ───
-const SERIF = 'Georgia, "Times New Roman", serif'
-const SANS = "'Helvetica Neue', Helvetica, Arial, sans-serif"
+// ─── Constants ───────────────────────────────────────────
+const TYPOGRAPHY = {
+  serif: 'Georgia, "Times New Roman", serif',
+  sans: "'Helvetica Neue', Helvetica, Arial, sans-serif"
+}
 
 const STATUS_CONFIG = {
-  pending: { label: 'Pending', color: 'bg-amber-400' },
-  confirmed: { label: 'Confirmed', color: 'bg-blue-400' },
-  'in-progress': { label: 'In Progress', color: 'bg-purple-400' },
-  completed: { label: 'Completed', color: 'bg-emerald-500' },
-  cancelled: { label: 'Cancelled', color: 'bg-red-400' },
+  pending: { 
+    label: 'Pending', 
+    color: 'bg-amber-400',
+    textColor: 'text-amber-600',
+    bgColor: 'bg-amber-50',
+    borderColor: 'border-amber-100'
+  },
+  confirmed: { 
+    label: 'Confirmed', 
+    color: 'bg-blue-400',
+    textColor: 'text-blue-600',
+    bgColor: 'bg-blue-50',
+    borderColor: 'border-blue-100'
+  },
+  'in-progress': { 
+    label: 'In Progress', 
+    color: 'bg-purple-400',
+    textColor: 'text-purple-600',
+    bgColor: 'bg-purple-50',
+    borderColor: 'border-purple-100'
+  },
+  completed: { 
+    label: 'Completed', 
+    color: 'bg-emerald-500',
+    textColor: 'text-emerald-600',
+    bgColor: 'bg-emerald-50',
+    borderColor: 'border-emerald-100'
+  },
+  cancelled: { 
+    label: 'Cancelled', 
+    color: 'bg-red-400',
+    textColor: 'text-red-600',
+    bgColor: 'bg-red-50',
+    borderColor: 'border-red-100'
+  },
 }
 
 const TABS = [
@@ -35,162 +67,296 @@ const TABS = [
   { id: 'settings', label: 'Settings', icon: Settings },
 ]
 
-// ─── Scroll Lock Hook ───
+const PASSWORD_REQUIREMENTS = {
+  minLength: 8,
+  regex: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])/,
+  message: 'Min 8 chars · uppercase · lowercase · number · special char'
+}
+
+// ─── Utilities ───────────────────────────────────────────
+const formatDate = (date) => {
+  const today = new Date()
+  const tomorrow = new Date(today)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  
+  if (date.toDateString() === today.toDateString()) return 'Today'
+  if (date.toDateString() === tomorrow.toDateString()) return 'Tomorrow'
+  
+  return date.toLocaleDateString('en-IN', { 
+    day: 'numeric', 
+    month: 'short',
+    ...(date.getFullYear() !== today.getFullYear() && { year: 'numeric' })
+  })
+}
+
+const formatLongDate = (dateString) => {
+  if (!dateString) return 'N/A'
+  return new Date(dateString).toLocaleDateString('en-IN', { 
+    month: 'short', 
+    year: 'numeric' 
+  })
+}
+
+const getInitials = (firstName = '', lastName = '') => {
+  return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || 'U'
+}
+
+const validatePassword = (password) => {
+  if (password.length < PASSWORD_REQUIREMENTS.minLength) {
+    return { valid: false, message: `Minimum ${PASSWORD_REQUIREMENTS.minLength} characters required` }
+  }
+  if (!PASSWORD_REQUIREMENTS.regex.test(password)) {
+    return { valid: false, message: 'Password needs uppercase, lowercase, number & special character' }
+  }
+  return { valid: true }
+}
+
+// ─── Hooks ───────────────────────────────────────────────
 function useScrollLock(isLocked) {
   useEffect(() => {
     if (!isLocked) return
+    
     const scrollY = window.scrollY
-    document.body.style.position = 'fixed'
-    document.body.style.top = `-${scrollY}px`
-    document.body.style.left = '0'
-    document.body.style.right = '0'
-    document.body.style.overflow = 'hidden'
+    const body = document.body
+    
+    body.style.position = 'fixed'
+    body.style.top = `-${scrollY}px`
+    body.style.left = '0'
+    body.style.right = '0'
+    body.style.overflow = 'hidden'
+    
     return () => {
-      document.body.style.position = ''
-      document.body.style.top = ''
-      document.body.style.left = ''
-      document.body.style.right = ''
-      document.body.style.overflow = ''
+      body.style.position = ''
+      body.style.top = ''
+      body.style.left = ''
+      body.style.right = ''
+      body.style.overflow = ''
       window.scrollTo(0, scrollY)
     }
   }, [isLocked])
 }
 
-// ─── Status Badge ───
-function StatusBadge({ status }) {
-  const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.pending
+function useAutoHideMessage(message, setMessage, duration = 3000) {
+  useEffect(() => {
+    if (!message) return
+    const timer = setTimeout(() => setMessage(''), duration)
+    return () => clearTimeout(timer)
+  }, [message, setMessage, duration])
+}
+
+// ─── Components ──────────────────────────────────────────
+
+// Status Badge
+const StatusBadge = ({ status }) => {
+  const config = STATUS_CONFIG[status] || STATUS_CONFIG.pending
+  
   return (
-    <span className="inline-flex items-center gap-1.5 px-2 py-1 bg-gray-50 border border-gray-100 rounded">
-      <span className={`w-1.5 h-1.5 rounded-full ${cfg.color}`} />
-      <span className="text-[8px] tracking-[0.12em] uppercase text-gray-600">
-        {cfg.label}
+    <span 
+      className={`inline-flex items-center gap-1.5 px-2 py-1 ${config.bgColor} ${config.borderColor} border rounded`}
+      role="status"
+      aria-label={`Status: ${config.label}`}
+    >
+      <span className={`w-1.5 h-1.5 rounded-full ${config.color}`} aria-hidden="true" />
+      <span className={`text-[8px] tracking-[0.12em] uppercase ${config.textColor}`}>
+        {config.label}
       </span>
     </span>
   )
 }
 
-// ─── Avatar ───
-function Avatar({ initials, size = 'md', variant = 'dark' }) {
+// Avatar
+const Avatar = ({ initials, size = 'md', variant = 'dark' }) => {
   const sizes = {
-    sm: 'w-8 h-8 text-[11px]',
-    md: 'w-12 h-12 text-[14px]',
-    lg: 'w-16 h-16 text-[18px]',
+    sm: { className: 'w-8 h-8', fontSize: '11px' },
+    md: { className: 'w-12 h-12', fontSize: '14px' },
+    lg: { className: 'w-16 h-16', fontSize: '18px' },
   }
+  
   const variants = {
     dark: 'bg-black text-white',
     light: 'bg-white text-black border border-gray-200',
     ghost: 'bg-white/10 text-white border border-white/15',
   }
+  
+  const sizeConfig = sizes[size]
+  
   return (
     <div
-      className={`rounded-full flex items-center justify-center shrink-0 ${sizes[size]} ${variants[variant]}`}
-      style={{ fontFamily: SERIF, fontWeight: 300 }}
+      className={`rounded-full flex items-center justify-center shrink-0 ${sizeConfig.className} ${variants[variant]}`}
+      style={{ fontFamily: TYPOGRAPHY.serif, fontWeight: 300, fontSize: sizeConfig.fontSize }}
+      aria-hidden="true"
     >
       {initials}
     </div>
   )
 }
 
-// ─── Input Field ───
-function InputField({ label, icon: Icon, disabled, hint, ...props }) {
+// Input Field
+const InputField = ({ 
+  label, 
+  icon: Icon, 
+  disabled, 
+  hint, 
+  error,
+  required,
+  ...props 
+}) => {
+  const hasError = Boolean(error)
+  
   return (
     <div>
       <label className="block text-[8px] tracking-[0.2em] uppercase text-gray-400 mb-1.5">
         {label}
+        {required && <span className="text-red-400 ml-0.5">*</span>}
       </label>
       <div className="relative">
         {Icon && (
-          <Icon size={14} strokeWidth={1.5} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" />
+          <Icon 
+            size={14} 
+            strokeWidth={1.5} 
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none" 
+            aria-hidden="true"
+          />
         )}
         <input
           disabled={disabled}
-          className={`w-full ${Icon ? 'pl-9' : 'pl-3'} pr-3 py-3 border text-[11px] rounded transition-all duration-200 min-h-[44px] ${disabled ? 'border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed' : 'border-gray-200 bg-white text-black focus:outline-none focus:border-black'}`}
+          aria-invalid={hasError}
+          aria-describedby={hint || error ? `${props.id}-description` : undefined}
+          className={`w-full ${Icon ? 'pl-9' : 'pl-3'} pr-3 py-3 border text-[11px] rounded transition-all duration-200 min-h-[44px]
+            ${hasError 
+              ? 'border-red-200 bg-red-50/50 text-red-900 focus:border-red-400 focus:ring-2 focus:ring-red-100' 
+              : disabled 
+                ? 'border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed' 
+                : 'border-gray-200 bg-white text-black focus:outline-none focus:border-black focus:ring-2 focus:ring-black/5'
+            }`}
           {...props}
         />
       </div>
-      {hint && <p className="text-[8px] text-gray-300 mt-1">{hint}</p>}
+      {(hint || error) && (
+        <p 
+          id={`${props.id}-description`}
+          className={`text-[8px] mt-1 ${hasError ? 'text-red-500' : 'text-gray-400'}`}
+        >
+          {error || hint}
+        </p>
+      )}
     </div>
   )
 }
 
-// ─── Password Field ───
-function PasswordField({ label, showPassword, onToggle, ...props }) {
+// Password Field
+const PasswordField = ({ 
+  label, 
+  showPassword, 
+  onToggle, 
+  error,
+  required,
+  ...props 
+}) => {
+  const hasError = Boolean(error)
+  
   return (
     <div>
       <label className="block text-[8px] tracking-[0.2em] uppercase text-gray-400 mb-1.5">
         {label}
+        {required && <span className="text-red-400 ml-0.5">*</span>}
       </label>
       <div className="relative">
-        <Lock size={14} strokeWidth={1.5} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" />
+        <Lock 
+          size={14} 
+          strokeWidth={1.5} 
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none" 
+          aria-hidden="true"
+        />
         <input
           type={showPassword ? 'text' : 'password'}
-          className="w-full pl-9 pr-10 py-3 border border-gray-200 text-[11px] text-black bg-white placeholder-gray-300 rounded focus:outline-none focus:border-black transition-colors duration-200 min-h-[44px]"
+          aria-invalid={hasError}
+          aria-describedby={error ? `${props.id}-error` : undefined}
+          className={`w-full pl-9 pr-10 py-3 border text-[11px] rounded transition-all duration-200 min-h-[44px]
+            ${hasError 
+              ? 'border-red-200 bg-red-50/50 text-red-900 focus:border-red-400 focus:ring-2 focus:ring-red-100' 
+              : 'border-gray-200 bg-white text-black placeholder-gray-300 focus:outline-none focus:border-black focus:ring-2 focus:ring-black/5'
+            }`}
           {...props}
         />
         <button
           type="button"
           onClick={onToggle}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 active:text-gray-600 transition-colors"
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-600 active:text-gray-600 transition-colors"
+          aria-label={showPassword ? 'Hide password' : 'Show password'}
         >
           {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
         </button>
       </div>
+      {error && (
+        <p id={`${props.id}-error`} className="text-[8px] text-red-500 mt-1">
+          {error}
+        </p>
+      )}
     </div>
   )
 }
 
-// ─── Stat Card ───
-function StatCard({ value, label, icon: Icon }) {
+// Stat Card
+const StatCard = ({ value, label, icon: Icon }) => {
   return (
-    <div className="border border-gray-100 rounded p-3 text-center">
+    <div className="border border-gray-100 rounded-lg p-3 text-center hover:border-gray-200 transition-colors">
       {Icon && (
         <div className="w-8 h-8 border border-gray-200 rounded-full flex items-center justify-center mx-auto mb-2">
           <Icon size={14} strokeWidth={1.5} className="text-gray-400" />
         </div>
       )}
-      <p className="text-black leading-none" style={{ fontFamily: SERIF, fontWeight: 300, fontSize: '18px' }}>
+      <p 
+        className="text-black leading-none" 
+        style={{ fontFamily: TYPOGRAPHY.serif, fontWeight: 300, fontSize: '18px' }}
+      >
         {value}
       </p>
-      <p className="text-[7px] tracking-[0.15em] uppercase text-gray-400 mt-1">{label}</p>
+      <p className="text-[7px] tracking-[0.15em] uppercase text-gray-400 mt-1">
+        {label}
+      </p>
     </div>
   )
 }
 
-// ─── Mobile Booking Card ───
-function MobileBookingCard({ booking, onClick }) {
+// Mobile Booking Card
+const MobileBookingCard = ({ booking, onClick }) => {
   const bookingDate = new Date(booking.bookingDate)
   const isUpcoming = bookingDate > new Date() && !['cancelled', 'completed'].includes(booking.status)
-
-  const formatDate = (date) => {
-    const today = new Date()
-    const tomorrow = new Date(today)
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    if (date.toDateString() === today.toDateString()) return 'Today'
-    if (date.toDateString() === tomorrow.toDateString()) return 'Tomorrow'
-    return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
-  }
+  const formattedDate = useMemo(() => formatDate(bookingDate), [bookingDate])
 
   return (
     <button
       onClick={onClick}
-      className="w-full text-left border border-gray-200 rounded overflow-hidden active:scale-[0.98] transition-transform duration-150 bg-white"
+      className="w-full text-left border border-gray-200 rounded-lg overflow-hidden 
+                 active:scale-[0.98] hover:border-gray-300 transition-all duration-200 bg-white
+                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2"
+      aria-label={`View booking for ${booking.serviceName}`}
     >
       <div className="relative bg-black px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="min-w-0 flex-1">
-            <h3 className="text-white truncate text-[14px]" style={{ fontFamily: SERIF, fontWeight: 400 }}>
+            <h3 
+              className="text-white truncate text-[14px]" 
+              style={{ fontFamily: TYPOGRAPHY.serif, fontWeight: 400 }}
+            >
               {booking.serviceName}
             </h3>
-            <p className="text-white/40 text-[9px] tracking-[0.08em] mt-0.5">{booking.bookingCode}</p>
+            <p className="text-white/40 text-[9px] tracking-[0.08em] mt-0.5 font-mono">
+              {booking.bookingCode}
+            </p>
           </div>
           <div className="text-right ml-3">
-            <p className="text-white" style={{ fontFamily: SERIF, fontWeight: 300, fontSize: '16px' }}>
+            <p 
+              className="text-white" 
+              style={{ fontFamily: TYPOGRAPHY.serif, fontWeight: 300, fontSize: '16px' }}
+            >
               ₹{booking.price}
             </p>
           </div>
         </div>
         {isUpcoming && (
-          <span className="absolute top-2 right-2 flex h-2 w-2">
+          <span className="absolute top-2 right-2 flex h-2 w-2" aria-label="Upcoming booking">
             <span className="animate-ping absolute h-full w-full rounded-full bg-emerald-400 opacity-75" />
             <span className="relative rounded-full h-full w-full bg-emerald-500" />
           </span>
@@ -199,19 +365,21 @@ function MobileBookingCard({ booking, onClick }) {
       <div className="px-4 py-3">
         <div className="flex items-center justify-between mb-2">
           <StatusBadge status={booking.status} />
-          <span className="text-[9px] text-gray-400 uppercase tracking-wider">{booking.vehicleTypeName}</span>
+          <span className="text-[9px] text-gray-400 uppercase tracking-wider">
+            {booking.vehicleTypeName}
+          </span>
         </div>
         <div className="flex items-center gap-3 text-[10px] text-gray-500">
           <span className="flex items-center gap-1">
-            <Calendar size={10} className="text-gray-300" />
-            {formatDate(bookingDate)}
+            <Calendar size={10} className="text-gray-300" aria-hidden="true" />
+            {formattedDate}
           </span>
           <span className="flex items-center gap-1">
-            <Clock size={10} className="text-gray-300" />
+            <Clock size={10} className="text-gray-300" aria-hidden="true" />
             {booking.timeSlot}
           </span>
           <span className="flex items-center gap-1">
-            <Timer size={10} className="text-gray-300" />
+            <Timer size={10} className="text-gray-300" aria-hidden="true" />
             {booking.duration}m
           </span>
         </div>
@@ -220,72 +388,87 @@ function MobileBookingCard({ booking, onClick }) {
   )
 }
 
-// ─── Desktop Booking Card ───
-function DesktopBookingCard({ booking, onClick }) {
+// Desktop Booking Card
+const DesktopBookingCard = ({ booking, onClick }) => {
   const bookingDate = new Date(booking.bookingDate)
   const isUpcoming = bookingDate > new Date() && !['cancelled', 'completed'].includes(booking.status)
-
-  const formatDate = (date) => {
-    const today = new Date()
-    const tomorrow = new Date(today)
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    if (date.toDateString() === today.toDateString()) return 'Today'
-    if (date.toDateString() === tomorrow.toDateString()) return 'Tomorrow'
-    return date.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })
-  }
+  const formattedDate = useMemo(() => formatDate(bookingDate), [bookingDate])
 
   return (
     <button
       onClick={onClick}
-      className="w-full text-left group border border-gray-200 rounded overflow-hidden hover:border-black hover:shadow-md transition-all duration-300 bg-white"
+      className="w-full text-left group border border-gray-200 rounded-lg overflow-hidden 
+                 hover:border-black hover:shadow-md transition-all duration-300 bg-white
+                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2"
+      aria-label={`View booking for ${booking.serviceName}`}
     >
       <div className="p-5 flex items-center gap-5">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2.5 mb-1.5">
+          <div className="flex items-center gap-2.5 mb-1.5 flex-wrap">
             <StatusBadge status={booking.status} />
-            <span className="text-[9px] text-gray-300 font-mono uppercase">{booking.bookingCode}</span>
+            <span className="text-[9px] text-gray-300 font-mono uppercase">
+              {booking.bookingCode}
+            </span>
             {isUpcoming && (
-              <span className="relative flex h-1.5 w-1.5">
+              <span className="relative flex h-1.5 w-1.5" aria-label="Upcoming">
                 <span className="animate-ping absolute h-full w-full rounded-full bg-emerald-400 opacity-75" />
                 <span className="relative rounded-full h-full w-full bg-emerald-500" />
               </span>
             )}
           </div>
-          <h3 className="text-black truncate mb-0.5" style={{ fontFamily: SERIF, fontWeight: 400, fontSize: '15px' }}>
+          <h3 
+            className="text-black truncate mb-0.5" 
+            style={{ fontFamily: TYPOGRAPHY.serif, fontWeight: 400, fontSize: '15px' }}
+          >
             {booking.serviceName}
           </h3>
-          <p className="text-[10px] text-gray-400 uppercase tracking-wider">{booking.vehicleTypeName}</p>
+          <p className="text-[10px] text-gray-400 uppercase tracking-wider">
+            {booking.vehicleTypeName}
+          </p>
         </div>
+        
         <div className="hidden lg:flex items-center gap-2 shrink-0">
           <div className="flex items-center gap-1.5 px-2.5 py-1.5 border border-gray-100 rounded">
-            <Calendar size={11} className="text-gray-400" />
-            <span className="text-[10px] text-black">{formatDate(bookingDate)}</span>
+            <Calendar size={11} className="text-gray-400" aria-hidden="true" />
+            <span className="text-[10px] text-black">{formattedDate}</span>
           </div>
           <div className="flex items-center gap-1.5 px-2.5 py-1.5 border border-gray-100 rounded">
-            <Clock size={11} className="text-gray-400" />
+            <Clock size={11} className="text-gray-400" aria-hidden="true" />
             <span className="text-[10px] text-black">{booking.timeSlot}</span>
           </div>
         </div>
+        
         <div className="flex items-center gap-3 shrink-0">
-          <p className="text-black" style={{ fontFamily: SERIF, fontWeight: 300, fontSize: '20px' }}>
+          <p 
+            className="text-black" 
+            style={{ fontFamily: TYPOGRAPHY.serif, fontWeight: 300, fontSize: '20px' }}
+          >
             ₹{booking.price}
           </p>
-          <ChevronRight size={14} className="text-gray-300 group-hover:text-black transition-colors" />
+          <ChevronRight 
+            size={14} 
+            className="text-gray-300 group-hover:text-black group-hover:translate-x-0.5 transition-all" 
+            aria-hidden="true"
+          />
         </div>
       </div>
     </button>
   )
 }
 
-// ─── Modal ───
-function Modal({ isOpen, onClose, children }) {
+// Modal
+const Modal = ({ isOpen, onClose, children, title }) => {
   useScrollLock(isOpen)
 
   useEffect(() => {
     if (!isOpen) return
-    const handleEsc = (e) => e.key === 'Escape' && onClose()
-    document.addEventListener('keydown', handleEsc)
-    return () => document.removeEventListener('keydown', handleEsc)
+    
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') onClose()
+    }
+    
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
   }, [isOpen, onClose])
 
   if (!isOpen) return null
@@ -294,10 +477,12 @@ function Modal({ isOpen, onClose, children }) {
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={(e) => e.target === e.currentTarget && onClose()}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={title ? "modal-title" : undefined}
     >
       <div
         className="relative w-full sm:max-w-md bg-white sm:rounded-lg rounded-t-2xl max-h-[90vh] overflow-hidden"
-        style={{ animation: 'slide-up 0.3s ease-out' }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sm:hidden flex justify-center pt-3 pb-2">
@@ -311,60 +496,87 @@ function Modal({ isOpen, onClose, children }) {
   )
 }
 
-// ─── Deactivate Modal ───
-function DeactivateModal({ isOpen, onClose, onConfirm, loading }) {
+// Deactivate Account Modal
+const DeactivateModal = ({ isOpen, onClose, onConfirm, loading }) => {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    if (!isOpen) setPassword('')
+    if (!isOpen) {
+      setPassword('')
+      setShowPassword(false)
+      setError('')
+    }
   }, [isOpen])
 
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    if (!password.trim()) {
+      setError('Password is required')
+      return
+    }
+    setError('')
+    onConfirm(password)
+  }
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose}>
-      <div className="p-5">
+    <Modal isOpen={isOpen} onClose={onClose} title="Deactivate Account">
+      <form onSubmit={handleSubmit} className="p-5">
         <div className="w-12 h-12 border border-red-200 bg-red-50 rounded-full flex items-center justify-center mb-4">
           <AlertCircle size={22} className="text-red-500" strokeWidth={1.5} />
         </div>
-        <h2 className="text-black mb-1.5" style={{ fontFamily: SERIF, fontWeight: 400, fontSize: '18px' }}>
+        
+        <h2 
+          id="modal-title"
+          className="text-black mb-1.5" 
+          style={{ fontFamily: TYPOGRAPHY.serif, fontWeight: 400, fontSize: '18px' }}
+        >
           Deactivate Account?
         </h2>
+        
         <p className="text-gray-500 text-[11px] leading-relaxed mb-5">
-          Once deactivated, you won't be able to access your account. Contact support to reactivate.
+          Once deactivated, you will not be able to access your account or data. 
+          Contact support if you need to reactivate later.
         </p>
+        
         <div className="mb-5">
-          <label className="block text-[8px] tracking-[0.2em] uppercase text-gray-400 mb-1.5">
-            Confirm Password
-          </label>
-          <div className="relative">
-            <input
-              type={showPassword ? 'text' : 'password'}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              className="w-full px-3 pr-10 py-3 border border-gray-200 rounded text-[11px] text-black placeholder-gray-300 focus:outline-none focus:border-black transition-colors min-h-[44px]"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
-            >
-              {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-            </button>
-          </div>
+          <PasswordField
+            id="deactivate-password"
+            label="Confirm Password"
+            value={password}
+            onChange={(e) => {
+              setPassword(e.target.value)
+              setError('')
+            }}
+            showPassword={showPassword}
+            onToggle={() => setShowPassword(!showPassword)}
+            placeholder="Enter your password"
+            error={error}
+            required
+          />
         </div>
+        
         <div className="flex gap-2">
           <button
+            type="button"
             onClick={onClose}
             disabled={loading}
-            className="flex-1 px-4 py-3 border border-gray-200 rounded text-[9px] tracking-[0.15em] uppercase text-black min-h-[44px] active:scale-[0.98] transition-all disabled:opacity-50"
+            className="flex-1 px-4 py-3 border border-gray-200 rounded text-[9px] tracking-[0.15em] 
+                       uppercase text-black min-h-[44px] hover:bg-gray-50 active:scale-[0.98] 
+                       transition-all disabled:opacity-50 disabled:cursor-not-allowed
+                       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2"
           >
             Cancel
           </button>
+          
           <button
-            onClick={() => onConfirm(password)}
+            type="submit"
             disabled={loading || !password}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-red-600 text-white rounded min-h-[44px] text-[9px] tracking-[0.15em] uppercase active:scale-[0.98] transition-all disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-red-600 text-white 
+                       rounded min-h-[44px] text-[9px] tracking-[0.15em] uppercase hover:bg-red-700 
+                       active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed
+                       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
           >
             {loading ? (
               <Loader2 size={14} className="animate-spin" />
@@ -376,65 +588,172 @@ function DeactivateModal({ isOpen, onClose, onConfirm, loading }) {
             )}
           </button>
         </div>
-      </div>
+      </form>
     </Modal>
   )
 }
 
-// ─── Toast ───
-function Toast({ type, message, onClose }) {
+// Toast Notification
+const Toast = ({ type, message, onClose }) => {
   if (!message) return null
 
   const config = {
-    error: { bg: 'bg-red-50 border-red-100', icon: AlertCircle, iconColor: 'text-red-500', text: 'text-red-600' },
-    success: { bg: 'bg-emerald-50 border-emerald-100', icon: CheckCircle, iconColor: 'text-emerald-500', text: 'text-emerald-600' },
+    error: { 
+      bg: 'bg-red-50 border-red-100', 
+      icon: AlertCircle, 
+      iconColor: 'text-red-500', 
+      text: 'text-red-700' 
+    },
+    success: { 
+      bg: 'bg-emerald-50 border-emerald-100', 
+      icon: CheckCircle, 
+      iconColor: 'text-emerald-500', 
+      text: 'text-emerald-700' 
+    },
   }
 
-  const cfg = config[type]
+  const cfg = config[type] || config.error
   const Icon = cfg.icon
 
   return (
-    <div className={`mb-4 flex items-center gap-2.5 p-3 border rounded ${cfg.bg}`}>
-      <Icon size={14} className={cfg.iconColor} />
-      <p className={`text-[11px] flex-1 ${cfg.text}`}>{message}</p>
-      <button onClick={onClose}>
-        <X size={12} className={cfg.iconColor} />
+    <div 
+      className={`mb-4 flex items-start gap-2.5 p-3 border rounded-lg ${cfg.bg}`}
+      role="alert"
+      aria-live="assertive"
+    >
+      <Icon size={16} className={`${cfg.iconColor} shrink-0 mt-0.5`} />
+      <p className={`text-[11px] flex-1 leading-relaxed ${cfg.text}`}>
+        {message}
+      </p>
+      <button
+        onClick={onClose}
+        className={`${cfg.iconColor} hover:opacity-70 transition-opacity shrink-0`}
+        aria-label="Dismiss notification"
+      >
+        <X size={14} />
       </button>
     </div>
   )
 }
 
-// ═══════════════════════════════════════
+// Empty State
+const EmptyState = ({ 
+  icon: Icon, 
+  title, 
+  description, 
+  actionLabel, 
+  actionHref,
+  onAction 
+}) => {
+  return (
+    <div className="flex flex-col items-center justify-center py-12 border border-gray-200 rounded-lg">
+      <div className="w-14 h-14 border border-gray-200 rounded-full flex items-center justify-center mb-4">
+        <Icon size={24} strokeWidth={1} className="text-gray-300" />
+      </div>
+      <h3 
+        className="text-black mb-1" 
+        style={{ fontFamily: TYPOGRAPHY.serif, fontWeight: 300, fontSize: '16px' }}
+      >
+        {title}
+      </h3>
+      {description && (
+        <p className="text-[10px] text-gray-400 mb-5 max-w-xs text-center">
+          {description}
+        </p>
+      )}
+      {(actionLabel && (actionHref || onAction)) && (
+        actionHref ? (
+          <Link
+            href={actionHref}
+            className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-lg 
+                       text-[9px] tracking-[0.15em] uppercase min-h-[44px] hover:bg-gray-900 
+                       active:scale-[0.98] transition-all
+                       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2"
+          >
+            {actionLabel}
+            <ArrowUpRight size={12} />
+          </Link>
+        ) : (
+          <button
+            onClick={onAction}
+            className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-lg 
+                       text-[9px] tracking-[0.15em] uppercase min-h-[44px] hover:bg-gray-900 
+                       active:scale-[0.98] transition-all
+                       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2"
+          >
+            {actionLabel}
+            <ArrowUpRight size={12} />
+          </button>
+        )
+      )}
+    </div>
+  )
+}
+
+// Section Header
+const SectionHeader = ({ title, action }) => {
+  return (
+    <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center gap-2">
+        <span className="block w-3 h-px bg-gray-300" />
+        <h2 
+          className="text-black" 
+          style={{ fontFamily: TYPOGRAPHY.serif, fontWeight: 300, fontSize: '16px' }}
+        >
+          {title}
+        </h2>
+      </div>
+      {action}
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════
 // MAIN COMPONENT
-// ═══════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 
 export default function ProfilePage() {
   const { user, loading: authLoading, logout, checkAuth } = useAuth()
   const router = useRouter()
 
+  // State
   const [activeTab, setActiveTab] = useState('profile')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  
   const [profile, setProfile] = useState(null)
   const [stats, setStats] = useState(null)
+  const [bookings, setBookings] = useState([])
+  const [bookingsLoading, setBookingsLoading] = useState(false)
+  
   const [isEditing, setIsEditing] = useState(false)
   const [formData, setFormData] = useState({ firstName: '', lastName: '' })
+  const [formErrors, setFormErrors] = useState({})
+  
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
     newPassword: '',
     confirmNewPassword: '',
   })
+  const [passwordErrors, setPasswordErrors] = useState({})
   const [showPasswords, setShowPasswords] = useState(false)
-  const [bookings, setBookings] = useState([])
-  const [bookingsLoading, setBookingsLoading] = useState(false)
+  
   const [showDeactivateModal, setShowDeactivateModal] = useState(false)
 
+  // Auto-hide messages
+  useAutoHideMessage(success, setSuccess, 3000)
+  useAutoHideMessage(error, setError, 5000)
+
+  // Redirect if not authenticated
   useEffect(() => {
-    if (!authLoading && !user) router.push('/')
+    if (!authLoading && !user) {
+      router.push('/')
+    }
   }, [user, authLoading, router])
 
+  // Fetch initial data
   useEffect(() => {
     if (user) {
       fetchProfile()
@@ -442,120 +761,186 @@ export default function ProfilePage() {
     }
   }, [user])
 
+  // Fetch bookings when tab changes
   useEffect(() => {
-    if (user && activeTab === 'bookings') fetchBookings()
+    if (user && activeTab === 'bookings' && bookings.length === 0) {
+      fetchBookings()
+    }
   }, [user, activeTab])
 
-  useEffect(() => {
-    if (success) {
-      const t = setTimeout(() => setSuccess(''), 3000)
-      return () => clearTimeout(t)
-    }
-  }, [success])
-
-  useEffect(() => {
-    if (error) {
-      const t = setTimeout(() => setError(''), 5000)
-      return () => clearTimeout(t)
-    }
-  }, [error])
-
-  const fetchProfile = async () => {
+  // Data fetching functions
+  const fetchProfile = useCallback(async () => {
     try {
       setLoading(true)
       const data = await getUserProfile()
       setProfile(data)
-      setFormData({ firstName: data.firstName || '', lastName: data.lastName || '' })
+      setFormData({ 
+        firstName: data.firstName || '', 
+        lastName: data.lastName || '' 
+      })
     } catch (err) {
-      setError(err.message)
+      setError(err.message || 'Failed to load profile')
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       const data = await getUserStats()
       setStats(data)
     } catch (err) {
       console.error('Stats error:', err)
     }
-  }
+  }, [])
 
-  const fetchBookings = async () => {
+  const fetchBookings = useCallback(async () => {
     try {
       setBookingsLoading(true)
       const data = await getUserBookings()
       setBookings(data.bookings || [])
     } catch (err) {
       console.error('Bookings error:', err)
+      setError('Failed to load bookings')
     } finally {
       setBookingsLoading(false)
     }
-  }
+  }, [])
 
-  const handleUpdateProfile = async (e) => {
+  // Form handlers
+  const handleUpdateProfile = useCallback(async (e) => {
     e.preventDefault()
+    
+    // Validation
+    const errors = {}
+    if (!formData.firstName.trim()) errors.firstName = 'First name is required'
+    if (!formData.lastName.trim()) errors.lastName = 'Last name is required'
+    
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors)
+      return
+    }
+    
+    setFormErrors({})
     setError('')
     setSuccess('')
     setSaving(true)
+    
     try {
       await updateUserProfile(formData)
-      setSuccess('Profile updated')
+      setSuccess('Profile updated successfully')
       setIsEditing(false)
       await checkAuth()
       await fetchProfile()
     } catch (err) {
-      setError(err.message)
+      setError(err.message || 'Failed to update profile')
     } finally {
       setSaving(false)
     }
-  }
+  }, [formData, checkAuth, fetchProfile])
 
-  const handleChangePassword = async (e) => {
+  const handleChangePassword = useCallback(async (e) => {
     e.preventDefault()
+    
+    // Validation
+    const errors = {}
+    
+    if (!passwordData.currentPassword) {
+      errors.currentPassword = 'Current password is required'
+    }
+    
+    if (!passwordData.newPassword) {
+      errors.newPassword = 'New password is required'
+    } else {
+      const validation = validatePassword(passwordData.newPassword)
+      if (!validation.valid) {
+        errors.newPassword = validation.message
+      }
+    }
+    
+    if (!passwordData.confirmNewPassword) {
+      errors.confirmNewPassword = 'Please confirm your password'
+    } else if (passwordData.newPassword !== passwordData.confirmNewPassword) {
+      errors.confirmNewPassword = 'Passwords do not match'
+    }
+    
+    if (Object.keys(errors).length > 0) {
+      setPasswordErrors(errors)
+      return
+    }
+    
+    setPasswordErrors({})
     setError('')
     setSuccess('')
-    if (passwordData.newPassword.length < 8) { setError('Min 8 characters required'); return }
-    if (passwordData.newPassword !== passwordData.confirmNewPassword) { setError('Passwords do not match'); return }
-    const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])/
-    if (!regex.test(passwordData.newPassword)) { setError('Needs uppercase, lowercase, number & special char'); return }
     setSaving(true)
+    
     try {
-      await changePassword(passwordData.currentPassword, passwordData.newPassword, passwordData.confirmNewPassword)
-      setSuccess('Password changed')
-      setPasswordData({ currentPassword: '', newPassword: '', confirmNewPassword: '' })
+      await changePassword(
+        passwordData.currentPassword, 
+        passwordData.newPassword, 
+        passwordData.confirmNewPassword
+      )
+      setSuccess('Password changed successfully')
+      setPasswordData({ 
+        currentPassword: '', 
+        newPassword: '', 
+        confirmNewPassword: '' 
+      })
     } catch (err) {
-      setError(err.message)
+      setError(err.message || 'Failed to change password')
     } finally {
       setSaving(false)
     }
-  }
+  }, [passwordData])
 
-  const handleDeactivateAccount = async (password) => {
-    if (!password) { setError('Enter your password'); return }
+  const handleDeactivateAccount = useCallback(async (password) => {
+    if (!password) {
+      setError('Password is required')
+      return
+    }
+    
     setSaving(true)
     setError('')
+    
     try {
       await deactivateAccount(password)
+      setShowDeactivateModal(false)
       logout()
     } catch (err) {
-      setError(err.message)
-    } finally {
+      setError(err.message || 'Failed to deactivate account')
       setSaving(false)
     }
-  }
+  }, [logout])
 
-  const switchTab = (id) => {
+  // Tab switching
+  const switchTab = useCallback((id) => {
     setActiveTab(id)
     setError('')
     setSuccess('')
-  }
+    setIsEditing(false)
+  }, [])
 
+  // Cancel editing
+  const handleCancelEdit = useCallback(() => {
+    setIsEditing(false)
+    setFormData({ 
+      firstName: profile?.firstName || '', 
+      lastName: profile?.lastName || '' 
+    })
+    setFormErrors({})
+  }, [profile])
+
+  // Computed values
+  const userInitials = useMemo(
+    () => getInitials(user?.firstName, user?.lastName),
+    [user?.firstName, user?.lastName]
+  )
+
+  // Loading state
   if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
-        <Loader2 size={24} className="animate-spin text-gray-300" />
+        <Loader2 size={32} className="animate-spin text-gray-300" />
       </div>
     )
   }
@@ -563,9 +948,9 @@ export default function ProfilePage() {
   if (!user) return null
 
   return (
-    <div className="min-h-screen bg-white pb-16 sm:pb-0" style={{ fontFamily: SANS }}>
-
-      {/* ── Header ── */}
+    <div className="min-h-screen bg-white" style={{ fontFamily: TYPOGRAPHY.sans }}>
+      
+      {/* Header */}
       <div className="bg-black">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 md:px-8">
           <div className="pt-16 pb-6 sm:pt-20 sm:pb-8">
@@ -575,137 +960,192 @@ export default function ProfilePage() {
                 Account
               </span>
             </div>
+            
             <div className="flex items-end justify-between gap-4">
               <div>
-                <h1 className="text-white mb-1" style={{ fontFamily: SERIF, fontWeight: 300, fontSize: 'clamp(1.25rem, 4vw, 1.75rem)' }}>
+                <h1 
+                  className="text-white mb-1" 
+                  style={{ 
+                    fontFamily: TYPOGRAPHY.serif, 
+                    fontWeight: 300, 
+                    fontSize: 'clamp(1.25rem, 4vw, 1.75rem)' 
+                  }}
+                >
                   My Account
                 </h1>
-                <p className="text-[9px] tracking-[0.15em] uppercase text-white/30">
-                  Manage profile & preferences
+                <p className="text-[9px] tracking-[0.15em] uppercase text-white/40">
+                  Manage your profile and preferences
                 </p>
               </div>
+              
               <div className="hidden sm:block">
-                <Avatar
-                  initials={`${user?.firstName?.[0] || ''}${user?.lastName?.[0] || ''}`}
-                  size="md"
-                  variant="ghost"
-                />
+                <Avatar initials={userInitials} size="md" variant="ghost" />
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── Desktop Tabs ── */}
-      <div className="hidden sm:block sticky top-0 z-30 bg-white border-b border-gray-100">
+      {/* Desktop Tabs */}
+      <div className="hidden sm:block sticky top-0 z-30 bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 md:px-8">
-          <div className="flex">
+          <nav className="flex" role="tablist" aria-label="Profile sections">
             {TABS.map((tab) => {
               const Icon = tab.icon
+              const isActive = activeTab === tab.id
+              
               return (
                 <button
                   key={tab.id}
                   onClick={() => switchTab(tab.id)}
-                  className={`relative flex items-center gap-2 px-5 py-3 text-[9px] tracking-[0.12em] uppercase transition-colors ${activeTab === tab.id ? 'text-black' : 'text-gray-400 hover:text-black'}`}
+                  role="tab"
+                  aria-selected={isActive}
+                  aria-controls={`${tab.id}-panel`}
+                  className={`relative flex items-center gap-2 px-5 py-4 text-[9px] tracking-[0.12em] 
+                             uppercase transition-all duration-200
+                             ${isActive 
+                               ? 'text-black font-medium' 
+                               : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+                             }
+                             focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-black`}
                 >
-                  <Icon size={13} strokeWidth={1.5} />
+                  <Icon size={14} strokeWidth={isActive ? 2 : 1.5} />
                   <span>{tab.label}</span>
-                  {activeTab === tab.id && (
-                    <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-black" />
+                  {isActive && (
+                    <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-black rounded-t-full" />
                   )}
                 </button>
               )
             })}
-          </div>
+          </nav>
         </div>
       </div>
 
-      {/* ── Content ── */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 md:px-8 py-5 sm:py-6">
+      {/* Content */}
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 md:px-8 py-5 sm:py-6 pb-24 sm:pb-6">
+        
+        {/* Toast Messages */}
         <Toast type="error" message={error} onClose={() => setError('')} />
         <Toast type="success" message={success} onClose={() => setSuccess('')} />
 
-        {/* ═══ Profile Tab ═══ */}
+        {/* Profile Tab */}
         {activeTab === 'profile' && (
-          <div className="space-y-4">
-            <div className="border border-gray-200 rounded p-4 sm:p-6">
+          <div className="space-y-4" role="tabpanel" id="profile-panel">
+            
+            {/* Profile Summary Card */}
+            <div className="border border-gray-200 rounded-lg p-4 sm:p-6">
               <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
-                <Avatar
-                  initials={`${user?.firstName?.[0] || ''}${user?.lastName?.[0] || ''}`}
-                  size="lg"
-                />
+                <Avatar initials={userInitials} size="lg" />
+                
                 <div className="text-center sm:text-left flex-1 min-w-0">
-                  <h2 className="text-black" style={{ fontFamily: SERIF, fontWeight: 300, fontSize: '18px' }}>
+                  <h2 
+                    className="text-black" 
+                    style={{ fontFamily: TYPOGRAPHY.serif, fontWeight: 300, fontSize: '18px' }}
+                  >
                     {user?.firstName} {user?.lastName}
                   </h2>
                   <p className="text-[10px] text-gray-400 mt-0.5">{user?.email}</p>
+                  
                   {stats && (
                     <div className="flex items-center justify-center sm:justify-start gap-4 mt-3">
                       <div>
-                        <span className="text-black" style={{ fontFamily: SERIF, fontWeight: 300, fontSize: '16px' }}>
+                        <span 
+                          className="text-black" 
+                          style={{ fontFamily: TYPOGRAPHY.serif, fontWeight: 300, fontSize: '16px' }}
+                        >
                           {stats.bookings?.total || 0}
                         </span>
-                        <span className="text-[8px] tracking-[0.12em] uppercase text-gray-400 ml-1">Bookings</span>
+                        <span className="text-[8px] tracking-[0.12em] uppercase text-gray-400 ml-1">
+                          Bookings
+                        </span>
                       </div>
                       <div className="w-px h-3 bg-gray-200" />
                       <div>
-                        <span className="text-black" style={{ fontFamily: SERIF, fontWeight: 300, fontSize: '16px' }}>
+                        <span 
+                          className="text-black" 
+                          style={{ fontFamily: TYPOGRAPHY.serif, fontWeight: 300, fontSize: '16px' }}
+                        >
                           ₹{stats.totalSpent || 0}
                         </span>
-                        <span className="text-[8px] tracking-[0.12em] uppercase text-gray-400 ml-1">Spent</span>
+                        <span className="text-[8px] tracking-[0.12em] uppercase text-gray-400 ml-1">
+                          Spent
+                        </span>
                       </div>
                     </div>
                   )}
                 </div>
+                
                 <button
-                  onClick={() => {
-                    if (isEditing) {
-                      setIsEditing(false)
-                      setFormData({ firstName: profile?.firstName || '', lastName: profile?.lastName || '' })
-                    } else {
-                      setIsEditing(true)
-                    }
-                  }}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 border border-gray-200 rounded text-[9px] tracking-[0.12em] uppercase hover:border-black active:scale-[0.98] transition-all shrink-0"
+                  onClick={isEditing ? handleCancelEdit : () => setIsEditing(true)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 border border-gray-200 rounded-lg 
+                             text-[9px] tracking-[0.12em] uppercase hover:border-black hover:bg-gray-50 
+                             active:scale-[0.98] transition-all shrink-0"
                 >
-                  {isEditing ? <X size={12} /> : <Edit2 size={12} />}
-                  {isEditing ? 'Cancel' : 'Edit'}
+                  {isEditing ? <><X size={12} />Cancel</> : <><Edit2 size={12} />Edit</>}
                 </button>
               </div>
             </div>
 
-            <div className="border border-gray-200 rounded p-4 sm:p-6">
+            {/* Personal Information */}
+            <div className="border border-gray-200 rounded-lg p-4 sm:p-6">
               <div className="flex items-center gap-2 mb-4">
                 <span className="block w-3 h-px bg-gray-300" />
-                <h3 className="text-[8px] tracking-[0.25em] uppercase text-gray-400">Personal Information</h3>
+                <h3 className="text-[8px] tracking-[0.25em] uppercase text-gray-400">
+                  Personal Information
+                </h3>
               </div>
+              
               <form onSubmit={handleUpdateProfile} className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <InputField
+                    id="firstName"
                     label="First Name"
                     value={formData.firstName}
-                    onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, firstName: e.target.value })
+                      setFormErrors({ ...formErrors, firstName: '' })
+                    }}
                     disabled={!isEditing}
+                    error={formErrors.firstName}
+                    required={isEditing}
                   />
                   <InputField
+                    id="lastName"
                     label="Last Name"
                     value={formData.lastName}
-                    onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, lastName: e.target.value })
+                      setFormErrors({ ...formErrors, lastName: '' })
+                    }}
                     disabled={!isEditing}
+                    error={formErrors.lastName}
+                    required={isEditing}
                   />
                 </div>
-                <InputField label="Email" icon={Mail} value={profile?.email || ''} disabled hint="Email cannot be changed" />
+                
+                <InputField 
+                  id="email"
+                  label="Email" 
+                  icon={Mail} 
+                  value={profile?.email || ''} 
+                  disabled 
+                  hint="Email cannot be changed" 
+                />
+                
                 <div className="h-px bg-gray-100" />
+                
                 <div>
                   <div className="flex items-center gap-2 mb-3">
                     <span className="block w-3 h-px bg-gray-300" />
-                    <h3 className="text-[8px] tracking-[0.25em] uppercase text-gray-400">Account Details</h3>
+                    <h3 className="text-[8px] tracking-[0.25em] uppercase text-gray-400">
+                      Account Details
+                    </h3>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 border border-gray-100 rounded">
                       <Calendar size={11} className="text-gray-400" />
                       <span className="text-[10px] text-black">
-                        {profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }) : 'N/A'}
+                        Joined {formatLongDate(profile?.createdAt)}
                       </span>
                     </div>
                     <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 border border-gray-100 rounded">
@@ -714,11 +1154,15 @@ export default function ProfilePage() {
                     </div>
                   </div>
                 </div>
+                
                 {isEditing && (
                   <button
                     type="submit"
                     disabled={saving}
-                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 bg-black text-white rounded min-h-[44px] text-[9px] tracking-[0.15em] uppercase active:scale-[0.98] transition-all disabled:opacity-50"
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 
+                               bg-black text-white rounded-lg min-h-[44px] text-[9px] tracking-[0.15em] 
+                               uppercase hover:bg-gray-900 active:scale-[0.98] transition-all 
+                               disabled:opacity-50"
                   >
                     {saving ? <Loader2 size={12} className="animate-spin" /> : <><Save size={12} />Save Changes</>}
                   </button>
@@ -728,63 +1172,66 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* ═══ Bookings Tab ═══ */}
+        {/* Bookings Tab */}
         {activeTab === 'bookings' && (
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <span className="block w-3 h-px bg-gray-300" />
-                <h2 className="text-black" style={{ fontFamily: SERIF, fontWeight: 300, fontSize: '16px' }}>
-                  Recent Bookings
-                </h2>
-              </div>
-              <button
-                onClick={() => router.push('/my-bookings')}
-                className="group inline-flex items-center gap-1 text-[9px] tracking-[0.12em] uppercase text-gray-400 hover:text-black transition-colors"
-              >
-                View All
-                <ArrowUpRight size={11} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-              </button>
-            </div>
+          <div role="tabpanel" id="bookings-panel">
+            <SectionHeader 
+              title="Recent Bookings"
+              action={
+                bookings.length > 0 && (
+                  <button
+                    onClick={() => router.push('/my-bookings')}
+                    className="group inline-flex items-center gap-1 text-[9px] tracking-[0.12em] 
+                               uppercase text-gray-400 hover:text-black transition-colors"
+                  >
+                    View All
+                    <ArrowUpRight size={11} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                  </button>
+                )
+              }
+            />
 
             {bookingsLoading ? (
               <div className="flex items-center justify-center py-16">
                 <Loader2 size={24} className="animate-spin text-gray-300" />
               </div>
             ) : bookings.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 border border-gray-200 rounded">
-                <div className="w-14 h-14 border border-gray-200 rounded-full flex items-center justify-center mb-4">
-                  <Car size={24} strokeWidth={1} className="text-gray-300" />
-                </div>
-                <h3 className="text-black mb-1" style={{ fontFamily: SERIF, fontWeight: 300, fontSize: '16px' }}>
-                  No bookings yet
-                </h3>
-                <p className="text-[10px] text-gray-400 mb-5">Book your first service today</p>
-                <Link
-                  href="/bookings"
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded text-[9px] tracking-[0.15em] uppercase min-h-[44px] active:scale-[0.98] transition-all"
-                >
-                  Book Now
-                  <ArrowUpRight size={12} />
-                </Link>
-              </div>
+              <EmptyState
+                icon={Car}
+                title="No bookings yet"
+                description="Book your first car wash service today"
+                actionLabel="Book Now"
+                actionHref="/bookings"
+              />
             ) : (
               <div className="space-y-2.5">
                 <div className="sm:hidden space-y-2.5">
-                  {bookings.slice(0, 5).map((b) => (
-                    <MobileBookingCard key={b._id} booking={b} onClick={() => router.push('/my-bookings')} />
+                  {bookings.slice(0, 5).map((booking) => (
+                    <MobileBookingCard 
+                      key={booking._id} 
+                      booking={booking} 
+                      onClick={() => router.push('/my-bookings')} 
+                    />
                   ))}
                 </div>
+                
                 <div className="hidden sm:block space-y-2.5">
-                  {bookings.slice(0, 5).map((b) => (
-                    <DesktopBookingCard key={b._id} booking={b} onClick={() => router.push('/my-bookings')} />
+                  {bookings.slice(0, 5).map((booking) => (
+                    <DesktopBookingCard 
+                      key={booking._id} 
+                      booking={booking} 
+                      onClick={() => router.push('/my-bookings')} 
+                    />
                   ))}
                 </div>
+                
                 {bookings.length > 5 && (
                   <div className="text-center pt-3">
                     <button
                       onClick={() => router.push('/my-bookings')}
-                      className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded text-[9px] tracking-[0.15em] uppercase min-h-[44px] active:scale-[0.98] transition-all"
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-lg 
+                                 text-[9px] tracking-[0.15em] uppercase min-h-[44px] hover:bg-gray-900 
+                                 active:scale-[0.98] transition-all"
                     >
                       View All Bookings
                       <ChevronRight size={12} />
@@ -796,56 +1243,82 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* ═══ Security Tab ═══ */}
+        {/* Security Tab */}
         {activeTab === 'security' && (
-          <div className="border border-gray-200 rounded p-4 sm:p-6">
+          <div className="border border-gray-200 rounded-lg p-4 sm:p-6" role="tabpanel" id="security-panel">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-9 h-9 border border-gray-200 rounded-full flex items-center justify-center">
                 <Shield size={16} className="text-gray-400" />
               </div>
               <div>
-                <h2 className="text-black" style={{ fontFamily: SERIF, fontWeight: 300, fontSize: '16px' }}>
+                <h2 className="text-black" style={{ fontFamily: TYPOGRAPHY.serif, fontWeight: 300, fontSize: '16px' }}>
                   Change Password
                 </h2>
                 <p className="text-[9px] text-gray-400">Keep your account secure</p>
               </div>
             </div>
+            
             <div className="h-px bg-gray-100 mb-5" />
+            
             <form onSubmit={handleChangePassword} className="space-y-4 max-w-sm">
               <PasswordField
+                id="currentPassword"
                 label="Current Password"
                 value={passwordData.currentPassword}
-                onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                onChange={(e) => {
+                  setPasswordData({ ...passwordData, currentPassword: e.target.value })
+                  setPasswordErrors({ ...passwordErrors, currentPassword: '' })
+                }}
                 showPassword={showPasswords}
                 onToggle={() => setShowPasswords(!showPasswords)}
-                placeholder="Current password"
+                placeholder="Enter current password"
+                error={passwordErrors.currentPassword}
                 required
               />
+              
               <PasswordField
+                id="newPassword"
                 label="New Password"
                 value={passwordData.newPassword}
-                onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                onChange={(e) => {
+                  setPasswordData({ ...passwordData, newPassword: e.target.value })
+                  setPasswordErrors({ ...passwordErrors, newPassword: '' })
+                }}
                 showPassword={showPasswords}
                 onToggle={() => setShowPasswords(!showPasswords)}
-                placeholder="New password"
+                placeholder="Enter new password"
+                error={passwordErrors.newPassword}
                 required
               />
-              <p className="text-[8px] text-gray-300 -mt-2">
-                Min 8 chars · uppercase · lowercase · number · special char
-              </p>
+              
+              {!passwordErrors.newPassword && (
+                <p className="text-[8px] text-gray-400 -mt-2">
+                  {PASSWORD_REQUIREMENTS.message}
+                </p>
+              )}
+              
               <PasswordField
+                id="confirmNewPassword"
                 label="Confirm Password"
                 value={passwordData.confirmNewPassword}
-                onChange={(e) => setPasswordData({ ...passwordData, confirmNewPassword: e.target.value })}
+                onChange={(e) => {
+                  setPasswordData({ ...passwordData, confirmNewPassword: e.target.value })
+                  setPasswordErrors({ ...passwordErrors, confirmNewPassword: '' })
+                }}
                 showPassword={showPasswords}
                 onToggle={() => setShowPasswords(!showPasswords)}
-                placeholder="Confirm password"
+                placeholder="Confirm new password"
+                error={passwordErrors.confirmNewPassword}
                 required
               />
+              
               <button
                 type="submit"
                 disabled={saving}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 bg-black text-white rounded min-h-[44px] text-[9px] tracking-[0.15em] uppercase active:scale-[0.98] transition-all disabled:opacity-50"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 
+                           bg-black text-white rounded-lg min-h-[44px] text-[9px] tracking-[0.15em] 
+                           uppercase hover:bg-gray-900 active:scale-[0.98] transition-all 
+                           disabled:opacity-50"
               >
                 {saving ? <Loader2 size={12} className="animate-spin" /> : <><Lock size={12} />Update Password</>}
               </button>
@@ -853,42 +1326,50 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* ═══ Settings Tab ═══ */}
+        {/* Settings Tab */}
         {activeTab === 'settings' && (
-          <div className="space-y-4">
+          <div className="space-y-4" role="tabpanel" id="settings-panel">
             {stats && (
-              <div className="border border-gray-200 rounded p-4 sm:p-6">
+              <div className="border border-gray-200 rounded-lg p-4 sm:p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <span className="block w-3 h-px bg-gray-300" />
-                  <h3 className="text-[8px] tracking-[0.25em] uppercase text-gray-400">Account Overview</h3>
+                  <h3 className="text-[8px] tracking-[0.25em] uppercase text-gray-400">
+                    Account Overview
+                  </h3>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  <StatCard value={stats.bookings?.total || 0} label="Total" icon={Car} />
-                  <StatCard value={stats.bookings?.completed || 0} label="Done" icon={CheckCircle} />
-                  <StatCard value={`₹${stats.totalSpent || 0}`} label="Spent" icon={Calendar} />
+                  <StatCard value={stats.bookings?.total || 0} label="Total Bookings" icon={Car} />
+                  <StatCard value={stats.bookings?.completed || 0} label="Completed" icon={CheckCircle} />
+                  <StatCard value={`₹${stats.totalSpent || 0}`} label="Total Spent" icon={Calendar} />
                   <StatCard value={stats.totalReviews || 0} label="Reviews" icon={Star} />
                 </div>
               </div>
             )}
-            <div className="border border-red-200 rounded p-4 sm:p-6">
+            
+            <div className="border border-red-200 rounded-lg p-4 sm:p-6">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-9 h-9 border border-red-200 bg-red-50 rounded-full flex items-center justify-center">
                   <AlertCircle size={16} className="text-red-500" />
                 </div>
                 <div>
-                  <h3 className="text-black" style={{ fontFamily: SERIF, fontWeight: 400, fontSize: '14px' }}>
+                  <h3 className="text-black" style={{ fontFamily: TYPOGRAPHY.serif, fontWeight: 400, fontSize: '14px' }}>
                     Danger Zone
                   </h3>
                   <p className="text-[9px] text-gray-400">Irreversible actions</p>
                 </div>
               </div>
+              
               <div className="h-px bg-red-100 my-4" />
+              
               <p className="text-[11px] text-gray-500 leading-relaxed mb-4 max-w-md">
-                Once deactivated, your account and data will be inaccessible. Contact support to reactivate.
+                Deactivating your account will revoke access to all data. Contact support to reactivate.
               </p>
+              
               <button
                 onClick={() => setShowDeactivateModal(true)}
-                className="inline-flex items-center gap-2 px-4 py-2.5 text-red-500 border border-red-200 rounded hover:bg-red-600 hover:text-white hover:border-red-600 active:scale-[0.98] transition-all text-[9px] tracking-[0.12em] uppercase"
+                className="inline-flex items-center gap-2 px-4 py-2.5 text-red-600 border border-red-200 
+                           rounded-lg hover:bg-red-600 hover:text-white hover:border-red-600 
+                           active:scale-[0.98] transition-all text-[9px] tracking-[0.12em] uppercase"
               >
                 <Trash2 size={12} />
                 Deactivate Account
@@ -898,34 +1379,68 @@ export default function ProfilePage() {
         )}
       </div>
 
-      {/* ── Mobile Bottom Nav ── */}
-      <div className="sm:hidden fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-gray-100">
-        <div className="flex h-14">
+      {/* Mobile Bottom Navigation */}
+      <nav 
+        className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t-2 border-gray-200 shadow-[0_-4px_12px_rgba(0,0,0,0.08)]"
+        role="tablist"
+        aria-label="Profile navigation"
+      >
+        <div className="grid grid-cols-4 h-16">
           {TABS.map((tab) => {
             const Icon = tab.icon
             const isActive = activeTab === tab.id
+            
             return (
               <button
                 key={tab.id}
                 onClick={() => switchTab(tab.id)}
-                className={`flex-1 flex flex-col items-center justify-center gap-0.5 relative transition-colors active:bg-gray-50 ${isActive ? 'text-black' : 'text-gray-300'}`}
+                role="tab"
+                aria-selected={isActive}
+                aria-controls={`${tab.id}-panel`}
+                className={`relative flex flex-col items-center justify-center gap-1 
+                           transition-all duration-200
+                           ${isActive 
+                             ? 'text-black' 
+                             : 'text-gray-400 active:bg-gray-50'
+                           }
+                           focus-visible:outline-none focus-visible:bg-gray-50`}
               >
                 {isActive && (
-                  <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-[2px] bg-black rounded-full" />
+                  <span className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-[3px] bg-black rounded-b-full" />
                 )}
-                <Icon size={16} strokeWidth={isActive ? 2 : 1.5} />
-                <span className="text-[7px] tracking-[0.08em] uppercase">{tab.label}</span>
+                
+                <div className={`relative ${isActive ? 'transform scale-110' : ''} transition-transform duration-200`}>
+                  {isActive && (
+                    <div className="absolute inset-0 bg-black/5 rounded-full scale-150" />
+                  )}
+                  <Icon 
+                    size={20} 
+                    strokeWidth={isActive ? 2.5 : 1.5}
+                    className="relative"
+                  />
+                </div>
+                
+                <span 
+                  className={`text-[7px] tracking-[0.1em] uppercase transition-all duration-200
+                             ${isActive ? 'font-semibold' : 'font-normal'}`}
+                >
+                  {tab.label}
+                </span>
               </button>
             )
           })}
         </div>
-        <div className="h-[env(safe-area-inset-bottom)]" />
-      </div>
+        
+        <div className="h-[env(safe-area-inset-bottom)] bg-white" />
+      </nav>
 
-      {/* ── Deactivate Modal ── */}
+      {/* Deactivate Modal */}
       <DeactivateModal
         isOpen={showDeactivateModal}
-        onClose={() => setShowDeactivateModal(false)}
+        onClose={() => {
+          setShowDeactivateModal(false)
+          setError('')
+        }}
         onConfirm={handleDeactivateAccount}
         loading={saving}
       />
