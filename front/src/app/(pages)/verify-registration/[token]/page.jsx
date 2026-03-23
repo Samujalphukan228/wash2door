@@ -112,7 +112,7 @@ export default function VerifyRegistrationPage() {
           Your registration is complete. Redirecting to dashboard...
         </p>
         <button
-          onClick={() => router.push("/dashboard")}
+          onClick={() => router.push("/")}
           className="group w-full inline-flex items-center justify-center gap-2 h-12 bg-black text-white rounded-full hover:bg-gray-800 active:scale-[0.97] transition-all duration-300"
         >
           <span className="tracking-wider uppercase" style={{ fontSize: "10px", fontWeight: 500 }}>
