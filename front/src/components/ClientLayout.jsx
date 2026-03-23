@@ -9,19 +9,17 @@ import { AuthProvider } from "@/context/AuthContext"
 const ease = [0.76, 0, 0.24, 1]
 
 export default function ClientLayout({ children }) {
-  const [done, setDone] = useState(true)
-  const [checked, setChecked] = useState(false)
+  const [done, setDone] = useState(false)
+  const [skip, setSkip] = useState(false)
 
   useEffect(() => {
     const seen = sessionStorage.getItem("w2d_intro") === "1"
 
     if (seen) {
-      setChecked(true)
+      setSkip(true)
+      setDone(true)
       return
     }
-
-    setDone(false)
-    setChecked(true)
 
     const t = setTimeout(() => {
       sessionStorage.setItem("w2d_intro", "1")
@@ -31,20 +29,10 @@ export default function ClientLayout({ children }) {
     return () => clearTimeout(t)
   }, [])
 
-  if (!checked) {
-    return (
-      <AuthProvider>
-        <Navbar />
-        {children}
-        <Footer />
-      </AuthProvider>
-    )
-  }
-
   return (
     <AuthProvider>
       <AnimatePresence>
-        {!done && (
+        {!done && !skip && (
           <motion.div
             key="overlay"
             className="fixed inset-0 z-[9999] pointer-events-none flex flex-col"
