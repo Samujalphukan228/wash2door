@@ -1,4 +1,4 @@
-// app/bookings/BookingContent.jsx
+// app/bookings/BookingContent.jsx - Updated version
 "use client"
 
 import { useEffect, useState } from 'react'
@@ -9,6 +9,7 @@ import DateTimeStep from '@/components/booking/DateTimeStep'
 import DetailsStep from '@/components/booking/DetailsStep'
 import ConfirmStep from '@/components/booking/ConfirmStep'
 import { ArrowLeft, Loader2 } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { getPublicServices } from '@/lib/services.api'
 
 const INITIAL_DATA = {
@@ -27,7 +28,6 @@ const INITIAL_DATA = {
     }
 }
 
-// ✅ 4 steps
 const STEPS = [
     { number: 1, label: 'Service' },
     { number: 2, label: 'Date & Time' },
@@ -40,25 +40,44 @@ function StepIndicator({ current }) {
         <div className="hidden md:flex items-center gap-0">
             {STEPS.map((step, i) => (
                 <div key={step.number} className="flex items-center">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center border transition-all
-                        ${current > step.number
-                            ? 'bg-white border-white'
-                            : current === step.number
-                            ? 'border-white'
-                            : 'border-white/20'}`}
+                    <motion.div 
+                        className={`w-8 h-8 rounded-full flex items-center justify-center border transition-all
+                            ${current > step.number
+                                ? 'bg-white border-white'
+                                : current === step.number
+                                ? 'border-white'
+                                : 'border-white/20'}`}
+                        animate={{
+                            scale: current === step.number ? 1.1 : 1,
+                        }}
+                        transition={{ duration: 0.3 }}
                     >
                         {current > step.number ? (
-                            <svg width="12" height="10" viewBox="0 0 12 10" fill="none">
+                            <motion.svg 
+                                width="12" 
+                                height="10" 
+                                viewBox="0 0 12 10" 
+                                fill="none"
+                                initial={{ pathLength: 0 }}
+                                animate={{ pathLength: 1 }}
+                                transition={{ duration: 0.5 }}
+                            >
                                 <path d="M1 5l3.5 3.5L11 1" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
+                            </motion.svg>
                         ) : (
                             <span className={`text-sm ${current === step.number ? 'text-white' : 'text-white/30'}`}>
                                 {step.number}
                             </span>
                         )}
-                    </div>
+                    </motion.div>
                     {i < STEPS.length - 1 && (
-                        <div className={`h-px w-12 xl:w-16 mx-2 ${current > step.number ? 'bg-white/60' : 'bg-white/10'}`} />
+                        <motion.div 
+                            className={`h-px w-12 xl:w-16 mx-2 ${current > step.number ? 'bg-white/60' : 'bg-white/10'}`}
+                            animate={{
+                                opacity: current > step.number ? 1 : 0.3,
+                            }}
+                            transition={{ duration: 0.3 }}
+                        />
                     )}
                 </div>
             ))}
@@ -71,17 +90,14 @@ export default function BookingContent() {
     const searchParams = useSearchParams()
     const { isAuthenticated, openModal } = useAuth()
 
-    const serviceIdFromUrl = searchParams.get('service')  // ✅ Get from URL
-
-    // ✅ If service comes from URL, start at step 2 (skip service selection)
+    const serviceIdFromUrl = searchParams.get('service')
     const [currentStep, setCurrentStep] = useState(serviceIdFromUrl ? 2 : 1)
     const [bookingData, setBookingData] = useState({
         ...INITIAL_DATA,
-        serviceId: serviceIdFromUrl || ''  // ✅ Pre-fill serviceId
+        serviceId: serviceIdFromUrl || ''
     })
     const [loadingService, setLoadingService] = useState(false)
 
-    // ✅ If serviceId comes from URL, fetch service details automatically
     useEffect(() => {
         if (serviceIdFromUrl) {
             loadServiceFromUrl(serviceIdFromUrl)
@@ -95,7 +111,6 @@ export default function BookingContent() {
             const service = services.find(s => s._id === serviceId)
 
             if (service) {
-                // ✅ Pre-fill UI data so confirm page shows correctly
                 setBookingData(prev => ({
                     ...prev,
                     serviceId: service._id,
@@ -108,7 +123,6 @@ export default function BookingContent() {
                         subcategoryName: service.subcategory?.name || ''
                     }
                 }))
-                // ✅ Go to step 2 (Date & Time) directly
                 setCurrentStep(2)
             }
         } catch (err) {
@@ -140,11 +154,15 @@ export default function BookingContent() {
         window.scrollTo({ top: 0, behavior: 'smooth' })
     }
 
-    // ✅ Show loading while fetching service from URL
     if (loadingService) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-white">
-                <Loader2 size={32} className="animate-spin text-gray-300" />
+                <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                >
+                    <Loader2 size={32} className="text-gray-300" />
+                </motion.div>
             </div>
         )
     }
@@ -152,11 +170,16 @@ export default function BookingContent() {
     return (
         <div style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
             {/* Black Header */}
-            <div className="bg-black">
+            <motion.div 
+                className="bg-black"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.5 }}
+            >
                 <div className="max-w-5xl mx-auto px-5 md:px-16">
                     <div className="flex items-center justify-between pt-16 md:pt-20 pb-8 md:pb-10">
                         <div>
-                            <h1
+                            <motion.h1
                                 className="text-white"
                                 style={{
                                     fontFamily: 'Georgia, serif',
@@ -164,80 +187,128 @@ export default function BookingContent() {
                                     fontSize: "clamp(1.4rem, 4vw, 2.4rem)",
                                     lineHeight: 1.1
                                 }}
+                                initial={{ opacity: 0, y: -20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.5, delay: 0.1 }}
                             >
                                 Book a Service
-                            </h1>
-                            {/* ✅ Show service name if pre-selected */}
-                            {bookingData._ui?.serviceName && currentStep > 1 && (
-                                <p className="text-white/50 text-sm mt-1">
-                                    {bookingData._ui.serviceName}
-                                </p>
-                            )}
+                            </motion.h1>
+                            <AnimatePresence>
+                                {bookingData._ui?.serviceName && currentStep > 1 && (
+                                    <motion.p 
+                                        className="text-white/50 text-sm mt-1"
+                                        initial={{ opacity: 0, y: -10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -10 }}
+                                        transition={{ duration: 0.3 }}
+                                    >
+                                        {bookingData._ui.serviceName}
+                                    </motion.p>
+                                )}
+                            </AnimatePresence>
                         </div>
-                        <button
+                        <motion.button
                             onClick={() => router.back()}
                             className="flex items-center gap-2 text-white/50 hover:text-white transition-colors"
                             style={{ fontSize: "11px", letterSpacing: "0.2em" }}
+                            whileHover={{ x: -4 }}
+                            whileTap={{ scale: 0.95 }}
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ duration: 0.5, delay: 0.2 }}
                         >
                             <ArrowLeft size={13} />
                             <span className="uppercase">Back</span>
-                        </button>
+                        </motion.button>
                     </div>
-                    <div className="pb-8 md:pb-10">
+                    <motion.div 
+                        className="pb-8 md:pb-10"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: 0.5, delay: 0.3 }}
+                    >
                         <StepIndicator current={currentStep} />
-                    </div>
+                    </motion.div>
                 </div>
-            </div>
+            </motion.div>
 
             {/* Content */}
             <div className="bg-white">
                 <div className="max-w-5xl mx-auto px-5 md:px-16 py-10 md:py-14">
+                    <AnimatePresence mode="wait">
+                        {currentStep === 1 && (
+                            <motion.div
+                                key="step-1"
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -20 }}
+                                transition={{ duration: 0.3 }}
+                            >
+                                <ServiceStep
+                                    data={bookingData}
+                                    onUpdate={updateData}
+                                    onUpdateUI={updateUI}
+                                    onNext={() => goToStep(2)}
+                                />
+                            </motion.div>
+                        )}
 
-                    {/* Step 1: Select Service (only shows if no service in URL) */}
-                    {currentStep === 1 && (
-                        <ServiceStep
-                            data={bookingData}
-                            onUpdate={updateData}
-                            onUpdateUI={updateUI}
-                            onNext={() => goToStep(2)}
-                        />
-                    )}
+                        {currentStep === 2 && (
+                            <motion.div
+                                key="step-2"
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -20 }}
+                                transition={{ duration: 0.3 }}
+                            >
+                                <DateTimeStep
+                                    data={bookingData}
+                                    onUpdate={updateData}
+                                    onNext={() => goToStep(3)}
+                                    onBack={() => {
+                                        if (serviceIdFromUrl) {
+                                            router.back()
+                                        } else {
+                                            goToStep(1)
+                                        }
+                                    }}
+                                />
+                            </motion.div>
+                        )}
 
-                    {/* Step 2: Date & Time */}
-                    {currentStep === 2 && (
-                        <DateTimeStep
-                            data={bookingData}
-                            onUpdate={updateData}
-                            onNext={() => goToStep(3)}
-                            onBack={() => {
-                                // ✅ If service came from URL, go back to services page
-                                if (serviceIdFromUrl) {
-                                    router.back()
-                                } else {
-                                    goToStep(1)
-                                }
-                            }}
-                        />
-                    )}
+                        {currentStep === 3 && (
+                            <motion.div
+                                key="step-3"
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -20 }}
+                                transition={{ duration: 0.3 }}
+                            >
+                                <DetailsStep
+                                    data={bookingData}
+                                    onUpdate={updateData}
+                                    onNext={() => goToStep(4)}
+                                    onBack={() => goToStep(2)}
+                                />
+                            </motion.div>
+                        )}
 
-                    {/* Step 3: Location Details */}
-                    {currentStep === 3 && (
-                        <DetailsStep
-                            data={bookingData}
-                            onUpdate={updateData}
-                            onNext={() => goToStep(4)}
-                            onBack={() => goToStep(2)}
-                        />
-                    )}
-
-                    {/* Step 4: Confirm */}
-                    {currentStep === 4 && (
-                        <ConfirmStep
-                            data={bookingData}
-                            onBack={() => goToStep(3)}
-                            onSuccess={() => router.push('/my-bookings')}
-                        />
-                    )}
+                        {currentStep === 4 && (
+                            <motion.div
+                                key="step-4"
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -20 }}
+                                transition={{ duration: 0.3 }}
+                            >
+                                <ConfirmStep
+                                    data={bookingData}
+                                    onBack={() => goToStep(3)}
+                                    onSuccess={() => router.push('/my-bookings')}
+                                />
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                 </div>
             </div>
         </div>
