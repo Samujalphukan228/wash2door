@@ -23,8 +23,6 @@ export default function VerifyRegistrationPage() {
         }
       } catch (err) {
         // silently ignore errors
-      } finally {
-        setTimeout(() => router.push("/"), 2000)
       }
     }
     verify()
@@ -58,7 +56,7 @@ export default function VerifyRegistrationPage() {
         </h2>
 
         <p className="text-gray-400 mb-8" style={{ fontSize: "13px", lineHeight: 1.6 }}>
-          Your registration is complete. Redirecting...
+          Your registration is complete. Click below to go home.
         </p>
 
         <button
