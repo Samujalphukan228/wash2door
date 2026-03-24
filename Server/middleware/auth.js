@@ -105,15 +105,15 @@ export const isAdmin = (req, res, next) => {
         });
     }
 
-    if (req.user.role !== 'admin') {
-        console.log('❌ Not admin');
+    if (req.user.role !== 'admin' && req.user.role !== 'developer') {
+        console.log('❌ Not admin or developer');
         return res.status(403).json({
             success: false,
             message: 'Admin access required'
         });
     }
 
-    console.log('✅ Admin verified');
+    console.log('✅ Admin/Developer verified');
     next();
 };
 
