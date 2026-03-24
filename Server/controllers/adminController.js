@@ -892,17 +892,10 @@ export const createAdminBooking = async (req, res) => {
             bookingDate,
             timeSlot,
             location,
-            specialNotes,
+            phone,
             paymentMethod,
             paymentStatus
         } = req.body;
-
-        console.log('📥 Admin booking request:', {
-            bookingType,
-            serviceId,
-            bookingDate,
-            timeSlot
-        });
 
         // Validate booking type
         if (!bookingType || !['walkin', 'online'].includes(bookingType)) {
@@ -939,6 +932,14 @@ export const createAdminBooking = async (req, res) => {
             }
         }
 
+        // Validate phone
+        if (!phone || !/^\+?[\d\s\-]{7,15}$/.test(phone)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Valid phone number is required'
+            });
+        }
+
         // Validate service
         if (!serviceId || !isValidObjectId(serviceId)) {
             return res.status(400).json({
@@ -947,10 +948,7 @@ export const createAdminBooking = async (req, res) => {
             });
         }
 
-        const service = await Service.findOne({
-            _id: serviceId,
-            isActive: true
-        })
+        const service = await Service.findOne({ _id: serviceId, isActive: true })
             .populate('category', 'name slug')
             .populate('subcategory', 'name slug');
 
@@ -961,92 +959,35 @@ export const createAdminBooking = async (req, res) => {
             });
         }
 
-        console.log('📦 Service found:', {
-            name: service.name,
-            hasCategory: !!service.category,
-            hasSubcategory: !!service.subcategory,
-            variantsCount: service.variants?.length || 0
-        });
-
-        // Check category and subcategory
-        if (!service.category || !service.category._id) {
+        if (!service.category || !service.subcategory) {
             return res.status(400).json({
                 success: false,
-                message: 'This service is missing a category assignment'
+                message: 'Service category/subcategory missing'
             });
         }
 
-        if (!service.subcategory || !service.subcategory._id) {
+        // Pricing
+        const finalPrice = service.discountPrice ?? service.price ?? 0;
+        const duration = service.duration ?? 60;
+
+        if (!finalPrice) {
             return res.status(400).json({
                 success: false,
-                message: 'This service is missing a subcategory assignment'
+                message: 'Service has no valid price'
             });
         }
 
-        // AUTO-SELECT VARIANT OR USE SERVICE PRICE
-        let finalPrice = 0;
-        let duration = 60;
-        let variantId = null;
-        let variantName = null;
-
-        const hasVariants = service.variants && service.variants.length > 0;
-
-        if (hasVariants) {
-            // Auto-select first active variant
-            const activeVariants = service.variants.filter(v => v.isActive);
-
-            if (activeVariants.length === 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'This service has no available variants at the moment'
-                });
-            }
-
-            const selectedVariant = activeVariants[0];
-            finalPrice = selectedVariant.discountPrice ?? selectedVariant.price;
-            duration = selectedVariant.duration;
-            variantId = selectedVariant._id;
-            variantName = selectedVariant.name;
-
-            console.log(`📌 Auto-selected variant: ${variantName}`);
-
-        } else {
-            // Use service-level pricing
-            finalPrice = service.discountPrice ?? service.price ?? 0;
-            duration = service.duration ?? 60;
-            variantId = null;
-            variantName = null;
-
-            if (!finalPrice || finalPrice === 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'This service has no price configured'
-                });
-            }
-
-            console.log('📌 No variants - using service-level pricing');
-        }
-
-        // Validate date and time
-        if (!bookingDate || !timeSlot) {
-            return res.status(400).json({
-                success: false,
-                message: 'Booking date and time slot are required'
-            });
-        }
-
-        // Parse date from local string
+        // Validate date
         const [year, month, day] = bookingDate.split('-').map(Number);
         const requestedDate = new Date(year, month - 1, day, 12, 0, 0, 0);
 
         if (isNaN(requestedDate.getTime())) {
             return res.status(400).json({
                 success: false,
-                message: 'Invalid date format. Use YYYY-MM-DD'
+                message: 'Invalid date format'
             });
         }
 
-        // Helper function for local date string
         const getLocalDateStr = (date) => {
             const y = date.getFullYear();
             const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -1074,24 +1015,11 @@ export const createAdminBooking = async (req, res) => {
         if (!isValidTimeSlot(timeSlot)) {
             return res.status(400).json({
                 success: false,
-                message: `Invalid time slot. Valid slots: ${TIME_SLOTS.join(', ')}`
+                message: `Invalid time slot`
             });
         }
 
-        // Check if slot time has passed today
-        const isToday = bookingDate === todayStr;
-        if (isToday) {
-            const [startTime] = timeSlot.split('-');
-            const [hours, minutes] = startTime.split(':').map(Number);
-            if (now.getHours() > hours || (now.getHours() === hours && now.getMinutes() >= minutes)) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'This time slot has already passed for today'
-                });
-            }
-        }
-
-        // GLOBAL SLOT CHECK - Exclude cancelled bookings
+        // Slot check
         const slotLockKey = `${bookingDate}|${timeSlot}`;
 
         const slotTaken = await Booking.findOne({
@@ -1102,110 +1030,69 @@ export const createAdminBooking = async (req, res) => {
         if (slotTaken) {
             return res.status(400).json({
                 success: false,
-                message: `Time slot ${timeSlot} is already booked for "${slotTaken.serviceName}". Please choose another slot.`
+                message: `Time slot already booked`
             });
         }
 
-        // Set location
+        // ✅ FIXED location (no landmark)
         const bookingLocation = {
             address: location?.address || 'Walk-in / At Shop',
-            city: location?.city || 'Walk-in',
-            landmark: location?.landmark || ''
+            city: location?.city || 'Walk-in'
         };
-
-        console.log(`📦 Creating booking: ${service.name} ${variantName ? `(${variantName})` : '(No variant)'}`);
-        console.log(`💰 Price: ₹${finalPrice}, ⏱️ Duration: ${duration} min`);
 
         // Create booking
         const booking = await Booking.create({
             bookingType,
             customerId: bookingType === 'online' ? customerId : null,
             walkInCustomer: bookingType === 'walkin'
-                ? { name: walkInCustomer.name, phone: walkInCustomer.phone || '' }
+                ? { name: walkInCustomer.name, phone: phone }
                 : { name: '', phone: '' },
+
             categoryId: service.category._id,
             categoryName: service.category.name,
+
             subcategoryId: service.subcategory._id,
             subcategoryName: service.subcategory.name,
+
             serviceId: service._id,
             serviceName: service.name,
             serviceTier: service.tier || 'basic',
-            variantId: variantId,
-            variantName: variantName,
+
             price: finalPrice,
-            duration: duration,
+            duration,
+
             bookingDate: requestedDate,
             timeSlot,
+
             location: bookingLocation,
-            specialNotes: specialNotes || '',
+
+            phone: phone, // ✅ consistent
+
             paymentMethod: paymentMethod || 'cash',
             paymentStatus: paymentStatus || 'pending',
+
             createdBy: req.user._id,
             status: 'confirmed'
         });
 
-        console.log('✅ Booking created:', booking.bookingCode);
-
-        // Update service booking count
+        // Increment service count
         await Service.findByIdAndUpdate(serviceId, {
             $inc: { totalBookings: 1 }
         });
 
-        // Socket events
-        const customerName = bookingType === 'walkin'
+        emitNewBooking(booking, bookingType === 'walkin'
             ? walkInCustomer.name
-            : 'Online Customer';
-
-        emitNewBooking(booking, customerName);
-
-        // Notify customer if online booking
-        if (bookingType === 'online' && customerId) {
-            emitBookingStatusUpdate(booking, customerId);
-        }
+            : 'Online Customer'
+        );
 
         res.status(201).json({
             success: true,
-            message: `${bookingType === 'walkin' ? 'Walk-in' : 'Online'} booking created!`,
-            data: {
-                bookingId: booking._id,
-                bookingCode: booking.bookingCode,
-                bookingType: booking.bookingType,
-                customer: bookingType === 'walkin'
-                    ? booking.walkInCustomer
-                    : { customerId },
-                categoryName: booking.categoryName,
-                subcategoryName: booking.subcategoryName,
-                serviceName: booking.serviceName,
-                variantName: booking.variantName,
-                price: booking.price,
-                duration: booking.duration,
-                bookingDate: booking.bookingDate,
-                timeSlot: booking.timeSlot,
-                location: booking.location,
-                status: booking.status,
-                paymentMethod: booking.paymentMethod,
-                paymentStatus: booking.paymentStatus
-            }
+            message: 'Booking created successfully',
+            data: booking
         });
 
     } catch (error) {
         console.error('Admin create booking error:', error);
-
-        if (error.code === 11000) {
-            return res.status(400).json({
-                success: false,
-                message: 'This time slot was just booked by someone else. Please choose another slot.'
-            });
-        }
-
-        if (error.name === 'ValidationError') {
-            const messages = Object.values(error.errors).map(e => e.message);
-            return res.status(400).json({
-                success: false,
-                message: 'Validation error',
-                errors: messages
-            });
-        }
 
         res.status(500).json({
             success: false,

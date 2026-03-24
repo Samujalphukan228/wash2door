@@ -1157,235 +1157,49 @@ export const getBookingConfirmationTemplate = (userName, booking) => {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Booking Confirmed</title>
-        <style>
-            body { 
-                font-family: 'Helvetica Neue', Arial, sans-serif; 
-                margin: 0; 
-                padding: 0; 
-                background-color: #f5f5f5; 
-                line-height: 1.6;
-            }
-            .container { 
-                max-width: 600px; 
-                margin: 40px auto; 
-                background-color: #ffffff; 
-                border: 1px solid #e0e0e0;
-            }
-            .header { 
-                background-color: #000000; 
-                padding: 50px 30px; 
-                text-align: center; 
-            }
-            .header h1 { 
-                color: #ffffff; 
-                margin: 0; 
-                font-size: 24px; 
-                font-weight: 300;
-                letter-spacing: 2px;
-                text-transform: uppercase;
-            }
-            .header p { 
-                color: #888888; 
-                margin: 15px 0 0; 
-                font-size: 14px;
-                letter-spacing: 1px;
-            }
-            .content { 
-                padding: 50px 40px; 
-            }
-            .greeting { 
-                color: #333333; 
-                font-size: 18px;
-                font-weight: 400;
-                margin-bottom: 10px;
-            }
-            .subtitle { 
-                color: #666666; 
-                font-size: 15px;
-                margin-bottom: 40px;
-            }
-            .booking-code-box {
-                background-color: #000000;
-                padding: 30px;
-                text-align: center;
-                margin: 30px 0;
-            }
-            .booking-code-label { 
-                color: #888888; 
-                font-size: 11px;
-                text-transform: uppercase;
-                letter-spacing: 2px;
-                margin-bottom: 15px;
-            }
-            .booking-code { 
-                color: #ffffff; 
-                font-size: 32px; 
-                font-weight: 300; 
-                letter-spacing: 6px;
-                font-family: 'Courier New', monospace;
-            }
-            .section { 
-                background-color: #fafafa; 
-                padding: 25px; 
-                margin: 25px 0;
-            }
-            .section-title { 
-                font-size: 12px;
-                text-transform: uppercase;
-                letter-spacing: 1px;
-                color: #333333;
-                margin: 0 0 20px 0;
-                font-weight: 600;
-                padding-bottom: 10px;
-                border-bottom: 1px solid #e0e0e0;
-            }
-            .info-row { 
-                display: flex; 
-                justify-content: space-between; 
-                padding: 10px 0; 
-                border-bottom: 1px solid #e8e8e8;
-            }
-            .info-row:last-child { 
-                border-bottom: none; 
-            }
-            .info-label { 
-                color: #888888;
-                font-size: 13px;
-            }
-            .info-value { 
-                color: #333333; 
-                font-size: 13px;
-                font-weight: 500;
-                text-align: right;
-            }
-            .highlight {
-                color: #000000;
-                font-weight: 600;
-            }
-            .note-box { 
-                background-color: #ffffff; 
-                border: 1px solid #e0e0e0;
-                padding: 25px; 
-                margin: 30px 0;
-            }
-            .note-title {
-                font-size: 12px;
-                text-transform: uppercase;
-                letter-spacing: 1px;
-                color: #333333;
-                margin: 0 0 15px 0;
-                font-weight: 600;
-            }
-            .note-box ul {
-                margin: 0;
-                padding-left: 20px;
-                color: #666666;
-                font-size: 13px;
-            }
-            .note-box li {
-                margin: 8px 0;
-            }
-            .footer { 
-                background-color: #fafafa; 
-                padding: 30px; 
-                text-align: center; 
-                border-top: 1px solid #e0e0e0;
-            }
-            .footer p { 
-                color: #999999; 
-                font-size: 12px; 
-                margin: 5px 0;
-            }
-            .brand {
-                font-weight: 600;
-                color: #333333;
-            }
-        </style>
     </head>
-    <body>
-        <div class="container">
-            <div class="header">
-                <h1>Booking Confirmed</h1>
-                <p>Your service has been scheduled successfully</p>
-            </div>
-            <div class="content">
-                <p class="greeting">Hello, ${userName}</p>
-                <p class="subtitle">Your booking is confirmed. Here are your booking details.</p>
+    <body style="font-family: Arial, sans-serif; background:#f5f5f5; padding:20px;">
+        
+        <div style="max-width:600px;margin:auto;background:#fff;border:1px solid #ddd;padding:30px;">
+            
+            <h2 style="text-align:center;">Booking Confirmed</h2>
 
-                <div class="booking-code-box">
-                    <p class="booking-code-label">Your Booking Code</p>
-                    <p class="booking-code">${booking.bookingCode}</p>
-                </div>
+            <p>Hello, ${userName}</p>
+            <p>Your booking is confirmed. Here are your details:</p>
 
-                <div class="section">
-                    <p class="section-title">Service Details</p>
-                    <div class="info-row">
-                        <span class="info-label">Service</span>
-                        <span class="info-value highlight">${booking.serviceName}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Category</span>
-                        <span class="info-value">${booking.serviceCategory}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Duration</span>
-                        <span class="info-value">${booking.duration} minutes</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Price</span>
-                        <span class="info-value highlight">Rs. ${booking.price}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Payment</span>
-                        <span class="info-value">Cash on Service</span>
-                    </div>
-                </div>
+            <h3 style="text-align:center;">${booking.bookingCode}</h3>
 
-                <div class="section">
-                    <p class="section-title">Schedule</p>
-                    <div class="info-row">
-                        <span class="info-label">Date</span>
-                        <span class="info-value highlight">${bookingDateFormatted}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Time Slot</span>
-                        <span class="info-value highlight">${booking.timeSlot}</span>
-                    </div>
-                </div>
+            <hr/>
 
-                <div class="section">
-                    <p class="section-title">Location</p>
-                    <div class="info-row">
-                        <span class="info-label">Address</span>
-                        <span class="info-value">${booking.location.address}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">City</span>
-                        <span class="info-value">${booking.location.city}</span>
-                    </div>
-                    ${booking.location.landmark ? `
-                    <div class="info-row">
-                        <span class="info-label">Landmark</span>
-                        <span class="info-value">${booking.location.landmark}</span>
-                    </div>` : ''}
-                </div>
+            <h4>Service Details</h4>
+            <p><strong>Service:</strong> ${booking.serviceName}</p>
+            <p><strong>Category:</strong> ${booking.serviceCategory}</p>
+            <p><strong>Duration:</strong> ${booking.duration} mins</p>
+            <p><strong>Price:</strong> Rs. ${booking.price}</p>
 
-                <div class="note-box">
-                    <p class="note-title">Important</p>
-                    <ul>
-                        <li>Please be available at the location during your time slot</li>
-                        <li>Keep your booking code <strong>${booking.bookingCode}</strong> handy</li>
-                        <li>Payment: Cash on service completion</li>
-                        <li>To cancel, please do so at least 2 hours before the slot</li>
-                    </ul>
-                </div>
-            </div>
-            <div class="footer">
-                <p class="brand">Wash2Door</p>
-                <p>&copy; ${new Date().getFullYear()} All rights reserved</p>
-                <p>Questions? Contact us at support@wash2door.com</p>
-            </div>
+            <hr/>
+
+            <h4>Schedule</h4>
+            <p><strong>Date:</strong> ${bookingDateFormatted}</p>
+            <p><strong>Time:</strong> ${booking.timeSlot}</p>
+
+            <hr/>
+
+            <h4>Location</h4>
+            <p>${booking.location.address}</p>
+            <p>${booking.location.city}</p>
+
+            <hr/>
+
+            <h4>Contact</h4>
+            <p><strong>Phone:</strong> ${booking.phone}</p>
+
+            <hr/>
+
+            <p>Please be available at your selected time.</p>
+
         </div>
+
     </body>
     </html>
     `;

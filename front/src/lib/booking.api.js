@@ -10,9 +10,9 @@ export async function createBooking(bookingData) {
     const response = await api.post('/bookings', {
       serviceId: bookingData.serviceId,
       bookingDate: bookingData.bookingDate,
-      timeSlot: bookingData.timeSlot,  // ✅ Already in 12-hour format
+      timeSlot: bookingData.timeSlot,
       location: bookingData.location,
-      specialNotes: bookingData.specialNotes || ''
+      phone: bookingData.phone
     })
     
     console.log('📦 Response:', response.data)

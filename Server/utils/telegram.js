@@ -44,13 +44,14 @@ export const sendNewBookingTelegram = async (booking, customer) => {
         day: 'numeric'
     });
 
-    const message = `
+const message = `
 🔔 <b>NEW BOOKING!</b>
 
 📋 <b>Booking Code:</b> ${booking.bookingCode}
 
 👤 <b>Customer:</b> ${customer.firstName} ${customer.lastName}
 📧 <b>Email:</b> ${customer.email}
+📞 <b>Phone:</b> ${booking.phone}
 
 🚗 <b>Service:</b> ${booking.serviceName}
 📁 <b>Category:</b> ${booking.categoryName}
@@ -63,9 +64,6 @@ export const sendNewBookingTelegram = async (booking, customer) => {
 📍 <b>Location:</b>
 ${booking.location.address}
 ${booking.location.city}
-${booking.location.landmark ? `Landmark: ${booking.location.landmark}` : ''}
-
-${booking.specialNotes ? `📝 <b>Notes:</b> ${booking.specialNotes}` : ''}
 
 ⏰ ${new Date().toLocaleString('en-IN')}
 `;

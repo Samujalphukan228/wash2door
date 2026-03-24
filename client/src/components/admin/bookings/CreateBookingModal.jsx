@@ -111,12 +111,12 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
     const [timeSlot, setTimeSlot] = useState('');
     const [availability, setAvailability] = useState([]);
     const [availabilityLoading, setAvailabilityLoading] = useState(false);
+    // ✅ CHANGE 1: Removed landmark from location state
     const [location, setLocation] = useState({
-        address: 'Walk-in / At Shop', 
-        city: 'Walk-in', 
-        landmark: ''
+        address: 'Walk-in / At Shop',
+        city: 'Walk-in'
     });
-    const [specialNotes, setSpecialNotes] = useState('');
+    // ✅ CHANGE 2: Removed specialNotes state
     const [paymentMethod, setPaymentMethod] = useState('cash');
 
     // Refresh current time every minute
@@ -149,12 +149,22 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
             return;
         }
         const t = setTimeout(async () => {
+            setSearchLoading(true);
             try {
-                setSearchLoading(true);
                 const res = await adminService.getAllUsers({ search: customerSearch, limit: 5 });
-                if (res.success) setCustomers(res.data.users);
-            } catch { }
-            finally { setSearchLoading(false); }
+                console.log('Customer search response:', res);
+                if (res.success) {
+                    setCustomers(res.data.users || []);
+                } else {
+                    console.error('Search failed:', res.message);
+                    setCustomers([]);
+                }
+            } catch (err) {
+                console.error('Customer search error:', err);
+                setCustomers([]);
+            } finally {
+                setSearchLoading(false);
+            }
         }, 400);
         return () => clearTimeout(t);
     }, [customerSearch, bookingType]);
@@ -197,21 +207,22 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
         try {
             setLoading(true);
             
-            // ✅ SIMPLIFIED: No variantId needed
+            // ✅ CHANGE 5: Updated payload — no specialNotes, phone added
             const payload = {
                 bookingType,
                 serviceId: selectedService._id,
                 bookingDate,
-                timeSlot,  // ✅ Already in 12-hour format
+                timeSlot,
                 location,
-                specialNotes,
                 paymentMethod
             };
 
             if (bookingType === 'walkin') {
                 payload.walkInCustomer = walkInCustomer;
+                payload.phone = walkInCustomer.phone;
             } else {
                 payload.customerId = selectedCustomer._id;
+                payload.phone = selectedCustomer?.phone || '';
             }
             
             await adminService.createAdminBooking(payload);
@@ -575,6 +586,7 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                                 <div className="h-px bg-white/[0.05]" />
 
                                 {/* Location */}
+                                {/* ✅ CHANGE 3: Removed Landmark field */}
                                 <div>
                                     <span className={sectionLabel}>Location</span>
                                     <div className="space-y-2.5">
@@ -589,12 +601,6 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                                             value={location.city}
                                             onChange={(v) => setLocation(p => ({ ...p, city: v }))}
                                             placeholder="City"
-                                        />
-                                        <FieldInput
-                                            label="Landmark"
-                                            value={location.landmark}
-                                            onChange={(v) => setLocation(p => ({ ...p, landmark: v }))}
-                                            placeholder="Optional"
                                         />
                                     </div>
                                 </div>
@@ -623,21 +629,7 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
 
                                 <div className="h-px bg-white/[0.05]" />
 
-                                {/* Notes */}
-                                <div>
-                                    <label className="block text-[10px] text-white/25 uppercase tracking-widest font-medium mb-2">
-                                        Special Notes
-                                    </label>
-                                    <textarea
-                                        value={specialNotes}
-                                        onChange={(e) => setSpecialNotes(e.target.value)}
-                                        placeholder="Vehicle details, special requests…"
-                                        rows={3}
-                                        className={`${inputCls} resize-none`}
-                                    />
-                                </div>
-
-                                <div className="h-px bg-white/[0.05]" />
+                                {/* ✅ CHANGE 4: Removed Special Notes section entirely */}
 
                                 {/* Summary */}
                                 <div>

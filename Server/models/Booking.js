@@ -97,14 +97,15 @@ const bookingSchema = new mongoose.Schema({
     location: {
         address: { type: String, required: [true, 'Address is required'] },
         city: { type: String, required: [true, 'City is required'] },
-        landmark: { type: String, default: '' }
     },
 
-    specialNotes: {
-        type: String,
-        default: '',
-        maxlength: [500, 'Notes cannot exceed 500 characters']
-    },
+    // ✅ ADDED: Contact phone number for this booking
+    phone: {
+    type: String,
+    required: [true, 'Phone number is required'],
+    match: [/^\+?[\d\s\-]{7,15}$/, 'Please enter a valid phone number']
+},
+
 
     // Status
     status: {
