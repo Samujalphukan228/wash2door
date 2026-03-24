@@ -10,11 +10,6 @@ export const TIME_SLOTS = [
     '01:00 PM-02:00 PM',
     '02:00 PM-03:00 PM',
     '03:00 PM-04:00 PM',
-    '04:00 PM-05:00 PM',
-    '05:00 PM-06:00 PM',
-    '06:00 PM-07:00 PM',
-    '07:00 PM-08:00 PM',
-    '08:00 PM-09:00 PM',
 ];
 
 // ============================================
@@ -121,7 +116,7 @@ export const LIMITS = {
 // ============================================
 // CLOSED DAYS
 // ============================================
-export const CLOSED_DAYS = [0]; // 0 = Sunday
+export const CLOSED_DAYS = [1]; // 0 = Sunday
 
 export const isClosedDay = (date) => {
     const day = new Date(date).getDay();
