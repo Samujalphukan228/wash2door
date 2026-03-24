@@ -155,7 +155,7 @@ const MobileCTA = memo(function MobileCTA() {
 
             <motion.a
               whileTap={{ scale: 0.97 }}
-              href="/bookings"
+              href="/services"
               className="group inline-flex items-center gap-3 h-12 px-8
                          bg-white text-black rounded-full no-underline
                          hover:bg-white/90 transition-colors duration-300"
@@ -290,7 +290,7 @@ const DesktopCTA = memo(function DesktopCTA() {
                 variants={fadeUp}
                 whileHover={{ scale: 1.02, y: -2 }}
                 whileTap={{ scale: 0.97 }}
-                href="/bookings"
+                href="/services"
                 className="group inline-flex items-center gap-3 h-12 px-8
                            bg-white text-black rounded-full no-underline
                            hover:bg-white/90 hover:shadow-xl hover:shadow-white/15
@@ -395,7 +395,7 @@ const DesktopCTA = memo(function DesktopCTA() {
             ))}
 
             {/* Inline CTA link in the trust bar */}
-            <a href="/bookings"
+            <a href="/services"
               className="group hidden xl:flex items-center gap-2 text-white/40 hover:text-white/70
                          transition-colors duration-300 no-underline ml-auto">
               <span className="tracking-wider uppercase" style={{ fontSize: "9px" }}>Get Started</span>
