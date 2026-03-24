@@ -815,7 +815,7 @@ const FooterStrip = memo(function FooterStrip() {
 // ══════════════════════════════════════════════════════════
 export default function ContactPage() {
   return (
-    <main>
+    <main className="overflow-x-hidden">
       <Hero />
       <ContactMethods />
       <FAQ />
