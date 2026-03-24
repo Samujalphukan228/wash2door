@@ -1,4 +1,3 @@
-// app/profile/page.jsx
 "use client"
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
@@ -580,6 +579,16 @@ export default function ProfilePage() {
   const { user, loading: authLoading, logout, checkAuth } = useAuth()
   const router = useRouter()
 
+  // ✅ Footer hide (correct place)
+  useEffect(() => {
+    const footer = document.querySelector("footer")
+    if (footer) footer.style.display = "none"
+
+    return () => {
+      if (footer) footer.style.display = ""
+    }
+  }, [])
+
   // State
   const [activeTab, setActiveTab] = useState('profile')
   const [loading, setLoading] = useState(true)
@@ -630,7 +639,7 @@ export default function ProfilePage() {
     if (user && activeTab === 'bookings' && bookings.length === 0) {
       fetchBookings()
     }
-  }, [user, activeTab])
+  }, [user, activeTab, bookings.length])
 
   // Data fetching functions
   const fetchProfile = useCallback(async () => {
