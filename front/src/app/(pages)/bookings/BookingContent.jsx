@@ -1,4 +1,4 @@
-// app/bookings/BookingContent.jsx - Updated version
+// app/bookings/BookingContent.jsx
 "use client"
 
 import { useEffect, useState } from 'react'
@@ -88,7 +88,9 @@ function StepIndicator({ current }) {
 export default function BookingContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
-    const { isAuthenticated, openModal } = useAuth()
+    
+    // ✅ Add 'loading' to the destructure
+    const { isAuthenticated, openModal, loading } = useAuth()
 
     const serviceIdFromUrl = searchParams.get('service')
     const [currentStep, setCurrentStep] = useState(serviceIdFromUrl ? 2 : 1)
@@ -132,12 +134,13 @@ export default function BookingContent() {
         }
     }
 
+    // ✅ FIX: Check loading state before triggering login modal
     useEffect(() => {
-        if (!isAuthenticated && currentStep > 1) {
+        if (!loading && !isAuthenticated && currentStep > 1) {
             openModal('login')
             setCurrentStep(1)
         }
-    }, [isAuthenticated, currentStep, openModal])
+    }, [isAuthenticated, currentStep, openModal, loading])
 
     const updateData = (newData) =>
         setBookingData(prev => ({ ...prev, ...newData }))
@@ -145,8 +148,9 @@ export default function BookingContent() {
     const updateUI = (uiData) =>
         setBookingData(prev => ({ ...prev, _ui: { ...prev._ui, ...uiData } }))
 
+    // ✅ FIX: Check loading state before triggering login modal
     const goToStep = (step) => {
-        if (step > 1 && !isAuthenticated) {
+        if (step > 1 && !loading && !isAuthenticated) {
             openModal('login')
             return
         }
@@ -154,7 +158,8 @@ export default function BookingContent() {
         window.scrollTo({ top: 0, behavior: 'smooth' })
     }
 
-    if (loadingService) {
+    // ✅ Show loading while auth is being checked
+    if (loading || loadingService) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-white">
                 <motion.div
