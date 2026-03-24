@@ -242,7 +242,7 @@ export const getDashboardStats = async (req, res) => {
             error: error.message
         });
     }
-};
+}; 
 
 // ============================================
 // GET ALL USERS
@@ -255,6 +255,7 @@ export const getAllUsers = async (req, res) => {
             limit = 10,
             search,
             isBlocked,
+            role,
             sortBy = 'createdAt',
             sortOrder = 'desc'
         } = req.query;
@@ -262,7 +263,21 @@ export const getAllUsers = async (req, res) => {
         const pageNum = parseInt(page);
         const limitNum = parseInt(limit);
 
-        const query = { role: 'user', registrationStatus: 'completed' };
+        // ✅ developer role is never fetchable — block it explicitly
+        if (role === 'developer') {
+            return res.status(403).json({
+                success: false,
+                message: 'Developer accounts cannot be accessed'
+            });
+        }
+
+        // ✅ Role-aware query — developer always excluded
+        let query;
+        if (role === 'admin') {
+            query = { role: 'admin' };
+        } else {
+            query = { role: 'user', registrationStatus: 'completed' };
+        }
 
         if (search) {
             query.$or = [
@@ -287,22 +302,29 @@ export const getAllUsers = async (req, res) => {
             .limit(limitNum)
             .skip((pageNum - 1) * limitNum);
 
-        // Add booking stats for each user
-        const usersWithStats = await Promise.all(
-            users.map(async (user) => {
-                const bookingCount = await Booking.countDocuments({ customerId: user._id });
-                const completedCount = await Booking.countDocuments({
-                    customerId: user._id,
-                    status: 'completed'
-                });
+        // ✅ Single aggregate instead of N+1 queries
+        const bookingStats = await Booking.aggregate([
+            { $match: { customerId: { $in: users.map(u => u._id) } } },
+            {
+                $group: {
+                    _id: '$customerId',
+                    totalBookings: { $sum: 1 },
+                    completedBookings: {
+                        $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] }
+                    }
+                }
+            }
+        ]);
 
-                return {
-                    ...user.toObject(),
-                    totalBookings: bookingCount,
-                    completedBookings: completedCount
-                };
-            })
+        const statsMap = Object.fromEntries(
+            bookingStats.map(s => [s._id.toString(), s])
         );
+
+        const usersWithStats = users.map(user => ({
+            ...user.toObject(),
+            totalBookings: statsMap[user._id.toString()]?.totalBookings || 0,
+            completedBookings: statsMap[user._id.toString()]?.completedBookings || 0
+        }));
 
         res.status(200).json({
             success: true,
