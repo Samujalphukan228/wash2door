@@ -129,6 +129,7 @@ export const getRegistrationVerificationEmailTemplate = (userName, verificationL
             }
         </style>
     </head>
+    
     <body>
         <div class="container">
             <div class="header">
