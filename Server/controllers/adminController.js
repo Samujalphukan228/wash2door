@@ -1,4 +1,4 @@
-// controllers/adminController.js - COMPLETE with GLOBAL SLOT BOOKING
+// controllers/adminController.js - FIXED: Removed developer role
 
 import User from '../models/User.js';
 import Service from '../models/Service.js';
@@ -141,7 +141,7 @@ export const getDashboardStats = async (req, res) => {
             { $sort: { count: -1 } }
         ]);
 
-        // ← WEEKLY DATA (last 7 days)
+        // WEEKLY DATA (last 7 days)
         const weeklyData = await Booking.aggregate([
             {
                 $match: {
@@ -177,7 +177,6 @@ export const getDashboardStats = async (req, res) => {
             .sort({ timeSlot: 1 })
             .limit(10);
 
-        // ← DEBUG LOG
         console.log('🔍 DEBUG - Dashboard Stats:', {
             weeklyDataCount: weeklyData?.length,
             weeklyDataSample: weeklyData?.slice(0, 2),
@@ -230,7 +229,7 @@ export const getDashboardStats = async (req, res) => {
                 popularServices,
                 bookingsByCategory,
                 bookingsByTimeSlot,
-                weeklyData  // ← RETURN THIS
+                weeklyData
             }
         });
 
@@ -242,7 +241,7 @@ export const getDashboardStats = async (req, res) => {
             error: error.message
         });
     }
-}; 
+};
 
 // ============================================
 // GET ALL USERS
@@ -263,20 +262,10 @@ export const getAllUsers = async (req, res) => {
         const pageNum = parseInt(page);
         const limitNum = parseInt(limit);
 
-        // ✅ developer role is never fetchable
-        if (role === 'developer') {
-            return res.status(403).json({
-                success: false,
-                message: 'Developer accounts cannot be accessed'
-            });
-        }
-
-        // ✅ Role-aware query
+        // Role-aware query — only user or admin allowed
         let query;
         if (role === 'admin') {
             query = { role: 'admin' };
-        } else if (role === 'all') {
-            query = { role: { $in: ['user', 'admin'] }, registrationStatus: 'completed' };
         } else {
             query = { role: 'user', registrationStatus: 'completed' };
         }
@@ -588,6 +577,7 @@ export const changeUserRole = async (req, res) => {
             });
         }
 
+        // ✅ Only allow 'user' and 'admin' roles
         if (!['user', 'admin'].includes(role)) {
             return res.status(400).json({
                 success: false,
@@ -889,7 +879,7 @@ export const updateBookingStatus = async (req, res) => {
 };
 
 // ============================================
-// CREATE ADMIN BOOKING - ✅ SAME AS USER BOOKING (NO VARIANT SELECTION)
+// CREATE ADMIN BOOKING
 // ============================================
 
 export const createAdminBooking = async (req, res) => {
@@ -978,7 +968,7 @@ export const createAdminBooking = async (req, res) => {
             variantsCount: service.variants?.length || 0
         });
 
-        // ✅ Check category and subcategory
+        // Check category and subcategory
         if (!service.category || !service.category._id) {
             return res.status(400).json({
                 success: false,
@@ -993,9 +983,7 @@ export const createAdminBooking = async (req, res) => {
             });
         }
 
-        // ============================================
-        // ✅ AUTO-SELECT VARIANT OR USE SERVICE PRICE (SAME AS USER BOOKING)
-        // ============================================
+        // AUTO-SELECT VARIANT OR USE SERVICE PRICE
         let finalPrice = 0;
         let duration = 60;
         let variantId = null;
@@ -1006,7 +994,7 @@ export const createAdminBooking = async (req, res) => {
         if (hasVariants) {
             // Auto-select first active variant
             const activeVariants = service.variants.filter(v => v.isActive);
-            
+
             if (activeVariants.length === 0) {
                 return res.status(400).json({
                     success: false,
@@ -1047,7 +1035,7 @@ export const createAdminBooking = async (req, res) => {
             });
         }
 
-        // ✅ Parse date from local string
+        // Parse date from local string
         const [year, month, day] = bookingDate.split('-').map(Number);
         const requestedDate = new Date(year, month - 1, day, 12, 0, 0, 0);
 
@@ -1058,7 +1046,7 @@ export const createAdminBooking = async (req, res) => {
             });
         }
 
-        // ✅ Helper function for local date string
+        // Helper function for local date string
         const getLocalDateStr = (date) => {
             const y = date.getFullYear();
             const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -1090,7 +1078,7 @@ export const createAdminBooking = async (req, res) => {
             });
         }
 
-        // ✅ Check if slot time has passed today
+        // Check if slot time has passed today
         const isToday = bookingDate === todayStr;
         if (isToday) {
             const [startTime] = timeSlot.split('-');
@@ -1103,7 +1091,7 @@ export const createAdminBooking = async (req, res) => {
             }
         }
 
-        // ✅ GLOBAL SLOT CHECK - Exclude cancelled bookings
+        // GLOBAL SLOT CHECK - Exclude cancelled bookings
         const slotLockKey = `${bookingDate}|${timeSlot}`;
 
         const slotTaken = await Booking.findOne({

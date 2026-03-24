@@ -1,4 +1,4 @@
-// models/User.js - FIXED: Removed duplicate email index
+// models/User.js - FIXED: Removed developer role
 
 import mongoose from 'mongoose';
 import argon2 from 'argon2';
@@ -40,7 +40,7 @@ const userSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ['user', 'admin', 'developer'],
+        enum: ['user', 'admin'],
         default: 'user'
     },
     registrationStatus: {
