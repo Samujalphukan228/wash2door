@@ -89,7 +89,6 @@ export default function BookingContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
     
-    // ✅ Add 'loading' to the destructure
     const { isAuthenticated, openModal, loading } = useAuth()
 
     const serviceIdFromUrl = searchParams.get('service')
@@ -99,6 +98,15 @@ export default function BookingContent() {
         serviceId: serviceIdFromUrl || ''
     })
     const [loadingService, setLoadingService] = useState(false)
+
+    // ✅ Hide footer
+    useEffect(() => {
+        const footer = document.querySelector("footer")
+        if (footer) footer.style.display = "none"
+        return () => {
+            if (footer) footer.style.display = ""
+        }
+    }, [])
 
     useEffect(() => {
         if (serviceIdFromUrl) {
@@ -134,7 +142,6 @@ export default function BookingContent() {
         }
     }
 
-    // ✅ FIX: Check loading state before triggering login modal
     useEffect(() => {
         if (!loading && !isAuthenticated && currentStep > 1) {
             openModal('login')
@@ -148,7 +155,6 @@ export default function BookingContent() {
     const updateUI = (uiData) =>
         setBookingData(prev => ({ ...prev, _ui: { ...prev._ui, ...uiData } }))
 
-    // ✅ FIX: Check loading state before triggering login modal
     const goToStep = (step) => {
         if (step > 1 && !loading && !isAuthenticated) {
             openModal('login')
@@ -158,7 +164,6 @@ export default function BookingContent() {
         window.scrollTo({ top: 0, behavior: 'smooth' })
     }
 
-    // ✅ Show loading while auth is being checked
     if (loading || loadingService) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-white">
