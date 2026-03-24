@@ -903,7 +903,7 @@ const FooterStrip = memo(function FooterStrip() {
 // ══════════════════════════════════════════════════════════
 export default function AboutPage() {
   return (
-    <main>
+    <main className="overflow-x-hidden">
       <Hero />
       <Story />
       <Features />
