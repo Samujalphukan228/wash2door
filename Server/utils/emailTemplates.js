@@ -147,7 +147,7 @@ export const getRegistrationVerificationEmailTemplate = (userName, verificationL
                     <div class="link-box">${verificationLink}</div>
                 </div>
                 
-                <p class="validity">This link will expire in 1 hour</p>
+                <p class="validity">This link will expire in 15 minutes</p>
                 
                 <div class="security-note">
                     <p><strong>Didn't sign up?</strong> If you didn't create an account with Wash2Door, please ignore this email.</p>

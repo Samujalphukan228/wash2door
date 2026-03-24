@@ -115,8 +115,6 @@ userSchema.virtual('fullName').get(function() {
 
 // ============================================
 // INDEXES
-// ✅ FIXED: Removed duplicate email index
-// email index is auto created by unique: true above
 // ============================================
 
 userSchema.index({ role: 1 });
@@ -249,7 +247,7 @@ userSchema.methods.generateEmailVerificationToken = function() {
         .update(verificationToken)
         .digest('hex');
 
-    this.emailVerificationExpire = Date.now() + 24 * 60 * 60 * 1000;
+    this.emailVerificationExpire = Date.now() + 15 * 60 * 1000;
 
     return verificationToken;
 };
@@ -302,12 +300,12 @@ userSchema.methods.resetLoginAttempts = async function() {
 // ============================================
 
 userSchema.statics.cleanupUnverifiedRegistrations = async function() {
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000);
 
     const result = await this.deleteMany({
         registrationStatus: { $ne: 'completed' },
         otpVerified: false,
-        createdAt: { $lt: oneHourAgo }
+        createdAt: { $lt: fifteenMinsAgo }
     });
 
     return result.deletedCount;
@@ -333,9 +331,9 @@ userSchema.statics.findForRegistration = async function(email) {
         };
     }
 
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000);
 
-    if (user.createdAt < oneHourAgo) {
+    if (user.createdAt < fifteenMinsAgo) {
         await user.deleteOne();
         return {
             exists: false,
