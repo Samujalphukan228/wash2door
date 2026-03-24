@@ -261,7 +261,7 @@ export default function Hero() {
             className="flex flex-col gap-3 mb-8"
           >
             <a
-              href="/bookings"
+              href="/services"
               className="group relative flex items-center justify-between px-5 h-14 bg-white rounded-xl overflow-hidden active:scale-95 transition-transform duration-200"
             >
               <div className="absolute inset-0 bg-white/80 -translate-x-full group-active:translate-x-0 transition-transform duration-300" />
