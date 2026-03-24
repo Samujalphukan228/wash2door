@@ -820,6 +820,15 @@ export default function MyBookingsPage() {
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
 
+  // ✅ Hide footer
+  useEffect(() => {
+    const footer = document.querySelector("footer")
+    if (footer) footer.style.display = "none"
+    return () => {
+      if (footer) footer.style.display = ""
+    }
+  }, [])
+
   // Redirect if not authenticated
   useEffect(() => {
     if (!authLoading && !user) {
