@@ -645,7 +645,7 @@ const BookingCTA = memo(function BookingCTA() {
       className="mt-14 md:mt-20 flex flex-col sm:flex-row items-center justify-center gap-4"
     >
       <a
-        href="/bookings"
+        href="/services"
         className="group relative inline-flex items-center justify-center gap-3
                    w-full sm:w-auto h-14 px-10 bg-black text-white
                    rounded-full overflow-hidden no-underline
