@@ -263,7 +263,7 @@ export const getAllUsers = async (req, res) => {
         const pageNum = parseInt(page);
         const limitNum = parseInt(limit);
 
-        // ✅ developer role is never fetchable — block it explicitly
+        // ✅ developer role is never fetchable
         if (role === 'developer') {
             return res.status(403).json({
                 success: false,
@@ -271,10 +271,12 @@ export const getAllUsers = async (req, res) => {
             });
         }
 
-        // ✅ Role-aware query — developer always excluded
+        // ✅ Role-aware query
         let query;
         if (role === 'admin') {
             query = { role: 'admin' };
+        } else if (role === 'all') {
+            query = { role: { $in: ['user', 'admin'] }, registrationStatus: 'completed' };
         } else {
             query = { role: 'user', registrationStatus: 'completed' };
         }
