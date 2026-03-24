@@ -1,4 +1,3 @@
-// src/app/admin/users/page.jsx
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -23,7 +22,6 @@ import {
     UserX,
     Crown,
     SlidersHorizontal,
-    Mail,
     Calendar
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -39,7 +37,7 @@ export default function UsersPage() {
         page: 1,
         limit: 10,
         search: '',
-        role: '',
+        role: 'all',   // ✅ fetch everyone by default
         isBlocked: ''
     });
 
@@ -48,7 +46,6 @@ export default function UsersPage() {
     const [showDetailModal, setShowDetailModal] = useState(false);
     const [showBlockModal, setShowBlockModal] = useState(false);
 
-    // Fetch users
     const fetchUsers = useCallback(async (isRefresh = false) => {
         try {
             isRefresh ? setRefreshing(true) : setLoading(true);
@@ -74,7 +71,6 @@ export default function UsersPage() {
         fetchUsers();
     }, [fetchUsers]);
 
-    // Stats
     const stats = useMemo(() => ({
         total: total,
         customers: users.filter(u => u.role === 'user').length,
@@ -82,7 +78,6 @@ export default function UsersPage() {
         blocked: users.filter(u => u.isBlocked).length
     }), [users, total]);
 
-    // Handlers
     const handleFilterChange = (newFilters) => {
         setFilters(prev => ({ ...prev, ...newFilters, page: 1 }));
     };
@@ -140,6 +135,9 @@ export default function UsersPage() {
     };
 
     const handleRoleChange = async (userId, role) => {
+        // ✅ Prevent assigning developer role from UI
+        if (role === 'developer') return;
+
         const roleLabel = role === 'user' ? 'Customer' : 'Admin';
         if (!confirm(`Change this user's role to ${roleLabel}?`)) return;
         try {
@@ -160,7 +158,7 @@ export default function UsersPage() {
         toast.success('Refreshed', { duration: 1200 });
     };
 
-    const activeFiltersCount = [filters.search, filters.role, filters.isBlocked].filter(Boolean).length;
+    const activeFiltersCount = [filters.search, filters.role !== 'all' ? filters.role : '', filters.isBlocked].filter(Boolean).length;
 
     if (loading && users.length === 0) {
         return (
@@ -209,31 +207,10 @@ export default function UsersPage() {
 
                     {/* Quick Stats */}
                     <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4 px-3 sm:px-4 md:px-6">
-                        <StatCard
-                            icon={Users}
-                            label="Total"
-                            value={stats.total}
-                            sub="All users"
-                        />
-                        <StatCard
-                            icon={UserCheck}
-                            label="Customers"
-                            value={stats.customers}
-                            sub="Regular users"
-                        />
-                        <StatCard
-                            icon={Crown}
-                            label="Admins"
-                            value={stats.admins}
-                            sub="Admin access"
-                        />
-                        <StatCard
-                            icon={UserX}
-                            label="Blocked"
-                            value={stats.blocked}
-                            sub="Restricted"
-                            highlight={stats.blocked > 0}
-                        />
+                        <StatCard icon={Users} label="Total" value={stats.total} sub="All users" />
+                        <StatCard icon={UserCheck} label="Customers" value={stats.customers} sub="Regular users" />
+                        <StatCard icon={Crown} label="Admins" value={stats.admins} sub="Admin access" />
+                        <StatCard icon={UserX} label="Blocked" value={stats.blocked} sub="Restricted" highlight={stats.blocked > 0} />
                     </div>
 
                     {/* Filters */}
@@ -264,7 +241,6 @@ export default function UsersPage() {
                 </div>
             </div>
 
-            {/* Modals */}
             {showDetailModal && selectedUser && (
                 <UserDetailModal
                     user={selectedUser}
@@ -301,13 +277,10 @@ export default function UsersPage() {
     );
 }
 
-// === COMPONENTS ===
-
 function StatCard({ icon: Icon, label, value, sub, highlight }) {
     return (
         <div className={`
-            bg-white/[0.02] border rounded-xl sm:rounded-2xl p-3 sm:p-4 transition-all
-            hover:bg-white/[0.04]
+            bg-white/[0.02] border rounded-xl sm:rounded-2xl p-3 sm:p-4 transition-all hover:bg-white/[0.04]
             ${highlight ? 'border-red-500/30 bg-red-500/[0.02]' : 'border-white/[0.08]'}
         `}>
             <div className="flex items-center gap-1.5 sm:gap-2 mb-2 sm:mb-3">
@@ -316,9 +289,7 @@ function StatCard({ icon: Icon, label, value, sub, highlight }) {
                 </div>
                 <span className="text-[10px] sm:text-xs text-gray-500 font-medium">{label}</span>
             </div>
-            <p className="text-lg sm:text-xl lg:text-2xl font-bold text-white tracking-tight truncate">
-                {value}
-            </p>
+            <p className="text-lg sm:text-xl lg:text-2xl font-bold text-white tracking-tight truncate">{value}</p>
             <p className="text-[10px] sm:text-xs text-gray-600 mt-0.5 sm:mt-1 truncate">{sub}</p>
         </div>
     );
@@ -328,24 +299,19 @@ function FilterBar({ filters, onFilterChange, showFilters, setShowFilters, activ
     const [searchInput, setSearchInput] = useState(filters.search || '');
 
     const handleSearch = (e) => {
-        if (e.key === 'Enter') {
-            onFilterChange({ search: searchInput });
-        }
+        if (e.key === 'Enter') onFilterChange({ search: searchInput });
     };
 
     const clearAll = () => {
         setSearchInput('');
-        onFilterChange({
-            search: '',
-            role: '',
-            isBlocked: ''
-        });
+        onFilterChange({ search: '', role: 'all', isBlocked: '' });
     };
 
     const roleOptions = [
-        { value: '', label: 'All Roles' },
+        { value: 'all', label: 'All Roles' },
         { value: 'user', label: 'Customer' },
         { value: 'admin', label: 'Admin' }
+        // developer intentionally excluded
     ];
 
     const statusOptions = [
@@ -356,9 +322,7 @@ function FilterBar({ filters, onFilterChange, showFilters, setShowFilters, activ
 
     return (
         <div className="space-y-3 px-3 sm:px-4 md:px-6">
-            {/* Search & Filter Row */}
             <div className="flex items-center gap-2">
-                {/* Search */}
                 <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
                     <input
@@ -372,10 +336,7 @@ function FilterBar({ filters, onFilterChange, showFilters, setShowFilters, activ
                     />
                     {searchInput && (
                         <button
-                            onClick={() => {
-                                setSearchInput('');
-                                onFilterChange({ search: '' });
-                            }}
+                            onClick={() => { setSearchInput(''); onFilterChange({ search: '' }); }}
                             className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-white transition-colors"
                         >
                             <X className="w-4 h-4" />
@@ -383,7 +344,6 @@ function FilterBar({ filters, onFilterChange, showFilters, setShowFilters, activ
                     )}
                 </div>
 
-                {/* Role - Desktop */}
                 <div className="hidden sm:block relative">
                     <select
                         value={filters.role}
@@ -391,15 +351,12 @@ function FilterBar({ filters, onFilterChange, showFilters, setShowFilters, activ
                         className="appearance-none bg-white/[0.02] border border-white/[0.08] text-white text-xs pl-3 pr-8 py-2.5 rounded-xl focus:outline-none focus:border-white/[0.15] cursor-pointer"
                     >
                         {roleOptions.map((opt) => (
-                            <option key={opt.value} value={opt.value} className="bg-black">
-                                {opt.label}
-                            </option>
+                            <option key={opt.value} value={opt.value} className="bg-black">{opt.label}</option>
                         ))}
                     </select>
                     <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500 pointer-events-none" />
                 </div>
 
-                {/* Status - Desktop */}
                 <div className="hidden sm:block relative">
                     <select
                         value={filters.isBlocked}
@@ -407,15 +364,12 @@ function FilterBar({ filters, onFilterChange, showFilters, setShowFilters, activ
                         className="appearance-none bg-white/[0.02] border border-white/[0.08] text-white text-xs pl-3 pr-8 py-2.5 rounded-xl focus:outline-none focus:border-white/[0.15] cursor-pointer"
                     >
                         {statusOptions.map((opt) => (
-                            <option key={opt.value} value={opt.value} className="bg-black">
-                                {opt.label}
-                            </option>
+                            <option key={opt.value} value={opt.value} className="bg-black">{opt.label}</option>
                         ))}
                     </select>
                     <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500 pointer-events-none" />
                 </div>
 
-                {/* Filter Toggle - Mobile */}
                 <button
                     onClick={() => setShowFilters(!showFilters)}
                     className={`
@@ -434,7 +388,6 @@ function FilterBar({ filters, onFilterChange, showFilters, setShowFilters, activ
                     )}
                 </button>
 
-                {/* Clear - Desktop */}
                 {activeCount > 0 && (
                     <button
                         onClick={clearAll}
@@ -446,7 +399,6 @@ function FilterBar({ filters, onFilterChange, showFilters, setShowFilters, activ
                 )}
             </div>
 
-            {/* Mobile Filters */}
             {showFilters && (
                 <div className="sm:hidden grid grid-cols-2 gap-2 p-3 rounded-xl border border-white/[0.08] bg-white/[0.02]">
                     <div className="relative">
@@ -456,9 +408,7 @@ function FilterBar({ filters, onFilterChange, showFilters, setShowFilters, activ
                             className="w-full appearance-none bg-white/[0.04] border border-white/[0.08] text-white text-xs pl-3 pr-8 py-2 rounded-lg focus:outline-none cursor-pointer"
                         >
                             {roleOptions.map((opt) => (
-                                <option key={opt.value} value={opt.value} className="bg-black">
-                                    {opt.label}
-                                </option>
+                                <option key={opt.value} value={opt.value} className="bg-black">{opt.label}</option>
                             ))}
                         </select>
                         <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-500 pointer-events-none" />
@@ -470,9 +420,7 @@ function FilterBar({ filters, onFilterChange, showFilters, setShowFilters, activ
                             className="w-full appearance-none bg-white/[0.04] border border-white/[0.08] text-white text-xs pl-3 pr-8 py-2 rounded-lg focus:outline-none cursor-pointer"
                         >
                             {statusOptions.map((opt) => (
-                                <option key={opt.value} value={opt.value} className="bg-black">
-                                    {opt.label}
-                                </option>
+                                <option key={opt.value} value={opt.value} className="bg-black">{opt.label}</option>
                             ))}
                         </select>
                         <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-500 pointer-events-none" />
@@ -489,13 +437,12 @@ function FilterBar({ filters, onFilterChange, showFilters, setShowFilters, activ
                 </div>
             )}
 
-            {/* Active Filter Pills */}
             {activeCount > 0 && (
                 <div className="flex items-center gap-2 flex-wrap">
-                    {filters.role && (
+                    {filters.role && filters.role !== 'all' && (
                         <FilterPill
                             label={filters.role === 'user' ? 'Customer' : 'Admin'}
-                            onRemove={() => onFilterChange({ role: '' })}
+                            onRemove={() => onFilterChange({ role: 'all' })}
                         />
                     )}
                     {filters.isBlocked && (
@@ -507,10 +454,7 @@ function FilterBar({ filters, onFilterChange, showFilters, setShowFilters, activ
                     {filters.search && (
                         <FilterPill
                             label={`"${filters.search}"`}
-                            onRemove={() => {
-                                setSearchInput('');
-                                onFilterChange({ search: '' });
-                            }}
+                            onRemove={() => { setSearchInput(''); onFilterChange({ search: '' }); }}
                         />
                     )}
                 </div>
@@ -553,9 +497,7 @@ function UsersList({ users, loading, total, pages, currentPage, onPageChange, on
                         <Users className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
                     </div>
                     <p className="text-sm sm:text-base text-gray-400 mb-1">No users found</p>
-                    <p className="text-[10px] sm:text-xs text-gray-600 text-center">
-                        Try adjusting your filters
-                    </p>
+                    <p className="text-[10px] sm:text-xs text-gray-600 text-center">Try adjusting your filters</p>
                 </div>
             </div>
         );
@@ -563,7 +505,6 @@ function UsersList({ users, loading, total, pages, currentPage, onPageChange, on
 
     return (
         <div className="bg-white/[0.02] border border-white/[0.08] rounded-xl sm:rounded-2xl overflow-hidden">
-            {/* Header */}
             <div className="flex items-center justify-between p-3 sm:p-4 border-b border-white/[0.06]">
                 <div className="flex items-center gap-2 sm:gap-2.5">
                     <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white/[0.06] flex items-center justify-center">
@@ -571,9 +512,7 @@ function UsersList({ users, loading, total, pages, currentPage, onPageChange, on
                     </div>
                     <div>
                         <p className="text-xs sm:text-sm font-medium text-white">All Users</p>
-                        <p className="text-[10px] sm:text-xs text-gray-600 hidden sm:block">
-                            {total} total
-                        </p>
+                        <p className="text-[10px] sm:text-xs text-gray-600 hidden sm:block">{total} total</p>
                     </div>
                 </div>
                 <p className="text-[10px] sm:text-xs text-gray-500 font-mono">
@@ -581,7 +520,6 @@ function UsersList({ users, loading, total, pages, currentPage, onPageChange, on
                 </p>
             </div>
 
-            {/* Users */}
             <div className="divide-y divide-white/[0.04]">
                 {users.map((user, index) => (
                     <UserRow
@@ -596,7 +534,6 @@ function UsersList({ users, loading, total, pages, currentPage, onPageChange, on
                 ))}
             </div>
 
-            {/* Pagination */}
             {pages > 1 && (
                 <div className="flex items-center justify-between p-3 sm:p-4 border-t border-white/[0.06]">
                     <button
@@ -611,15 +548,10 @@ function UsersList({ users, loading, total, pages, currentPage, onPageChange, on
                     <div className="flex items-center gap-1">
                         {Array.from({ length: Math.min(5, pages) }, (_, i) => {
                             let page;
-                            if (pages <= 5) {
-                                page = i + 1;
-                            } else if (currentPage <= 3) {
-                                page = i + 1;
-                            } else if (currentPage >= pages - 2) {
-                                page = pages - 4 + i;
-                            } else {
-                                page = currentPage - 2 + i;
-                            }
+                            if (pages <= 5) page = i + 1;
+                            else if (currentPage <= 3) page = i + 1;
+                            else if (currentPage >= pages - 2) page = pages - 4 + i;
+                            else page = currentPage - 2 + i;
 
                             return (
                                 <button
@@ -667,15 +599,10 @@ function UserRow({ user, isFirst, onView, onBlock, onUnblock, onRoleChange }) {
             onClick={() => onView(user)}
         >
             <div className="flex items-start gap-3">
-                {/* Avatar */}
                 <div className="relative shrink-0">
                     <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white/[0.06] overflow-hidden border border-white/[0.08] flex items-center justify-center">
                         {user.avatar && user.avatar !== 'default-avatar.jpg' ? (
-                            <img
-                                src={user.avatar}
-                                alt={user.firstName}
-                                className="w-full h-full object-cover"
-                            />
+                            <img src={user.avatar} alt={user.firstName} className="w-full h-full object-cover" />
                         ) : (
                             <span className="text-sm font-semibold text-white/40 uppercase">
                                 {user.firstName?.[0]}{user.lastName?.[0]}
@@ -688,7 +615,6 @@ function UserRow({ user, isFirst, onView, onBlock, onUnblock, onRoleChange }) {
                     `} />
                 </div>
 
-                {/* Content */}
                 <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2 mb-1">
                         <div className="min-w-0">
@@ -702,12 +628,9 @@ function UserRow({ user, isFirst, onView, onBlock, onUnblock, onRoleChange }) {
                                     </span>
                                 )}
                             </div>
-                            <p className="text-[10px] sm:text-xs text-gray-600 truncate mt-0.5">
-                                {user.email}
-                            </p>
+                            <p className="text-[10px] sm:text-xs text-gray-600 truncate mt-0.5">{user.email}</p>
                         </div>
 
-                        {/* Badges */}
                         <div className="flex items-center gap-1.5 shrink-0">
                             <span className={`
                                 text-[9px] font-medium px-1.5 py-0.5 rounded capitalize
@@ -730,25 +653,18 @@ function UserRow({ user, isFirst, onView, onBlock, onUnblock, onRoleChange }) {
                         </div>
                     </div>
 
-                    {/* Meta Row */}
                     <div className="flex items-center gap-3 mt-2">
                         <span className="flex items-center gap-1 text-[10px] text-gray-600">
                             <Calendar className="w-3 h-3" />
                             {joinedDate ? format(joinedDate, 'MMM dd, yyyy') : '—'}
                         </span>
                         <span className="text-[8px] text-gray-700">•</span>
-                        <span className="text-[10px] text-gray-600">
-                            {user.totalBookings || 0} bookings
-                        </span>
+                        <span className="text-[10px] text-gray-600">{user.totalBookings || 0} bookings</span>
                     </div>
 
-                    {/* Actions */}
                     <div className="flex items-center gap-2 mt-3">
                         <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onView(user);
-                            }}
+                            onClick={(e) => { e.stopPropagation(); onView(user); }}
                             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[10px] text-gray-400 hover:text-white hover:bg-white/[0.08] transition-all"
                         >
                             <Eye className="w-3 h-3" />
@@ -756,10 +672,7 @@ function UserRow({ user, isFirst, onView, onBlock, onUnblock, onRoleChange }) {
                         </button>
                         {user.isBlocked ? (
                             <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onUnblock(user._id);
-                                }}
+                                onClick={(e) => { e.stopPropagation(); onUnblock(user._id); }}
                                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[10px] text-gray-400 hover:text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/20 transition-all"
                             >
                                 <ShieldCheck className="w-3 h-3" />
@@ -767,10 +680,7 @@ function UserRow({ user, isFirst, onView, onBlock, onUnblock, onRoleChange }) {
                             </button>
                         ) : (
                             <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onBlock(user);
-                                }}
+                                onClick={(e) => { e.stopPropagation(); onBlock(user); }}
                                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[10px] text-gray-400 hover:text-red-400 hover:bg-red-500/10 hover:border-red-500/20 transition-all"
                             >
                                 <ShieldOff className="w-3 h-3" />
@@ -779,10 +689,7 @@ function UserRow({ user, isFirst, onView, onBlock, onUnblock, onRoleChange }) {
                         )}
                         {user.role === 'user' ? (
                             <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onRoleChange(user._id, 'admin');
-                                }}
+                                onClick={(e) => { e.stopPropagation(); onRoleChange(user._id, 'admin'); }}
                                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[10px] text-gray-400 hover:text-purple-400 hover:bg-purple-500/10 hover:border-purple-500/20 transition-all"
                             >
                                 <ShieldAlert className="w-3 h-3" />
@@ -790,10 +697,7 @@ function UserRow({ user, isFirst, onView, onBlock, onUnblock, onRoleChange }) {
                             </button>
                         ) : (
                             <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onRoleChange(user._id, 'user');
-                                }}
+                                onClick={(e) => { e.stopPropagation(); onRoleChange(user._id, 'user'); }}
                                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[10px] text-gray-400 hover:text-white hover:bg-white/[0.08] transition-all"
                             >
                                 <ShieldOff className="w-3 h-3" />
