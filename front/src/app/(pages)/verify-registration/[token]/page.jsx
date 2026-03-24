@@ -14,6 +14,21 @@ export default function VerifyRegistrationPage() {
   const token = params.token
 
   useEffect(() => {
+    const navbar = document.querySelector("nav")
+    const footer = document.querySelector("footer")
+    const topbar = document.querySelector("[role='marquee']")
+    if (navbar) navbar.style.display = "none"
+    if (footer) footer.style.display = "none"
+    if (topbar) topbar.style.display = "none"
+
+    return () => {
+      if (navbar) navbar.style.display = ""
+      if (footer) footer.style.display = ""
+      if (topbar) topbar.style.display = ""
+    }
+  }, [])
+
+  useEffect(() => {
     const verify = async () => {
       try {
         const result = await verifyRegistration(token)
