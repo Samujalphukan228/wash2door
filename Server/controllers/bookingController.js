@@ -118,7 +118,7 @@ export const checkAvailability = async (req, res) => {
                     date,
                     isAvailable: false,
                     isClosed: true,
-                    message: 'We are closed on Sundays',
+                    message: 'We are closed on Mondays',
                     availableSlots: 0,
                     totalSlots: TIME_SLOTS.length,
                     slots: TIME_SLOTS.map(slot => ({ slot, available: false, reason: 'Closed' }))
