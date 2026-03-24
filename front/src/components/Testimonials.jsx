@@ -626,7 +626,7 @@ const MobileTestimonials = memo(function MobileTestimonials() {
       {/* CTA */}
       <div className="flex justify-center">
         <a
-          href="/bookings"
+          href="/services"
           className="group relative inline-flex items-center justify-center gap-3
                      w-full sm:w-auto h-14 px-10 bg-white text-black
                      rounded-full no-underline overflow-hidden
