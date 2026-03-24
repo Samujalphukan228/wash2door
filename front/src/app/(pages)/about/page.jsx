@@ -1,121 +1,109 @@
 "use client"
 
 import { memo, useRef, useMemo } from "react"
-import { motion, useInView } from "framer-motion"
+import { motion, useInView, useScroll, useTransform } from "framer-motion"
 import {
-  ArrowUpRight,
-  ArrowRight,
-  Leaf,
-  Users,
-  Star,
-  MapPin,
-  Shield,
-  Check,
-  Phone,
-  Mail,
-  Clock,
+  ArrowUpRight, ArrowRight,
+  Leaf, Users, Star, MapPin,
+  Shield, Check, Phone, Mail, Clock, Zap,
 } from "lucide-react"
 
-// ── Constants ──────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════
+// CONSTANTS
+// ══════════════════════════════════════════════════════════
 const FEATURES = [
-  {
-    icon: MapPin,
-    title: "Doorstep Service",
-    desc: "We come to you — home, office, or anywhere in Duliajan",
-  },
-  {
-    icon: Leaf,
-    title: "Eco-Friendly",
-    desc: "Safe products that protect your vehicle and the environment",
-  },
-  {
-    icon: Shield,
-    title: "Trusted Team",
-    desc: "Trained professionals with consistent, quality results",
-  },
-  {
-    icon: Star,
-    title: "Satisfaction Guaranteed",
-    desc: "Not happy? We make it right — no questions asked",
-  },
+  { icon: MapPin,   title: "Doorstep Service",        desc: "We come to you — home, office, or anywhere in Duliajan" },
+  { icon: Leaf,     title: "Eco-Friendly",             desc: "Safe products that protect your vehicle and the environment" },
+  { icon: Shield,   title: "Trusted Team",             desc: "Trained professionals with consistent, quality results" },
+  { icon: Star,     title: "Satisfaction Guaranteed",  desc: "Not happy? We make it right — no questions asked" },
 ]
 
 const PROCESS_STEPS = [
-  { number: "01", title: "Book Online", desc: "Choose your service and time slot" },
-  { number: "02", title: "We Arrive", desc: "Our team comes to your location" },
-  { number: "03", title: "We Clean", desc: "Professional cleaning with care" },
-  { number: "04", title: "You Enjoy", desc: "Spotless results, guaranteed" },
+  { number: "01", title: "Book Online", desc: "Choose your service and time slot in seconds" },
+  { number: "02", title: "We Arrive",   desc: "Our team comes fully equipped to your location" },
+  { number: "03", title: "We Clean",    desc: "Professional cleaning with care and precision" },
+  { number: "04", title: "You Enjoy",   desc: "Spotless results, guaranteed every time" },
 ]
 
 const STATS = [
   { value: "100+", label: "Happy Customers" },
   { value: "500+", label: "Cars Cleaned" },
-  { value: "4.9", label: "Average Rating" },
-  { value: "2hr", label: "Avg. Service Time" },
+  { value: "4.9",  label: "Average Rating" },
+  { value: "2hr",  label: "Avg. Service Time" },
 ]
 
 const SERVICES_LIST = [
-  { name: "Car Exterior Wash", price: "₹299" },
-  { name: "Full Car Detailing", price: "₹799" },
-  { name: "Sofa Cleaning", price: "₹499" },
+  { name: "Car Exterior Wash",   price: "₹299" },
+  { name: "Full Car Detailing",  price: "₹799" },
+  { name: "Sofa Cleaning",       price: "₹499" },
   { name: "Water Tank Cleaning", price: "₹599" },
 ]
 
 const IMAGES = {
-  hero: "https://images.unsplash.com/photo-1607860108855-64acf2078ed9?q=80&w=2000&auto=format&fit=crop",
-  story: "https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?q=80&w=1000&auto=format&fit=crop",
+  hero:     "https://images.unsplash.com/photo-1607860108855-64acf2078ed9?q=80&w=2000&auto=format&fit=crop",
+  story:    "https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?q=80&w=1000&auto=format&fit=crop",
   services: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=80&w=1000&auto=format&fit=crop",
 }
 
-// ── Real Business Info ─────────────────────────────────────
 const BUSINESS = {
-  phone: "+91 6900706456",
-  email: "Wash2Door786602@gmail.com",
-  address: "Near Sonapur Namghar, Duliajan, Assam",
-  hours: "Monday – Sunday: 9:00 AM – 5:00 PM",
-  facebook: "https://www.facebook.com/profile.php?id=61581835752285",
+  phone:     "+91 6900706456",
+  email:     "Wash2Door786602@gmail.com",
+  address:   "Near Sonapur Namghar, Duliajan, Assam",
+  hours:     "Tue – Sun: 9:00 AM – 5:00 PM",
+  facebook:  "https://www.facebook.com/profile.php?id=61581835752285",
   instagram: "https://www.instagram.com/wash2door.djn",
 }
 
-// ── Typography Tokens ──────────────────────────────────────
-const SANS = "'Helvetica Neue', Helvetica, Arial, sans-serif"
 const SERIF = 'Georgia, "Times New Roman", serif'
+const SANS  = "'Helvetica Neue', Helvetica, Arial, sans-serif"
+const EASE  = [0.16, 1, 0.3, 1]
 
-// ── Animation Variants ─────────────────────────────────────
+// ══════════════════════════════════════════════════════════
+// ANIMATION VARIANTS
+// ══════════════════════════════════════════════════════════
 const fadeUp = {
-  hidden: { opacity: 0, y: 32 },
+  hidden:  { opacity: 0, y: 36 },
   visible: (i = 0) => ({
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.7, delay: i * 0.1, ease: [0.16, 1, 0.3, 1] },
+    opacity: 1, y: 0,
+    transition: { duration: 0.8, delay: i * 0.11, ease: EASE },
   }),
 }
-
 const fadeLeft = {
-  hidden: { opacity: 0, x: -40 },
-  visible: { opacity: 1, x: 0, transition: { duration: 0.9, ease: [0.16, 1, 0.3, 1] } },
+  hidden:  { opacity: 0, x: -48 },
+  visible: { opacity: 1, x: 0, transition: { duration: 0.9, ease: EASE } },
 }
-
 const fadeRight = {
-  hidden: { opacity: 0, x: 40 },
-  visible: { opacity: 1, x: 0, transition: { duration: 0.9, ease: [0.16, 1, 0.3, 1] } },
+  hidden:  { opacity: 0, x: 48 },
+  visible: { opacity: 1, x: 0, transition: { duration: 0.9, ease: EASE } },
+}
+const clipReveal = {
+  hidden:  { clipPath: "inset(0 100% 0 0)" },
+  visible: { clipPath: "inset(0 0% 0 0)", transition: { duration: 1.1, ease: EASE } },
 }
 
-// ── Reusable Components ────────────────────────────────────
+// ══════════════════════════════════════════════════════════
+// SHARED PRIMITIVES
+// ══════════════════════════════════════════════════════════
+
+/** Thin horizontal rule with label */
 const Eyebrow = memo(function Eyebrow({ children, light = false }) {
   return (
-    <div className="flex items-center gap-3 mb-6">
-      <span className={`w-10 h-px ${light ? "bg-white/30" : "bg-black"}`} />
+    <motion.div variants={fadeUp} className="flex items-center gap-4 mb-7">
+      <motion.span
+        variants={clipReveal}
+        className={`block h-px w-10 ${light ? "bg-white/30" : "bg-black/30"}`}
+      />
       <span
-        className={`tracking-[0.4em] uppercase ${light ? "text-white/50" : "text-gray-400"}`}
-        style={{ fontSize: "10px", fontFamily: SANS }}
+        className={`tracking-[0.38em] uppercase ${light ? "text-white/45" : "text-black/35"}`}
+        style={{ fontSize: "9px", fontFamily: SANS, fontWeight: 500 }}
       >
         {children}
       </span>
-    </div>
+    </motion.div>
   )
 })
 
+/** Large serif heading */
 const SectionHeading = memo(function SectionHeading({ children, light = false, className = "" }) {
   return (
     <h2
@@ -123,9 +111,9 @@ const SectionHeading = memo(function SectionHeading({ children, light = false, c
       style={{
         fontFamily: SERIF,
         fontWeight: 300,
-        fontSize: "clamp(1.9rem, 4vw, 3rem)",
-        lineHeight: 1.12,
-        letterSpacing: "-0.02em",
+        fontSize: "clamp(2rem, 4.5vw, 3.4rem)",
+        lineHeight: 1.1,
+        letterSpacing: "-0.025em",
       }}
     >
       {children}
@@ -133,202 +121,256 @@ const SectionHeading = memo(function SectionHeading({ children, light = false, c
   )
 })
 
-const GridTexture = memo(function GridTexture({ opacity = 0.025 }) {
+/** Subtle grid overlay texture */
+const GridTexture = memo(function GridTexture({ light = false }) {
   return (
     <div
-      className="absolute inset-0 pointer-events-none"
+      className="absolute inset-0 pointer-events-none select-none"
       style={{
-        opacity,
+        opacity: light ? 0.018 : 0.04,
         backgroundImage: `
-          linear-gradient(rgba(255,255,255,0.15) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(255,255,255,0.15) 1px, transparent 1px)
+          linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)
         `,
-        backgroundSize: "80px 80px",
+        backgroundSize: "72px 72px",
       }}
       aria-hidden="true"
     />
   )
 })
 
-// ── Hero ───────────────────────────────────────────────────
+/** Film-grain noise overlay */
+const Grain = memo(function Grain({ opacity = 0.035 }) {
+  return (
+    <div
+      className="absolute inset-0 pointer-events-none mix-blend-overlay"
+      style={{
+        opacity,
+        backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
+      }}
+      aria-hidden="true"
+    />
+  )
+})
+
+// ══════════════════════════════════════════════════════════
+// SECTION 1 — HERO
+// ══════════════════════════════════════════════════════════
 const Hero = memo(function Hero() {
+  const sectionRef = useRef(null)
+  const { scrollYProgress } = useScroll({ target: sectionRef, offset: ["start start", "end start"] })
+  const bgY       = useTransform(scrollYProgress, [0, 1], ["0%", "18%"])
+  const bgOpacity = useTransform(scrollYProgress, [0, 0.6], [1, 0.5])
+  const contentY  = useTransform(scrollYProgress, [0, 1], ["0%", "10%"])
+
   return (
     <section
-      className="relative min-h-[90dvh] md:min-h-screen bg-black overflow-hidden"
+      ref={sectionRef}
+      className="relative min-h-[100svh] bg-black overflow-hidden"
       style={{ fontFamily: SANS }}
+      aria-label="Hero"
     >
-      {/* Background */}
-      <div className="absolute inset-0">
+      {/* Parallax background */}
+      <motion.div className="absolute inset-0" style={{ y: bgY, opacity: bgOpacity }}>
         <img
-          src={IMAGES.hero}
-          alt=""
-          role="presentation"
-          className="w-full h-full object-cover opacity-40"
-          loading="eager"
+          src={IMAGES.hero} alt="" role="presentation"
+          className="w-full h-full object-cover"
+          style={{ filter: "brightness(0.28) contrast(1.1) saturate(0.55)" }}
+          loading="eager" fetchPriority="high"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-black/30" />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-transparent to-transparent" />
+      </motion.div>
+
+      {/* Overlays */}
+      <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
+        <div className="absolute inset-x-0 bottom-0 h-[80%] bg-gradient-to-t from-black via-black/70 to-transparent" />
+        <div className="absolute inset-y-0 left-0 w-[60%] bg-gradient-to-r from-black/70 to-transparent" />
+        <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/50 to-transparent" />
+        <GridTexture />
+        <Grain />
       </div>
 
       {/* Content */}
-      <div className="relative z-10 max-w-7xl mx-auto px-5 sm:px-8 md:px-12 lg:px-16 min-h-[90dvh] md:min-h-screen flex flex-col justify-end pb-14 md:pb-24 pt-28 md:pt-32">
-
+      <motion.div
+        style={{ y: contentY }}
+        className="relative z-10 max-w-7xl mx-auto px-5 sm:px-8 md:px-12 lg:px-16
+                   min-h-[100svh] flex flex-col justify-end pb-14 md:pb-24 pt-28"
+      >
+        {/* Eyebrow */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="flex items-center gap-3 mb-6"
+          initial={{ opacity: 0, x: -16 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.7, ease: EASE }}
+          className="flex items-center gap-4 mb-8"
         >
-          <span className="w-10 h-px bg-white/40" />
-          <span className="tracking-[0.4em] uppercase text-white/60" style={{ fontSize: "10px" }}>
+          <span className="w-10 h-px bg-white/30" />
+          <span className="tracking-[0.38em] uppercase text-white/45" style={{ fontSize: "9px", fontFamily: SANS }}>
             About Us
           </span>
         </motion.div>
 
-        <motion.h1
-          initial={{ opacity: 0, y: 32 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-          className="text-white mb-6 max-w-4xl"
-          style={{
-            fontFamily: SERIF,
-            fontWeight: 300,
-            fontSize: "clamp(2.4rem, 7vw, 5.5rem)",
-            lineHeight: 1.05,
-            letterSpacing: "-0.02em",
-          }}
-        >
-          The Shine That
-          <br />
-          <span className="italic text-white/50">Finds You</span>
-        </motion.h1>
+        {/* Headline — slide up per line */}
+        <div className="mb-8 overflow-hidden">
+          {["The Shine That", "Finds You."].map((line, i) => (
+            <div key={line} className="overflow-hidden">
+              <motion.h1
+                initial={{ y: "110%" }}
+                animate={{ y: "0%" }}
+                transition={{ delay: 0.15 + i * 0.14, duration: 1.0, ease: EASE }}
+                className={`leading-[0.95] ${i === 1 ? "italic text-white/18" : "text-white"}`}
+                style={{
+                  fontFamily: SERIF,
+                  fontWeight: 300,
+                  fontSize: i === 1
+                    ? "clamp(2rem, 5.5vw, 4.5rem)"
+                    : "clamp(2.6rem, 7vw, 5.8rem)",
+                  letterSpacing: "-0.025em",
+                }}
+              >
+                {line}
+              </motion.h1>
+            </div>
+          ))}
+        </div>
 
+        {/* Description */}
         <motion.p
-          initial={{ opacity: 0, y: 24 }}
+          initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-          className="text-white/50 max-w-lg mb-10 leading-relaxed"
-          style={{ fontSize: "16px" }}
+          transition={{ delay: 0.5, duration: 0.7, ease: EASE }}
+          className="text-white/42 max-w-lg mb-10 leading-[1.75]"
+          style={{ fontSize: "15px" }}
         >
-          Professional doorstep cleaning in Duliajan — car wash, sofa cleaning, and water tank cleaning, all delivered with care right where you are.
+          Professional doorstep cleaning in Duliajan — car wash, sofa cleaning,
+          and water tank cleaning, all delivered with care right where you are.
         </motion.p>
 
+        {/* CTAs */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
-          className="flex flex-wrap items-center gap-4 mb-12"
+          transition={{ delay: 0.62, duration: 0.6, ease: EASE }}
+          className="flex flex-wrap items-center gap-4 mb-14"
         >
-          <motion.a
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.96 }}
+          <a
             href="/bookings"
-            className="group flex items-center gap-3 h-14 px-8 bg-white text-black rounded-full hover:bg-gray-100 transition-colors duration-300"
+            className="group flex items-center justify-between gap-4 h-13 pl-7 pr-3 bg-white text-black
+                       rounded-full hover:bg-gray-100 active:scale-[0.97] transition-all duration-300"
           >
-            <span className="tracking-wider uppercase" style={{ fontSize: "11px", fontWeight: 500 }}>
+            <span className="tracking-[0.16em] uppercase" style={{ fontSize: "10px", fontWeight: 600 }}>
               Book a Service
             </span>
-            <ArrowRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
-          </motion.a>
+            <div className="w-8 h-8 rounded-full bg-black flex items-center justify-center
+                            group-hover:scale-110 group-hover:rotate-[-6deg] transition-transform duration-400">
+              <ArrowRight size={14} className="text-white" />
+            </div>
+          </a>
 
           <a
             href="#story"
-            className="group flex items-center gap-3 h-14 px-2 text-white hover:text-white/60 transition-colors duration-300"
+            className="group flex items-center gap-3 h-13 px-2 text-white/40
+                       hover:text-white/70 transition-colors duration-300"
           >
-            <span className="tracking-wider uppercase" style={{ fontSize: "11px" }}>
-              Our Story
-            </span>
-            <div className="w-8 h-px bg-current" />
+            <span className="tracking-[0.16em] uppercase" style={{ fontSize: "10px" }}>Our Story</span>
+            <div className="w-8 h-px bg-current group-hover:w-12 transition-all duration-400" />
           </a>
         </motion.div>
 
+        {/* Stats row */}
         <motion.div
-          initial={{ opacity: 0, y: 24 }}
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
-          className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-10 pt-8 border-t border-white/10"
+          transition={{ delay: 0.75, duration: 0.7, ease: EASE }}
+          className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-10 pt-8 border-t border-white/[0.08]"
         >
           {STATS.map((stat, i) => (
-            <div key={i}>
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.82 + i * 0.08, duration: 0.6 }}
+            >
               <p
-                className="text-white mb-1"
-                style={{
-                  fontFamily: SERIF,
-                  fontSize: "clamp(26px, 4vw, 40px)",
-                  fontWeight: 300,
-                  letterSpacing: "-0.02em",
-                }}
+                className="text-white mb-1 leading-none"
+                style={{ fontFamily: SERIF, fontSize: "clamp(24px, 3.5vw, 38px)", fontWeight: 300, letterSpacing: "-0.02em" }}
               >
                 {stat.value}
               </p>
-              <p className="text-white/30 tracking-wider uppercase" style={{ fontSize: "10px" }}>
+              <p className="text-white/28 tracking-[0.2em] uppercase" style={{ fontSize: "9px" }}>
                 {stat.label}
               </p>
-            </div>
+            </motion.div>
           ))}
         </motion.div>
-      </div>
+      </motion.div>
 
-      {/* Scroll Indicator */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 hidden md:flex flex-col items-center gap-2">
-        <span className="text-white/30 tracking-widest uppercase" style={{ fontSize: "9px" }}>
-          Scroll
-        </span>
-        <div className="w-px h-12 bg-gradient-to-b from-white/30 to-transparent" />
+      {/* Scroll indicator */}
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 hidden md:flex flex-col items-center gap-2.5" aria-hidden="true">
+        <motion.div
+          animate={{ y: [0, 6, 0] }}
+          transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+          className="w-px h-14 bg-gradient-to-b from-white/30 to-transparent"
+        />
       </div>
     </section>
   )
 })
 
-// ── Story ──────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════
+// SECTION 2 — STORY
+// ══════════════════════════════════════════════════════════
 const Story = memo(function Story() {
-  const ref = useRef(null)
+  const ref    = useRef(null)
   const inView = useInView(ref, { once: true, margin: "-80px" })
 
   return (
     <section
       ref={ref}
       id="story"
-      className="w-full bg-white py-20 md:py-32 lg:py-40"
+      className="w-full bg-white py-24 md:py-36 lg:py-44"
       style={{ fontFamily: SANS }}
     >
       <div className="max-w-7xl mx-auto px-5 sm:px-8 md:px-12 lg:px-16">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-14 lg:gap-24 items-center">
 
-          {/* Image */}
+          {/* Image side */}
           <motion.div
             variants={fadeLeft}
             initial="hidden"
             animate={inView ? "visible" : "hidden"}
             className="relative"
           >
+            {/* Main image */}
             <div className="relative aspect-[4/5] rounded-2xl overflow-hidden bg-gray-100">
               <img
                 src={IMAGES.story}
-                alt="Professional car cleaning service"
+                alt="Professional car cleaning"
                 className="w-full h-full object-cover"
                 loading="lazy"
               />
+              {/* Inner vignette */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
             </div>
 
-            {/* Stat Card */}
-            <div className="absolute -bottom-6 -right-4 md:-bottom-0 md:-right-8 bg-black text-white p-5 rounded-2xl shadow-2xl max-w-[180px]">
-              <p className="mb-1.5" style={{ fontFamily: SERIF, fontSize: "36px", fontWeight: 300, lineHeight: 1 }}>
+            {/* Floating stat */}
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              animate={inView ? { opacity: 1, y: 0, scale: 1 } : {}}
+              transition={{ delay: 0.5, duration: 0.7, ease: EASE }}
+              className="absolute -bottom-6 -right-4 md:-right-8 bg-black text-white p-6 rounded-2xl shadow-2xl max-w-[190px]"
+            >
+              <p className="leading-none mb-2" style={{ fontFamily: SERIF, fontSize: "44px", fontWeight: 300 }}>
                 3+
               </p>
-              <p className="text-white/50 leading-snug" style={{ fontSize: "12px" }}>
+              <p className="text-white/45 leading-snug" style={{ fontSize: "12px" }}>
                 Years serving Duliajan with quality cleaning
               </p>
-            </div>
+            </motion.div>
 
-            {/* Decorative Element */}
-            <div
-              className="absolute -top-4 -left-4 w-20 h-20 border border-black/10 rounded-2xl -z-10"
-              aria-hidden="true"
-            />
+            {/* Decorative border square */}
+            <div className="absolute -top-5 -left-5 w-24 h-24 border border-black/8 rounded-2xl -z-10" aria-hidden="true" />
           </motion.div>
 
-          {/* Content */}
+          {/* Text side */}
           <motion.div
             variants={fadeRight}
             initial="hidden"
@@ -336,43 +378,65 @@ const Story = memo(function Story() {
           >
             <Eyebrow>Our Story</Eyebrow>
 
-            <SectionHeading className="mb-8">
-              Built on a Simple
-              <br />
-              <span className="text-gray-300">Idea</span>
+            <SectionHeading className="mb-9">
+              Built on a Simple<br />
+              <span className="text-black/18 italic">Idea</span>
             </SectionHeading>
 
             <div className="space-y-5 mb-10">
-              <p className="text-gray-500 leading-relaxed" style={{ fontSize: "15px" }}>
-                <span className="text-black font-medium">Your time is valuable.</span> That's the belief that started Wash2Door. We saw people spending hours at car washes in Duliajan — waiting in queues, dealing with inconsistent results, juggling busy schedules.
-              </p>
-              <p className="text-gray-500 leading-relaxed" style={{ fontSize: "15px" }}>
-                We thought — what if we brought the car wash to you? What if cleaning your car, sofa, or water tank was as simple as booking a slot on your phone?
-              </p>
-              <p className="text-gray-500 leading-relaxed" style={{ fontSize: "15px" }}>
-                Today, we serve 100+ happy customers across Duliajan. Our trained professionals use eco-friendly products and modern cleaning techniques to leave your home and vehicle spotless, germ-free, and shining like new.
-              </p>
+              {[
+                <><span className="text-black font-medium">Your time is valuable.</span> That's the belief that started Wash2Door. We saw people spending hours at car washes in Duliajan — waiting in queues, dealing with inconsistent results, juggling busy schedules.</>,
+                <>We thought — what if we brought the car wash to you? What if cleaning your car, sofa, or water tank was as simple as booking a slot on your phone?</>,
+                <>Today, we serve 100+ happy customers across Duliajan. Our trained professionals use eco-friendly products and modern techniques to leave your home and vehicle spotless.</>
+              ].map((para, i) => (
+                <motion.p
+                  key={i}
+                  custom={i}
+                  variants={fadeUp}
+                  initial="hidden"
+                  animate={inView ? "visible" : "hidden"}
+                  className="text-black/45 leading-[1.8]"
+                  style={{ fontSize: "15px" }}
+                >
+                  {para}
+                </motion.p>
+              ))}
             </div>
 
-            <blockquote className="relative pl-6 py-4 border-l-2 border-black mb-10">
-              <p className="text-black italic" style={{ fontFamily: SERIF, fontSize: "19px", lineHeight: 1.5 }}>
+            {/* Pull quote */}
+            <motion.blockquote
+              variants={fadeUp}
+              initial="hidden"
+              animate={inView ? "visible" : "hidden"}
+              className="relative pl-6 py-4 border-l-2 border-black mb-11"
+            >
+              <p className="text-black italic leading-snug" style={{ fontFamily: SERIF, fontSize: "20px" }}>
                 "You book. We clean. You enjoy."
               </p>
-              <cite className="text-gray-400 not-italic mt-2 block" style={{ fontSize: "12px" }}>
+              <cite className="text-black/30 not-italic mt-2 block" style={{ fontSize: "11px", letterSpacing: "0.1em" }}>
                 — The Wash2Door Promise
               </cite>
-            </blockquote>
+            </motion.blockquote>
 
-            <a
+            <motion.a
+              variants={fadeUp}
+              initial="hidden"
+              animate={inView ? "visible" : "hidden"}
               href="/services"
               className="group inline-flex items-center gap-3 text-black no-underline"
             >
-              <span className="tracking-wider uppercase border-b border-black pb-1 group-hover:border-gray-400 transition-colors duration-300"
-                style={{ fontSize: "11px", fontWeight: 500 }}>
+              <span
+                className="tracking-[0.16em] uppercase border-b border-black/30 pb-0.5
+                           group-hover:border-black transition-colors duration-300"
+                style={{ fontSize: "10px", fontWeight: 500 }}
+              >
                 Explore Our Services
               </span>
-              <ArrowUpRight size={14} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-            </a>
+              <ArrowUpRight
+                size={13}
+                className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform duration-300"
+              />
+            </motion.a>
           </motion.div>
         </div>
       </div>
@@ -380,15 +444,17 @@ const Story = memo(function Story() {
   )
 })
 
-// ── Features ───────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════
+// SECTION 3 — FEATURES
+// ══════════════════════════════════════════════════════════
 const Features = memo(function Features() {
-  const headerRef = useRef(null)
-  const gridRef = useRef(null)
-  const headerInView = useInView(headerRef, { once: true, margin: "-60px" })
-  const gridInView = useInView(gridRef, { once: true, margin: "-60px" })
+  const headerRef  = useRef(null)
+  const gridRef    = useRef(null)
+  const headerView = useInView(headerRef, { once: true, margin: "-60px" })
+  const gridView   = useInView(gridRef,   { once: true, margin: "-60px" })
 
   return (
-    <section className="w-full bg-gray-50 py-20 md:py-28 lg:py-32" style={{ fontFamily: SANS }}>
+    <section className="w-full bg-[#f7f7f5] py-24 md:py-32" style={{ fontFamily: SANS }}>
       <div className="max-w-7xl mx-auto px-5 sm:px-8 md:px-12 lg:px-16">
 
         {/* Header */}
@@ -396,24 +462,20 @@ const Features = memo(function Features() {
           ref={headerRef}
           variants={fadeUp}
           initial="hidden"
-          animate={headerInView ? "visible" : "hidden"}
-          className="text-center mb-14 md:mb-20"
+          animate={headerView ? "visible" : "hidden"}
+          className="mb-16 md:mb-20 max-w-2xl"
         >
-          <div className="flex items-center justify-center gap-3 mb-6">
-            <span className="w-10 h-px bg-black" />
-            <span className="tracking-[0.4em] uppercase text-gray-400" style={{ fontSize: "10px" }}>
+          <div className="flex items-center gap-4 mb-7">
+            <span className="w-10 h-px bg-black/25" />
+            <span className="tracking-[0.38em] uppercase text-black/30" style={{ fontSize: "9px" }}>
               Why Us
             </span>
-            <span className="w-10 h-px bg-black" />
           </div>
-          <SectionHeading className="mb-5">What Makes Us Different</SectionHeading>
-          <p className="text-gray-400 max-w-lg mx-auto leading-relaxed" style={{ fontSize: "15px" }}>
-            We're not just another cleaning service. Here's why customers in Duliajan choose Wash2Door.
-          </p>
+          <SectionHeading>What Makes Us<br /><span className="text-black/18 italic">Different</span></SectionHeading>
         </motion.div>
 
         {/* Grid */}
-        <div ref={gridRef} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div ref={gridRef} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {FEATURES.map((feature, i) => {
             const Icon = feature.icon
             return (
@@ -422,27 +484,32 @@ const Features = memo(function Features() {
                 custom={i}
                 variants={fadeUp}
                 initial="hidden"
-                animate={gridInView ? "visible" : "hidden"}
-                className="group relative bg-white p-7 rounded-2xl border border-transparent hover:border-black transition-all duration-500"
+                animate={gridView ? "visible" : "hidden"}
+                className="group relative bg-white rounded-2xl p-7 border border-transparent
+                           hover:border-black/10 hover:shadow-xl hover:shadow-black/[0.04]
+                           transition-all duration-500 overflow-hidden cursor-default"
               >
-                {/* Background Number */}
+                {/* Ghost number */}
                 <span
-                  className="absolute top-5 right-5 text-gray-100 group-hover:text-gray-200 transition-colors duration-500 select-none"
-                  style={{ fontFamily: SERIF, fontSize: "44px", fontWeight: 300, lineHeight: 1 }}
+                  className="absolute -bottom-3 -right-1 text-black/[0.04] select-none
+                             group-hover:text-black/[0.07] transition-colors duration-500"
+                  style={{ fontFamily: SERIF, fontSize: "88px", fontWeight: 300, lineHeight: 1 }}
                   aria-hidden="true"
                 >
                   {String(i + 1).padStart(2, "0")}
                 </span>
 
                 {/* Icon */}
-                <div className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center mb-5 group-hover:bg-black transition-colors duration-500">
-                  <Icon size={20} strokeWidth={1.3} className="text-gray-400 group-hover:text-white transition-colors duration-500" />
+                <div className="w-11 h-11 rounded-xl bg-black/[0.03] flex items-center justify-center mb-6
+                               group-hover:bg-black transition-colors duration-500">
+                  <Icon size={18} strokeWidth={1.3}
+                    className="text-black/40 group-hover:text-white transition-colors duration-500" />
                 </div>
 
                 <h3 className="text-black mb-2.5" style={{ fontFamily: SERIF, fontWeight: 400, fontSize: "17px" }}>
                   {feature.title}
                 </h3>
-                <p className="text-gray-400 leading-relaxed" style={{ fontSize: "13px" }}>
+                <p className="text-black/40 leading-[1.7]" style={{ fontSize: "13px" }}>
                   {feature.desc}
                 </p>
               </motion.div>
@@ -454,70 +521,86 @@ const Features = memo(function Features() {
   )
 })
 
-// ── Process ────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════
+// SECTION 4 — PROCESS
+// ══════════════════════════════════════════════════════════
 const Process = memo(function Process() {
-  const headerRef = useRef(null)
-  const stepsRef = useRef(null)
-  const headerInView = useInView(headerRef, { once: true, margin: "-60px" })
-  const stepsInView = useInView(stepsRef, { once: true, margin: "-60px" })
+  const headerRef  = useRef(null)
+  const stepsRef   = useRef(null)
+  const headerView = useInView(headerRef, { once: true, margin: "-60px" })
+  const stepsView  = useInView(stepsRef,  { once: true, margin: "-60px" })
 
   return (
-    <section className="w-full bg-black py-20 md:py-28 lg:py-32 relative overflow-hidden" style={{ fontFamily: SANS }}>
+    <section
+      className="w-full bg-black py-24 md:py-32 relative overflow-hidden"
+      style={{ fontFamily: SANS }}
+    >
       <GridTexture />
+      <Grain />
 
       <div className="max-w-7xl mx-auto px-5 sm:px-8 md:px-12 lg:px-16 relative z-10">
 
-        {/* Header */}
+        {/* Header — left aligned, editorial */}
         <motion.div
           ref={headerRef}
           variants={fadeUp}
           initial="hidden"
-          animate={headerInView ? "visible" : "hidden"}
-          className="text-center mb-14 md:mb-20"
+          animate={headerView ? "visible" : "hidden"}
+          className="mb-16 md:mb-20 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-8"
         >
-          <div className="flex items-center justify-center gap-3 mb-6">
-            <span className="w-10 h-px bg-white/30" />
-            <span className="tracking-[0.4em] uppercase text-white/50" style={{ fontSize: "10px" }}>
-              How It Works
-            </span>
-            <span className="w-10 h-px bg-white/30" />
+          <div>
+            <div className="flex items-center gap-4 mb-7">
+              <span className="w-10 h-px bg-white/25" />
+              <span className="tracking-[0.38em] uppercase text-white/40" style={{ fontSize: "9px" }}>
+                How It Works
+              </span>
+            </div>
+            <SectionHeading light>
+              Simple as<br /><span className="italic text-white/18">1 — 2 — 3 — 4</span>
+            </SectionHeading>
           </div>
-          <SectionHeading light>
-            Simple as <span className="italic text-white/40">1-2-3-4</span>
-          </SectionHeading>
+
+          <p className="text-white/30 leading-[1.75] max-w-xs lg:pb-1" style={{ fontSize: "14px" }}>
+            From booking to clean car — our process is designed around your convenience.
+          </p>
         </motion.div>
 
         {/* Steps */}
-        <div ref={stepsRef} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+        <div ref={stepsRef} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-14">
           {PROCESS_STEPS.map((step, i) => (
             <motion.div
               key={i}
               custom={i}
               variants={fadeUp}
               initial="hidden"
-              animate={stepsInView ? "visible" : "hidden"}
-              className="relative group"
+              animate={stepsView ? "visible" : "hidden"}
+              className="group relative"
             >
-              {/* Connector Line */}
+              {/* Connector — desktop only */}
               {i < PROCESS_STEPS.length - 1 && (
                 <div
-                  className="hidden lg:block absolute top-9 left-[calc(100%+12px)] right-[-12px] h-px bg-white/10 z-10"
+                  className="hidden lg:block absolute top-8 left-[calc(100%+6px)] right-[-6px] h-px bg-white/[0.07] z-10"
                   aria-hidden="true"
                 />
               )}
 
-              <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-6 hover:bg-white/[0.07] hover:border-white/25 transition-all duration-500">
+              <div
+                className="h-full bg-white/[0.025] border border-white/[0.07] rounded-2xl p-7
+                           hover:bg-white/[0.055] hover:border-white/20
+                           transition-all duration-500"
+              >
+                {/* Big ghost number */}
                 <span
-                  className="text-white/10 block mb-4 group-hover:text-white/20 transition-colors duration-500"
-                  style={{ fontFamily: SERIF, fontSize: "52px", fontWeight: 300, lineHeight: 1 }}
+                  className="text-white/[0.07] block mb-5 group-hover:text-white/[0.12] transition-colors duration-500"
+                  style={{ fontFamily: SERIF, fontSize: "56px", fontWeight: 300, lineHeight: 1 }}
                   aria-hidden="true"
                 >
                   {step.number}
                 </span>
-                <h3 className="text-white mb-2" style={{ fontFamily: SERIF, fontWeight: 400, fontSize: "17px" }}>
+                <h3 className="text-white mb-2" style={{ fontFamily: SERIF, fontWeight: 400, fontSize: "18px" }}>
                   {step.title}
                 </h3>
-                <p className="text-white/40 leading-relaxed" style={{ fontSize: "13px" }}>
+                <p className="text-white/35 leading-[1.7]" style={{ fontSize: "13px" }}>
                   {step.desc}
                 </p>
               </div>
@@ -526,93 +609,103 @@ const Process = memo(function Process() {
         </div>
 
         {/* CTA */}
-        <div className="text-center mt-12 md:mt-16">
-          <motion.a
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.96 }}
+        <motion.div
+          variants={fadeUp}
+          initial="hidden"
+          animate={stepsView ? "visible" : "hidden"}
+          className="flex justify-center"
+        >
+          <a
             href="/bookings"
-            className="group inline-flex items-center gap-3 h-14 px-8 bg-white text-black rounded-full hover:bg-gray-100 transition-colors duration-300"
+            className="group flex items-center justify-between gap-4 h-13 pl-7 pr-3 bg-white text-black
+                       rounded-full hover:bg-gray-100 active:scale-[0.97] transition-all duration-300"
           >
-            <span className="tracking-wider uppercase" style={{ fontSize: "11px", fontWeight: 500 }}>
+            <span className="tracking-[0.16em] uppercase" style={{ fontSize: "10px", fontWeight: 600 }}>
               Start Booking
             </span>
-            <ArrowRight size={15} className="group-hover:translate-x-0.5 transition-transform" />
-          </motion.a>
-        </div>
+            <div className="w-8 h-8 rounded-full bg-black flex items-center justify-center
+                            group-hover:scale-110 group-hover:rotate-[-6deg] transition-transform duration-400">
+              <ArrowRight size={14} className="text-white" />
+            </div>
+          </a>
+        </motion.div>
       </div>
     </section>
   )
 })
 
-// ── Services Preview ───────────────────────────────────────
+// ══════════════════════════════════════════════════════════
+// SECTION 5 — SERVICES PREVIEW
+// ══════════════════════════════════════════════════════════
 const ServicesPreview = memo(function ServicesPreview() {
-  const leftRef = useRef(null)
-  const rightRef = useRef(null)
-  const leftInView = useInView(leftRef, { once: true, margin: "-60px" })
-  const rightInView = useInView(rightRef, { once: true, margin: "-60px" })
-
-  const avatarCount = useMemo(() => Array(3).fill(null), [])
-  const starCount = useMemo(() => Array(5).fill(null), [])
+  const leftRef   = useRef(null)
+  const rightRef  = useRef(null)
+  const leftView  = useInView(leftRef,  { once: true, margin: "-60px" })
+  const rightView = useInView(rightRef, { once: true, margin: "-60px" })
 
   return (
-    <section className="w-full bg-white py-20 md:py-28 lg:py-32" style={{ fontFamily: SANS }}>
+    <section className="w-full bg-white py-24 md:py-36 lg:py-44" style={{ fontFamily: SANS }}>
       <div className="max-w-7xl mx-auto px-5 sm:px-8 md:px-12 lg:px-16">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-14 lg:gap-24 items-center">
 
-          {/* Content */}
+          {/* Text */}
           <motion.div
             ref={leftRef}
             variants={fadeLeft}
             initial="hidden"
-            animate={leftInView ? "visible" : "hidden"}
+            animate={leftView ? "visible" : "hidden"}
           >
             <Eyebrow>Our Services</Eyebrow>
-
-            <SectionHeading className="mb-6">
-              What We
-              <br />
-              <span className="text-gray-300">Clean</span>
+            <SectionHeading className="mb-7">
+              What We<br /><span className="text-black/18 italic">Clean</span>
             </SectionHeading>
 
-            <p className="text-gray-500 leading-relaxed mb-10 max-w-md" style={{ fontSize: "15px" }}>
-              Cars, sofas, water tanks — we cover it all at your doorstep. Fast, safe, and hassle-free cleaning for your home and vehicle across Duliajan.
+            <p className="text-black/42 leading-[1.8] mb-10 max-w-md" style={{ fontSize: "15px" }}>
+              Cars, sofas, water tanks — we cover it all at your doorstep.
+              Fast, safe, and hassle-free cleaning across Duliajan.
             </p>
 
-            {/* Services List */}
-            <div className="mb-10 border-t border-gray-100">
+            {/* Services list */}
+            <div className="mb-11 border-t border-black/[0.07]">
               {SERVICES_LIST.map((service, i) => (
                 <motion.div
                   key={i}
                   custom={i}
                   variants={fadeUp}
                   initial="hidden"
-                  animate={leftInView ? "visible" : "hidden"}
-                  className="flex items-center justify-between py-4 border-b border-gray-100 group hover:pl-2 transition-all duration-300"
+                  animate={leftView ? "visible" : "hidden"}
+                  className="group flex items-center justify-between py-4 border-b border-black/[0.07]
+                             hover:pl-2 transition-all duration-300"
                 >
                   <div className="flex items-center gap-3">
-                    <Check size={13} className="text-gray-300 shrink-0" />
-                    <span className="text-black group-hover:text-gray-500 transition-colors duration-300" style={{ fontSize: "14px" }}>
+                    <Check size={12} className="text-black/20 shrink-0" strokeWidth={2} />
+                    <span
+                      className="text-black group-hover:text-black/50 transition-colors duration-300"
+                      style={{ fontSize: "14px" }}
+                    >
                       {service.name}
                     </span>
                   </div>
-                  <span className="text-gray-400 tabular-nums" style={{ fontFamily: SERIF, fontSize: "14px" }}>
+                  <span className="text-black/35 tabular-nums" style={{ fontFamily: SERIF, fontSize: "14px" }}>
                     {service.price}
                   </span>
                 </motion.div>
               ))}
             </div>
 
-            <motion.a
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.96 }}
+            <a
               href="/services"
-              className="inline-flex items-center gap-3 h-12 px-7 bg-black text-white rounded-full hover:bg-gray-800 transition-colors duration-300 group"
+              className="group inline-flex items-center gap-4 h-12 pl-7 pr-3 bg-black text-white
+                         rounded-full hover:bg-black/80 active:scale-[0.97] transition-all duration-300"
             >
-              <span className="tracking-wider uppercase" style={{ fontSize: "11px", fontWeight: 500 }}>
+              <span className="tracking-[0.16em] uppercase" style={{ fontSize: "10px", fontWeight: 600 }}>
                 View All Services
               </span>
-              <ArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
-            </motion.a>
+              <div className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center
+                              group-hover:bg-white/20 transition-colors duration-300">
+                <ArrowRight size={13} className="text-white" />
+              </div>
+            </a>
           </motion.div>
 
           {/* Image */}
@@ -620,42 +713,46 @@ const ServicesPreview = memo(function ServicesPreview() {
             ref={rightRef}
             variants={fadeRight}
             initial="hidden"
-            animate={rightInView ? "visible" : "hidden"}
+            animate={rightView ? "visible" : "hidden"}
             className="relative"
           >
             <div className="relative aspect-square rounded-2xl overflow-hidden bg-gray-100">
               <img
                 src={IMAGES.services}
-                alt="Professional car detailing service"
+                alt="Professional car detailing"
                 className="w-full h-full object-cover"
                 loading="lazy"
               />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/15 to-transparent" />
 
-              {/* Social Proof Card */}
-              <div className="absolute bottom-5 left-5 right-5 bg-white/95 backdrop-blur-sm p-4 rounded-xl shadow-lg">
-                <div className="flex items-center gap-3 mb-1.5">
+              {/* Social proof */}
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={rightView ? { opacity: 1, y: 0 } : {}}
+                transition={{ delay: 0.5, duration: 0.7, ease: EASE }}
+                className="absolute bottom-5 left-5 right-5 bg-white/95 backdrop-blur-md
+                           p-5 rounded-xl shadow-2xl"
+              >
+                <div className="flex items-center justify-between mb-2">
                   <div className="flex -space-x-2">
-                    {avatarCount.map((_, i) => (
+                    {[...Array(3)].map((_, i) => (
                       <div key={i} className="w-8 h-8 rounded-full bg-gray-200 border-2 border-white" />
                     ))}
                   </div>
                   <div className="flex items-center gap-0.5">
-                    {starCount.map((_, i) => (
-                      <Star key={i} size={11} fill="#000" strokeWidth={0} />
+                    {[...Array(5)].map((_, i) => (
+                      <Star key={i} size={10} fill="black" strokeWidth={0} />
                     ))}
                   </div>
                 </div>
-                <p className="text-gray-500" style={{ fontSize: "12px" }}>
+                <p className="text-black/45 leading-snug" style={{ fontSize: "12px" }}>
                   <span className="text-black font-medium">100+ customers</span> trust us in Duliajan
                 </p>
-              </div>
+              </motion.div>
             </div>
 
-            {/* Decorative Element */}
-            <div
-              className="absolute -bottom-4 -right-4 w-28 h-28 border border-black/10 rounded-2xl -z-10"
-              aria-hidden="true"
-            />
+            {/* Decorative square */}
+            <div className="absolute -bottom-5 -right-5 w-28 h-28 border border-black/8 rounded-2xl -z-10" aria-hidden="true" />
           </motion.div>
         </div>
       </div>
@@ -663,40 +760,68 @@ const ServicesPreview = memo(function ServicesPreview() {
   )
 })
 
-// ── Contact Strip ──────────────────────────────────────────
-const ContactStrip = memo(function ContactStrip() {
-  const ref = useRef(null)
+// ══════════════════════════════════════════════════════════
+// SECTION 6 — CONTACT
+// ══════════════════════════════════════════════════════════
+const Contact = memo(function Contact() {
+  const ref    = useRef(null)
   const inView = useInView(ref, { once: true, margin: "-60px" })
 
   const items = [
-    { Icon: Phone, label: "Call Us", value: BUSINESS.phone, href: `tel:${BUSINESS.phone}` },
-    { Icon: Mail, label: "Email", value: BUSINESS.email, href: `mailto:${BUSINESS.email}` },
-    { Icon: MapPin, label: "Location", value: BUSINESS.address, href: null },
-    { Icon: Clock, label: "Hours", value: BUSINESS.hours, href: null },
+    { Icon: Phone,  label: "Call Us",   value: BUSINESS.phone,   href: `tel:${BUSINESS.phone}` },
+    { Icon: Mail,   label: "Email",     value: BUSINESS.email,   href: `mailto:${BUSINESS.email}` },
+    { Icon: MapPin, label: "Location",  value: BUSINESS.address, href: null },
+    { Icon: Clock,  label: "Hours",     value: BUSINESS.hours,   href: null },
   ]
 
   return (
     <section
       ref={ref}
-      className="w-full bg-gray-50 py-16 md:py-20"
+      className="w-full bg-[#f7f7f5] py-24 md:py-28"
       style={{ fontFamily: SANS }}
     >
       <div className="max-w-7xl mx-auto px-5 sm:px-8 md:px-12 lg:px-16">
+
+        {/* Header */}
         <motion.div
           variants={fadeUp}
           initial="hidden"
           animate={inView ? "visible" : "hidden"}
-          className="text-center mb-10"
+          className="mb-14 md:flex md:items-end md:justify-between"
         >
-          <Eyebrow>Get In Touch</Eyebrow>
-          <SectionHeading>
-            We're Just a
-            <br />
-            <span className="text-gray-300">Call Away</span>
-          </SectionHeading>
+          <div>
+            <div className="flex items-center gap-4 mb-7">
+              <span className="w-10 h-px bg-black/25" />
+              <span className="tracking-[0.38em] uppercase text-black/30" style={{ fontSize: "9px" }}>
+                Get In Touch
+              </span>
+            </div>
+            <SectionHeading>
+              We're Just a<br /><span className="text-black/18 italic">Call Away</span>
+            </SectionHeading>
+          </div>
+
+          <motion.a
+            variants={fadeUp}
+            initial="hidden"
+            animate={inView ? "visible" : "hidden"}
+            href={`tel:${BUSINESS.phone}`}
+            className="group hidden md:inline-flex items-center gap-4 h-13 pl-7 pr-3
+                       bg-black text-white rounded-full hover:bg-black/80
+                       active:scale-[0.97] transition-all duration-300 self-end"
+          >
+            <span className="tracking-[0.16em] uppercase" style={{ fontSize: "10px", fontWeight: 600 }}>
+              Call Now
+            </span>
+            <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center
+                            group-hover:bg-white/20 transition-colors duration-300">
+              <Phone size={13} className="text-white" strokeWidth={1.5} />
+            </div>
+          </motion.a>
         </motion.div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {items.map(({ Icon, label, value, href }, i) => (
             <motion.div
               key={i}
@@ -704,18 +829,23 @@ const ContactStrip = memo(function ContactStrip() {
               variants={fadeUp}
               initial="hidden"
               animate={inView ? "visible" : "hidden"}
-              className="bg-white rounded-2xl p-6 border border-gray-100"
+              className="group bg-white rounded-2xl p-7 border border-transparent
+                         hover:border-black/10 hover:shadow-xl hover:shadow-black/[0.04]
+                         transition-all duration-500"
             >
-              <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center mb-4">
-                <Icon size={17} strokeWidth={1.4} className="text-gray-400" />
+              <div className="w-11 h-11 rounded-xl bg-black/[0.03] flex items-center justify-center mb-6
+                             group-hover:bg-black transition-colors duration-500">
+                <Icon size={17} strokeWidth={1.4}
+                  className="text-black/40 group-hover:text-white transition-colors duration-500" />
               </div>
-              <p className="text-gray-400 tracking-wider uppercase mb-1.5" style={{ fontSize: "10px" }}>
+
+              <p className="text-black/28 tracking-[0.2em] uppercase mb-2" style={{ fontSize: "9px" }}>
                 {label}
               </p>
               {href ? (
                 <a
                   href={href}
-                  className="text-black hover:text-gray-500 transition-colors duration-200 leading-snug block"
+                  className="text-black hover:text-black/50 transition-colors duration-200 leading-snug block"
                   style={{ fontSize: "13px" }}
                 >
                   {value}
@@ -728,12 +858,49 @@ const ContactStrip = memo(function ContactStrip() {
             </motion.div>
           ))}
         </div>
+
+        {/* Nexxupp credit — inside section */}
+        <motion.p
+          variants={fadeUp}
+          initial="hidden"
+          animate={inView ? "visible" : "hidden"}
+          className="text-center text-black/25 mt-14 tracking-[0.15em] uppercase"
+          style={{ fontSize: "10px", fontFamily: SANS }}
+        >
+          Designed &amp; Developed by{" "}
+          <span className="text-black/55 font-medium">Nexxupp</span>
+        </motion.p>
       </div>
     </section>
   )
 })
 
-// ── Main Page ──────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════
+// FOOTER STRIP
+// ══════════════════════════════════════════════════════════
+const FooterStrip = memo(function FooterStrip() {
+  return (
+    <footer
+      className="w-full bg-black py-6 border-t border-white/[0.06]"
+      style={{ fontFamily: SANS }}
+    >
+      <div className="max-w-7xl mx-auto px-5 sm:px-8 md:px-12 lg:px-16
+                      flex flex-col sm:flex-row items-center justify-between gap-4">
+        <p className="text-white/20 tracking-[0.15em] uppercase" style={{ fontSize: "9px" }}>
+          © {new Date().getFullYear()} Wash2Door · Duliajan, Assam
+        </p>
+        <p className="text-white/20 tracking-[0.15em] uppercase" style={{ fontSize: "9px" }}>
+          Designed &amp; Developed by{" "}
+          <span className="text-white/45 font-medium">Nexxupp</span>
+        </p>
+      </div>
+    </footer>
+  )
+})
+
+// ══════════════════════════════════════════════════════════
+// PAGE
+// ══════════════════════════════════════════════════════════
 export default function AboutPage() {
   return (
     <main>
@@ -742,7 +909,8 @@ export default function AboutPage() {
       <Features />
       <Process />
       <ServicesPreview />
-      <ContactStrip />
+      <Contact />
+      <FooterStrip />
     </main>
   )
 }
