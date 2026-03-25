@@ -36,6 +36,7 @@ export default function WelcomePopup({ user, onClose }) {
 
     const guide = SECURITY_GUIDES[currentGuide];
     const GuideIcon = guide.icon;
+    const isLastGuide = currentGuide === SECURITY_GUIDES.length - 1;
 
     const handleClose = () => {
         if (dontShowAgain) {
@@ -137,24 +138,32 @@ export default function WelcomePopup({ user, onClose }) {
                         ))}
                     </div>
 
-                    {/* Don't Show Again */}
-                    <button
-                        onClick={() => setDontShowAgain(!dontShowAgain)}
-                        className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/[0.03] transition-all group w-fit"
-                    >
-                        <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${
-                            dontShowAgain 
-                                ? 'bg-white/20 border-white/40' 
-                                : 'border-white/20 group-hover:border-white/30'
-                        }`}>
-                            {dontShowAgain && (
-                                <CheckCircle2 className="w-3 h-3 text-white" strokeWidth={3} />
-                            )}
-                        </div>
-                        <span className="text-xs text-gray-400 group-hover:text-gray-300 transition-colors">
-                            Don't show again
-                        </span>
-                    </button>
+                    {/* Don't Show Again - Only on last tab */}
+                    {isLastGuide && (
+                        <button
+                            onClick={() => setDontShowAgain(!dontShowAgain)}
+                            className={`flex items-center justify-center gap-3 w-full px-4 py-4 rounded-xl border transition-all ${
+                                dontShowAgain 
+                                    ? 'bg-white/[0.08] border-white/20' 
+                                    : 'bg-white/[0.02] border-white/[0.08] hover:bg-white/[0.05] hover:border-white/[0.12]'
+                            }`}
+                        >
+                            <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${
+                                dontShowAgain 
+                                    ? 'bg-white border-white' 
+                                    : 'border-white/30'
+                            }`}>
+                                {dontShowAgain && (
+                                    <CheckCircle2 className="w-4 h-4 text-black" strokeWidth={3} />
+                                )}
+                            </div>
+                            <span className={`text-sm font-medium transition-colors ${
+                                dontShowAgain ? 'text-white' : 'text-gray-300'
+                            }`}>
+                                Don't show this welcome guide again
+                            </span>
+                        </button>
+                    )}
 
                     {/* Navigation */}
                     <div className="flex gap-2">
