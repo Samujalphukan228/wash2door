@@ -12,6 +12,7 @@ import {
   Instagram,
   Facebook,
   ChevronUp,
+  ArrowUpRight,
 } from "lucide-react"
 
 // ─── Constants ───────────────────────────────────────────────
@@ -74,6 +75,9 @@ const SOCIALS = [
 const WHATSAPP_URL =
   "https://wa.me/916900706456?text=Hi%2C%20I%20want%20to%20book%20a%20service"
 
+const NEXXUPP_URL = "https://nexxupp.com"
+const NEXXUPP_CONTACT_URL = "https://nexxupp.com/contact"
+
 // ─── Styles ──────────────────────────────────────────────────
 const SERIF = 'Georgia, "Times New Roman", serif'
 const EASE = [0.22, 1, 0.36, 1]
@@ -103,6 +107,30 @@ const STYLES = {
   },
   footerRoot: {
     fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
+  },
+  nexxuppLabel: {
+    fontSize: "9px",
+    letterSpacing: "0.3em",
+  },
+  nexxuppHeading: {
+    fontFamily: SERIF,
+    fontWeight: 400,
+    fontSize: "18px",
+    letterSpacing: "0.05em",
+  },
+  nexxuppHeadingLg: {
+    fontFamily: SERIF,
+    fontWeight: 400,
+    fontSize: "22px",
+    letterSpacing: "0.05em",
+  },
+  nexxuppBody: {
+    fontSize: "12px",
+    lineHeight: "1.7",
+  },
+  nexxuppCta: {
+    fontSize: "11px",
+    letterSpacing: "0.15em",
   },
 }
 
@@ -338,18 +366,80 @@ function BottomBar({ showAllRights = false }) {
           © {CURRENT_YEAR} Wash2Door
           {showAllRights ? ". All rights reserved." : ""}
         </p>
-        <a
-          href="https://nexxupp.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-white/20 hover:text-white/40 transition-colors no-underline"
-          style={showAllRights ? STYLES.madeBySm : STYLES.madeBy}
-        >
-          Made by Nexxupp
-        </a>
       </div>
       <ScrollToTop />
     </div>
+  )
+}
+
+// ─── Nexxupp Banner ──────────────────────────────────────────
+/**
+ * A subtle "built by" strip that sits above the bottom bar.
+ * Mobile: stacked layout, full-width CTA button.
+ * Desktop: side-by-side with right-aligned CTA.
+ */
+function NexxuppBanner({ mobile = false }) {
+  return (
+    <motion.div
+      variants={fadeUp}
+      className={`border border-white/[0.08] rounded-2xl p-6
+        ${mobile ? "space-y-4" : "flex items-center justify-between gap-8"}`}
+      style={{ background: "rgba(255,255,255,0.03)" }}
+    >
+      {/* Left — text */}
+      <div className={mobile ? "" : "flex-1"}>
+        <p
+          className="text-white/25 uppercase mb-2"
+          style={STYLES.nexxuppLabel}
+        >
+          Designed & Developed by
+        </p>
+        <p
+          className="text-white/80"
+          style={mobile ? STYLES.nexxuppHeading : STYLES.nexxuppHeadingLg}
+        >
+          Nexxupp
+        </p>
+        <p
+          className="text-white/35 mt-2 max-w-sm"
+          style={STYLES.nexxuppBody}
+        >
+          This site was fully designed and developed by Nexxupp. Want a
+          website, app, or digital product built for your business?
+        </p>
+      </div>
+
+      {/* Right — CTA */}
+      <div className={mobile ? "flex gap-3" : "flex flex-col gap-2.5 items-end shrink-0"}>
+        <motion.a
+          whileTap={{ scale: 0.97 }}
+          href={NEXXUPP_CONTACT_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`inline-flex items-center gap-2 h-11 px-6 bg-white
+            text-black rounded-full no-underline hover:bg-white/90
+            transition-colors duration-300 font-medium
+            ${mobile ? "flex-1 justify-center" : ""}`}
+          style={STYLES.nexxuppCta}
+        >
+          Get in touch
+          <ArrowUpRight size={13} strokeWidth={2} />
+        </motion.a>
+
+        <a
+          href={NEXXUPP_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`inline-flex items-center gap-2 h-11 px-6 border border-white/20
+            text-white/50 rounded-full no-underline hover:border-white/40 hover:text-white/70
+            transition-colors duration-300
+            ${mobile ? "flex-1 justify-center" : ""}`}
+          style={STYLES.nexxuppCta}
+        >
+          Visit Nexxupp
+        </a>
+      </div>
+    </motion.div>
   )
 }
 
@@ -429,6 +519,9 @@ function MobileFooter() {
         <SocialRow full />
       </motion.div>
 
+      {/* Nexxupp Banner */}
+      <NexxuppBanner mobile />
+
       {/* Bottom */}
       <motion.div variants={fadeUp}>
         <BottomBar />
@@ -482,6 +575,11 @@ function DesktopFooter() {
         </motion.div>
       </div>
 
+      {/* Nexxupp Banner */}
+      <div className="mb-8">
+        <NexxuppBanner />
+      </div>
+
       {/* Divider */}
       <motion.div
         variants={lineReveal}
@@ -494,15 +592,6 @@ function DesktopFooter() {
         <p className="text-white/35" style={STYLES.copyright}>
           © {CURRENT_YEAR} Wash2Door. All rights reserved.
         </p>
-        <a
-          href="https://nexxupp.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-white/20 hover:text-white/40 transition-colors no-underline"
-          style={STYLES.madeBySm}
-        >
-          Made by Nexxupp
-        </a>
         <ScrollToTop />
       </div>
     </motion.div>
