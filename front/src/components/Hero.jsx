@@ -190,7 +190,7 @@ export default function Hero() {
                 letterSpacing: '-0.03em',
               }}
             >
-              The Shine
+              The Shines
             </motion.h1>
 
             <motion.h1
