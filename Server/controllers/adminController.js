@@ -76,8 +76,8 @@ export const getDashboardStats = async (req, res) => {
         const revenueThisMonth = await Booking.aggregate([
             {
                 $match: {
-                    status: 'completed',
-                    completedAt: { $gte: thisMonthStart }
+                    status: { $in: ['pending', 'confirmed', 'in-progress', 'completed'] },
+                    createdAt: { $gte: thisMonthStart }
                 }
             },
             { $group: { _id: null, total: { $sum: '$price' } } }
@@ -86,15 +86,19 @@ export const getDashboardStats = async (req, res) => {
         const revenueLastMonth = await Booking.aggregate([
             {
                 $match: {
-                    status: 'completed',
-                    completedAt: { $gte: lastMonthStart, $lte: lastMonthEnd }
+                    status: { $in: ['pending', 'confirmed', 'in-progress', 'completed'] },
+                    createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd }
                 }
             },
             { $group: { _id: null, total: { $sum: '$price' } } }
         ]);
 
         const totalRevenue = await Booking.aggregate([
-            { $match: { status: 'completed' } },
+            {
+                $match: {
+                    status: { $in: ['pending', 'confirmed', 'in-progress', 'completed'] }
+                }
+            },
             { $group: { _id: null, total: { $sum: '$price' } } }
         ]);
 
@@ -141,10 +145,11 @@ export const getDashboardStats = async (req, res) => {
             { $sort: { count: -1 } }
         ]);
 
-        // WEEKLY DATA (last 7 days)
+        // WEEKLY DATA - all non-cancelled bookings by createdAt
         const weeklyData = await Booking.aggregate([
             {
                 $match: {
+                    status: { $nin: ['cancelled'] },
                     createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
                 }
             },
@@ -168,7 +173,6 @@ export const getDashboardStats = async (req, res) => {
             }
         ]);
 
-        // Upcoming bookings for today
         const upcomingToday = await Booking.find({
             bookingDate: { $gte: today, $lte: todayEnd },
             status: { $in: ['pending', 'confirmed'] }
@@ -176,17 +180,6 @@ export const getDashboardStats = async (req, res) => {
             .populate('customerId', 'firstName lastName email')
             .sort({ timeSlot: 1 })
             .limit(10);
-
-        console.log('🔍 DEBUG - Dashboard Stats:', {
-            weeklyDataCount: weeklyData?.length,
-            weeklyDataSample: weeklyData?.slice(0, 2),
-            bookingsByCategories: bookingsByCategory?.length,
-            totalBookingsInDB: totalBookings,
-            last7DaysBookings: await Booking.countDocuments({
-                createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
-            }),
-            sampleBooking: await Booking.findOne().select('bookingCode price createdAt bookingDate status')
-        });
 
         res.status(200).json({
             success: true,
