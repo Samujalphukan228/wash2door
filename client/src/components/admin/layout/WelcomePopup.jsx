@@ -6,27 +6,27 @@ import { X, Lock, Shield, Key, AlertCircle, CheckCircle2 } from 'lucide-react';
 const SECURITY_GUIDES = [
     {
         icon: Lock,
-        title: 'Password Security',
-        description: 'Use strong, unique passwords with uppercase, numbers, and special characters.',
-        tips: ['Change password regularly', 'Never share credentials', 'Use 12+ characters']
+        title: 'Admin Account Security',
+        description: 'This account has full privileged access to the entire system and all customer data.',
+        tips: ['Never share your credentials with anyone', 'Rotate password every 90 days minimum', 'Enable MFA when available']
     },
     {
         icon: Shield,
-        title: 'Account Protection',
-        description: 'Keep your admin account secure and monitor unusual activities.',
-        tips: ['Enable 2FA if available', 'Review login history', 'Use secure devices']
+        title: 'Access Protection',
+        description: 'Nexxa continuously monitors all login activity and will alert you to unusual locations.',
+        tips: ['Never login on untrusted public devices', 'Always log out on shared computers', 'Review login history weekly']
     },
     {
         icon: Key,
-        title: 'API Keys',
-        description: 'Protect your API keys and regenerate them if compromised.',
-        tips: ['Never commit keys to git', 'Rotate keys quarterly', 'Use environment variables']
+        title: 'System Credentials',
+        description: 'Protect all integration keys, API tokens and system configuration values.',
+        tips: ['Never commit secrets to source code', 'Rotate keys quarterly', 'Always use environment variables']
     },
     {
         icon: AlertCircle,
-        title: 'Suspicious Activity',
-        description: 'Report any unauthorized access or suspicious behavior immediately.',
-        tips: ['Check admin logs', 'Verify all changes', 'Contact support if needed']
+        title: 'System Monitoring',
+        description: 'You are responsible for reviewing all system alerts and suspicious activity.',
+        tips: ['Verify all manual booking modifications', 'Check fraud flags daily', 'Escalate issues immediately']
     }
 ];
 
