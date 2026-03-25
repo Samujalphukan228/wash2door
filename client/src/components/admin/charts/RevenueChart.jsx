@@ -1,7 +1,15 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { BarChart3, ChevronDown, Clock, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { useState, useMemo, useRef } from 'react';
+import { 
+    BarChart3, 
+    ChevronDown, 
+    Clock,
+    ArrowUpRight,
+    ArrowDownRight,
+    Sparkles,
+    Calendar
+} from 'lucide-react';
 import { Line } from 'react-chartjs-2';
 import {
     Chart as ChartJS,
@@ -13,19 +21,29 @@ import {
     Filler
 } from 'chart.js';
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler);
+// ⚠️ Register BEFORE component
+ChartJS.register(
+    CategoryScale,
+    LinearScale,
+    PointElement,
+    LineElement,
+    Tooltip,
+    Filler
+);
+
+// 🔥 Set default tension globally for smooth curves
+ChartJS.defaults.elements.line.tension = 0.4;
 
 export default function RevenueChart({ categoryData = [], weeklyData = [], totals = {} }) {
+    const chartRef = useRef(null);
     const [activeIndex, setActiveIndex] = useState(null);
     const [showBreakdown, setShowBreakdown] = useState(false);
     const [viewMode, setViewMode] = useState('days');
 
-    console.log('🎨 RevenueChart Received:', {
-        weeklyData: weeklyData?.length,
-        categoryData: categoryData?.length,
-        totals
-    });
-
+    // ═══════════════════════════════════════════════════════════
+    // HELPERS
+    // ═══════════════════════════════════════════════════════════
+    
     const formatValue = (val) => {
         if (val === undefined || val === null || isNaN(val)) return '₹0';
         const num = Number(val);
@@ -35,325 +53,468 @@ export default function RevenueChart({ categoryData = [], weeklyData = [], total
         return '₹' + num.toLocaleString('en-IN');
     };
 
+    const formatCompact = (val) => {
+        if (val === undefined || val === null || isNaN(val)) return '0';
+        const num = Number(val);
+        if (num >= 100000) return (num / 100000).toFixed(1) + 'L';
+        if (num >= 1000) return (num / 1000).toFixed(1) + 'k';
+        return num.toLocaleString('en-IN');
+    };
+
+    // ═══════════════════════════════════════════════════════════
+    // DATA PROCESSING
+    // ═══════════════════════════════════════════════════════════
+    
     const safeWeeklyData = Array.isArray(weeklyData) ? weeklyData : [];
     const safeCategoryData = Array.isArray(categoryData) ? categoryData : [];
     const data = viewMode === 'days' ? safeWeeklyData : safeCategoryData;
 
+    // Process chart data
+    const { chartLabels, chartValues, chartDates } = useMemo(() => {
+        if (!data || data.length === 0) {
+            return { chartLabels: [], chartValues: [], chartDates: [] };
+        }
+
+        const labels = data.map((d, idx) => {
+            if (viewMode === 'days' && d.day) {
+                return new Date(d.day + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short' });
+            }
+            return d.name?.substring(0, 8) || `#${idx + 1}`;
+        });
+
+        const values = data.map(d => {
+            const val = d.revenue;
+            return typeof val === 'number' && val >= 0 ? val : 0;
+        });
+
+        const dates = data.map(d => {
+            if (viewMode === 'days' && d.day) {
+                return new Date(d.day + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            }
+            return d.name || 'Unknown';
+        });
+
+        return { chartLabels: labels, chartValues: values, chartDates: dates };
+    }, [data, viewMode]);
+
+    // Empty State
     if (!data || data.length === 0) {
         return (
-            <div className="bg-white/[0.02] border border-white/[0.08] rounded-2xl p-8">
-                <div className="flex flex-col items-center justify-center py-16 gap-3">
-                    <div className="w-12 h-12 rounded-full border border-white/[0.08] flex items-center justify-center">
-                        <BarChart3 className="w-5 h-5 text-gray-600" />
+            <div className="bg-white/[0.02] border border-white/[0.08] rounded-2xl overflow-hidden">
+                <div className="flex flex-col items-center justify-center py-20 gap-4">
+                    <div className="w-14 h-14 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center">
+                        <BarChart3 className="w-6 h-6 text-gray-600" />
                     </div>
-                    <p className="text-sm text-gray-500">No {viewMode} data available</p>
+                    <div className="text-center">
+                        <p className="text-sm font-medium text-gray-400 mb-1">No {viewMode} data</p>
+                        <p className="text-xs text-gray-600">Start receiving orders to see analytics</p>
+                    </div>
                 </div>
             </div>
         );
     }
-
-    const chartLabels = data.map((d, idx) => {
-        if (viewMode === 'days' && d.day) {
-            return new Date(d.day + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short' });
-        }
-        return d.name || `#${idx + 1}`;
-    });
-
-    const chartValues = data.map(d => {
-        const val = d.revenue;
-        return typeof val === 'number' && val >= 0 ? val : 0;
-    });
-
-    const chartDates = data.map(d => {
-        if (viewMode === 'days' && d.day) {
-            return new Date(d.day + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        }
-        return d.name || 'Unknown';
-    });
 
     const hasValidData = chartValues.some(v => v > 0);
+    
     if (!hasValidData) {
         return (
-            <div className="bg-white/[0.02] border border-white/[0.08] rounded-2xl p-8">
-                <div className="flex flex-col items-center justify-center py-16 gap-3">
-                    <div className="w-12 h-12 rounded-full border border-white/[0.08] flex items-center justify-center">
-                        <BarChart3 className="w-5 h-5 text-yellow-600" />
+            <div className="bg-white/[0.02] border border-white/[0.08] rounded-2xl overflow-hidden">
+                <div className="flex flex-col items-center justify-center py-20 gap-4">
+                    <div className="w-14 h-14 rounded-2xl bg-yellow-500/[0.08] border border-yellow-500/[0.15] flex items-center justify-center">
+                        <Sparkles className="w-6 h-6 text-yellow-500" />
                     </div>
-                    <p className="text-sm text-gray-500">No revenue data yet</p>
+                    <div className="text-center">
+                        <p className="text-sm font-medium text-gray-400 mb-1">No revenue yet</p>
+                        <p className="text-xs text-gray-600">Revenue will appear here once orders come in</p>
+                    </div>
                 </div>
             </div>
         );
     }
 
+    // ═══════════════════════════════════════════════════════════
+    // CALCULATIONS
+    // ═══════════════════════════════════════════════════════════
+    
     const maxValue = Math.max(...chartValues, 1);
     const minValue = Math.min(...chartValues);
     const totalValue = chartValues.reduce((a, b) => a + b, 0);
     const avgValue = chartValues.length > 0 ? totalValue / chartValues.length : 0;
+    
+    const bestDayIndex = chartValues.indexOf(maxValue);
+    const worstDayIndex = chartValues.indexOf(minValue);
 
-    // Trend: compare last two points
-    const trend = chartValues.length >= 2
-        ? chartValues[chartValues.length - 1] - chartValues[chartValues.length - 2]
-        : 0;
-    const trendPct = chartValues.length >= 2 && chartValues[chartValues.length - 2] > 0
-        ? ((trend / chartValues[chartValues.length - 2]) * 100).toFixed(1)
-        : null;
+    const lastIdx = chartValues.length - 1;
+    const prevIdx = chartValues.length - 2;
+    const todayVal = chartValues[lastIdx] || 0;
+    const yesterdayVal = chartValues[prevIdx] || 0;
+    
+    let growthPercent = null;
+    if (yesterdayVal > 0) {
+        growthPercent = ((todayVal - yesterdayVal) / yesterdayVal) * 100;
+    } else if (todayVal > 0) {
+        growthPercent = 100;
+    }
 
-    const displayValue = activeIndex !== null ? chartValues[activeIndex] : (totals?.totalRevenue || 0);
-    const displayLabel = activeIndex !== null ? chartDates[activeIndex] : 'Total Revenue';
+    const displayValue = activeIndex !== null 
+        ? chartValues[activeIndex] 
+        : (totals?.totalRevenue || totalValue);
+    const displayLabel = activeIndex !== null 
+        ? chartDates[activeIndex] 
+        : 'Total Revenue';
 
-    const chartData = useMemo(() => ({
+    // ═══════════════════════════════════════════════════════════
+    // 🔥 CHART CONFIG - SMOOTH CURVES
+    // ═══════════════════════════════════════════════════════════
+    
+    const chartData = {
         labels: chartLabels,
         datasets: [{
             data: chartValues,
             borderColor: '#ffffff',
             backgroundColor: (context) => {
                 const ctx = context.chart.ctx;
-                const gradient = ctx.createLinearGradient(0, 0, 0, 220);
-                gradient.addColorStop(0, 'rgba(255,255,255,0.12)');
-                gradient.addColorStop(0.6, 'rgba(255,255,255,0.03)');
-                gradient.addColorStop(1, 'rgba(255,255,255,0)');
+                const gradient = ctx.createLinearGradient(0, 0, 0, 180);
+                gradient.addColorStop(0, 'rgba(255, 255, 255, 0.15)');
+                gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.05)');
+                gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
                 return gradient;
             },
             fill: true,
-            tension: 0.45,
-            borderWidth: 1.5,
+            // 🔥 KEY: This makes the line smooth!
+            tension: 0.4,
+            borderWidth: 2,
             pointRadius: 0,
-            pointHoverRadius: 5,
-            pointHoverBackgroundColor: '#000',
-            pointHoverBorderColor: '#fff',
+            pointHoverRadius: 6,
+            pointHoverBackgroundColor: '#000000',
+            pointHoverBorderColor: '#ffffff',
             pointHoverBorderWidth: 2,
+            borderCapStyle: 'round',
+            borderJoinStyle: 'round',
         }]
-    }), [chartLabels.join(), chartValues.join()]);
+    };
 
-    const options = useMemo(() => ({
+    const options = {
         responsive: true,
         maintainAspectRatio: false,
-        interaction: { intersect: false, mode: 'index' },
-        animation: { duration: 600, easing: 'easeOutQuart' },
+        
+        interaction: {
+            intersect: false,
+            mode: 'index',
+        },
+        
+        animation: {
+            duration: 750,
+            easing: 'easeInOutQuart',
+        },
+        
         plugins: {
             legend: { display: false },
             tooltip: {
                 enabled: true,
-                backgroundColor: '#fff',
-                titleColor: '#999',
-                bodyColor: '#000',
-                titleFont: { size: 10, weight: '500', family: 'monospace' },
-                bodyFont: { size: 13, weight: '700' },
-                padding: { x: 14, y: 10 },
-                cornerRadius: 10,
+                backgroundColor: '#ffffff',
+                titleColor: '#888888',
+                bodyColor: '#000000',
+                titleFont: { size: 10, weight: '500' },
+                bodyFont: { size: 13, weight: '600' },
+                padding: { x: 12, y: 8 },
+                cornerRadius: 8,
+                displayColors: false,
                 callbacks: {
+                    title: (items) => chartDates[items[0]?.dataIndex] || '',
                     label: (ctx) => `₹${(ctx.parsed.y || 0).toLocaleString('en-IN')}`
                 }
             }
         },
+        
         scales: {
             x: {
                 grid: { display: false },
                 border: { display: false },
-                ticks: { color: '#555', font: { size: 10, family: 'monospace' }, maxRotation: 0 }
+                ticks: {
+                    color: '#444444',
+                    font: { size: 10, weight: '500' },
+                    padding: 8,
+                    maxRotation: 0,
+                }
             },
-            y: { display: false, min: minValue * 0.8, max: maxValue * 1.2 }
+            y: {
+                display: false,
+                beginAtZero: false,
+            }
         },
+        
         onHover: (event, elements) => {
             setActiveIndex(elements.length > 0 ? elements[0].index : null);
         }
-    }), [maxValue, minValue]);
+    };
+
+    // ═══════════════════════════════════════════════════════════
+    // RENDER
+    // ═══════════════════════════════════════════════════════════
+    
+    const showGrowth = growthPercent !== null && !isNaN(growthPercent);
+    const isUp = growthPercent >= 0;
 
     return (
-        <div className="bg-white/[0.02] border border-white/[0.08] rounded-2xl overflow-hidden">
+        <div className="bg-white/[0.02] border border-white/[0.08] rounded-xl sm:rounded-2xl overflow-hidden">
 
-            {/* ── Top Header Bar ── */}
-            <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06]">
+            {/* HEADER */}
+            <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-white/[0.06]">
                 <div className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-white/30" />
-                    <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-500">
-                        Revenue
-                    </span>
+                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white/[0.06] flex items-center justify-center">
+                        <BarChart3 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500" />
+                    </div>
+                    <div>
+                        <p className="text-xs sm:text-sm font-medium text-white">Revenue</p>
+                        <p className="text-[10px] text-gray-600 hidden sm:block">
+                            {data.length} {viewMode === 'days' ? 'days' : 'categories'}
+                        </p>
+                    </div>
                 </div>
 
-                {/* View toggle — pill style */}
-                <div className="flex items-center bg-white/[0.05] rounded-lg p-0.5 border border-white/[0.06]">
-                    {['days', 'categories'].map(mode => (
+                {/* View Toggle */}
+                <div className="flex items-center bg-white/[0.04] rounded-lg p-0.5 border border-white/[0.06]">
+                    {[
+                        { key: 'days', label: 'Daily', icon: Calendar },
+                        { key: 'categories', label: 'Category', icon: BarChart3 }
+                    ].map(({ key, label, icon: Icon }) => (
                         <button
-                            key={mode}
-                            onClick={() => setViewMode(mode)}
-                            className={`px-3 py-1 text-[10px] font-semibold uppercase tracking-wider rounded-md transition-all duration-200 ${
-                                viewMode === mode
+                            key={key}
+                            onClick={() => setViewMode(key)}
+                            className={`
+                                flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 
+                                text-[10px] sm:text-xs font-medium rounded-md 
+                                transition-all duration-200 active:scale-95
+                                ${viewMode === key
                                     ? 'bg-white text-black shadow-sm'
-                                    : 'text-gray-600 hover:text-gray-400'
-                            }`}
+                                    : 'text-gray-500 hover:text-gray-300'
+                                }
+                            `}
                         >
-                            {mode === 'days' ? 'Daily' : 'Category'}
+                            <Icon className="w-3 h-3 hidden sm:block" />
+                            {label}
                         </button>
                     ))}
                 </div>
             </div>
 
-            {/* ── Primary Display ── */}
-            <div className="px-5 pt-5 pb-4">
-                {/* Label */}
-                <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-gray-600 mb-1.5">
-                    {displayLabel}
-                </p>
-
-                {/* Big Number + Trend */}
-                <div className="flex items-end gap-3 mb-5">
-                    <p className="text-4xl sm:text-5xl font-bold text-white leading-none tracking-tight tabular-nums">
+            {/* MAIN CONTENT */}
+            <div className="p-4 sm:p-5">
+                
+                {/* Value Display */}
+                <div className="mb-4 sm:mb-5">
+                    <div className="flex items-center gap-2 mb-1">
+                        <p className="text-[10px] sm:text-xs text-gray-500 font-medium uppercase tracking-wider">
+                            {displayLabel}
+                        </p>
+                        {activeIndex === null && showGrowth && (
+                            <div className={`
+                                flex items-center gap-0.5 
+                                px-1.5 py-0.5 rounded-full 
+                                text-[9px] sm:text-[10px] font-medium
+                                ${isUp 
+                                    ? 'bg-emerald-500/15 text-emerald-400' 
+                                    : 'bg-red-500/15 text-red-400'
+                                }
+                            `}>
+                                {isUp 
+                                    ? <ArrowUpRight className="w-2.5 h-2.5" /> 
+                                    : <ArrowDownRight className="w-2.5 h-2.5" />
+                                }
+                                <span>{Math.abs(growthPercent).toFixed(1)}%</span>
+                            </div>
+                        )}
+                    </div>
+                    <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white tracking-tight tabular-nums">
                         {formatValue(displayValue)}
                     </p>
-                    {trendPct !== null && activeIndex === null && (
-                        <div className={`flex items-center gap-1 mb-1.5 px-2 py-1 rounded-lg text-[11px] font-semibold ${
-                            trend > 0
-                                ? 'bg-emerald-500/[0.12] text-emerald-400'
-                                : trend < 0
-                                    ? 'bg-red-500/[0.12] text-red-400'
-                                    : 'bg-white/[0.06] text-gray-500'
-                        }`}>
-                            {trend > 0 ? <TrendingUp className="w-3 h-3" /> : trend < 0 ? <TrendingDown className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
-                            <span>{trend > 0 ? '+' : ''}{trendPct}%</span>
-                        </div>
-                    )}
                 </div>
 
-                {/* ── 4 Stats Row ── */}
-                <div className="grid grid-cols-4 gap-2 mb-5">
-                    {[
-                        { label: 'Total', value: formatValue(totalValue), dim: false },
-                        { label: 'Avg', value: formatValue(avgValue), dim: true },
-                        { label: 'Peak', value: formatValue(maxValue), accent: 'up' },
-                        { label: 'Low', value: formatValue(minValue), accent: 'down' },
-                    ].map(({ label, value, dim, accent }) => (
-                        <div
-                            key={label}
-                            className={`rounded-xl p-2.5 border flex flex-col gap-1 ${
-                                accent === 'up'
-                                    ? 'bg-emerald-500/[0.08] border-emerald-500/[0.15]'
-                                    : accent === 'down'
-                                        ? 'bg-red-500/[0.08] border-red-500/[0.15]'
-                                        : 'bg-white/[0.03] border-white/[0.06]'
-                            }`}
-                        >
-                            <span className={`text-[9px] font-bold uppercase tracking-widest ${
-                                accent === 'up' ? 'text-emerald-500' : accent === 'down' ? 'text-red-500' : 'text-gray-600'
-                            }`}>
-                                {label}
-                            </span>
-                            <span className={`text-[11px] font-bold tabular-nums truncate ${dim ? 'text-gray-400' : 'text-white'}`}>
-                                {value}
-                            </span>
-                        </div>
-                    ))}
+                {/* Mini Stats Grid */}
+                <div className="grid grid-cols-4 gap-1.5 sm:gap-2 mb-4 sm:mb-5">
+                    <MiniStat 
+                        label={viewMode === 'days' ? 'Week' : 'Total'} 
+                        value={formatValue(totalValue)} 
+                    />
+                    <MiniStat 
+                        label="Avg" 
+                        value={formatValue(avgValue)} 
+                        dim 
+                    />
+                    <MiniStat 
+                        label="Peak" 
+                        value={formatValue(maxValue)} 
+                        highlight="up" 
+                    />
+                    <MiniStat 
+                        label="Low" 
+                        value={formatValue(minValue)} 
+                        highlight="down" 
+                    />
                 </div>
 
-                {/* ── Chart ── */}
-                <div className="h-40 -mx-1">
-                    <Line data={chartData} options={options} />
+                {/* 🔥 CHART */}
+                <div className="h-36 sm:h-44 lg:h-52 -mx-1 sm:-mx-2">
+                    <Line 
+                        ref={chartRef}
+                        data={chartData} 
+                        options={options} 
+                    />
                 </div>
             </div>
 
-            {/* ── Breakdown Toggle ── */}
+            {/* BREAKDOWN SECTION */}
             <div className="border-t border-white/[0.06]">
                 <button
                     onClick={() => setShowBreakdown(!showBreakdown)}
-                    className="w-full flex items-center justify-between px-5 py-3 hover:bg-white/[0.02] transition-colors group"
+                    className="w-full flex items-center justify-between px-4 sm:px-5 py-3 
+                               hover:bg-white/[0.02] active:bg-white/[0.03] transition-colors"
                 >
-                    <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-600 group-hover:text-gray-400 transition-colors">
+                    <span className="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wider font-medium">
                         {viewMode === 'days' ? 'Daily' : 'Category'} Breakdown
-                        <span className="ml-2 text-gray-700">({data.length})</span>
                     </span>
-                    <ChevronDown
-                        className={`w-3.5 h-3.5 text-gray-600 transition-transform duration-300 ${showBreakdown ? 'rotate-180' : ''}`}
-                    />
+                    <ChevronDown className={`
+                        w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-600 
+                        transition-transform duration-200
+                        ${showBreakdown ? 'rotate-180' : ''}
+                    `} />
                 </button>
 
-                {showBreakdown && (
-                    <div className="pb-2 max-h-72 overflow-y-auto">
-                        {/* Table Header */}
-                        <div className="grid grid-cols-[auto_1fr_auto_auto] gap-3 px-5 py-2 border-b border-white/[0.04]">
-                            {['#', viewMode === 'days' ? 'Date' : 'Category', 'Share', 'Revenue'].map(h => (
-                                <span key={h} className="text-[9px] font-bold uppercase tracking-widest text-gray-700">
-                                    {h}
-                                </span>
-                            ))}
-                        </div>
-
+                {/* Collapsible Content */}
+                <div className={`
+                    overflow-hidden transition-all duration-300
+                    ${showBreakdown ? 'max-h-[400px]' : 'max-h-0'}
+                `}>
+                    <div className="px-3 sm:px-4 pb-3 sm:pb-4 space-y-0.5 sm:space-y-1 overflow-y-auto max-h-72">
                         {data.map((item, i) => {
-                            const val = item.revenue || 0;
+                            const val = chartValues[i];
+                            const isLast = viewMode === 'days' && i === lastIdx;
+                            const isBest = i === bestDayIndex && val > 0;
+                            const isWorst = i === worstDayIndex && val > 0 && bestDayIndex !== worstDayIndex;
                             const percentage = maxValue > 0 ? (val / maxValue) * 100 : 0;
                             const share = totalValue > 0 ? Math.round((val / totalValue) * 100) : 0;
-                            const isTop = val === maxValue;
+                            
+                            const prevVal = i > 0 ? chartValues[i - 1] : val;
+                            const change = prevVal > 0 ? ((val - prevVal) / prevVal) * 100 : 0;
 
                             return (
                                 <div
                                     key={item.day || item.name || i}
-                                    className={`grid grid-cols-[auto_1fr_auto_auto] gap-3 items-center px-5 py-2.5 transition-colors ${
-                                        isTop ? 'bg-white/[0.03]' : 'hover:bg-white/[0.02]'
-                                    }`}
+                                    className={`
+                                        flex items-center gap-2 sm:gap-3 
+                                        p-2 sm:p-2.5 rounded-lg sm:rounded-xl 
+                                        transition-all cursor-default
+                                        ${isLast ? 'bg-white/[0.06]' : 'hover:bg-white/[0.03]'}
+                                        ${activeIndex === i ? 'bg-white/[0.08]' : ''}
+                                    `}
+                                    onMouseEnter={() => setActiveIndex(i)}
+                                    onMouseLeave={() => setActiveIndex(null)}
                                 >
-                                    {/* Rank */}
-                                    <span className={`text-[10px] font-mono w-4 ${isTop ? 'text-white' : 'text-gray-700'}`}>
-                                        {i + 1}
-                                    </span>
-
-                                    {/* Name + bar */}
-                                    <div className="flex flex-col gap-1.5 min-w-0">
-                                        <span className={`text-[11px] font-medium truncate ${isTop ? 'text-white' : 'text-gray-400'}`}>
-                                            {viewMode === 'days' ? chartDates[i] : item.name}
+                                    {/* Indicator + Label */}
+                                    <div className="flex items-center gap-1.5 w-14 sm:w-20 shrink-0">
+                                        <div className={`
+                                            w-1.5 h-1.5 rounded-full shrink-0
+                                            ${isLast ? 'bg-white' :
+                                                isBest ? 'bg-emerald-500' :
+                                                isWorst ? 'bg-red-500' : 'bg-white/20'}
+                                        `} />
+                                        <span className={`
+                                            text-[10px] sm:text-xs font-medium truncate
+                                            ${isLast ? 'text-white' : 'text-gray-500'}
+                                        `}>
+                                            {isLast && viewMode === 'days' ? 'Today' : chartLabels[i]}
                                         </span>
-                                        <div className="h-px bg-white/[0.06] rounded-full overflow-hidden">
-                                            <div
-                                                className={`h-full rounded-full transition-all duration-500 ${isTop ? 'bg-white/50' : 'bg-white/15'}`}
-                                                style={{ width: `${percentage}%` }}
-                                            />
-                                        </div>
+                                    </div>
+
+                                    {/* Progress Bar */}
+                                    <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+                                        <div
+                                            className={`
+                                                h-full rounded-full transition-all duration-500
+                                                ${isLast ? 'bg-white' :
+                                                    isBest ? 'bg-emerald-500' :
+                                                    isWorst ? 'bg-red-500' : 'bg-white/25'}
+                                            `}
+                                            style={{ width: `${percentage}%` }}
+                                        />
                                     </div>
 
                                     {/* Share */}
-                                    <span className="text-[10px] font-mono text-gray-600 tabular-nums w-8 text-right">
+                                    <span className="text-[9px] sm:text-[10px] text-gray-600 tabular-nums w-7 sm:w-8 text-right shrink-0">
                                         {share}%
                                     </span>
 
-                                    {/* Value */}
-                                    <span className={`text-[11px] font-semibold tabular-nums text-right w-16 ${isTop ? 'text-white' : 'text-gray-500'}`}>
-                                        {formatValue(val)}
-                                    </span>
+                                    {/* Value + Change */}
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                        <span className={`
+                                            text-[10px] sm:text-xs font-semibold tabular-nums
+                                            ${isLast ? 'text-white' : 'text-gray-400'}
+                                        `}>
+                                            ₹{formatCompact(val)}
+                                        </span>
+                                        {i > 0 && viewMode === 'days' && (
+                                            <span className={`
+                                                text-[8px] sm:text-[9px] font-medium 
+                                                px-1 py-0.5 rounded hidden sm:inline-block
+                                                ${change >= 0 
+                                                    ? 'bg-emerald-500/10 text-emerald-400' 
+                                                    : 'bg-red-500/10 text-red-400'
+                                                }
+                                            `}>
+                                                {change >= 0 ? '+' : ''}{change.toFixed(0)}%
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                             );
                         })}
                     </div>
-                )}
+                </div>
             </div>
 
-            {/* ── Footer ── */}
-            <div className="px-5 py-2.5 border-t border-white/[0.04] flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                    <Clock className="w-3 h-3 text-gray-700 shrink-0" />
-                    <span className="text-[10px] font-mono text-gray-700">
-                        {viewMode === 'days' ? 'daily' : 'category'} · {data.length} entries
+            {/* FOOTER */}
+            <div className="px-4 sm:px-5 py-2.5 sm:py-3 bg-white/[0.02] border-t border-white/[0.05]">
+                <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs text-gray-500">
+                    <Clock className="w-3 h-3 shrink-0" />
+                    <span className="truncate">
+                        {showGrowth 
+                            ? isUp
+                                ? `Up ${Math.abs(growthPercent).toFixed(1)}% from ${viewMode === 'days' ? 'yesterday' : 'previous'}`
+                                : `Down ${Math.abs(growthPercent).toFixed(1)}% from ${viewMode === 'days' ? 'yesterday' : 'previous'}`
+                            : `Tracking ${viewMode === 'days' ? 'daily' : 'category'} performance`
+                        }
                     </span>
-                </div>
-                <div className="flex items-center gap-1">
-                    <div className="w-6 h-px bg-white/20" />
-                    <div className="w-1.5 h-1.5 rounded-full border border-white/20" />
                 </div>
             </div>
         </div>
     );
 }
 
-function MiniStat({ label, value, highlight }) {
+// ═══════════════════════════════════════════════════════════════════
+// MINI STAT COMPONENT
+// ═══════════════════════════════════════════════════════════════════
+
+function MiniStat({ label, value, highlight, dim }) {
     return (
-        <div className={`p-3 rounded-xl border text-center ${
-            highlight === 'up'
-                ? 'bg-emerald-500/[0.08] border-emerald-500/[0.15]'
-                : highlight === 'down'
-                    ? 'bg-red-500/[0.08] border-red-500/[0.15]'
-                    : 'bg-white/[0.03] border-white/[0.06]'
-        }`}>
-            <p className={`text-[9px] font-bold uppercase tracking-widest mb-1 ${
-                highlight === 'up' ? 'text-emerald-500' : highlight === 'down' ? 'text-red-500' : 'text-gray-600'
-            }`}>{label}</p>
-            <p className="text-[11px] font-bold text-white truncate tabular-nums">{value}</p>
+        <div className={`
+            p-2 sm:p-2.5 rounded-lg sm:rounded-xl text-center
+            ${highlight === 'up' ? 'bg-emerald-500/[0.08]' :
+                highlight === 'down' ? 'bg-red-500/[0.08]' : 'bg-white/[0.03]'}
+        `}>
+            <p className={`
+                text-[8px] sm:text-[9px] font-medium uppercase tracking-wider mb-0.5 sm:mb-1
+                ${highlight === 'up' ? 'text-emerald-500' :
+                    highlight === 'down' ? 'text-red-500' : 'text-gray-600'}
+            `}>
+                {label}
+            </p>
+            <p className={`
+                text-[10px] sm:text-xs font-bold truncate tabular-nums
+                ${dim ? 'text-gray-400' : 'text-white'}
+            `}>
+                {value}
+            </p>
         </div>
     );
 }
