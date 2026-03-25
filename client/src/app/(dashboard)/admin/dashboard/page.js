@@ -3,9 +3,11 @@
 import { useState, useEffect, useMemo } from 'react';
 import DashboardLayout from '@/components/admin/layout/DashboardLayout';
 import RevenueChart from '@/components/admin/charts/RevenueChart';
+import CreateBookingModal from '@/components/admin/bookings/CreateBookingModal';
 import useDashboard from '@/hooks/useDashboard';
 import { useSocket } from '@/context/SocketContext';
 import Link from 'next/link';
+import toast from 'react-hot-toast';
 import {
     Chart as ChartJS,
     CategoryScale,
@@ -32,7 +34,8 @@ import {
     AlertCircle,
     Timer,
     XCircle,
-    Sparkles
+    Sparkles,
+    Plus
 } from 'lucide-react';
 
 ChartJS.register(
@@ -49,6 +52,7 @@ ChartJS.register(
 export default function DashboardPage() {
     const { stats, loading, refetch } = useDashboard();
     const { socket } = useSocket();
+    const [showCreateModal, setShowCreateModal] = useState(false);
 
     // ← DEBUG: Check what stats contains
     useEffect(() => {
@@ -114,6 +118,15 @@ export default function DashboardPage() {
         return { totalBookings, totalRevenue, avgPerBooking };
     }, [categoryData]);
 
+    // Handle create booking success
+    const handleCreateSuccess = () => {
+        setShowCreateModal(false);
+        setTimeout(() => {
+            refetch();
+            toast.success('Booking created');
+        }, 100);
+    };
+
     // Loading state
     if (loading) {
         return (
@@ -148,7 +161,7 @@ export default function DashboardPage() {
                                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                                 <span className="text-[10px] text-emerald-400 font-medium">Live</span>
                             </div>
-                            <div className="text-right">
+                            <div className="text-right hidden sm:block">
                                 <p className="text-[10px] sm:text-xs text-gray-500">
                                     {new Date().toLocaleDateString('en-US', {
                                         weekday: 'short',
@@ -157,6 +170,14 @@ export default function DashboardPage() {
                                     })}
                                 </p>
                             </div>
+                            {/* New Booking Button - Desktop */}
+                            <button
+                                onClick={() => setShowCreateModal(true)}
+                                className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-lg bg-white text-black text-xs font-medium hover:bg-gray-200 transition-colors"
+                            >
+                                <Plus className="w-3.5 h-3.5" />
+                                New Booking
+                            </button>
                         </div>
                     </header>
 
@@ -213,6 +234,25 @@ export default function DashboardPage() {
 
                 </div>
             </div>
+
+            {/* Mobile FAB Button - New Booking */}
+            <div className="lg:hidden fixed bottom-24 right-4 z-41">
+                <button
+                    onClick={() => setShowCreateModal(true)}
+                    className="w-14 h-14 bg-white text-black rounded-2xl shadow-2xl shadow-black/50 flex items-center justify-center active:scale-95 transition-transform hover:shadow-2xl hover:shadow-white/20"
+                    aria-label="Create new booking"
+                >
+                    <Plus className="w-6 h-6" strokeWidth={2.5} />
+                </button>
+            </div>
+
+            {/* Create Booking Modal */}
+            {showCreateModal && (
+                <CreateBookingModal
+                    onClose={() => setShowCreateModal(false)}
+                    onSuccess={handleCreateSuccess}
+                />
+            )}
         </DashboardLayout>
     );
 }
