@@ -45,7 +45,7 @@ const MOBILE_NAV = [
 ];
 
 // ── Mobile Nav Item ──────────────────────────────────────────────
-function MobileNavItem({ item, isActive, onOpenMenu }) {
+function MobileNavItem({ item, isActive, isMenuOpen, onOpenMenu }) {
     const Icon = item.icon;
     return (
         <motion.button
@@ -55,6 +55,7 @@ function MobileNavItem({ item, isActive, onOpenMenu }) {
             aria-label={item.label}
             whileTap={{ scale: 0.92 }}
         >
+            {/* Active route indicator bar */}
             <motion.span 
                 className="absolute top-0 left-1/2 -translate-x-1/2 h-[2px] rounded-full bg-white"
                 initial={false}
@@ -66,21 +67,43 @@ function MobileNavItem({ item, isActive, onOpenMenu }) {
             />
 
             <motion.div 
-                className="w-9 h-9 rounded-xl flex items-center justify-center"
+                className="relative w-9 h-9 rounded-xl flex items-center justify-center"
                 initial={false}
                 animate={{ 
-                    backgroundColor: isActive ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0)',
-                    scale: isActive ? 1 : 0.95
+                    backgroundColor: isMenuOpen 
+                        ? 'rgba(255,255,255,0.12)' 
+                        : isActive 
+                            ? 'rgba(255,255,255,0.1)' 
+                            : 'rgba(255,255,255,0)',
+                    scale: isMenuOpen ? 1.08 : isActive ? 1 : 0.95
                 }}
                 transition={{ type: 'spring', stiffness: 400, damping: 25 }}
             >
+                {/* Simple dot indicator when menu is open */}
+                <AnimatePresence>
+                    {isMenuOpen && (
+                        <motion.div
+                            className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-white"
+                            initial={{ scale: 0, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0, opacity: 0 }}
+                            transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+                        />
+                    )}
+                </AnimatePresence>
+
                 <Icon
-                    className={`h-[18px] w-[18px] transition-colors duration-200 ${isActive ? 'text-white' : 'text-gray-600'}`}
-                    strokeWidth={isActive ? 2.5 : 1.8}
+                    className={`h-[18px] w-[18px] transition-colors duration-200 ${
+                        isMenuOpen || isActive ? 'text-white' : 'text-gray-600'
+                    }`}
+                    strokeWidth={isMenuOpen || isActive ? 2.5 : 1.8}
                     aria-hidden="true"
                 />
             </motion.div>
-            <span className={`text-[10px] font-medium leading-none transition-colors duration-200 ${isActive ? 'text-white' : 'text-gray-600'}`}>
+
+            <span className={`text-[10px] font-medium leading-none transition-colors duration-200 ${
+                isMenuOpen || isActive ? 'text-white' : 'text-gray-600'
+            }`}>
                 {item.label}
             </span>
         </motion.button>
@@ -122,7 +145,6 @@ function MenuPopoverContent({ item, onClose, pathname, direction, isInitial }) {
         ? [...item.routes, { label: 'Settings', href: '/admin/settings', icon: Settings, isSettings: true }]
         : item.routes;
 
-    // Animation variants based on direction
     const variants = {
         initial: isInitial 
             ? { 
@@ -414,12 +436,10 @@ export default function DashboardLayout({ children }) {
     const [showWelcome, setShowWelcome] = useState(false);
     const [mounted, setMounted] = useState(false);
     
-    // Track direction and initial state for animations
     const [direction, setDirection] = useState(0);
     const [isInitialOpen, setIsInitialOpen] = useState(true);
     const prevMenuRef = useRef(null);
 
-    // Get the currently open menu item
     const currentMenuItem = useMemo(() => {
         return MOBILE_NAV.find(item => item.label === menuOpen) || null;
     }, [menuOpen]);
@@ -433,17 +453,14 @@ export default function DashboardLayout({ children }) {
         return null;
     }, [pathname]);
 
-    // Calculate direction when menu changes
     const openMenu = useCallback((item) => {
         const newIndex = MOBILE_NAV.findIndex(nav => nav.label === item.label);
         const prevIndex = MOBILE_NAV.findIndex(nav => nav.label === prevMenuRef.current);
         
         if (prevMenuRef.current === null) {
-            // First open - use initial animation
             setIsInitialOpen(true);
             setDirection(0);
         } else if (prevMenuRef.current !== item.label) {
-            // Switching between tabs
             setIsInitialOpen(false);
             setDirection(newIndex > prevIndex ? 1 : -1);
         }
@@ -652,6 +669,7 @@ export default function DashboardLayout({ children }) {
                             key={item.label}
                             item={item}
                             isActive={activeTab === item.label}
+                            isMenuOpen={menuOpen === item.label}
                             onOpenMenu={openMenu}
                         />
                     ))}
@@ -659,4 +677,4 @@ export default function DashboardLayout({ children }) {
             </nav>
         </div>
     );
-}
+}asd
