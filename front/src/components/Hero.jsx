@@ -6,7 +6,7 @@ import { ArrowRight, Phone, Droplets, Shield, Clock, Zap } from 'lucide-react'
 
 /* ─── Constants ─── */
 const STATS = [
-  { value: '500+', label: 'Happy Clients', icon: Shield },
+  { value: '100+', label: 'Happy Clients', icon: Shield },
   { value: '4.9★', label: 'Avg Rating', icon: Clock },
   { value: '2min', label: 'Quick Booking', icon: Droplets },
 ]
