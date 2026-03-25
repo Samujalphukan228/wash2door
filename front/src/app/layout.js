@@ -16,9 +16,6 @@ export const metadata = {
     apple: "/apple-touch-icon.png",
   },
   manifest: "/site.webmanifest",
-  // Android Chrome icons are in site.webmanifest:
-  // - android-chrome-192x192.png
-  // - android-chrome-512x512.png
 };
 
 export default function RootLayout({ children }) {
