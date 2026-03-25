@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -55,7 +55,6 @@ function MobileNavItem({ item, isActive, onOpenMenu }) {
             aria-label={item.label}
             whileTap={{ scale: 0.92 }}
         >
-            {/* Active indicator bar */}
             <motion.span 
                 className="absolute top-0 left-1/2 -translate-x-1/2 h-[2px] rounded-full bg-white"
                 initial={false}
@@ -88,8 +87,34 @@ function MobileNavItem({ item, isActive, onOpenMenu }) {
     );
 }
 
-// ── Menu Popover ─────────────────────────────────────────────────
-function MenuPopover({ item, isOpen, onClose, pathname }) {
+// ── Menu Backdrop ────────────────────────────────────────────────
+function MenuBackdrop({ isOpen, onClose }) {
+    return (
+        <AnimatePresence>
+            {isOpen && (
+                <motion.div
+                    className="fixed inset-0 z-40 bg-black/70"
+                    initial={{ opacity: 0, backdropFilter: 'blur(0px)' }}
+                    animate={{ 
+                        opacity: 1, 
+                        backdropFilter: 'blur(12px)',
+                        transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] }
+                    }}
+                    exit={{ 
+                        opacity: 0, 
+                        backdropFilter: 'blur(0px)',
+                        transition: { duration: 0.25, ease: [0.22, 1, 0.36, 1] }
+                    }}
+                    onClick={onClose}
+                    aria-hidden="true"
+                />
+            )}
+        </AnimatePresence>
+    );
+}
+
+// ── Menu Popover Content ─────────────────────────────────────────
+function MenuPopoverContent({ item, onClose, pathname, direction, isInitial }) {
     const isRouteActive = (route) =>
         pathname === route.href || pathname.startsWith(route.href + '/');
 
@@ -97,239 +122,243 @@ function MenuPopover({ item, isOpen, onClose, pathname }) {
         ? [...item.routes, { label: 'Settings', href: '/admin/settings', icon: Settings, isSettings: true }]
         : item.routes;
 
+    // Animation variants based on direction
+    const variants = {
+        initial: isInitial 
+            ? { 
+                opacity: 0, 
+                y: 60, 
+                scale: 0.85,
+                filter: 'blur(10px)',
+                rotateX: -15,
+            }
+            : {
+                opacity: 0,
+                x: direction > 0 ? 100 : -100,
+                scale: 0.92,
+                filter: 'blur(8px)',
+                rotateY: direction > 0 ? -15 : 15,
+            },
+        animate: { 
+            opacity: 1, 
+            y: 0,
+            x: 0,
+            scale: 1,
+            filter: 'blur(0px)',
+            rotateX: 0,
+            rotateY: 0,
+            transition: {
+                type: 'spring',
+                damping: 30,
+                stiffness: 350,
+                mass: 0.8,
+            }
+        },
+        exit: isInitial
+            ? { 
+                opacity: 0, 
+                y: 40,
+                scale: 0.9,
+                filter: 'blur(8px)',
+                transition: {
+                    duration: 0.2,
+                    ease: [0.32, 0, 0.67, 0],
+                }
+            }
+            : {
+                opacity: 0,
+                x: direction > 0 ? -100 : 100,
+                scale: 0.92,
+                filter: 'blur(8px)',
+                rotateY: direction > 0 ? 15 : -15,
+                transition: {
+                    duration: 0.25,
+                    ease: [0.32, 0, 0.67, 0],
+                }
+            },
+    };
+
     return (
-        <AnimatePresence mode="wait">
-            {isOpen && (
-                <>
-                    {/* Backdrop */}
-                    <motion.div
-                        className="fixed inset-0 z-40 bg-black/70"
-                        initial={{ opacity: 0, backdropFilter: 'blur(0px)' }}
-                        animate={{ 
-                            opacity: 1, 
-                            backdropFilter: 'blur(12px)',
-                            transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] }
-                        }}
-                        exit={{ 
-                            opacity: 0, 
-                            backdropFilter: 'blur(0px)',
-                            transition: { duration: 0.2, ease: [0.22, 1, 0.36, 1] }
-                        }}
-                        onClick={onClose}
-                        aria-hidden="true"
-                    />
+        <motion.div
+            className="fixed bottom-[88px] left-3 right-3 z-50 rounded-2xl bg-[#0A0A0A] border border-white/[0.08] shadow-2xl shadow-black/80 overflow-hidden"
+            variants={variants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            style={{ 
+                transformPerspective: 1200,
+                transformOrigin: 'center center',
+            }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="menu-title"
+        >
+            {/* Glow effect */}
+            <motion.div 
+                className="absolute -top-20 left-1/2 -translate-x-1/2 w-40 h-40 bg-white/10 rounded-full blur-3xl pointer-events-none"
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ 
+                    opacity: 1, 
+                    scale: 1,
+                    transition: { delay: 0.1, duration: 0.4 }
+                }}
+                exit={{ opacity: 0, scale: 0.5, transition: { duration: 0.1 } }}
+            />
 
-                    {/* Popover Container */}
-                    <motion.div
-                        className="fixed bottom-[88px] left-3 right-3 z-50 rounded-2xl bg-[#0A0A0A] border border-white/[0.08] shadow-2xl shadow-black/80 overflow-hidden"
-                        initial={{ 
-                            opacity: 0, 
-                            y: 60, 
-                            scale: 0.85,
-                            filter: 'blur(10px)',
-                            rotateX: -15,
-                        }}
+            {/* Header */}
+            <motion.div 
+                className="relative flex items-center justify-between px-4 py-3.5 border-b border-white/[0.06]"
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ 
+                    opacity: 1, 
+                    y: 0,
+                    transition: { delay: 0.05, duration: 0.3, ease: [0.22, 1, 0.36, 1] }
+                }}
+            >
+                <div className="flex items-center gap-2.5">
+                    <motion.div 
+                        className="w-7 h-7 rounded-lg bg-white/[0.06] flex items-center justify-center"
+                        initial={{ scale: 0, rotate: -180 }}
                         animate={{ 
-                            opacity: 1, 
-                            y: 0, 
-                            scale: 1,
-                            filter: 'blur(0px)',
-                            rotateX: 0,
-                            transition: {
+                            scale: 1, 
+                            rotate: 0,
+                            transition: { 
+                                delay: 0.1,
                                 type: 'spring',
-                                damping: 28,
-                                stiffness: 350,
-                                mass: 0.8,
+                                stiffness: 400,
+                                damping: 15
                             }
                         }}
-                        exit={{ 
-                            opacity: 0, 
-                            y: 40,
-                            scale: 0.9,
-                            filter: 'blur(8px)',
-                            transition: {
-                                duration: 0.2,
-                                ease: [0.32, 0, 0.67, 0],
-                            }
-                        }}
-                        style={{ 
-                            transformPerspective: 1200,
-                            transformOrigin: 'bottom center',
-                        }}
-                        role="dialog"
-                        aria-modal="true"
-                        aria-labelledby="menu-title"
                     >
-                        {/* Glow effect */}
-                        <motion.div 
-                            className="absolute -top-20 left-1/2 -translate-x-1/2 w-40 h-40 bg-white/10 rounded-full blur-3xl pointer-events-none"
-                            initial={{ opacity: 0, scale: 0.5 }}
-                            animate={{ 
-                                opacity: 1, 
-                                scale: 1,
-                                transition: { delay: 0.1, duration: 0.4 }
-                            }}
-                            exit={{ opacity: 0, scale: 0.5 }}
-                        />
+                        <item.icon className="w-3.5 h-3.5 text-gray-400" strokeWidth={2} />
+                    </motion.div>
+                    <motion.h3 
+                        id="menu-title" 
+                        className="text-sm font-semibold text-white"
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ 
+                            opacity: 1, 
+                            x: 0,
+                            transition: { delay: 0.12, duration: 0.3 }
+                        }}
+                    >
+                        {item.label}
+                    </motion.h3>
+                </div>
+                <motion.button
+                    onClick={onClose}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/[0.03] hover:bg-white/[0.08] transition-colors"
+                    aria-label="Close menu"
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ 
+                        scale: 1, 
+                        opacity: 1,
+                        transition: { delay: 0.15, type: 'spring', stiffness: 500, damping: 25 }
+                    }}
+                    whileHover={{ scale: 1.1, rotate: 90 }}
+                    whileTap={{ scale: 0.9 }}
+                >
+                    <X className="w-4 h-4 text-gray-500" strokeWidth={2} />
+                </motion.button>
+            </motion.div>
 
-                        {/* Header */}
+            {/* Routes */}
+            <div className="p-2 relative">
+                {allRoutes.map((route, index) => {
+                    const RouteIcon = route.icon;
+                    const active = isRouteActive(route);
+                    const isSettings = route.isSettings;
+                    
+                    return (
                         <motion.div 
-                            className="relative flex items-center justify-between px-4 py-3.5 border-b border-white/[0.06]"
-                            initial={{ opacity: 0, y: -10 }}
+                            key={route.href}
+                            initial={{ opacity: 0, x: -30, filter: 'blur(10px)' }}
                             animate={{ 
                                 opacity: 1, 
-                                y: 0,
-                                transition: { delay: 0.05, duration: 0.3, ease: [0.22, 1, 0.36, 1] }
+                                x: 0,
+                                filter: 'blur(0px)',
+                                transition: {
+                                    delay: 0.08 + index * 0.06,
+                                    type: 'spring',
+                                    stiffness: 350,
+                                    damping: 30,
+                                }
+                            }}
+                            exit={{
+                                opacity: 0,
+                                x: direction > 0 ? -20 : 20,
+                                filter: 'blur(5px)',
+                                transition: {
+                                    duration: 0.12,
+                                    delay: index * 0.02,
+                                }
                             }}
                         >
-                            <div className="flex items-center gap-2.5">
+                            {isSettings && (
                                 <motion.div 
-                                    className="w-7 h-7 rounded-lg bg-white/[0.06] flex items-center justify-center"
-                                    initial={{ scale: 0, rotate: -180 }}
+                                    className="h-px mx-1 my-2 bg-white/[0.06]"
+                                    initial={{ scaleX: 0 }}
                                     animate={{ 
-                                        scale: 1, 
-                                        rotate: 0,
-                                        transition: { 
-                                            delay: 0.1,
-                                            type: 'spring',
-                                            stiffness: 400,
-                                            damping: 15
-                                        }
+                                        scaleX: 1,
+                                        transition: { delay: 0.2, duration: 0.3 }
                                     }}
-                                >
-                                    <item.icon className="w-3.5 h-3.5 text-gray-400" strokeWidth={2} />
-                                </motion.div>
-                                <motion.h3 
-                                    id="menu-title" 
-                                    className="text-sm font-semibold text-white"
-                                    initial={{ opacity: 0, x: -10 }}
-                                    animate={{ 
-                                        opacity: 1, 
-                                        x: 0,
-                                        transition: { delay: 0.12, duration: 0.3 }
-                                    }}
-                                >
-                                    {item.label}
-                                </motion.h3>
-                            </div>
-                            <motion.button
+                                />
+                            )}
+                            <Link
+                                href={route.href}
                                 onClick={onClose}
-                                className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/[0.03] hover:bg-white/[0.08] transition-colors"
-                                aria-label="Close menu"
-                                initial={{ scale: 0, opacity: 0 }}
-                                animate={{ 
-                                    scale: 1, 
-                                    opacity: 1,
-                                    transition: { delay: 0.15, type: 'spring', stiffness: 500, damping: 25 }
-                                }}
-                                whileHover={{ scale: 1.1, rotate: 90 }}
-                                whileTap={{ scale: 0.9 }}
                             >
-                                <X className="w-4 h-4 text-gray-500" strokeWidth={2} />
-                            </motion.button>
-                        </motion.div>
-
-                        {/* Routes */}
-                        <div className="p-2 relative">
-                            {allRoutes.map((route, index) => {
-                                const RouteIcon = route.icon;
-                                const active = isRouteActive(route);
-                                const isSettings = route.isSettings;
-                                
-                                return (
+                                <motion.div
+                                    className={`
+                                        flex items-center gap-3 px-3 py-3 rounded-xl transition-colors duration-150 group relative overflow-hidden
+                                        ${active ? 'bg-white text-black' : 'text-gray-400 hover:text-white'}
+                                    `}
+                                    whileHover={{ 
+                                        scale: 1.02,
+                                        backgroundColor: active ? 'rgb(255,255,255)' : 'rgba(255,255,255,0.05)',
+                                        transition: { duration: 0.2 }
+                                    }}
+                                    whileTap={{ scale: 0.98 }}
+                                    aria-current={active ? 'page' : undefined}
+                                >
                                     <motion.div 
-                                        key={route.href}
-                                        initial={{ opacity: 0, x: -30, filter: 'blur(10px)' }}
-                                        animate={{ 
-                                            opacity: 1, 
-                                            x: 0,
-                                            filter: 'blur(0px)',
-                                            transition: {
-                                                delay: 0.08 + index * 0.06,
-                                                type: 'spring',
-                                                stiffness: 350,
-                                                damping: 30,
-                                            }
-                                        }}
-                                        exit={{
-                                            opacity: 0,
-                                            x: -20,
-                                            filter: 'blur(5px)',
-                                            transition: {
-                                                duration: 0.15,
-                                                delay: index * 0.02,
-                                            }
-                                        }}
+                                        className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+                                        initial={false}
+                                    />
+                                    
+                                    <motion.div
+                                        initial={{ rotate: 0 }}
+                                        whileHover={{ rotate: [0, -10, 10, 0] }}
+                                        transition={{ duration: 0.4 }}
                                     >
-                                        {isSettings && (
-                                            <motion.div 
-                                                className="h-px mx-1 my-2 bg-white/[0.06]"
-                                                initial={{ scaleX: 0 }}
-                                                animate={{ 
-                                                    scaleX: 1,
-                                                    transition: { delay: 0.2, duration: 0.3 }
-                                                }}
-                                            />
-                                        )}
-                                        <Link
-                                            href={route.href}
-                                            onClick={onClose}
-                                        >
-                                            <motion.div
-                                                className={`
-                                                    flex items-center gap-3 px-3 py-3 rounded-xl transition-colors duration-150 group relative overflow-hidden
-                                                    ${active ? 'bg-white text-black' : 'text-gray-400 hover:text-white'}
-                                                `}
-                                                whileHover={{ 
-                                                    scale: 1.02,
-                                                    backgroundColor: active ? 'rgb(255,255,255)' : 'rgba(255,255,255,0.05)',
-                                                    transition: { duration: 0.2 }
-                                                }}
-                                                whileTap={{ scale: 0.98 }}
-                                                aria-current={active ? 'page' : undefined}
-                                            >
-                                                {/* Hover glow */}
-                                                <motion.div 
-                                                    className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
-                                                    initial={false}
-                                                />
-                                                
-                                                <motion.div
-                                                    initial={{ rotate: 0 }}
-                                                    whileHover={{ rotate: [0, -10, 10, 0] }}
-                                                    transition={{ duration: 0.4 }}
-                                                >
-                                                    <RouteIcon className={`w-4 h-4 ${active ? 'text-black' : 'text-gray-500 group-hover:text-white'} transition-colors`} strokeWidth={2} />
-                                                </motion.div>
-                                                <span className="flex-1 text-sm font-medium">{route.label}</span>
-                                                <motion.div
-                                                    initial={{ x: 0 }}
-                                                    whileHover={{ x: 3 }}
-                                                    transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-                                                >
-                                                    <ChevronRight className={`w-3.5 h-3.5 ${active ? 'text-black/50' : 'text-gray-700 group-hover:text-gray-400'} transition-colors`} strokeWidth={2} />
-                                                </motion.div>
-                                            </motion.div>
-                                        </Link>
+                                        <RouteIcon className={`w-4 h-4 ${active ? 'text-black' : 'text-gray-500 group-hover:text-white'} transition-colors`} strokeWidth={2} />
                                     </motion.div>
-                                );
-                            })}
-                        </div>
+                                    <span className="flex-1 text-sm font-medium">{route.label}</span>
+                                    <motion.div
+                                        initial={{ x: 0 }}
+                                        whileHover={{ x: 3 }}
+                                        transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+                                    >
+                                        <ChevronRight className={`w-3.5 h-3.5 ${active ? 'text-black/50' : 'text-gray-700 group-hover:text-gray-400'} transition-colors`} strokeWidth={2} />
+                                    </motion.div>
+                                </motion.div>
+                            </Link>
+                        </motion.div>
+                    );
+                })}
+            </div>
 
-                        {/* Bottom gradient */}
-                        <motion.div 
-                            className="h-1 bg-gradient-to-r from-transparent via-white/10 to-transparent"
-                            initial={{ scaleX: 0, opacity: 0 }}
-                            animate={{ 
-                                scaleX: 1, 
-                                opacity: 1,
-                                transition: { delay: 0.3, duration: 0.4 }
-                            }}
-                        />
-                    </motion.div>
-                </>
-            )}
-        </AnimatePresence>
+            {/* Bottom gradient */}
+            <motion.div 
+                className="h-1 bg-gradient-to-r from-transparent via-white/10 to-transparent"
+                initial={{ scaleX: 0, opacity: 0 }}
+                animate={{ 
+                    scaleX: 1, 
+                    opacity: 1,
+                    transition: { delay: 0.3, duration: 0.4 }
+                }}
+            />
+        </motion.div>
     );
 }
 
@@ -384,6 +413,16 @@ export default function DashboardLayout({ children }) {
     const [menuOpen, setMenuOpen] = useState(null);
     const [showWelcome, setShowWelcome] = useState(false);
     const [mounted, setMounted] = useState(false);
+    
+    // Track direction and initial state for animations
+    const [direction, setDirection] = useState(0);
+    const [isInitialOpen, setIsInitialOpen] = useState(true);
+    const prevMenuRef = useRef(null);
+
+    // Get the currently open menu item
+    const currentMenuItem = useMemo(() => {
+        return MOBILE_NAV.find(item => item.label === menuOpen) || null;
+    }, [menuOpen]);
 
     const activeTab = useMemo(() => {
         for (let tab of MOBILE_NAV) {
@@ -393,6 +432,32 @@ export default function DashboardLayout({ children }) {
         }
         return null;
     }, [pathname]);
+
+    // Calculate direction when menu changes
+    const openMenu = useCallback((item) => {
+        const newIndex = MOBILE_NAV.findIndex(nav => nav.label === item.label);
+        const prevIndex = MOBILE_NAV.findIndex(nav => nav.label === prevMenuRef.current);
+        
+        if (prevMenuRef.current === null) {
+            // First open - use initial animation
+            setIsInitialOpen(true);
+            setDirection(0);
+        } else if (prevMenuRef.current !== item.label) {
+            // Switching between tabs
+            setIsInitialOpen(false);
+            setDirection(newIndex > prevIndex ? 1 : -1);
+        }
+        
+        prevMenuRef.current = item.label;
+        setMenuOpen(item.label);
+    }, []);
+
+    const closeMenu = useCallback(() => {
+        setIsInitialOpen(true);
+        setDirection(0);
+        prevMenuRef.current = null;
+        setMenuOpen(null);
+    }, []);
 
     useEffect(() => {
         if (loading) return;
@@ -418,16 +483,16 @@ export default function DashboardLayout({ children }) {
 
     useEffect(() => {
         setDrawerOpen(false);
-        setMenuOpen(null);
-    }, [pathname]);
+        closeMenu();
+    }, [pathname, closeMenu]);
 
     useEffect(() => {
         const handler = (e) => {
-            if (e.key === 'Escape') { setDrawerOpen(false); setMenuOpen(null); }
+            if (e.key === 'Escape') { setDrawerOpen(false); closeMenu(); }
         };
         document.addEventListener('keydown', handler);
         return () => document.removeEventListener('keydown', handler);
-    }, []);
+    }, [closeMenu]);
 
     useEffect(() => {
         if (!socket) return;
@@ -451,8 +516,6 @@ export default function DashboardLayout({ children }) {
     const handleLogout = useCallback(() => logout?.(), [logout]);
     const openDrawer   = useCallback(() => setDrawerOpen(true), []);
     const closeDrawer  = useCallback(() => setDrawerOpen(false), []);
-    const openMenu     = useCallback((item) => setMenuOpen(item.label), []);
-    const closeMenu    = useCallback(() => setMenuOpen(null), []);
     const closeWelcome = useCallback(() => {
         setShowWelcome(false);
     }, []);
@@ -560,16 +623,22 @@ export default function DashboardLayout({ children }) {
                 </main>
             </div>
 
-            {/* Mobile popovers */}
-            {MOBILE_NAV.map((item) => (
-                <MenuPopover
-                    key={item.label}
-                    item={item}
-                    isOpen={menuOpen === item.label}
-                    onClose={closeMenu}
-                    pathname={pathname}
-                />
-            ))}
+            {/* Mobile Menu Backdrop */}
+            <MenuBackdrop isOpen={menuOpen !== null} onClose={closeMenu} />
+
+            {/* Mobile Menu Popover Content */}
+            <AnimatePresence mode="popLayout" initial={false}>
+                {currentMenuItem && (
+                    <MenuPopoverContent
+                        key={currentMenuItem.label}
+                        item={currentMenuItem}
+                        onClose={closeMenu}
+                        pathname={pathname}
+                        direction={direction}
+                        isInitial={isInitialOpen}
+                    />
+                )}
+            </AnimatePresence>
 
             {/* Mobile bottom nav */}
             <nav
