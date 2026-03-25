@@ -16,11 +16,11 @@ const TIME_SLOTS = [
     '04:00 PM-05:30 PM',
 ];
 
-// ✅ UPDATED: 3 steps instead of 4 (no variant selection)
+// ✅ UPDATED: Reordered steps - Schedule first, then Services, then Customer
 const STEPS = [
-    { label: 'Customer', desc: 'Who is booking?' },
-    { label: 'Service',  desc: 'What service?'   },
-    { label: 'Schedule', desc: 'When & where?'   }
+    { label: 'Schedule', desc: 'When & where?' },
+    { label: 'Service',  desc: 'What service?' },
+    { label: 'Customer', desc: 'Who is booking?' }
 ];
 
 /* ── Shared styles ── */
@@ -85,31 +85,29 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
     const [loading, setLoading] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
 
-    /* Step 1 */
+    /* Step 1 - Schedule */
+    const [bookingDate, setBookingDate] = useState('');
+    const [timeSlot, setTimeSlot] = useState('');
+    const [availability, setAvailability] = useState([]);
+    const [availabilityLoading, setAvailabilityLoading] = useState(false);
+    const [location, setLocation] = useState({
+        address: 'Walk-in / At Shop',
+        city: 'Walk-in'
+    });
+    const [paymentMethod, setPaymentMethod] = useState('cash');
+
+    /* Step 2 - Service */
+    const [services, setServices] = useState([]);
+    const [selectedService, setSelectedService] = useState(null);
+    const [servicesLoading, setServicesLoading] = useState(false);
+
+    /* Step 3 - Customer */
     const [bookingType, setBookingType] = useState('walkin');
     const [walkInCustomer, setWalkInCustomer] = useState({ name: '', phone: '' });
     const [customerSearch, setCustomerSearch] = useState('');
     const [customers, setCustomers] = useState([]);
     const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [searchLoading, setSearchLoading] = useState(false);
-
-    /* Step 2 - ✅ SIMPLIFIED: Just service selection */
-    const [services, setServices] = useState([]);
-    const [selectedService, setSelectedService] = useState(null);
-    const [servicesLoading, setServicesLoading] = useState(false);
-
-    /* Step 3 - ✅ COMBINED: Date/Time + Location */
-    const [bookingDate, setBookingDate] = useState('');
-    const [timeSlot, setTimeSlot] = useState('');
-    const [availability, setAvailability] = useState([]);
-    const [availabilityLoading, setAvailabilityLoading] = useState(false);
-    // ✅ CHANGE 1: Removed landmark from location state
-    const [location, setLocation] = useState({
-        address: 'Walk-in / At Shop',
-        city: 'Walk-in'
-    });
-    // ✅ CHANGE 2: Removed specialNotes state
-    const [paymentMethod, setPaymentMethod] = useState('cash');
 
     // Refresh current time every minute
     useEffect(() => {
@@ -199,7 +197,6 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
         try {
             setLoading(true);
             
-            // ✅ CHANGE 5: Updated payload — no specialNotes, phone added
             const payload = {
                 bookingType,
                 serviceId: selectedService._id,
@@ -228,9 +225,9 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
     };
 
     const canProceed = {
-        1: bookingType === 'walkin' ? walkInCustomer.name.trim() : selectedCustomer !== null,
+        1: bookingDate && timeSlot && location.address.trim() && location.city.trim(),
         2: selectedService !== null,
-        3: bookingDate && timeSlot && location.address.trim() && location.city.trim()
+        3: bookingType === 'walkin' ? walkInCustomer.name.trim() : selectedCustomer !== null
     };
 
     return (
@@ -325,8 +322,187 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                     {/* ✅ FIXED: Content with proper scrolling */}
                     <div className="flex-1 overflow-y-auto px-4 py-5 space-y-6 pb-28 sm:pb-6">
 
-                        {/* STEP 1 — Customer */}
+                        {/* STEP 1 — Schedule + Location */}
                         {step === 1 && (
+                            <div className="space-y-5">
+                                {/* Date */}
+                                <div>
+                                    <span className={sectionLabel}>Booking Date</span>
+                                    <input
+                                        type="date"
+                                        value={bookingDate}
+                                        min={(() => {
+                                            const today = new Date();
+                                            const year = today.getFullYear();
+                                            const month = String(today.getMonth() + 1).padStart(2, '0');
+                                            const day = String(today.getDate()).padStart(2, '0');
+                                            return `${year}-${month}-${day}`;
+                                        })()}
+                                        onChange={(e) => { 
+                                            setBookingDate(e.target.value); 
+                                            setTimeSlot(''); 
+                                        }}
+                                        className={`${inputCls} [color-scheme:dark]`}
+                                    />
+                                </div>
+
+                                {/* Time Slots */}
+                                {bookingDate && (
+                                    <div>
+                                        <div className="flex items-center justify-between mb-3">
+                                            <span className={`${sectionLabel} mb-0`}>Time Slot</span>
+                                            <div className="flex items-center gap-3">
+                                                {bookingDate === (() => {
+                                                    const t = new Date();
+                                                    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+                                                })() && (
+                                                    <span className="text-[10px] text-white/20 font-mono">
+                                                        Now {currentTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                                                    </span>
+                                                )}
+                                                {availabilityLoading && (
+                                                    <div className="flex items-center gap-1.5">
+                                                        <Loader2 className="w-3 h-3 text-white/25 animate-spin" />
+                                                        <span className="text-[10px] text-white/25">Checking…</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {TIME_SLOTS.map((slot) => {
+                                                const available = isSlotAvailable(slot);
+                                                const passed = isSlotPassed(slot, bookingDate);
+                                                const disabled = !available || passed;
+                                                const selected = timeSlot === slot;
+
+                                                return (
+                                                    <button
+                                                        key={slot}
+                                                        onClick={() => !disabled && setTimeSlot(slot)}
+                                                        disabled={disabled}
+                                                        className={`relative p-3 rounded-lg border text-xs font-medium transition-all duration-150 ${
+                                                            selected
+                                                                ? 'border-white/30 bg-white/[0.08] text-white'
+                                                                : disabled
+                                                                ? 'border-white/[0.04] bg-white/[0.01] text-white/15 cursor-not-allowed'
+                                                                : 'border-white/[0.07] bg-white/[0.02] text-white/50 hover:border-white/[0.14] hover:text-white/70'
+                                                        }`}
+                                                    >
+                                                        {slot}
+                                                        {passed && (
+                                                            <span className="block text-[10px] text-white/15 mt-0.5">
+                                                                Passed
+                                                            </span>
+                                                        )}
+                                                        {!passed && !available && (
+                                                            <span className="block text-[10px] text-white/15 mt-0.5">
+                                                                Booked
+                                                            </span>
+                                                        )}
+                                                        {selected && (
+                                                            <span className="absolute top-1.5 right-1.5 w-3 h-3 rounded-full bg-white flex items-center justify-center">
+                                                                <Check className="w-2 h-2 text-black" />
+                                                            </span>
+                                                        )}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="h-px bg-white/[0.05]" />
+
+                                {/* Location */}
+                                <div>
+                                    <span className={sectionLabel}>Location</span>
+                                    <div className="space-y-2.5">
+                                        <FieldInput
+                                            label="Address *"
+                                            value={location.address}
+                                            onChange={(v) => setLocation(p => ({ ...p, address: v }))}
+                                            placeholder="Street address"
+                                        />
+                                        <FieldInput
+                                            label="City *"
+                                            value={location.city}
+                                            onChange={(v) => setLocation(p => ({ ...p, city: v }))}
+                                            placeholder="City"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="h-px bg-white/[0.05]" />
+
+                                {/* Payment */}
+                                <div>
+                                    <span className={sectionLabel}>Payment Method</span>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {['cash', 'card', 'online'].map((m) => (
+                                            <button
+                                                key={m}
+                                                onClick={() => setPaymentMethod(m)}
+                                                className={`p-3 rounded-lg border text-xs font-medium capitalize transition-all duration-150 ${
+                                                    paymentMethod === m
+                                                        ? 'border-white/25 bg-white/[0.07] text-white/80'
+                                                        : 'border-white/[0.07] bg-white/[0.02] text-white/35 hover:border-white/[0.12]'
+                                                }`}
+                                            >
+                                                {m}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* STEP 2 — Service (NO variant selection) */}
+                        {step === 2 && (
+                            <div className="space-y-5">
+                                <div>
+                                    <span className={sectionLabel}>Select Service</span>
+                                    {servicesLoading ? (
+                                        <div className="space-y-2">
+                                            {[...Array(4)].map((_, i) => (
+                                                <div key={i} className="h-16 rounded-lg bg-white/[0.03] animate-pulse" />
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-1.5">
+                                            {services.map((s) => (
+                                                <button
+                                                    key={s._id}
+                                                    onClick={() => setSelectedService(s)}
+                                                    className={`w-full flex items-center justify-between p-3.5 rounded-lg border text-left transition-all duration-150 ${
+                                                        selectedService?._id === s._id
+                                                            ? 'border-white/25 bg-white/[0.06]'
+                                                            : 'border-white/[0.07] bg-white/[0.02] hover:border-white/[0.12]'
+                                                    }`}
+                                                >
+                                                    <div>
+                                                        <p className="text-sm text-white/80">{s.name}</p>
+                                                        <p className="text-[11px] text-white/30 mt-0.5">
+                                                            {s.category?.name || s.tier}
+                                                            <span className="mx-1.5 text-white/15">·</span>
+                                                            ₹{(s.discountPrice || s.price || 0).toLocaleString('en-IN')}
+                                                        </p>
+                                                    </div>
+                                                    {selectedService?._id === s._id && (
+                                                        <div className="w-5 h-5 rounded-full bg-white flex items-center justify-center shrink-0">
+                                                            <Check className="w-3 h-3 text-black" />
+                                                        </div>
+                                                    )}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* STEP 3 — Customer */}
+                        {step === 3 && (
                             <div className="space-y-5">
                                 <div>
                                     <span className={sectionLabel}>Booking Type</span>
@@ -438,195 +614,19 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                                         )}
                                     </div>
                                 )}
-                            </div>
-                        )}
-
-                        {/* STEP 2 — Service (NO variant selection) */}
-                        {step === 2 && (
-                            <div className="space-y-5">
-                                <div>
-                                    <span className={sectionLabel}>Select Service</span>
-                                    {servicesLoading ? (
-                                        <div className="space-y-2">
-                                            {[...Array(4)].map((_, i) => (
-                                                <div key={i} className="h-16 rounded-lg bg-white/[0.03] animate-pulse" />
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-1.5">
-                                            {services.map((s) => (
-                                                <button
-                                                    key={s._id}
-                                                    onClick={() => setSelectedService(s)}
-                                                    className={`w-full flex items-center justify-between p-3.5 rounded-lg border text-left transition-all duration-150 ${
-                                                        selectedService?._id === s._id
-                                                            ? 'border-white/25 bg-white/[0.06]'
-                                                            : 'border-white/[0.07] bg-white/[0.02] hover:border-white/[0.12]'
-                                                    }`}
-                                                >
-                                                    <div>
-                                                        <p className="text-sm text-white/80">{s.name}</p>
-                                                        <p className="text-[11px] text-white/30 mt-0.5">
-                                                            {s.category?.name || s.tier}
-                                                            <span className="mx-1.5 text-white/15">·</span>
-                                                            ₹{(s.discountPrice || s.price || 0).toLocaleString('en-IN')}
-                                                        </p>
-                                                    </div>
-                                                    {selectedService?._id === s._id && (
-                                                        <div className="w-5 h-5 rounded-full bg-white flex items-center justify-center shrink-0">
-                                                            <Check className="w-3 h-3 text-black" />
-                                                        </div>
-                                                    )}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* STEP 3 — Schedule + Location */}
-                        {step === 3 && (
-                            <div className="space-y-5">
-                                {/* Date */}
-                                <div>
-                                    <span className={sectionLabel}>Booking Date</span>
-                                    <input
-                                        type="date"
-                                        value={bookingDate}
-                                        min={(() => {
-                                            const today = new Date();
-                                            const year = today.getFullYear();
-                                            const month = String(today.getMonth() + 1).padStart(2, '0');
-                                            const day = String(today.getDate()).padStart(2, '0');
-                                            return `${year}-${month}-${day}`;
-                                        })()}
-                                        onChange={(e) => { 
-                                            setBookingDate(e.target.value); 
-                                            setTimeSlot(''); 
-                                        }}
-                                        className={`${inputCls} [color-scheme:dark]`}
-                                    />
-                                </div>
-
-                                {/* Time Slots */}
-                                {bookingDate && (
-                                    <div>
-                                        <div className="flex items-center justify-between mb-3">
-                                            <span className={`${sectionLabel} mb-0`}>Time Slot</span>
-                                            <div className="flex items-center gap-3">
-                                                {bookingDate === (() => {
-                                                    const t = new Date();
-                                                    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
-                                                })() && (
-                                                    <span className="text-[10px] text-white/20 font-mono">
-                                                        Now {currentTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
-                                                    </span>
-                                                )}
-                                                {availabilityLoading && (
-                                                    <div className="flex items-center gap-1.5">
-                                                        <Loader2 className="w-3 h-3 text-white/25 animate-spin" />
-                                                        <span className="text-[10px] text-white/25">Checking…</span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        <div className="grid grid-cols-2 gap-2">
-                                            {TIME_SLOTS.map((slot) => {
-                                                const available = isSlotAvailable(slot);
-                                                const passed = isSlotPassed(slot, bookingDate);
-                                                const disabled = !available || passed;
-                                                const selected = timeSlot === slot;
-
-                                                return (
-                                                    <button
-                                                        key={slot}
-                                                        onClick={() => !disabled && setTimeSlot(slot)}
-                                                        disabled={disabled}
-                                                        className={`relative p-3 rounded-lg border text-xs font-medium transition-all duration-150 ${
-                                                            selected
-                                                                ? 'border-white/30 bg-white/[0.08] text-white'
-                                                                : disabled
-                                                                ? 'border-white/[0.04] bg-white/[0.01] text-white/15 cursor-not-allowed'
-                                                                : 'border-white/[0.07] bg-white/[0.02] text-white/50 hover:border-white/[0.14] hover:text-white/70'
-                                                        }`}
-                                                    >
-                                                        {slot}
-                                                        {passed && (
-                                                            <span className="block text-[10px] text-white/15 mt-0.5">
-                                                                Passed
-                                                            </span>
-                                                        )}
-                                                        {!passed && !available && (
-                                                            <span className="block text-[10px] text-white/15 mt-0.5">
-                                                                Booked
-                                                            </span>
-                                                        )}
-                                                        {selected && (
-                                                            <span className="absolute top-1.5 right-1.5 w-3 h-3 rounded-full bg-white flex items-center justify-center">
-                                                                <Check className="w-2 h-2 text-black" />
-                                                            </span>
-                                                        )}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                )}
-
-                                <div className="h-px bg-white/[0.05]" />
-
-                                {/* Location */}
-                                {/* ✅ CHANGE 3: Removed Landmark field */}
-                                <div>
-                                    <span className={sectionLabel}>Location</span>
-                                    <div className="space-y-2.5">
-                                        <FieldInput
-                                            label="Address *"
-                                            value={location.address}
-                                            onChange={(v) => setLocation(p => ({ ...p, address: v }))}
-                                            placeholder="Street address"
-                                        />
-                                        <FieldInput
-                                            label="City *"
-                                            value={location.city}
-                                            onChange={(v) => setLocation(p => ({ ...p, city: v }))}
-                                            placeholder="City"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="h-px bg-white/[0.05]" />
-
-                                {/* Payment */}
-                                <div>
-                                    <span className={sectionLabel}>Payment Method</span>
-                                    <div className="grid grid-cols-3 gap-2">
-                                        {['cash', 'card', 'online'].map((m) => (
-                                            <button
-                                                key={m}
-                                                onClick={() => setPaymentMethod(m)}
-                                                className={`p-3 rounded-lg border text-xs font-medium capitalize transition-all duration-150 ${
-                                                    paymentMethod === m
-                                                        ? 'border-white/25 bg-white/[0.07] text-white/80'
-                                                        : 'border-white/[0.07] bg-white/[0.02] text-white/35 hover:border-white/[0.12]'
-                                                }`}
-                                            >
-                                                {m}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div className="h-px bg-white/[0.05]" />
-
-                                {/* ✅ CHANGE 4: Removed Special Notes section entirely */}
 
                                 {/* Summary */}
+                                <div className="h-px bg-white/[0.05]" />
                                 <div>
                                     <span className={sectionLabel}>Summary</span>
                                     <div className="rounded-lg border border-white/[0.07] bg-white/[0.02] p-4 space-y-2.5">
+                                        <SummaryRow
+                                            label="Date"
+                                            value={bookingDate}
+                                            mono
+                                        />
+                                        <SummaryRow label="Time" value={timeSlot} mono />
+                                        <SummaryRow label="Service" value={selectedService?.name} />
                                         <SummaryRow
                                             label="Customer"
                                             value={bookingType === 'walkin'
@@ -634,9 +634,6 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                                                 : `${selectedCustomer?.firstName} ${selectedCustomer?.lastName}`
                                             }
                                         />
-                                        <SummaryRow label="Service" value={selectedService?.name} />
-                                        <SummaryRow label="Date" value={bookingDate} mono />
-                                        <SummaryRow label="Time" value={timeSlot} mono />
                                         <div className="h-px bg-white/[0.05]" />
                                         <SummaryRow
                                             label="Total"
