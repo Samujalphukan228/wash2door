@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import { useSocket } from '@/context/SocketContext';
 import Sidebar from './Sidebar';
@@ -47,118 +48,288 @@ const MOBILE_NAV = [
 function MobileNavItem({ item, isActive, onOpenMenu }) {
     const Icon = item.icon;
     return (
-        <button
+        <motion.button
             onClick={() => onOpenMenu(item)}
             className="relative flex flex-col items-center justify-center gap-1 flex-1 h-full transition-all duration-200 select-none"
             aria-current={isActive ? 'page' : undefined}
             aria-label={item.label}
+            whileTap={{ scale: 0.92 }}
         >
             {/* Active indicator bar */}
-            <span className={`
-                absolute top-0 left-1/2 -translate-x-1/2 h-[2px] rounded-full
-                transition-all duration-300
-                ${isActive ? 'w-8 bg-white' : 'w-0 bg-transparent'}
-            `} />
+            <motion.span 
+                className="absolute top-0 left-1/2 -translate-x-1/2 h-[2px] rounded-full bg-white"
+                initial={false}
+                animate={{ 
+                    width: isActive ? 32 : 0,
+                    opacity: isActive ? 1 : 0 
+                }}
+                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+            />
 
-            <div className={`
-                w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200
-                ${isActive ? 'bg-white/10' : 'bg-transparent'}
-            `}>
+            <motion.div 
+                className="w-9 h-9 rounded-xl flex items-center justify-center"
+                initial={false}
+                animate={{ 
+                    backgroundColor: isActive ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0)',
+                    scale: isActive ? 1 : 0.95
+                }}
+                transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+            >
                 <Icon
-                    className={`h-[18px] w-[18px] transition-all duration-200 ${isActive ? 'text-white' : 'text-gray-600'}`}
+                    className={`h-[18px] w-[18px] transition-colors duration-200 ${isActive ? 'text-white' : 'text-gray-600'}`}
                     strokeWidth={isActive ? 2.5 : 1.8}
                     aria-hidden="true"
                 />
-            </div>
-            <span className={`text-[10px] font-medium leading-none transition-all duration-200 ${isActive ? 'text-white' : 'text-gray-600'}`}>
+            </motion.div>
+            <span className={`text-[10px] font-medium leading-none transition-colors duration-200 ${isActive ? 'text-white' : 'text-gray-600'}`}>
                 {item.label}
             </span>
-        </button>
+        </motion.button>
     );
 }
 
 // ── Menu Popover ─────────────────────────────────────────────────
 function MenuPopover({ item, isOpen, onClose, pathname }) {
-    if (!isOpen) return null;
-
     const isRouteActive = (route) =>
         pathname === route.href || pathname.startsWith(route.href + '/');
 
+    const allRoutes = item.label === 'Catalog' 
+        ? [...item.routes, { label: 'Settings', href: '/admin/settings', icon: Settings, isSettings: true }]
+        : item.routes;
+
     return (
-        <>
-            <div
-                className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
-                onClick={onClose}
-                aria-hidden="true"
-            />
-            <div
-                className="fixed bottom-[88px] left-3 right-3 z-50 rounded-2xl bg-[#0A0A0A] border border-white/[0.08] shadow-2xl shadow-black/80 overflow-hidden"
-                style={{ animation: 'slideUp 0.2s ease-out' }}
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="menu-title"
-            >
-                <style>{`@keyframes slideUp { from { opacity:0; transform:translateY(12px) } to { opacity:1; transform:translateY(0) } }`}</style>
-
-                {/* Header */}
-                <div className="flex items-center justify-between px-4 py-3.5 border-b border-white/[0.06]">
-                    <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-lg bg-white/[0.06] flex items-center justify-center">
-                            <item.icon className="w-3.5 h-3.5 text-gray-400" strokeWidth={2} />
-                        </div>
-                        <h3 id="menu-title" className="text-sm font-semibold text-white">{item.label}</h3>
-                    </div>
-                    <button
+        <AnimatePresence mode="wait">
+            {isOpen && (
+                <>
+                    {/* Backdrop */}
+                    <motion.div
+                        className="fixed inset-0 z-40 bg-black/70"
+                        initial={{ opacity: 0, backdropFilter: 'blur(0px)' }}
+                        animate={{ 
+                            opacity: 1, 
+                            backdropFilter: 'blur(12px)',
+                            transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] }
+                        }}
+                        exit={{ 
+                            opacity: 0, 
+                            backdropFilter: 'blur(0px)',
+                            transition: { duration: 0.2, ease: [0.22, 1, 0.36, 1] }
+                        }}
                         onClick={onClose}
-                        className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-white/[0.06] transition-colors"
-                        aria-label="Close menu"
+                        aria-hidden="true"
+                    />
+
+                    {/* Popover Container */}
+                    <motion.div
+                        className="fixed bottom-[88px] left-3 right-3 z-50 rounded-2xl bg-[#0A0A0A] border border-white/[0.08] shadow-2xl shadow-black/80 overflow-hidden"
+                        initial={{ 
+                            opacity: 0, 
+                            y: 60, 
+                            scale: 0.85,
+                            filter: 'blur(10px)',
+                            rotateX: -15,
+                        }}
+                        animate={{ 
+                            opacity: 1, 
+                            y: 0, 
+                            scale: 1,
+                            filter: 'blur(0px)',
+                            rotateX: 0,
+                            transition: {
+                                type: 'spring',
+                                damping: 28,
+                                stiffness: 350,
+                                mass: 0.8,
+                            }
+                        }}
+                        exit={{ 
+                            opacity: 0, 
+                            y: 40,
+                            scale: 0.9,
+                            filter: 'blur(8px)',
+                            transition: {
+                                duration: 0.2,
+                                ease: [0.32, 0, 0.67, 0],
+                            }
+                        }}
+                        style={{ 
+                            transformPerspective: 1200,
+                            transformOrigin: 'bottom center',
+                        }}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="menu-title"
                     >
-                        <X className="w-4 h-4 text-gray-500" strokeWidth={2} />
-                    </button>
-                </div>
+                        {/* Glow effect */}
+                        <motion.div 
+                            className="absolute -top-20 left-1/2 -translate-x-1/2 w-40 h-40 bg-white/10 rounded-full blur-3xl pointer-events-none"
+                            initial={{ opacity: 0, scale: 0.5 }}
+                            animate={{ 
+                                opacity: 1, 
+                                scale: 1,
+                                transition: { delay: 0.1, duration: 0.4 }
+                            }}
+                            exit={{ opacity: 0, scale: 0.5 }}
+                        />
 
-                {/* Routes */}
-                <div className="p-2">
-                    {item.routes.map((route) => {
-                        const RouteIcon = route.icon;
-                        const active = isRouteActive(route);
-                        return (
-                            <Link
-                                key={route.href}
-                                href={route.href}
+                        {/* Header */}
+                        <motion.div 
+                            className="relative flex items-center justify-between px-4 py-3.5 border-b border-white/[0.06]"
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ 
+                                opacity: 1, 
+                                y: 0,
+                                transition: { delay: 0.05, duration: 0.3, ease: [0.22, 1, 0.36, 1] }
+                            }}
+                        >
+                            <div className="flex items-center gap-2.5">
+                                <motion.div 
+                                    className="w-7 h-7 rounded-lg bg-white/[0.06] flex items-center justify-center"
+                                    initial={{ scale: 0, rotate: -180 }}
+                                    animate={{ 
+                                        scale: 1, 
+                                        rotate: 0,
+                                        transition: { 
+                                            delay: 0.1,
+                                            type: 'spring',
+                                            stiffness: 400,
+                                            damping: 15
+                                        }
+                                    }}
+                                >
+                                    <item.icon className="w-3.5 h-3.5 text-gray-400" strokeWidth={2} />
+                                </motion.div>
+                                <motion.h3 
+                                    id="menu-title" 
+                                    className="text-sm font-semibold text-white"
+                                    initial={{ opacity: 0, x: -10 }}
+                                    animate={{ 
+                                        opacity: 1, 
+                                        x: 0,
+                                        transition: { delay: 0.12, duration: 0.3 }
+                                    }}
+                                >
+                                    {item.label}
+                                </motion.h3>
+                            </div>
+                            <motion.button
                                 onClick={onClose}
-                                className={`
-                                    flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-150 group
-                                    ${active ? 'bg-white text-black' : 'text-gray-400 hover:text-white hover:bg-white/[0.05] active:scale-[0.98]'}
-                                `}
-                                aria-current={active ? 'page' : undefined}
+                                className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/[0.03] hover:bg-white/[0.08] transition-colors"
+                                aria-label="Close menu"
+                                initial={{ scale: 0, opacity: 0 }}
+                                animate={{ 
+                                    scale: 1, 
+                                    opacity: 1,
+                                    transition: { delay: 0.15, type: 'spring', stiffness: 500, damping: 25 }
+                                }}
+                                whileHover={{ scale: 1.1, rotate: 90 }}
+                                whileTap={{ scale: 0.9 }}
                             >
-                                <RouteIcon className={`w-4 h-4 ${active ? 'text-black' : 'text-gray-500'}`} strokeWidth={2} />
-                                <span className="flex-1 text-sm font-medium">{route.label}</span>
-                                <ChevronRight className={`w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5 ${active ? 'text-black/50' : 'text-gray-700'}`} strokeWidth={2} />
-                            </Link>
-                        );
-                    })}
-                </div>
+                                <X className="w-4 h-4 text-gray-500" strokeWidth={2} />
+                            </motion.button>
+                        </motion.div>
 
-                {item.label === 'Catalog' && (
-                    <>
-                        <div className="h-px mx-3 bg-white/[0.06]" />
-                        <div className="p-2">
-                            <Link
-                                href="/admin/settings"
-                                onClick={onClose}
-                                className="flex items-center gap-3 px-3 py-3 rounded-xl text-gray-400 hover:text-white hover:bg-white/[0.05] transition-all group active:scale-[0.98]"
-                            >
-                                <Settings className="w-4 h-4 text-gray-500" strokeWidth={2} />
-                                <span className="flex-1 text-sm font-medium">Settings</span>
-                                <ChevronRight className="w-3.5 h-3.5 text-gray-700 group-hover:translate-x-0.5 transition-transform" strokeWidth={2} />
-                            </Link>
+                        {/* Routes */}
+                        <div className="p-2 relative">
+                            {allRoutes.map((route, index) => {
+                                const RouteIcon = route.icon;
+                                const active = isRouteActive(route);
+                                const isSettings = route.isSettings;
+                                
+                                return (
+                                    <motion.div 
+                                        key={route.href}
+                                        initial={{ opacity: 0, x: -30, filter: 'blur(10px)' }}
+                                        animate={{ 
+                                            opacity: 1, 
+                                            x: 0,
+                                            filter: 'blur(0px)',
+                                            transition: {
+                                                delay: 0.08 + index * 0.06,
+                                                type: 'spring',
+                                                stiffness: 350,
+                                                damping: 30,
+                                            }
+                                        }}
+                                        exit={{
+                                            opacity: 0,
+                                            x: -20,
+                                            filter: 'blur(5px)',
+                                            transition: {
+                                                duration: 0.15,
+                                                delay: index * 0.02,
+                                            }
+                                        }}
+                                    >
+                                        {isSettings && (
+                                            <motion.div 
+                                                className="h-px mx-1 my-2 bg-white/[0.06]"
+                                                initial={{ scaleX: 0 }}
+                                                animate={{ 
+                                                    scaleX: 1,
+                                                    transition: { delay: 0.2, duration: 0.3 }
+                                                }}
+                                            />
+                                        )}
+                                        <Link
+                                            href={route.href}
+                                            onClick={onClose}
+                                        >
+                                            <motion.div
+                                                className={`
+                                                    flex items-center gap-3 px-3 py-3 rounded-xl transition-colors duration-150 group relative overflow-hidden
+                                                    ${active ? 'bg-white text-black' : 'text-gray-400 hover:text-white'}
+                                                `}
+                                                whileHover={{ 
+                                                    scale: 1.02,
+                                                    backgroundColor: active ? 'rgb(255,255,255)' : 'rgba(255,255,255,0.05)',
+                                                    transition: { duration: 0.2 }
+                                                }}
+                                                whileTap={{ scale: 0.98 }}
+                                                aria-current={active ? 'page' : undefined}
+                                            >
+                                                {/* Hover glow */}
+                                                <motion.div 
+                                                    className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+                                                    initial={false}
+                                                />
+                                                
+                                                <motion.div
+                                                    initial={{ rotate: 0 }}
+                                                    whileHover={{ rotate: [0, -10, 10, 0] }}
+                                                    transition={{ duration: 0.4 }}
+                                                >
+                                                    <RouteIcon className={`w-4 h-4 ${active ? 'text-black' : 'text-gray-500 group-hover:text-white'} transition-colors`} strokeWidth={2} />
+                                                </motion.div>
+                                                <span className="flex-1 text-sm font-medium">{route.label}</span>
+                                                <motion.div
+                                                    initial={{ x: 0 }}
+                                                    whileHover={{ x: 3 }}
+                                                    transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+                                                >
+                                                    <ChevronRight className={`w-3.5 h-3.5 ${active ? 'text-black/50' : 'text-gray-700 group-hover:text-gray-400'} transition-colors`} strokeWidth={2} />
+                                                </motion.div>
+                                            </motion.div>
+                                        </Link>
+                                    </motion.div>
+                                );
+                            })}
                         </div>
-                    </>
-                )}
-            </div>
-        </>
+
+                        {/* Bottom gradient */}
+                        <motion.div 
+                            className="h-1 bg-gradient-to-r from-transparent via-white/10 to-transparent"
+                            initial={{ scaleX: 0, opacity: 0 }}
+                            animate={{ 
+                                scaleX: 1, 
+                                opacity: 1,
+                                transition: { delay: 0.3, duration: 0.4 }
+                            }}
+                        />
+                    </motion.div>
+                </>
+            )}
+        </AnimatePresence>
     );
 }
 
@@ -228,7 +399,6 @@ export default function DashboardLayout({ children }) {
         if (!isAuthenticated || user?.role !== 'admin') router.push('/admin/login');
     }, [isAuthenticated, loading, user, router]);
 
-    // Check localStorage on mount
     useEffect(() => {
         setMounted(true);
         const hideWelcome = localStorage.getItem('hideWelcomePopup') === 'true';
@@ -238,9 +408,13 @@ export default function DashboardLayout({ children }) {
     }, []);
 
     useEffect(() => {
-        document.body.style.overflow = drawerOpen ? 'hidden' : '';
+        if (drawerOpen || menuOpen) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = '';
+        }
         return () => { document.body.style.overflow = ''; };
-    }, [drawerOpen]);
+    }, [drawerOpen, menuOpen]);
 
     useEffect(() => {
         setDrawerOpen(false);
@@ -311,21 +485,60 @@ export default function DashboardLayout({ children }) {
             </div>
 
             {/* Mobile backdrop */}
-            <div
-                className={`lg:hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 transition-opacity duration-300 ${drawerOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
-                onClick={closeDrawer}
-                aria-hidden="true"
-            />
+            <AnimatePresence>
+                {drawerOpen && (
+                    <motion.div
+                        className="lg:hidden fixed inset-0 bg-black/80 z-50"
+                        initial={{ opacity: 0, backdropFilter: 'blur(0px)' }}
+                        animate={{ 
+                            opacity: 1, 
+                            backdropFilter: 'blur(8px)',
+                            transition: { duration: 0.3 }
+                        }}
+                        exit={{ 
+                            opacity: 0,
+                            backdropFilter: 'blur(0px)',
+                            transition: { duration: 0.2 }
+                        }}
+                        onClick={closeDrawer}
+                        aria-hidden="true"
+                    />
+                )}
+            </AnimatePresence>
 
             {/* Mobile drawer */}
-            <div
-                className={`lg:hidden fixed inset-y-0 left-0 w-64 max-w-[80vw] z-[60] transition-transform duration-300 ease-in-out ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}`}
-                aria-modal="true"
-                role="dialog"
-                aria-label="Navigation drawer"
-            >
-                <Sidebar onLogout={handleLogout} onClose={closeDrawer} isMobile={true} />
-            </div>
+            <AnimatePresence>
+                {drawerOpen && (
+                    <motion.div
+                        className="lg:hidden fixed inset-y-0 left-0 w-64 max-w-[80vw] z-[60]"
+                        initial={{ x: '-100%', opacity: 0.5 }}
+                        animate={{ 
+                            x: 0, 
+                            opacity: 1,
+                            transition: { 
+                                type: 'spring', 
+                                damping: 30, 
+                                stiffness: 300,
+                                mass: 0.8
+                            }
+                        }}
+                        exit={{ 
+                            x: '-100%',
+                            opacity: 0.5,
+                            transition: { 
+                                type: 'spring',
+                                damping: 35,
+                                stiffness: 400
+                            }
+                        }}
+                        aria-modal="true"
+                        role="dialog"
+                        aria-label="Navigation drawer"
+                    >
+                        <Sidebar onLogout={handleLogout} onClose={closeDrawer} isMobile={true} />
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Main */}
             <div className="lg:pl-[220px] flex flex-col min-h-screen">
