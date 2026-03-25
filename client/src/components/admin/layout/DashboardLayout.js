@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useSocket } from '@/context/SocketContext';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import WelcomePopup from './WelcomePopup';
 import toast from 'react-hot-toast';
 import {
     LayoutDashboard,
@@ -210,6 +211,8 @@ export default function DashboardLayout({ children }) {
 
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [menuOpen, setMenuOpen] = useState(null);
+    const [showWelcome, setShowWelcome] = useState(false);
+    const [mounted, setMounted] = useState(false);
 
     const activeTab = useMemo(() => {
         for (let tab of MOBILE_NAV) {
@@ -224,6 +227,15 @@ export default function DashboardLayout({ children }) {
         if (loading) return;
         if (!isAuthenticated || user?.role !== 'admin') router.push('/admin/login');
     }, [isAuthenticated, loading, user, router]);
+
+    // Check localStorage on mount
+    useEffect(() => {
+        setMounted(true);
+        const hideWelcome = localStorage.getItem('hideWelcomePopup') === 'true';
+        if (!hideWelcome) {
+            setShowWelcome(true);
+        }
+    }, []);
 
     useEffect(() => {
         document.body.style.overflow = drawerOpen ? 'hidden' : '';
@@ -267,6 +279,9 @@ export default function DashboardLayout({ children }) {
     const closeDrawer  = useCallback(() => setDrawerOpen(false), []);
     const openMenu     = useCallback((item) => setMenuOpen(item.label), []);
     const closeMenu    = useCallback(() => setMenuOpen(null), []);
+    const closeWelcome = useCallback(() => {
+        setShowWelcome(false);
+    }, []);
 
     if (loading) {
         return (
@@ -286,6 +301,9 @@ export default function DashboardLayout({ children }) {
 
     return (
         <div className="min-h-screen bg-black">
+
+            {/* Welcome Popup */}
+            {mounted && showWelcome && user && <WelcomePopup user={user} onClose={closeWelcome} />}
 
             {/* Desktop sidebar */}
             <div className="hidden lg:block fixed inset-y-0 left-0 w-[220px] z-40">

@@ -1,0 +1,194 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { X, Lock, Shield, Key, AlertCircle, CheckCircle2 } from 'lucide-react';
+
+const SECURITY_GUIDES = [
+    {
+        icon: Lock,
+        title: 'Password Security',
+        description: 'Use strong, unique passwords with uppercase, numbers, and special characters.',
+        tips: ['Change password regularly', 'Never share credentials', 'Use 12+ characters']
+    },
+    {
+        icon: Shield,
+        title: 'Account Protection',
+        description: 'Keep your admin account secure and monitor unusual activities.',
+        tips: ['Enable 2FA if available', 'Review login history', 'Use secure devices']
+    },
+    {
+        icon: Key,
+        title: 'API Keys',
+        description: 'Protect your API keys and regenerate them if compromised.',
+        tips: ['Never commit keys to git', 'Rotate keys quarterly', 'Use environment variables']
+    },
+    {
+        icon: AlertCircle,
+        title: 'Suspicious Activity',
+        description: 'Report any unauthorized access or suspicious behavior immediately.',
+        tips: ['Check admin logs', 'Verify all changes', 'Contact support if needed']
+    }
+];
+
+export default function WelcomePopup({ user, onClose }) {
+    const [currentGuide, setCurrentGuide] = useState(0);
+    const [dontShowAgain, setDontShowAgain] = useState(false);
+
+    const guide = SECURITY_GUIDES[currentGuide];
+    const GuideIcon = guide.icon;
+
+    const handleClose = () => {
+        if (dontShowAgain) {
+            localStorage.setItem('hideWelcomePopup', 'true');
+        }
+        onClose();
+    };
+
+    // Prevent scroll on body when modal is open
+    useEffect(() => {
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = '';
+        };
+    }, []);
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/30 backdrop-blur-sm overflow-hidden" onClick={handleClose}>
+            <div className="bg-[#0A0A0A] border border-white/[0.08] rounded-t-3xl sm:rounded-3xl shadow-2xl shadow-black/80 w-full sm:max-w-md overflow-hidden animate-in fade-in slide-in-from-bottom-4 sm:zoom-in-95 duration-300" onClick={(e) => e.stopPropagation()}>
+
+                {/* Header */}
+                <div className="relative px-4 sm:px-6 py-6 sm:py-8 border-b border-white/[0.06]">
+                    <button
+                        onClick={handleClose}
+                        className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/[0.06] transition-colors"
+                        aria-label="Close"
+                    >
+                        <X className="w-4 h-4 text-gray-500" strokeWidth={2} />
+                    </button>
+
+                    <div className="space-y-3">
+                        <div>
+                            <p className="text-xs font-medium text-gray-400 uppercase tracking-[0.2em] mb-1">Welcome</p>
+                            <h1 className="text-xl sm:text-2xl font-bold text-white leading-tight">
+                                Hi {user?.firstName}, I'm Nexxa
+                            </h1>
+                        </div>
+                        
+                        <p className="text-sm text-gray-400 leading-relaxed">
+                            A monitoring system from{' '}
+                            <a
+                                href="https://nexxupp.com"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-white font-semibold hover:text-gray-200 underline underline-offset-2 transition-colors"
+                            >
+                                nexxupp
+                            </a>
+                            . I'm here to help fix all the possible issues you might have.
+                        </p>
+                    </div>
+                </div>
+
+                {/* Content - Scrollable */}
+                <div className="px-4 sm:px-6 py-6 space-y-5 max-h-[50vh] overflow-y-auto">
+                    {/* Icon */}
+                    <div className="w-14 h-14 rounded-2xl bg-white/[0.05] border border-white/[0.08] flex items-center justify-center">
+                        <GuideIcon className="w-7 h-7 text-white/80" strokeWidth={1.5} />
+                    </div>
+
+                    {/* Title & Description */}
+                    <div>
+                        <h2 className="text-base sm:text-lg font-semibold text-white mb-1">
+                            {guide.title}
+                        </h2>
+                        <p className="text-xs sm:text-sm text-gray-400 leading-relaxed">
+                            {guide.description}
+                        </p>
+                    </div>
+
+                    {/* Tips */}
+                    <div className="space-y-2">
+                        {guide.tips.map((tip, i) => (
+                            <div key={i} className="flex items-start gap-2">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-white/50 shrink-0 mt-0.5" strokeWidth={2} />
+                                <span className="text-xs sm:text-sm text-gray-400">{tip}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Progress & Actions - Fixed at bottom */}
+                <div className="border-t border-white/[0.06] bg-white/[0.01] p-4 sm:p-6 space-y-4">
+                    {/* Progress */}
+                    <div className="flex gap-1">
+                        {SECURITY_GUIDES.map((_, i) => (
+                            <button
+                                key={i}
+                                onClick={() => setCurrentGuide(i)}
+                                className={`h-0.5 flex-1 rounded-full transition-all ${
+                                    i === currentGuide
+                                        ? 'bg-white'
+                                        : i < currentGuide
+                                        ? 'bg-white/50'
+                                        : 'bg-white/[0.1]'
+                                }`}
+                                aria-label={`Guide ${i + 1}`}
+                            />
+                        ))}
+                    </div>
+
+                    {/* Don't Show Again */}
+                    <button
+                        onClick={() => setDontShowAgain(!dontShowAgain)}
+                        className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/[0.03] transition-all group w-fit"
+                    >
+                        <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${
+                            dontShowAgain 
+                                ? 'bg-white/20 border-white/40' 
+                                : 'border-white/20 group-hover:border-white/30'
+                        }`}>
+                            {dontShowAgain && (
+                                <CheckCircle2 className="w-3 h-3 text-white" strokeWidth={3} />
+                            )}
+                        </div>
+                        <span className="text-xs text-gray-400 group-hover:text-gray-300 transition-colors">
+                            Don't show again
+                        </span>
+                    </button>
+
+                    {/* Navigation */}
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => setCurrentGuide(Math.max(0, currentGuide - 1))}
+                            disabled={currentGuide === 0}
+                            className="flex-1 px-3 py-2 rounded-lg border border-white/[0.08] text-xs sm:text-sm font-medium text-gray-400 hover:text-gray-300 hover:bg-white/[0.03] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                        >
+                            Back
+                        </button>
+
+                        {currentGuide < SECURITY_GUIDES.length - 1 ? (
+                            <button
+                                onClick={() => setCurrentGuide(currentGuide + 1)}
+                                className="flex-1 px-3 py-2 rounded-lg bg-white text-xs sm:text-sm font-medium text-black hover:bg-gray-100 transition-all"
+                            >
+                                Next
+                            </button>
+                        ) : (
+                            <button
+                                onClick={handleClose}
+                                className="flex-1 px-3 py-2 rounded-lg bg-white text-xs sm:text-sm font-medium text-black hover:bg-gray-100 transition-all"
+                            >
+                                Done
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Footer */}
+                    <p className="text-[10px] text-gray-600 text-center">
+                        {currentGuide + 1} / {SECURITY_GUIDES.length}
+                    </p>
+                </div>
+            </div>
+        </div>
+    );
+}
