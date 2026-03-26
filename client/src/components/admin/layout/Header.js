@@ -7,7 +7,7 @@ import { useSocket } from '@/context/SocketContext';
 import Image from 'next/image';
 import { User, LogOut, WifiOff, Car, Menu } from 'lucide-react';
 
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.1.0';
 
 const PAGE_TITLES = {
     '/admin/dashboard':     { title: 'Dashboard',     subtitle: 'Overview & analytics' },
