@@ -7,7 +7,7 @@ import serviceService from '@/services/serviceService';
 import axiosInstance from '@/lib/axios';
 import toast from 'react-hot-toast';
 
-// ✅ UPDATED: 12-hour format time slots
+// ✅ 12-hour format time slots
 const TIME_SLOTS = [
     '08:30 AM-10:30 AM',
     '10:30 AM-12:00 PM',
@@ -16,11 +16,11 @@ const TIME_SLOTS = [
     '04:00 PM-05:30 PM',
 ];
 
-// ✅ UPDATED: Reordered steps - Schedule first, then Services, then Customer
+// ✅ UPDATED: Step descriptions
 const STEPS = [
-    { label: 'Schedule', desc: 'When & where?' },
+    { label: 'Schedule', desc: 'When?' },
     { label: 'Service',  desc: 'What service?' },
-    { label: 'Customer', desc: 'Who is booking?' }
+    { label: 'Customer', desc: 'Who & where?' }
 ];
 
 /* ── Shared styles ── */
@@ -35,7 +35,7 @@ const inputCls = `
 const sectionLabel = `text-[10px] text-white/25 uppercase tracking-widest font-medium mb-3 block`;
 
 /**
- * ✅ FIXED: Convert 12-hour format "08:00 AM" to 24-hour (8)
+ * Convert 12-hour format "08:00 AM" to 24-hour (8)
  */
 function convertTo24Hour(time12) {
     const [time, period] = time12.split(' ');
@@ -51,7 +51,7 @@ function convertTo24Hour(time12) {
 }
 
 /**
- * ✅ FIXED: Check if a time slot has passed (handles 12-hour format)
+ * Check if a time slot has passed (handles 12-hour format)
  */
 function isSlotPassed(slot, selectedDate) {
     const now = new Date();
@@ -67,7 +67,6 @@ function isSlotPassed(slot, selectedDate) {
     if (selectedDate > todayStr) return false;
     if (selectedDate < todayStr) return true;
 
-    // ✅ FIXED: Extract start time from "08:00 AM-09:00 AM"
     const startTimePart = slot.split('-')[0].trim();
     const startHour = convertTo24Hour(startTimePart);
 
@@ -90,10 +89,6 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
     const [timeSlot, setTimeSlot] = useState('');
     const [availability, setAvailability] = useState([]);
     const [availabilityLoading, setAvailabilityLoading] = useState(false);
-    const [location, setLocation] = useState({
-        address: 'Walk-in / At Shop',
-        city: 'Walk-in'
-    });
     const [paymentMethod, setPaymentMethod] = useState('cash');
 
     /* Step 2 - Service */
@@ -101,13 +96,17 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
     const [selectedService, setSelectedService] = useState(null);
     const [servicesLoading, setServicesLoading] = useState(false);
 
-    /* Step 3 - Customer */
+    /* Step 3 - Customer & Location */
     const [bookingType, setBookingType] = useState('walkin');
     const [walkInCustomer, setWalkInCustomer] = useState({ name: '', phone: '' });
     const [customerSearch, setCustomerSearch] = useState('');
     const [customers, setCustomers] = useState([]);
     const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [searchLoading, setSearchLoading] = useState(false);
+    const [location, setLocation] = useState({
+        address: 'Walk-in / At Shop',
+        city: 'Walk-in'
+    });
 
     // Refresh current time every minute
     useEffect(() => {
@@ -159,7 +158,7 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
         return () => clearTimeout(t);
     }, [customerSearch, bookingType]);
 
-    /* ✅ Check availability (receives 12-hour format) */
+    /* Check availability */
     useEffect(() => {
         if (!bookingDate) return;
         
@@ -224,10 +223,12 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
         }
     };
 
+    // ✅ UPDATED: Moved location validation to step 3
     const canProceed = {
-        1: bookingDate && timeSlot && location.address.trim() && location.city.trim(),
+        1: bookingDate && timeSlot,
         2: selectedService !== null,
-        3: bookingType === 'walkin' ? walkInCustomer.name.trim() : selectedCustomer !== null
+        3: (bookingType === 'walkin' ? walkInCustomer.name.trim() : selectedCustomer !== null) && 
+           location.address.trim() && location.city.trim()
     };
 
     return (
@@ -238,7 +239,7 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                 onClick={onClose}
             />
 
-            {/* ✅ FIXED: Full screen on mobile, centered on desktop */}
+            {/* Modal */}
             <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center pointer-events-none">
                 <div className="
                     pointer-events-auto
@@ -319,10 +320,10 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
 
                     <div className="h-px bg-white/[0.05] shrink-0" />
 
-                    {/* ✅ FIXED: Content with proper scrolling */}
+                    {/* Content */}
                     <div className="flex-1 overflow-y-auto px-4 py-5 space-y-6 pb-28 sm:pb-6">
 
-                        {/* STEP 1 — Schedule + Location */}
+                        {/* STEP 1 — Schedule (Date, Time, Payment - NO Location) */}
                         {step === 1 && (
                             <div className="space-y-5">
                                 {/* Date */}
@@ -414,27 +415,6 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
 
                                 <div className="h-px bg-white/[0.05]" />
 
-                                {/* Location */}
-                                <div>
-                                    <span className={sectionLabel}>Location</span>
-                                    <div className="space-y-2.5">
-                                        <FieldInput
-                                            label="Address *"
-                                            value={location.address}
-                                            onChange={(v) => setLocation(p => ({ ...p, address: v }))}
-                                            placeholder="Street address"
-                                        />
-                                        <FieldInput
-                                            label="City *"
-                                            value={location.city}
-                                            onChange={(v) => setLocation(p => ({ ...p, city: v }))}
-                                            placeholder="City"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="h-px bg-white/[0.05]" />
-
                                 {/* Payment */}
                                 <div>
                                     <span className={sectionLabel}>Payment Method</span>
@@ -457,7 +437,7 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                             </div>
                         )}
 
-                        {/* STEP 2 — Service (NO variant selection) */}
+                        {/* STEP 2 — Service */}
                         {step === 2 && (
                             <div className="space-y-5">
                                 <div>
@@ -501,9 +481,10 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                             </div>
                         )}
 
-                        {/* STEP 3 — Customer */}
+                        {/* STEP 3 — Customer & Location */}
                         {step === 3 && (
                             <div className="space-y-5">
+                                {/* Booking Type */}
                                 <div>
                                     <span className={sectionLabel}>Booking Type</span>
                                     <div className="grid grid-cols-2 gap-2">
@@ -538,6 +519,7 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                                     </div>
                                 </div>
 
+                                {/* Walk-in Customer Details */}
                                 {bookingType === 'walkin' && (
                                     <div className="space-y-3">
                                         <FieldInput
@@ -555,6 +537,7 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                                     </div>
                                 )}
 
+                                {/* Online Customer Search */}
                                 {bookingType === 'online' && (
                                     <div className="space-y-2">
                                         <span className={sectionLabel}>Search Customer</span>
@@ -615,8 +598,30 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                                     </div>
                                 )}
 
-                                {/* Summary */}
                                 <div className="h-px bg-white/[0.05]" />
+
+                                {/* ✅ MOVED: Location Section */}
+                                <div>
+                                    <span className={sectionLabel}>Service Location</span>
+                                    <div className="space-y-2.5">
+                                        <FieldInput
+                                            label="Address *"
+                                            value={location.address}
+                                            onChange={(v) => setLocation(p => ({ ...p, address: v }))}
+                                            placeholder="Street address or 'Walk-in / At Shop'"
+                                        />
+                                        <FieldInput
+                                            label="City *"
+                                            value={location.city}
+                                            onChange={(v) => setLocation(p => ({ ...p, city: v }))}
+                                            placeholder="City"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="h-px bg-white/[0.05]" />
+
+                                {/* Summary */}
                                 <div>
                                     <span className={sectionLabel}>Summary</span>
                                     <div className="rounded-lg border border-white/[0.07] bg-white/[0.02] p-4 space-y-2.5">
@@ -631,8 +636,15 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                                             label="Customer"
                                             value={bookingType === 'walkin'
                                                 ? walkInCustomer.name
-                                                : `${selectedCustomer?.firstName} ${selectedCustomer?.lastName}`
+                                                : `${selectedCustomer?.firstName || ''} ${selectedCustomer?.lastName || ''}`
                                             }
+                                        />
+                                        <SummaryRow 
+                                            label="Location" 
+                                            value={location.address !== 'Walk-in / At Shop' 
+                                                ? `${location.address}, ${location.city}` 
+                                                : location.address
+                                            } 
                                         />
                                         <div className="h-px bg-white/[0.05]" />
                                         <SummaryRow
@@ -646,7 +658,7 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                         )}
                     </div>
 
-                    {/* ✅ FIXED: Footer with proper positioning for mobile */}
+                    {/* Footer */}
                     <div className="shrink-0 h-px bg-white/[0.05]" />
                     <div className="shrink-0 px-4 py-4 flex gap-2 bg-[#0a0a0a] border-t border-white/[0.05]">
                         {step > 1 && (
@@ -659,7 +671,6 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                             </button>
                         )}
 
-                        {/* ✅ FIXED: Button visible on all screen sizes */}
                         <button
                             onClick={() => {
                                 if (step < 3) {
