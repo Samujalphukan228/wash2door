@@ -19,7 +19,7 @@ export const getActiveServices = async (req, res) => {
     try {
         const {
             category,
-            subcategory,    // ✅ ADD THIS
+            subcategory,
             tier,
             sort,
             search,
@@ -37,7 +37,6 @@ export const getActiveServices = async (req, res) => {
             query.category = category;
         }
 
-        // ✅ ADD SUBCATEGORY FILTER
         if (subcategory && isValidObjectId(subcategory)) {
             query.subcategory = subcategory;
         }
@@ -72,8 +71,8 @@ export const getActiveServices = async (req, res) => {
 
         const services = await Service.find(query)
             .populate('category', 'name slug icon image')
-            .populate('subcategory', 'name slug icon')  // ✅ ADD THIS
-            .select('name shortDescription category subcategory tier images highlights price discountPrice duration averageRating totalReviews totalBookings displayOrder isFeatured')
+            .populate('subcategory', 'name slug icon')
+            .select('name shortDescription category subcategory tier images highlights features price discountPrice duration averageRating totalReviews totalBookings displayOrder isFeatured')
             .sort(sortOption)
             .limit(limitNum)
             .skip((pageNum - 1) * limitNum);
@@ -83,12 +82,13 @@ export const getActiveServices = async (req, res) => {
             name: service.name,
             shortDescription: service.shortDescription,
             category: service.category,
-            subcategory: service.subcategory,   // ✅ ADD THIS
+            subcategory: service.subcategory,
             tier: service.tier,
             primaryImage: service.primaryImage,
             images: service.images,
             highlights: service.highlights,
-            price: service.price,               // ✅ NO VARIANTS
+            features: service.features,
+            price: service.price,
             discountPrice: service.discountPrice,
             finalPrice: service.finalPrice,
             duration: service.duration,

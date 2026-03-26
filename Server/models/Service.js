@@ -40,6 +40,19 @@ const serviceSchema = new mongoose.Schema({
         required: [true, 'Duration is required'],
         min: [1, 'Duration must be at least 1 minute']
     },
+    
+    // Features array
+    features: {
+        type: [String],
+        validate: {
+            validator: function (features) {
+                return features.length <= 10;
+            },
+            message: 'Maximum 10 features allowed'
+        },
+        default: []
+    },
+
     images: {
         type: [
             {

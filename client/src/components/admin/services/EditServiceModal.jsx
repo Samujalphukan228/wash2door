@@ -34,6 +34,9 @@ export default function EditServiceModal({ service, onClose, onSuccess }) {
     const [duration, setDuration] = useState(service.duration || '');
     const [isActive, setIsActive] = useState(service.isActive);
     const [isFeatured, setIsFeatured] = useState(service.isFeatured || false);
+    const [features, setFeatures] = useState(
+        service.features?.length > 0 ? service.features : ['']
+    );
 
     // Fetch categories on mount
     useEffect(() => {
@@ -118,6 +121,7 @@ export default function EditServiceModal({ service, onClose, onSuccess }) {
             formData.append('duration', Number(duration));
             formData.append('isActive', isActive);
             formData.append('isFeatured', isFeatured);
+            formData.append('features', JSON.stringify(features.filter(f => f.trim())));
 
             await serviceService.update(service._id, formData);
             toast.success('Service updated successfully');
@@ -332,6 +336,52 @@ export default function EditServiceModal({ service, onClose, onSuccess }) {
                                     disabled={loading}
                                     className={inputCls}
                                 />
+                            </div>
+                        </div>
+
+                        {/* Features */}
+                        <div>
+                            <div className="flex items-center justify-between mb-3">
+                                <label className={sectionLabel} style={{ marginBottom: 0 }}>
+                                    Features ({features.filter(f => f.trim()).length}/10)
+                                </label>
+                                <button
+                                    type="button"
+                                    onClick={() => features.length < 10 && setFeatures(p => [...p, ''])}
+                                    disabled={loading || features.length >= 10}
+                                    className="text-[11px] text-white/30 hover:text-white/60 disabled:opacity-30 transition-all duration-150"
+                                >
+                                    + Add
+                                </button>
+                            </div>
+                            <div className="space-y-2">
+                                {features.map((f, i) => (
+                                    <div key={i} className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            value={f}
+                                            onChange={(e) => {
+                                                const updated = [...features];
+                                                updated[i] = e.target.value;
+                                                setFeatures(updated);
+                                            }}
+                                            placeholder={`e.g. Feature ${i + 1}`}
+                                            disabled={loading}
+                                            className={inputCls}
+                                            maxLength={100}
+                                        />
+                                        {features.length > 1 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setFeatures(p => p.filter((_, idx) => idx !== i))}
+                                                disabled={loading}
+                                                className="w-8 h-10 rounded-lg flex items-center justify-center text-white/20 hover:text-white/60 hover:bg-white/[0.05] transition-all duration-150 shrink-0"
+                                            >
+                                                <X className="w-3.5 h-3.5" />
+                                            </button>
+                                        )}
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     </div>

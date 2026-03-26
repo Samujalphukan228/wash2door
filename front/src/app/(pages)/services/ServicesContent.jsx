@@ -10,6 +10,10 @@ import {
   Sparkles,
   Loader2,
   AlertCircle,
+  X,
+  Check,
+  Clock,
+  Tag,
 } from "lucide-react"
 import { getPublicServices, getCategories, getSubcategoriesByCategoryId } from "@/lib/services.api"
 
@@ -47,10 +51,8 @@ const getImageUrl = (image) => {
 
 const calculateLowestPrice = (variants, fallbackPrice) => {
   if (!variants || variants.length === 0) return fallbackPrice
-
   const activeVariants = variants.filter((v) => v.isActive !== false)
   if (activeVariants.length === 0) return fallbackPrice
-
   return Math.min(...activeVariants.map(v => v.discountPrice || v.price))
 }
 
@@ -59,14 +61,8 @@ const ServiceImage = memo(function ServiceImage({ src, alt, fallbackIcon }) {
   const [hasError, setHasError] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
-  const handleLoad = useCallback(() => {
-    setIsLoading(false)
-  }, [])
-
-  const handleError = useCallback(() => {
-    setHasError(true)
-    setIsLoading(false)
-  }, [])
+  const handleLoad = useCallback(() => setIsLoading(false), [])
+  const handleError = useCallback(() => { setHasError(true); setIsLoading(false) }, [])
 
   if (!src || hasError) {
     return (
@@ -78,9 +74,7 @@ const ServiceImage = memo(function ServiceImage({ src, alt, fallbackIcon }) {
 
   return (
     <>
-      {isLoading && (
-        <div className="absolute inset-0 bg-gray-100 animate-pulse" />
-      )}
+      {isLoading && <div className="absolute inset-0 bg-gray-100 animate-pulse" />}
       <img
         src={src}
         alt={alt}
@@ -122,9 +116,7 @@ const ErrorMessage = memo(function ErrorMessage({ message, onRetry }) {
   return (
     <div className="flex flex-col items-center justify-center py-20 px-5">
       <AlertCircle size={48} className="text-red-400 mb-4" />
-      <h3 className="text-xl font-medium text-gray-900 mb-2">
-        Something went wrong
-      </h3>
+      <h3 className="text-xl font-medium text-gray-900 mb-2">Something went wrong</h3>
       <p className="text-gray-500 text-center mb-6 max-w-md">
         {message || "Failed to load services. Please try again."}
       </p>
@@ -145,13 +137,174 @@ const EmptyState = memo(function EmptyState({ message, icon }) {
   return (
     <div className="flex flex-col items-center justify-center py-20 px-5">
       <span className="text-6xl mb-4">{icon || "📭"}</span>
-      <h3 className="text-xl font-medium text-gray-900 mb-2">
-        No services found
-      </h3>
+      <h3 className="text-xl font-medium text-gray-900 mb-2">No services found</h3>
       <p className="text-gray-500 text-center max-w-md">
         {message || "There are no services available right now."}
       </p>
     </div>
+  )
+})
+
+// ══════════════════════════════════════════════════════════
+// ── SERVICE DETAIL POPUP ─────────────────────────────────
+// ══════════════════════════════════════════════════════════
+
+const ServiceDetailPopup = memo(function ServiceDetailPopup({ service, onClose }) {
+  const image = useMemo(
+    () => getImageUrl(service.primaryImage) || getImageUrl(service.images?.[0]),
+    [service.primaryImage, service.images]
+  )
+
+  const price = service.finalPrice || service.price
+  const discountPrice = service.discountPrice
+  const hasDiscount = discountPrice && discountPrice < price
+
+  const bookingUrl = `/bookings?service=${encodeURIComponent(service._id)}`
+
+  // Prevent background scroll
+  useEffect(() => {
+    document.body.style.overflow = "hidden"
+    return () => { document.body.style.overflow = "" }
+  }, [])
+
+  return (
+    <AnimatePresence>
+      {/* Backdrop */}
+      <motion.div
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center px-0 sm:px-4"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+      >
+        {/* Modal */}
+        <motion.div
+          className="
+            relative bg-white w-full sm:max-w-lg
+            rounded-t-3xl sm:rounded-2xl
+            overflow-hidden shadow-2xl
+            max-h-[92vh] flex flex-col
+          "
+          initial={{ opacity: 0, y: 60 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 60 }}
+          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Image */}
+          <div className="relative h-52 sm:h-60 bg-gray-100 shrink-0">
+            <ServiceImage src={image} alt={service.name} fallbackIcon={service.category?.icon} />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+
+            {/* Close button */}
+            <button
+              onClick={onClose}
+              className="absolute top-4 right-4 w-9 h-9 bg-black/50 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-black/70 transition-colors"
+            >
+              <X size={18} />
+            </button>
+
+            {/* Price on image */}
+            <div className="absolute bottom-4 left-4">
+              <div className="flex items-center gap-2">
+                {hasDiscount ? (
+                  <>
+                    <span
+                      className="bg-white text-black px-4 py-1.5 rounded-xl font-medium"
+                      style={{ fontFamily: 'Georgia, serif', fontSize: "18px" }}
+                    >
+                      ₹{discountPrice.toLocaleString("en-IN")}
+                    </span>
+                    <span
+                      className="text-white/60 line-through text-sm"
+                    >
+                      ₹{price.toLocaleString("en-IN")}
+                    </span>
+                  </>
+                ) : (
+                  <span
+                    className="bg-white text-black px-4 py-1.5 rounded-xl font-medium"
+                    style={{ fontFamily: 'Georgia, serif', fontSize: "18px" }}
+                  >
+                    ₹{price?.toLocaleString("en-IN")}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto px-6 py-5">
+            {/* Category breadcrumb */}
+            {(service.category?.name || service.subcategory?.name) && (
+              <p className="text-gray-400 text-xs uppercase tracking-wider mb-2">
+                {service.category?.icon && <span className="mr-1">{service.category.icon}</span>}
+                {service.category?.name}
+                {service.subcategory?.name && ` › ${service.subcategory.name}`}
+              </p>
+            )}
+
+            {/* Title */}
+            <h2
+              className="text-black mb-2"
+              style={{
+                fontFamily: 'Georgia, "Times New Roman", serif',
+                fontSize: "24px",
+                fontWeight: 400,
+                lineHeight: 1.2,
+              }}
+            >
+              {service.name}
+            </h2>
+
+            {/* Duration */}
+            {service.duration && (
+              <div className="flex items-center gap-1.5 text-gray-400 text-sm mb-4">
+                <Clock size={14} />
+                <span>{service.duration} min</span>
+              </div>
+            )}
+
+            {/* Description */}
+            {(service.description || service.shortDescription) && (
+              <p className="text-gray-500 text-sm leading-relaxed mb-5">
+                {service.description || service.shortDescription}
+              </p>
+            )}
+
+            {/* Features */}
+            {service.features?.length > 0 && (
+              <div className="mb-5">
+                <p className="text-xs uppercase tracking-wider text-gray-400 mb-3">
+                  What's included
+                </p>
+                <ul className="space-y-2.5">
+                  {service.features.map((feature, i) => (
+                    <li key={i} className="flex items-start gap-3">
+                      <div className="w-5 h-5 rounded-full bg-black flex items-center justify-center shrink-0 mt-0.5">
+                        <Check size={11} className="text-white" />
+                      </div>
+                      <span className="text-gray-600 text-sm">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          {/* Footer CTA */}
+          <div className="shrink-0 px-6 py-4 border-t border-gray-100 bg-white">
+            <a
+              href={bookingUrl}
+              className="flex items-center justify-center gap-2 h-13 py-3.5 bg-black text-white rounded-xl hover:bg-gray-900 transition-colors no-underline w-full"
+            >
+              <span className="text-sm font-medium">Book Now</span>
+              <ArrowRight size={16} />
+            </a>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
   )
 })
 
@@ -165,7 +318,6 @@ const Hero = memo(function Hero({ activeCategoryData, activeSubcategoryData, onB
 
   return (
     <section className="relative bg-black pt-24 pb-12 md:pt-32 md:pb-16 overflow-hidden">
-      {/* Background pattern */}
       <div 
         className="absolute inset-0 opacity-[0.02] pointer-events-none"
         aria-hidden="true"
@@ -197,7 +349,6 @@ const Hero = memo(function Hero({ activeCategoryData, activeSubcategoryData, onB
           )}
         </AnimatePresence>
 
-        {/* Breadcrumb */}
         {isSubcategory && activeCategoryData && (
           <motion.p
             initial={{ opacity: 0 }}
@@ -221,15 +372,9 @@ const Hero = memo(function Hero({ activeCategoryData, activeSubcategoryData, onB
           }}
         >
           {isSubcategory ? (
-            <>
-              <span className="mr-3">{activeSubcategoryData?.icon}</span>
-              {activeSubcategoryData?.name}
-            </>
+            <><span className="mr-3">{activeSubcategoryData?.icon}</span>{activeSubcategoryData?.name}</>
           ) : isCategory ? (
-            <>
-              <span className="mr-3">{activeCategoryData?.icon}</span>
-              {activeCategoryData?.name}
-            </>
+            <><span className="mr-3">{activeCategoryData?.icon}</span>{activeCategoryData?.name}</>
           ) : (
             "Our Services"
           )}
@@ -259,10 +404,7 @@ const Hero = memo(function Hero({ activeCategoryData, activeSubcategoryData, onB
 
 const CategoryCard = memo(function CategoryCard({ category, onClick }) {
   const image = useMemo(() => getImageUrl(category.image), [category.image])
-
-  const handleClick = useCallback(() => {
-    onClick(category._id)
-  }, [category._id, onClick])
+  const handleClick = useCallback(() => onClick(category._id), [category._id, onClick])
 
   return (
     <motion.div
@@ -271,13 +413,10 @@ const CategoryCard = memo(function CategoryCard({ category, onClick }) {
       className="group cursor-pointer bg-white rounded-2xl overflow-hidden border border-gray-100
                  hover:shadow-xl hover:border-gray-200 transition-all duration-300"
     >
-      {/* Image */}
       <div className="aspect-[4/3] overflow-hidden bg-gray-100 relative">
         <ServiceImage src={image} alt={category.name} fallbackIcon={category.icon} />
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300" />
       </div>
-
-      {/* Content */}
       <div className="p-6">
         <div className="flex items-center justify-between mb-3">
           <span className="text-3xl" aria-hidden="true">{category.icon}</span>
@@ -287,24 +426,15 @@ const CategoryCard = memo(function CategoryCard({ category, onClick }) {
             </span>
           )}
         </div>
-
         <h3
           className="text-black mb-2"
-          style={{
-            fontFamily: 'Georgia, "Times New Roman", serif',
-            fontSize: "22px",
-            fontWeight: 400,
-          }}
+          style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontSize: "22px", fontWeight: 400 }}
         >
           {category.name}
         </h3>
-
         {category.description && (
-          <p className="text-gray-500 text-sm mb-4 line-clamp-2">
-            {category.description}
-          </p>
+          <p className="text-gray-500 text-sm mb-4 line-clamp-2">{category.description}</p>
         )}
-
         <div className="flex items-center gap-2 text-black text-sm font-medium group-hover:gap-3 transition-all">
           <span>Explore</span>
           <ArrowRight size={16} />
@@ -320,10 +450,7 @@ const CategoryCard = memo(function CategoryCard({ category, onClick }) {
 
 const SubcategoryCard = memo(function SubcategoryCard({ subcategory, onClick }) {
   const image = useMemo(() => getImageUrl(subcategory.image), [subcategory.image])
-
-  const handleClick = useCallback(() => {
-    onClick(subcategory._id)
-  }, [subcategory._id, onClick])
+  const handleClick = useCallback(() => onClick(subcategory._id), [subcategory._id, onClick])
 
   return (
     <motion.div
@@ -332,13 +459,10 @@ const SubcategoryCard = memo(function SubcategoryCard({ subcategory, onClick }) 
       className="group cursor-pointer bg-white rounded-2xl overflow-hidden border border-gray-100
                  hover:shadow-xl hover:border-gray-200 transition-all duration-300"
     >
-      {/* Image */}
       <div className="aspect-[4/3] overflow-hidden bg-gray-100 relative">
         <ServiceImage src={image} alt={subcategory.name} fallbackIcon={subcategory.icon} />
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300" />
       </div>
-
-      {/* Content */}
       <div className="p-6">
         <div className="flex items-center justify-between mb-3">
           <span className="text-3xl" aria-hidden="true">{subcategory.icon}</span>
@@ -348,24 +472,15 @@ const SubcategoryCard = memo(function SubcategoryCard({ subcategory, onClick }) 
             </span>
           )}
         </div>
-
         <h3
           className="text-black mb-2"
-          style={{
-            fontFamily: 'Georgia, "Times New Roman", serif',
-            fontSize: "22px",
-            fontWeight: 400,
-          }}
+          style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontSize: "22px", fontWeight: 400 }}
         >
           {subcategory.name}
         </h3>
-
         {subcategory.description && (
-          <p className="text-gray-500 text-sm mb-4 line-clamp-2">
-            {subcategory.description}
-          </p>
+          <p className="text-gray-500 text-sm mb-4 line-clamp-2">{subcategory.description}</p>
         )}
-
         <div className="flex items-center gap-2 text-black text-sm font-medium group-hover:gap-3 transition-all">
           <span>View Services</span>
           <ArrowRight size={16} />
@@ -379,7 +494,7 @@ const SubcategoryCard = memo(function SubcategoryCard({ subcategory, onClick }) 
 // ── SERVICE CARD ─────────────────────────────────────────
 // ══════════════════════════════════════════════════════════
 
-const ServiceCard = memo(function ServiceCard({ service }) {
+const ServiceCard = memo(function ServiceCard({ service, onBookClick }) {
   const image = useMemo(
     () => getImageUrl(service.primaryImage) || getImageUrl(service.images?.[0]),
     [service.primaryImage, service.images]
@@ -390,13 +505,8 @@ const ServiceCard = memo(function ServiceCard({ service }) {
   const subcategoryName = service.subcategory?.name || ""
 
   const lowestPrice = useMemo(
-    () => calculateLowestPrice(service.variants, service.startingPrice),
-    [service.variants, service.startingPrice]
-  )
-
-  const bookingUrl = useMemo(
-    () => `/bookings?service=${encodeURIComponent(service._id)}`,
-    [service._id]
+    () => calculateLowestPrice(service.variants, service.finalPrice || service.price),
+    [service.variants, service.finalPrice, service.price]
   )
 
   return (
@@ -408,11 +518,9 @@ const ServiceCard = memo(function ServiceCard({ service }) {
       {/* Image */}
       <div className="aspect-[4/3] overflow-hidden bg-gray-100 relative">
         <ServiceImage src={image} alt={service.name} fallbackIcon={categoryIcon} />
-        
-        {/* Price badge */}
         {lowestPrice && (
           <div className="absolute top-4 right-4">
-            <span 
+            <span
               className="bg-black/90 backdrop-blur-sm text-white px-4 py-2 rounded-xl"
               style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontSize: "16px" }}
             >
@@ -424,7 +532,6 @@ const ServiceCard = memo(function ServiceCard({ service }) {
 
       {/* Content */}
       <div className="p-6">
-        {/* ✅ SHOW CATEGORY > SUBCATEGORY */}
         {(categoryName || subcategoryName) && (
           <p className="text-gray-400 text-xs mb-3 uppercase tracking-wider">
             {categoryIcon && <span className="mr-1">{categoryIcon}</span>}
@@ -435,29 +542,42 @@ const ServiceCard = memo(function ServiceCard({ service }) {
 
         <h3
           className="text-black mb-3"
-          style={{
-            fontFamily: 'Georgia, "Times New Roman", serif',
-            fontSize: "20px",
-            fontWeight: 400,
-          }}
+          style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontSize: "20px", fontWeight: 400 }}
         >
           {service.name}
         </h3>
 
-        {(service.description || service.shortDescription) && (
+        {/* Features preview */}
+        {service.features?.length > 0 && (
+          <ul className="mb-4 space-y-1.5">
+            {service.features.slice(0, 3).map((feature, i) => (
+              <li key={i} className="flex items-center gap-2 text-gray-500 text-sm">
+                <span className="w-1 h-1 rounded-full bg-gray-300 shrink-0" />
+                {feature}
+              </li>
+            ))}
+            {service.features.length > 3 && (
+              <li className="text-gray-400 text-xs pl-3">
+                +{service.features.length - 3} more
+              </li>
+            )}
+          </ul>
+        )}
+
+        {(service.description || service.shortDescription) && !service.features?.length && (
           <p className="text-gray-500 text-sm mb-5 line-clamp-2">
             {service.description || service.shortDescription}
           </p>
         )}
 
-        <a
-          href={bookingUrl}
-          className="flex items-center justify-center gap-2 h-12 bg-black text-white rounded-xl
-                     hover:bg-gray-900 transition-colors no-underline"
+        <button
+          onClick={() => onBookClick(service)}
+          className="flex items-center justify-center gap-2 h-12 w-full bg-black text-white rounded-xl
+                     hover:bg-gray-900 transition-colors"
         >
           <span className="text-sm font-medium">Book Now</span>
           <ArrowRight size={16} />
-        </a>
+        </button>
       </div>
     </motion.div>
   )
@@ -478,7 +598,6 @@ const CTASection = memo(function CTASection() {
           transition={{ duration: 0.6 }}
         >
           <Sparkles size={32} className="mx-auto mb-6 text-white/30" />
-          
           <h2
             className="text-white mb-8"
             style={{
@@ -489,7 +608,6 @@ const CTASection = memo(function CTASection() {
           >
             Ready to Book?
           </h2>
-
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <a
               href="/bookings"
@@ -498,7 +616,6 @@ const CTASection = memo(function CTASection() {
               <span className="text-sm font-medium">Book Now</span>
               <ArrowRight size={16} />
             </a>
-
             <a
               href={`tel:${PHONE_NUMBER}`}
               className="inline-flex items-center gap-3 h-14 px-10 border border-white/20 text-white rounded-full no-underline hover:bg-white/5 transition-colors"
@@ -530,6 +647,7 @@ export default function ServicesContent() {
   const [activeSubcategoryData, setActiveSubcategoryData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [selectedService, setSelectedService] = useState(null)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -537,36 +655,28 @@ export default function ServicesContent() {
 
     try {
       if (subcategoryId) {
-        // ✅ STEP 3: Show services for selected subcategory
         const [servicesData, categoriesData] = await Promise.all([
           getPublicServices({ subcategory: subcategoryId }),
           getCategories(),
         ])
-
         setServices(Array.isArray(servicesData) ? servicesData : [])
-        
         const category = categoriesData?.find((c) => c._id === categoryId)
         setActiveCategoryData(category || null)
-
-        // Find subcategory name
         if (category) {
           const subcatsData = await getSubcategoriesByCategoryId(categoryId)
           const subcat = subcatsData?.find((s) => s._id === subcategoryId)
           setActiveSubcategoryData(subcat || null)
         }
       } else if (categoryId) {
-        // ✅ STEP 2: Show subcategories for selected category
         const [subcatsData, categoriesData] = await Promise.all([
           getSubcategoriesByCategoryId(categoryId),
           getCategories(),
         ])
-
         setSubcategories(Array.isArray(subcatsData) ? subcatsData : [])
         const found = categoriesData?.find((c) => c._id === categoryId)
         setActiveCategoryData(found || null)
         setActiveSubcategoryData(null)
       } else {
-        // ✅ STEP 1: Show all categories
         const data = await getCategories()
         setCategories(Array.isArray(data) ? data : [])
         setActiveCategoryData(null)
@@ -585,32 +695,26 @@ export default function ServicesContent() {
   }, [fetchData])
 
   const handleCategoryClick = useCallback(
-    (catId) => {
-      router.push(`/services?category=${encodeURIComponent(catId)}`)
-    },
+    (catId) => router.push(`/services?category=${encodeURIComponent(catId)}`),
     [router]
   )
 
   const handleSubcategoryClick = useCallback(
-    (subcatId) => {
-      router.push(`/services?category=${encodeURIComponent(categoryId)}&subcategory=${encodeURIComponent(subcatId)}`)
-    },
+    (subcatId) => router.push(`/services?category=${encodeURIComponent(categoryId)}&subcategory=${encodeURIComponent(subcatId)}`),
     [router, categoryId]
   )
 
   const handleBack = useCallback(() => {
     if (subcategoryId) {
-      // Go back to subcategories
       router.push(`/services?category=${categoryId}`)
     } else if (categoryId) {
-      // Go back to categories
       router.push("/services")
     }
   }, [router, categoryId, subcategoryId])
 
-  const handleRetry = useCallback(() => {
-    fetchData()
-  }, [fetchData])
+  const handleRetry = useCallback(() => fetchData(), [fetchData])
+  const handleBookClick = useCallback((service) => setSelectedService(service), [])
+  const handleClosePopup = useCallback(() => setSelectedService(null), [])
 
   const isViewingServices = !!subcategoryId
   const isViewingSubcategories = !!categoryId && !subcategoryId
@@ -622,31 +726,23 @@ export default function ServicesContent() {
   if (isViewingServices) {
     hasContent = services.length > 0
     contentToShow = services.map((service) => (
-      <ServiceCard key={service._id} service={service} />
+      <ServiceCard key={service._id} service={service} onBookClick={handleBookClick} />
     ))
   } else if (isViewingSubcategories) {
     hasContent = subcategories.length > 0
     contentToShow = subcategories.map((subcategory) => (
-      <SubcategoryCard
-        key={subcategory._id}
-        subcategory={subcategory}
-        onClick={handleSubcategoryClick}
-      />
+      <SubcategoryCard key={subcategory._id} subcategory={subcategory} onClick={handleSubcategoryClick} />
     ))
   } else {
     hasContent = categories.length > 0
     contentToShow = categories.map((category) => (
-      <CategoryCard
-        key={category._id}
-        category={category}
-        onClick={handleCategoryClick}
-      />
+      <CategoryCard key={category._id} category={category} onClick={handleCategoryClick} />
     ))
   }
 
   return (
     <main style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
-      <Hero 
+      <Hero
         activeCategoryData={activeCategoryData}
         activeSubcategoryData={activeSubcategoryData}
         onBack={handleBack}
@@ -663,7 +759,7 @@ export default function ServicesContent() {
               ))}
             </div>
           ) : !hasContent ? (
-            <EmptyState 
+            <EmptyState
               message={
                 isViewingServices
                   ? "No services available in this category"
@@ -687,6 +783,11 @@ export default function ServicesContent() {
       </section>
 
       {!loading && !error && <CTASection />}
+
+      {/* Service Detail Popup */}
+      {selectedService && (
+        <ServiceDetailPopup service={selectedService} onClose={handleClosePopup} />
+      )}
     </main>
   )
 }

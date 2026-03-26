@@ -33,6 +33,7 @@ export default function CreateServiceModal({ onClose, onSuccess }) {
     const [price, setPrice] = useState('');
     const [discountPrice, setDiscountPrice] = useState('');
     const [duration, setDuration] = useState('');
+    const [features, setFeatures] = useState(['']);
     const [images, setImages] = useState([]);
     const [imagePreviews, setImagePreviews] = useState([]);
 
@@ -139,7 +140,8 @@ export default function CreateServiceModal({ onClose, onSuccess }) {
             formData.append('price', Number(price));
             if (discountPrice) formData.append('discountPrice', Number(discountPrice));
             formData.append('duration', Number(duration));
-            
+            formData.append('features', JSON.stringify(features.filter(f => f.trim())));
+
             // Add images
             images.forEach(img => formData.append('images', img));
 
@@ -331,6 +333,52 @@ export default function CreateServiceModal({ onClose, onSuccess }) {
                                 disabled={loading}
                                 className={inputCls}
                             />
+                        </div>
+
+                        {/* Features */}
+                        <div>
+                            <div className="flex items-center justify-between mb-3">
+                                <label className={sectionLabel} style={{ marginBottom: 0 }}>
+                                    Features ({features.filter(f => f.trim()).length}/10)
+                                </label>
+                                <button
+                                    type="button"
+                                    onClick={() => features.length < 10 && setFeatures(p => [...p, ''])}
+                                    disabled={loading || features.length >= 10}
+                                    className="text-[11px] text-white/30 hover:text-white/60 disabled:opacity-30 transition-all duration-150"
+                                >
+                                    + Add
+                                </button>
+                            </div>
+                            <div className="space-y-2">
+                                {features.map((f, i) => (
+                                    <div key={i} className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            value={f}
+                                            onChange={(e) => {
+                                                const updated = [...features];
+                                                updated[i] = e.target.value;
+                                                setFeatures(updated);
+                                            }}
+                                            placeholder={`e.g. Feature ${i + 1}`}
+                                            disabled={loading}
+                                            className={inputCls}
+                                            maxLength={100}
+                                        />
+                                        {features.length > 1 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setFeatures(p => p.filter((_, idx) => idx !== i))}
+                                                disabled={loading}
+                                                className="w-8 h-10 rounded-lg flex items-center justify-center text-white/20 hover:text-white/60 hover:bg-white/[0.05] transition-all duration-150 shrink-0"
+                                            >
+                                                <X className="w-3.5 h-3.5" />
+                                            </button>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
                         </div>
 
                         {/* Images */}
