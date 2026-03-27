@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef, memo, useReducer } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -22,378 +22,309 @@ import {
     X,
 } from 'lucide-react';
 
+// ── Constants (outside component) ────────────────────────────────
 const ROUTES = {
     OVERVIEW: [
         { label: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
-        { label: 'Reports',   href: '/admin/reports',   icon: BarChart3 },
+        { label: 'Reports', href: '/admin/reports', icon: BarChart3 },
     ],
     MANAGE: [
         { label: 'Bookings', href: '/admin/bookings', icon: CalendarDays },
-        { label: 'Users',    href: '/admin/users',    icon: Users },
+        { label: 'Users', href: '/admin/users', icon: Users },
     ],
     CATALOG: [
-        { label: 'Categories',    href: '/admin/categories',    icon: Layers },
+        { label: 'Categories', href: '/admin/categories', icon: Layers },
         { label: 'Subcategories', href: '/admin/subcategories', icon: Layers },
-        { label: 'Services',      href: '/admin/services',      icon: Wrench },
+        { label: 'Services', href: '/admin/services', icon: Wrench },
     ],
 };
 
 const MOBILE_NAV = [
     { label: 'Overview', icon: LayoutDashboard, routes: ROUTES.OVERVIEW },
-    { label: 'Manage',   icon: CalendarDays,    routes: ROUTES.MANAGE },
-    { label: 'Catalog',  icon: Layers,          routes: ROUTES.CATALOG },
+    { label: 'Manage', icon: CalendarDays, routes: ROUTES.MANAGE },
+    { label: 'Catalog', icon: Layers, routes: ROUTES.CATALOG },
 ];
 
-// ── Mobile Nav Item ──────────────────────────────────────────────
-function MobileNavItem({ item, isActive, isMenuOpen, onOpenMenu }) {
+// Toast style - constant, not recreated
+const TOAST_STYLE = {
+    background: '#0A0A0A',
+    color: '#f0f0f0',
+    border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: '12px',
+    fontSize: '13px',
+    fontWeight: '500',
+    padding: '12px 16px',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+};
+
+// Simplified animation variants - constant objects
+const BACKDROP_VARIANTS = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1 },
+};
+
+const DRAWER_VARIANTS = {
+    hidden: { x: '-100%' },
+    visible: { x: 0 },
+};
+
+const POPOVER_VARIANTS = {
+    hidden: { opacity: 0, y: 20, scale: 0.95 },
+    visible: { 
+        opacity: 1, 
+        y: 0, 
+        scale: 1,
+        transition: { type: 'spring', damping: 25, stiffness: 300 }
+    },
+    exit: { 
+        opacity: 0, 
+        y: 10, 
+        scale: 0.98,
+        transition: { duration: 0.15 }
+    },
+};
+
+// Initial state for reducer
+const initialState = {
+    drawerOpen: false,
+    menuOpen: null,
+    showWelcome: false,
+    mounted: false,
+};
+
+// State reducer for consolidated state management
+function menuReducer(state, action) {
+    switch (action.type) {
+        case 'OPEN_DRAWER':
+            return { ...state, drawerOpen: true, menuOpen: null };
+        case 'CLOSE_DRAWER':
+            return { ...state, drawerOpen: false };
+        case 'OPEN_MENU':
+            return { ...state, menuOpen: action.payload, drawerOpen: false };
+        case 'CLOSE_MENU':
+            return { ...state, menuOpen: null };
+        case 'CLOSE_ALL':
+            return { ...state, drawerOpen: false, menuOpen: null };
+        case 'SET_MOUNTED':
+            return { ...state, mounted: true };
+        case 'SHOW_WELCOME':
+            return { ...state, showWelcome: true };
+        case 'HIDE_WELCOME':
+            return { ...state, showWelcome: false };
+        default:
+            return state;
+    }
+}
+
+// ── Memoized Mobile Nav Item ─────────────────────────────────────
+const MobileNavItem = memo(function MobileNavItem({ 
+    item, 
+    isActive, 
+    isMenuOpen, 
+    onOpenMenu 
+}) {
     const Icon = item.icon;
+    const handleClick = useCallback(() => onOpenMenu(item), [item, onOpenMenu]);
+
     return (
-        <motion.button
-            onClick={() => onOpenMenu(item)}
-            className="relative flex flex-col items-center justify-center gap-1 flex-1 h-full transition-all duration-200 select-none"
+        <button
+            onClick={handleClick}
+            className={`
+                relative flex flex-col items-center justify-center gap-1 flex-1 h-full 
+                transition-all duration-150 select-none active:scale-95
+                ${isMenuOpen || isActive ? 'text-white' : 'text-gray-600'}
+            `}
             aria-current={isActive ? 'page' : undefined}
             aria-label={item.label}
-            whileTap={{ scale: 0.92 }}
         >
-            {/* Active route indicator bar */}
-            <motion.span 
-                className="absolute top-0 left-1/2 -translate-x-1/2 h-[2px] rounded-full bg-white"
-                initial={false}
-                animate={{ 
-                    width: isActive ? 32 : 0,
-                    opacity: isActive ? 1 : 0 
-                }}
-                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+            {/* Active indicator - CSS only */}
+            <span 
+                className={`
+                    absolute top-0 left-1/2 -translate-x-1/2 h-[2px] rounded-full bg-white
+                    transition-all duration-200
+                    ${isActive ? 'w-8 opacity-100' : 'w-0 opacity-0'}
+                `}
             />
 
-            <motion.div 
-                className="relative w-9 h-9 rounded-xl flex items-center justify-center"
-                initial={false}
-                animate={{ 
-                    backgroundColor: isMenuOpen 
-                        ? 'rgba(255,255,255,0.12)' 
-                        : isActive 
-                            ? 'rgba(255,255,255,0.1)' 
-                            : 'rgba(255,255,255,0)',
-                    scale: isMenuOpen ? 1.08 : isActive ? 1 : 0.95
-                }}
-                transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+            <div 
+                className={`
+                    relative w-9 h-9 rounded-xl flex items-center justify-center
+                    transition-all duration-150
+                    ${isMenuOpen ? 'bg-white/12 scale-105' : isActive ? 'bg-white/10' : 'bg-transparent scale-95'}
+                `}
             >
-                {/* Simple dot indicator when menu is open */}
-                <AnimatePresence>
-                    {isMenuOpen && (
-                        <motion.div
-                            className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-white"
-                            initial={{ scale: 0, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0, opacity: 0 }}
-                            transition={{ type: 'spring', stiffness: 500, damping: 25 }}
-                        />
-                    )}
-                </AnimatePresence>
+                {/* Dot indicator */}
+                {isMenuOpen && (
+                    <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-white" />
+                )}
 
                 <Icon
-                    className={`h-[18px] w-[18px] transition-colors duration-200 ${
-                        isMenuOpen || isActive ? 'text-white' : 'text-gray-600'
-                    }`}
+                    className="h-[18px] w-[18px] transition-colors duration-150"
                     strokeWidth={isMenuOpen || isActive ? 2.5 : 1.8}
                     aria-hidden="true"
                 />
-            </motion.div>
+            </div>
 
-            <span className={`text-[10px] font-medium leading-none transition-colors duration-200 ${
-                isMenuOpen || isActive ? 'text-white' : 'text-gray-600'
-            }`}>
+            <span className="text-[10px] font-medium leading-none transition-colors duration-150">
                 {item.label}
             </span>
-        </motion.button>
+        </button>
     );
-}
+});
 
-// ── Menu Backdrop ────────────────────────────────────────────────
-function MenuBackdrop({ isOpen, onClose }) {
+MobileNavItem.displayName = 'MobileNavItem';
+
+// ── Memoized Menu Backdrop ───────────────────────────────────────
+const MenuBackdrop = memo(function MenuBackdrop({ isOpen, onClose }) {
+    if (!isOpen) return null;
+    
     return (
-        <AnimatePresence>
-            {isOpen && (
-                <motion.div
-                    className="fixed inset-0 z-40 bg-black/70"
-                    initial={{ opacity: 0, backdropFilter: 'blur(0px)' }}
-                    animate={{ 
-                        opacity: 1, 
-                        backdropFilter: 'blur(12px)',
-                        transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] }
-                    }}
-                    exit={{ 
-                        opacity: 0, 
-                        backdropFilter: 'blur(0px)',
-                        transition: { duration: 0.25, ease: [0.22, 1, 0.36, 1] }
-                    }}
-                    onClick={onClose}
-                    aria-hidden="true"
-                />
-            )}
-        </AnimatePresence>
+        <motion.div
+            className="fixed inset-0 z-40 bg-black/70"
+            variants={BACKDROP_VARIANTS}
+            initial="hidden"
+            animate="visible"
+            exit="hidden"
+            transition={{ duration: 0.2 }}
+            onClick={onClose}
+            aria-hidden="true"
+        />
     );
-}
+});
 
-// ── Menu Popover Content ─────────────────────────────────────────
-function MenuPopoverContent({ item, onClose, pathname, direction, isInitial }) {
-    const isRouteActive = (route) =>
-        pathname === route.href || pathname.startsWith(route.href + '/');
+MenuBackdrop.displayName = 'MenuBackdrop';
 
-    const allRoutes = item.label === 'Catalog' 
-        ? [...item.routes, { label: 'Settings', href: '/admin/settings', icon: Settings, isSettings: true }]
-        : item.routes;
+// ── Memoized Menu Route Item ─────────────────────────────────────
+const MenuRouteItem = memo(function MenuRouteItem({ 
+    route, 
+    active, 
+    onClose,
+    isSettings = false
+}) {
+    const RouteIcon = route.icon;
+    
+    return (
+        <>
+            {isSettings && <div className="h-px mx-1 my-2 bg-white/[0.06]" />}
+            <Link href={route.href} onClick={onClose}>
+                <div
+                    className={`
+                        flex items-center gap-3 px-3 py-3 rounded-xl 
+                        transition-all duration-150 group relative overflow-hidden
+                        active:scale-[0.98]
+                        ${active 
+                            ? 'bg-white text-black' 
+                            : 'text-gray-400 hover:text-white hover:bg-white/5'
+                        }
+                    `}
+                    aria-current={active ? 'page' : undefined}
+                >
+                    <RouteIcon 
+                        className={`w-4 h-4 transition-colors duration-150 ${
+                            active ? 'text-black' : 'text-gray-500 group-hover:text-white'
+                        }`} 
+                        strokeWidth={2} 
+                    />
+                    <span className="flex-1 text-sm font-medium">{route.label}</span>
+                    <ChevronRight 
+                        className={`w-3.5 h-3.5 transition-all duration-150 group-hover:translate-x-0.5 ${
+                            active ? 'text-black/50' : 'text-gray-700 group-hover:text-gray-400'
+                        }`} 
+                        strokeWidth={2} 
+                    />
+                </div>
+            </Link>
+        </>
+    );
+});
 
-    const variants = {
-        initial: isInitial 
-            ? { 
-                opacity: 0, 
-                y: 60, 
-                scale: 0.85,
-                filter: 'blur(10px)',
-                rotateX: -15,
-            }
-            : {
-                opacity: 0,
-                x: direction > 0 ? 100 : -100,
-                scale: 0.92,
-                filter: 'blur(8px)',
-                rotateY: direction > 0 ? -15 : 15,
-            },
-        animate: { 
-            opacity: 1, 
-            y: 0,
-            x: 0,
-            scale: 1,
-            filter: 'blur(0px)',
-            rotateX: 0,
-            rotateY: 0,
-            transition: {
-                type: 'spring',
-                damping: 30,
-                stiffness: 350,
-                mass: 0.8,
-            }
-        },
-        exit: isInitial
-            ? { 
-                opacity: 0, 
-                y: 40,
-                scale: 0.9,
-                filter: 'blur(8px)',
-                transition: {
-                    duration: 0.2,
-                    ease: [0.32, 0, 0.67, 0],
-                }
-            }
-            : {
-                opacity: 0,
-                x: direction > 0 ? -100 : 100,
-                scale: 0.92,
-                filter: 'blur(8px)',
-                rotateY: direction > 0 ? 15 : -15,
-                transition: {
-                    duration: 0.25,
-                    ease: [0.32, 0, 0.67, 0],
-                }
-            },
-    };
+MenuRouteItem.displayName = 'MenuRouteItem';
+
+// ── Memoized Menu Popover Content ────────────────────────────────
+const MenuPopoverContent = memo(function MenuPopoverContent({ 
+    item, 
+    onClose, 
+    pathname 
+}) {
+    const isRouteActive = useCallback((route) =>
+        pathname === route.href || pathname.startsWith(route.href + '/'),
+        [pathname]
+    );
+
+    const allRoutes = useMemo(() => {
+        if (item.label === 'Catalog') {
+            return [
+                ...item.routes, 
+                { label: 'Settings', href: '/admin/settings', icon: Settings, isSettings: true }
+            ];
+        }
+        return item.routes.map(r => ({ ...r, isSettings: false }));
+    }, [item]);
+
+    const Icon = item.icon;
 
     return (
         <motion.div
-            className="fixed bottom-[88px] left-3 right-3 z-50 rounded-2xl bg-[#0A0A0A] border border-white/[0.08] shadow-2xl shadow-black/80 overflow-hidden"
-            variants={variants}
-            initial="initial"
-            animate="animate"
+            className="fixed bottom-[88px] left-3 right-3 z-50 rounded-2xl bg-[#0A0A0A] border border-white/[0.08] shadow-2xl overflow-hidden"
+            variants={POPOVER_VARIANTS}
+            initial="hidden"
+            animate="visible"
             exit="exit"
-            style={{ 
-                transformPerspective: 1200,
-                transformOrigin: 'center center',
-            }}
             role="dialog"
             aria-modal="true"
             aria-labelledby="menu-title"
         >
-            {/* Glow effect */}
-            <motion.div 
-                className="absolute -top-20 left-1/2 -translate-x-1/2 w-40 h-40 bg-white/10 rounded-full blur-3xl pointer-events-none"
-                initial={{ opacity: 0, scale: 0.5 }}
-                animate={{ 
-                    opacity: 1, 
-                    scale: 1,
-                    transition: { delay: 0.1, duration: 0.4 }
-                }}
-                exit={{ opacity: 0, scale: 0.5, transition: { duration: 0.1 } }}
-            />
-
             {/* Header */}
-            <motion.div 
-                className="relative flex items-center justify-between px-4 py-3.5 border-b border-white/[0.06]"
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ 
-                    opacity: 1, 
-                    y: 0,
-                    transition: { delay: 0.05, duration: 0.3, ease: [0.22, 1, 0.36, 1] }
-                }}
-            >
+            <div className="relative flex items-center justify-between px-4 py-3.5 border-b border-white/[0.06]">
                 <div className="flex items-center gap-2.5">
-                    <motion.div 
-                        className="w-7 h-7 rounded-lg bg-white/[0.06] flex items-center justify-center"
-                        initial={{ scale: 0, rotate: -180 }}
-                        animate={{ 
-                            scale: 1, 
-                            rotate: 0,
-                            transition: { 
-                                delay: 0.1,
-                                type: 'spring',
-                                stiffness: 400,
-                                damping: 15
-                            }
-                        }}
-                    >
-                        <item.icon className="w-3.5 h-3.5 text-gray-400" strokeWidth={2} />
-                    </motion.div>
-                    <motion.h3 
-                        id="menu-title" 
-                        className="text-sm font-semibold text-white"
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ 
-                            opacity: 1, 
-                            x: 0,
-                            transition: { delay: 0.12, duration: 0.3 }
-                        }}
-                    >
+                    <div className="w-7 h-7 rounded-lg bg-white/[0.06] flex items-center justify-center">
+                        <Icon className="w-3.5 h-3.5 text-gray-400" strokeWidth={2} />
+                    </div>
+                    <h3 id="menu-title" className="text-sm font-semibold text-white">
                         {item.label}
-                    </motion.h3>
+                    </h3>
                 </div>
-                <motion.button
+                <button
                     onClick={onClose}
-                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/[0.03] hover:bg-white/[0.08] transition-colors"
+                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/[0.03] 
+                             hover:bg-white/[0.08] active:scale-90 transition-all duration-150"
                     aria-label="Close menu"
-                    initial={{ scale: 0, opacity: 0 }}
-                    animate={{ 
-                        scale: 1, 
-                        opacity: 1,
-                        transition: { delay: 0.15, type: 'spring', stiffness: 500, damping: 25 }
-                    }}
-                    whileHover={{ scale: 1.1, rotate: 90 }}
-                    whileTap={{ scale: 0.9 }}
                 >
                     <X className="w-4 h-4 text-gray-500" strokeWidth={2} />
-                </motion.button>
-            </motion.div>
-
-            {/* Routes */}
-            <div className="p-2 relative">
-                {allRoutes.map((route, index) => {
-                    const RouteIcon = route.icon;
-                    const active = isRouteActive(route);
-                    const isSettings = route.isSettings;
-                    
-                    return (
-                        <motion.div 
-                            key={route.href}
-                            initial={{ opacity: 0, x: -30, filter: 'blur(10px)' }}
-                            animate={{ 
-                                opacity: 1, 
-                                x: 0,
-                                filter: 'blur(0px)',
-                                transition: {
-                                    delay: 0.08 + index * 0.06,
-                                    type: 'spring',
-                                    stiffness: 350,
-                                    damping: 30,
-                                }
-                            }}
-                            exit={{
-                                opacity: 0,
-                                x: direction > 0 ? -20 : 20,
-                                filter: 'blur(5px)',
-                                transition: {
-                                    duration: 0.12,
-                                    delay: index * 0.02,
-                                }
-                            }}
-                        >
-                            {isSettings && (
-                                <motion.div 
-                                    className="h-px mx-1 my-2 bg-white/[0.06]"
-                                    initial={{ scaleX: 0 }}
-                                    animate={{ 
-                                        scaleX: 1,
-                                        transition: { delay: 0.2, duration: 0.3 }
-                                    }}
-                                />
-                            )}
-                            <Link
-                                href={route.href}
-                                onClick={onClose}
-                            >
-                                <motion.div
-                                    className={`
-                                        flex items-center gap-3 px-3 py-3 rounded-xl transition-colors duration-150 group relative overflow-hidden
-                                        ${active ? 'bg-white text-black' : 'text-gray-400 hover:text-white'}
-                                    `}
-                                    whileHover={{ 
-                                        scale: 1.02,
-                                        backgroundColor: active ? 'rgb(255,255,255)' : 'rgba(255,255,255,0.05)',
-                                        transition: { duration: 0.2 }
-                                    }}
-                                    whileTap={{ scale: 0.98 }}
-                                    aria-current={active ? 'page' : undefined}
-                                >
-                                    <motion.div 
-                                        className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
-                                        initial={false}
-                                    />
-                                    
-                                    <motion.div
-                                        initial={{ rotate: 0 }}
-                                        whileHover={{ rotate: [0, -10, 10, 0] }}
-                                        transition={{ duration: 0.4 }}
-                                    >
-                                        <RouteIcon className={`w-4 h-4 ${active ? 'text-black' : 'text-gray-500 group-hover:text-white'} transition-colors`} strokeWidth={2} />
-                                    </motion.div>
-                                    <span className="flex-1 text-sm font-medium">{route.label}</span>
-                                    <motion.div
-                                        initial={{ x: 0 }}
-                                        whileHover={{ x: 3 }}
-                                        transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-                                    >
-                                        <ChevronRight className={`w-3.5 h-3.5 ${active ? 'text-black/50' : 'text-gray-700 group-hover:text-gray-400'} transition-colors`} strokeWidth={2} />
-                                    </motion.div>
-                                </motion.div>
-                            </Link>
-                        </motion.div>
-                    );
-                })}
+                </button>
             </div>
 
-            {/* Bottom gradient */}
-            <motion.div 
-                className="h-1 bg-gradient-to-r from-transparent via-white/10 to-transparent"
-                initial={{ scaleX: 0, opacity: 0 }}
-                animate={{ 
-                    scaleX: 1, 
-                    opacity: 1,
-                    transition: { delay: 0.3, duration: 0.4 }
-                }}
-            />
+            {/* Routes */}
+            <div className="p-2">
+                {allRoutes.map((route) => (
+                    <MenuRouteItem
+                        key={route.href}
+                        route={route}
+                        active={isRouteActive(route)}
+                        onClose={onClose}
+                        isSettings={route.isSettings || false}
+                    />
+                ))}
+            </div>
         </motion.div>
     );
-}
+});
 
-// ── Catalog Tabs ─────────────────────────────────────────────────
-function CatalogTabs({ pathname }) {
+MenuPopoverContent.displayName = 'MenuPopoverContent';
+
+// ── Memoized Catalog Tabs ────────────────────────────────────────
+const CatalogTabs = memo(function CatalogTabs({ pathname }) {
     const isInCatalog = useMemo(
-        () => ROUTES.CATALOG.some(tab => pathname === tab.href || pathname.startsWith(tab.href + '/')),
+        () => ROUTES.CATALOG.some(tab => 
+            pathname === tab.href || pathname.startsWith(tab.href + '/')
+        ),
         [pathname]
     );
+    
     if (!isInCatalog) return null;
 
     return (
-        <div className="sticky top-14 sm:top-16 z-30 bg-[#0A0A0A]/95 backdrop-blur-xl border-b border-white/[0.06]">
+        <div className="sticky top-14 sm:top-16 z-30 bg-[#0A0A0A]/95 border-b border-white/[0.06]">
             <div className="max-w-screen-2xl mx-auto px-4 lg:px-8">
                 <nav className="flex gap-1 overflow-x-auto scrollbar-hide py-2" aria-label="Catalog navigation">
                     {ROUTES.CATALOG.map((tab) => {
@@ -405,7 +336,7 @@ function CatalogTabs({ pathname }) {
                                 href={tab.href}
                                 className={`
                                     flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium
-                                    whitespace-nowrap transition-all duration-200 shrink-0
+                                    whitespace-nowrap transition-all duration-150 shrink-0
                                     ${isActive
                                         ? 'bg-white text-black'
                                         : 'text-gray-500 hover:text-gray-300 hover:bg-white/[0.05]'
@@ -422,7 +353,26 @@ function CatalogTabs({ pathname }) {
             </div>
         </div>
     );
-}
+});
+
+CatalogTabs.displayName = 'CatalogTabs';
+
+// ── Loading Component ────────────────────────────────────────────
+const LoadingScreen = memo(function LoadingScreen() {
+    return (
+        <div className="min-h-screen bg-black flex items-center justify-center">
+            <div className="flex flex-col items-center gap-3">
+                <div className="relative w-8 h-8">
+                    <div className="absolute inset-0 rounded-full border border-white/[0.06]" />
+                    <div className="absolute inset-0 rounded-full border border-transparent border-t-white/50 animate-spin" />
+                </div>
+                <p className="text-[10px] font-medium text-gray-700 uppercase tracking-[0.2em]">Loading</p>
+            </div>
+        </div>
+    );
+});
+
+LoadingScreen.displayName = 'LoadingScreen';
 
 // ── Main Layout ──────────────────────────────────────────────────
 export default function DashboardLayout({ children }) {
@@ -431,21 +381,19 @@ export default function DashboardLayout({ children }) {
     const router = useRouter();
     const pathname = usePathname();
 
-    const [drawerOpen, setDrawerOpen] = useState(false);
-    const [menuOpen, setMenuOpen] = useState(null);
-    const [showWelcome, setShowWelcome] = useState(false);
-    const [mounted, setMounted] = useState(false);
-    
-    const [direction, setDirection] = useState(0);
-    const [isInitialOpen, setIsInitialOpen] = useState(true);
-    const prevMenuRef = useRef(null);
+    const [state, dispatch] = useReducer(menuReducer, initialState);
 
-    const currentMenuItem = useMemo(() => {
-        return MOBILE_NAV.find(item => item.label === menuOpen) || null;
-    }, [menuOpen]);
+    const { drawerOpen, menuOpen, showWelcome, mounted } = state;
 
+    // Memoized current menu item
+    const currentMenuItem = useMemo(() => 
+        MOBILE_NAV.find(item => item.label === menuOpen) || null,
+        [menuOpen]
+    );
+
+    // Memoized active tab
     const activeTab = useMemo(() => {
-        for (let tab of MOBILE_NAV) {
+        for (const tab of MOBILE_NAV) {
             if (tab.routes.some(r => pathname === r.href || pathname.startsWith(r.href + '/'))) {
                 return tab.label;
             }
@@ -453,177 +401,149 @@ export default function DashboardLayout({ children }) {
         return null;
     }, [pathname]);
 
+    // Callbacks
     const openMenu = useCallback((item) => {
-        const newIndex = MOBILE_NAV.findIndex(nav => nav.label === item.label);
-        const prevIndex = MOBILE_NAV.findIndex(nav => nav.label === prevMenuRef.current);
-        
-        if (prevMenuRef.current === null) {
-            setIsInitialOpen(true);
-            setDirection(0);
-        } else if (prevMenuRef.current !== item.label) {
-            setIsInitialOpen(false);
-            setDirection(newIndex > prevIndex ? 1 : -1);
-        }
-        
-        prevMenuRef.current = item.label;
-        setMenuOpen(item.label);
+        dispatch({ type: 'OPEN_MENU', payload: item.label });
     }, []);
 
     const closeMenu = useCallback(() => {
-        setIsInitialOpen(true);
-        setDirection(0);
-        prevMenuRef.current = null;
-        setMenuOpen(null);
+        dispatch({ type: 'CLOSE_MENU' });
     }, []);
 
+    const openDrawer = useCallback(() => {
+        dispatch({ type: 'OPEN_DRAWER' });
+    }, []);
+
+    const closeDrawer = useCallback(() => {
+        dispatch({ type: 'CLOSE_DRAWER' });
+    }, []);
+
+    const closeWelcome = useCallback(() => {
+        dispatch({ type: 'HIDE_WELCOME' });
+    }, []);
+
+    const handleLogout = useCallback(() => logout?.(), [logout]);
+
+    // Auth check effect
     useEffect(() => {
         if (loading) return;
-        if (!isAuthenticated || user?.role !== 'admin') router.push('/admin/login');
+        if (!isAuthenticated || user?.role !== 'admin') {
+            router.push('/admin/login');
+        }
     }, [isAuthenticated, loading, user, router]);
 
+    // Mount effect
     useEffect(() => {
-        setMounted(true);
+        dispatch({ type: 'SET_MOUNTED' });
         const hideWelcome = localStorage.getItem('hideWelcomePopup') === 'true';
         if (!hideWelcome) {
-            setShowWelcome(true);
+            dispatch({ type: 'SHOW_WELCOME' });
         }
     }, []);
 
+    // Body overflow effect - batched
     useEffect(() => {
-        if (drawerOpen || menuOpen) {
-            document.body.style.overflow = 'hidden';
-        } else {
-            document.body.style.overflow = '';
-        }
+        const shouldLock = drawerOpen || menuOpen;
+        document.body.style.overflow = shouldLock ? 'hidden' : '';
         return () => { document.body.style.overflow = ''; };
     }, [drawerOpen, menuOpen]);
 
+    // Route change effect
     useEffect(() => {
-        setDrawerOpen(false);
-        closeMenu();
-    }, [pathname, closeMenu]);
+        dispatch({ type: 'CLOSE_ALL' });
+    }, [pathname]);
 
+    // Escape key effect
     useEffect(() => {
         const handler = (e) => {
-            if (e.key === 'Escape') { setDrawerOpen(false); closeMenu(); }
+            if (e.key === 'Escape') {
+                dispatch({ type: 'CLOSE_ALL' });
+            }
         };
         document.addEventListener('keydown', handler);
         return () => document.removeEventListener('keydown', handler);
-    }, [closeMenu]);
-
-    useEffect(() => {
-        if (!socket) return;
-        const style = {
-            background: '#0A0A0A',
-            color: '#f0f0f0',
-            border: '1px solid rgba(255,255,255,0.08)',
-            borderRadius: '12px',
-            fontSize: '13px',
-            fontWeight: '500',
-            padding: '12px 16px',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
-        };
-        const onNew = (data) => toast(`📅 New booking: ${data?.bookingCode ?? 'unknown'}`, { style, duration: 5000 });
-        const onUpdate = (data) => toast(`🔄 Booking ${data?.bookingCode ?? '—'} → ${data?.status ?? '—'}`, { style, duration: 4000 });
-        socket.on('new_booking', onNew);
-        socket.on('booking_status_updated', onUpdate);
-        return () => { socket.off('new_booking', onNew); socket.off('booking_status_updated', onUpdate); };
-    }, [socket]);
-
-    const handleLogout = useCallback(() => logout?.(), [logout]);
-    const openDrawer   = useCallback(() => setDrawerOpen(true), []);
-    const closeDrawer  = useCallback(() => setDrawerOpen(false), []);
-    const closeWelcome = useCallback(() => {
-        setShowWelcome(false);
     }, []);
 
-    if (loading) {
-        return (
-            <div className="min-h-screen bg-black flex items-center justify-center">
-                <div className="flex flex-col items-center gap-3">
-                    <div className="relative w-8 h-8">
-                        <div className="absolute inset-0 rounded-full border border-white/[0.06]" />
-                        <div className="absolute inset-0 rounded-full border border-transparent border-t-white/50 animate-spin" />
-                    </div>
-                    <p className="text-[10px] font-medium text-gray-700 uppercase tracking-[0.2em]">Loading</p>
-                </div>
-            </div>
-        );
-    }
+    // Socket effect with stable toast style reference
+    useEffect(() => {
+        if (!socket) return;
+        
+        const onNew = (data) => {
+            toast(`📅 New booking: ${data?.bookingCode ?? 'unknown'}`, { 
+                style: TOAST_STYLE, 
+                duration: 5000 
+            });
+        };
+        
+        const onUpdate = (data) => {
+            toast(`🔄 Booking ${data?.bookingCode ?? '—'} → ${data?.status ?? '—'}`, { 
+                style: TOAST_STYLE, 
+                duration: 4000 
+            });
+        };
+        
+        socket.on('new_booking', onNew);
+        socket.on('booking_status_updated', onUpdate);
+        
+        return () => {
+            socket.off('new_booking', onNew);
+            socket.off('booking_status_updated', onUpdate);
+        };
+    }, [socket]);
 
+    // Early returns
+    if (loading) return <LoadingScreen />;
     if (!isAuthenticated || user?.role !== 'admin') return null;
 
     return (
         <div className="min-h-screen bg-black">
-
             {/* Welcome Popup */}
-            {mounted && showWelcome && user && <WelcomePopup user={user} onClose={closeWelcome} />}
+            {mounted && showWelcome && user && (
+                <WelcomePopup user={user} onClose={closeWelcome} />
+            )}
 
             {/* Desktop sidebar */}
             <div className="hidden lg:block fixed inset-y-0 left-0 w-[220px] z-40">
                 <Sidebar onLogout={handleLogout} isMobile={false} />
             </div>
 
-            {/* Mobile backdrop */}
-            <AnimatePresence>
+            {/* Mobile backdrop & drawer */}
+            <AnimatePresence mode="wait">
                 {drawerOpen && (
-                    <motion.div
-                        className="lg:hidden fixed inset-0 bg-black/80 z-50"
-                        initial={{ opacity: 0, backdropFilter: 'blur(0px)' }}
-                        animate={{ 
-                            opacity: 1, 
-                            backdropFilter: 'blur(8px)',
-                            transition: { duration: 0.3 }
-                        }}
-                        exit={{ 
-                            opacity: 0,
-                            backdropFilter: 'blur(0px)',
-                            transition: { duration: 0.2 }
-                        }}
-                        onClick={closeDrawer}
-                        aria-hidden="true"
-                    />
+                    <>
+                        <motion.div
+                            key="backdrop"
+                            className="lg:hidden fixed inset-0 bg-black/80 z-50"
+                            variants={BACKDROP_VARIANTS}
+                            initial="hidden"
+                            animate="visible"
+                            exit="hidden"
+                            transition={{ duration: 0.2 }}
+                            onClick={closeDrawer}
+                            aria-hidden="true"
+                        />
+                        <motion.div
+                            key="drawer"
+                            className="lg:hidden fixed inset-y-0 left-0 w-64 max-w-[80vw] z-[60]"
+                            variants={DRAWER_VARIANTS}
+                            initial="hidden"
+                            animate="visible"
+                            exit="hidden"
+                            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+                            aria-modal="true"
+                            role="dialog"
+                            aria-label="Navigation drawer"
+                        >
+                            <Sidebar onLogout={handleLogout} onClose={closeDrawer} isMobile />
+                        </motion.div>
+                    </>
                 )}
             </AnimatePresence>
 
-            {/* Mobile drawer */}
-            <AnimatePresence>
-                {drawerOpen && (
-                    <motion.div
-                        className="lg:hidden fixed inset-y-0 left-0 w-64 max-w-[80vw] z-[60]"
-                        initial={{ x: '-100%', opacity: 0.5 }}
-                        animate={{ 
-                            x: 0, 
-                            opacity: 1,
-                            transition: { 
-                                type: 'spring', 
-                                damping: 30, 
-                                stiffness: 300,
-                                mass: 0.8
-                            }
-                        }}
-                        exit={{ 
-                            x: '-100%',
-                            opacity: 0.5,
-                            transition: { 
-                                type: 'spring',
-                                damping: 35,
-                                stiffness: 400
-                            }
-                        }}
-                        aria-modal="true"
-                        role="dialog"
-                        aria-label="Navigation drawer"
-                    >
-                        <Sidebar onLogout={handleLogout} onClose={closeDrawer} isMobile={true} />
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
-            {/* Main */}
+            {/* Main content */}
             <div className="lg:pl-[220px] flex flex-col min-h-screen">
                 <Header onMenuClick={openDrawer} onLogout={handleLogout} />
-
+                
                 <div className="hidden lg:block">
                     <CatalogTabs pathname={pathname} />
                 </div>
@@ -640,26 +560,25 @@ export default function DashboardLayout({ children }) {
                 </main>
             </div>
 
-            {/* Mobile Menu Backdrop */}
-            <MenuBackdrop isOpen={menuOpen !== null} onClose={closeMenu} />
+            {/* Mobile Menu */}
+            <AnimatePresence>
+                {menuOpen && <MenuBackdrop isOpen onClose={closeMenu} />}
+            </AnimatePresence>
 
-            {/* Mobile Menu Popover Content */}
-            <AnimatePresence mode="popLayout" initial={false}>
+            <AnimatePresence mode="wait">
                 {currentMenuItem && (
                     <MenuPopoverContent
                         key={currentMenuItem.label}
                         item={currentMenuItem}
                         onClose={closeMenu}
                         pathname={pathname}
-                        direction={direction}
-                        isInitial={isInitialOpen}
                     />
                 )}
             </AnimatePresence>
 
             {/* Mobile bottom nav */}
             <nav
-                className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0A0A0A]/98 backdrop-blur-xl border-t border-white/[0.06]"
+                className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0A0A0A]/98 border-t border-white/[0.06]"
                 style={{ paddingBottom: 'max(0px, env(safe-area-inset-bottom))' }}
                 aria-label="Mobile navigation"
             >
