@@ -2,13 +2,13 @@
 
 import { useRef, useEffect, useState, memo, useMemo } from 'react'
 import { motion, useScroll, useTransform } from 'framer-motion'
-import { ArrowRight, Phone, Droplets, Shield, Clock, Zap } from 'lucide-react'
+import { ArrowRight, Phone, Shield, Clock, Zap } from 'lucide-react'
 
 /* ─── Constants ─── */
 const STATS = [
   { value: '100+', label: 'Happy Clients', icon: Shield },
   { value: '4.9★', label: 'Avg Rating', icon: Clock },
-  { value: '2min', label: 'Quick Booking', icon: Droplets },
+  { value: '2min', label: 'Quick Booking', icon: Zap },
 ]
 
 const SERVICES_MARQUEE = [
@@ -28,6 +28,8 @@ const WHATSAPP_URL =
 const SERIF = 'Georgia, "Times New Roman", serif'
 const SANS = "'Helvetica Neue', Helvetica, Arial, sans-serif"
 
+const TAGLINE = 'The Shine That Finds You'
+
 /* ─── Memoized Subcomponents ─── */
 const PulsingDot = memo(function PulsingDot() {
   return (
@@ -38,7 +40,6 @@ const PulsingDot = memo(function PulsingDot() {
   )
 })
 
-// Use CSS animation instead of Framer Motion for marquee
 const ServicesMarquee = memo(function ServicesMarquee() {
   const doubled = useMemo(() => [...SERVICES_MARQUEE, ...SERVICES_MARQUEE], [])
   
@@ -64,7 +65,6 @@ const ServicesMarquee = memo(function ServicesMarquee() {
   )
 })
 
-// Memoized stat card to prevent re-renders
 const StatCard = memo(function StatCard({ stat, index, variant = 'mobile' }) {
   const Icon = stat.icon
   
@@ -113,7 +113,26 @@ const StatCard = memo(function StatCard({ stat, index, variant = 'mobile' }) {
   )
 })
 
-// Simple greeting hook with SSR support
+// Logo component without water drop
+const Logo = memo(function Logo({ size = 'default' }) {
+  const sizes = {
+    small: { fontSize: '10px', tracking: '0.2em' },
+    default: { fontSize: '11px', tracking: '0.25em' },
+    large: { fontSize: '12px', tracking: '0.3em' },
+  }
+  
+  const s = sizes[size] || sizes.default
+  
+  return (
+    <span
+      className="text-white/40 tracking-[0.2em] uppercase font-medium"
+      style={{ fontSize: s.fontSize, fontFamily: SANS, letterSpacing: s.tracking }}
+    >
+      Wash<span className="text-white/60">2</span>Door
+    </span>
+  )
+})
+
 function useGreeting() {
   const [greeting, setGreeting] = useState('Welcome')
   
@@ -125,7 +144,6 @@ function useGreeting() {
   return greeting
 }
 
-// Background component - separated to prevent re-renders
 const Background = memo(function Background({ scrollYProgress }) {
   const bgOpacity = useTransform(scrollYProgress, [0, 0.5], [1, 0.6])
   
@@ -151,7 +169,6 @@ const Background = memo(function Background({ scrollYProgress }) {
   )
 })
 
-// Overlays - static, no need for motion
 const Overlays = memo(function Overlays() {
   return (
     <div className="absolute inset-0 z-[1] pointer-events-none" aria-hidden="true">
@@ -166,7 +183,7 @@ const Overlays = memo(function Overlays() {
   )
 })
 
-// Animation variants - defined outside component to prevent recreation
+// Animation variants
 const fadeInUp = {
   hidden: { opacity: 0, y: 20 },
   visible: (delay) => ({
@@ -202,7 +219,6 @@ export default function Hero() {
     offset: ['start start', 'end start'],
   })
 
-  // Trigger animations after mount
   useEffect(() => {
     const timer = requestAnimationFrame(() => setIsVisible(true))
     return () => cancelAnimationFrame(timer)
@@ -214,7 +230,6 @@ export default function Hero() {
       className="relative w-full min-h-[100svh] overflow-hidden bg-black"
       aria-label="Hero section"
     >
-      {/* CSS for marquee and noise */}
       <style jsx global>{`
         @keyframes marquee {
           from { transform: translateX(0); }
@@ -251,17 +266,7 @@ export default function Hero() {
           variants={fadeInLeft}
           custom={0.1}
         >
-          <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded-full border border-white/20 flex items-center justify-center">
-              <Droplets size={10} className="text-white/40" />
-            </div>
-            <span
-              className="text-white/40 tracking-[0.2em] uppercase"
-              style={{ fontSize: '8px', fontFamily: SANS, fontWeight: 500 }}
-            >
-              Wash2Door
-            </span>
-          </div>
+          <Logo size="small" />
 
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-white/10 bg-white/[0.04]">
             <PulsingDot />
@@ -278,6 +283,7 @@ export default function Hero() {
 
         {/* Main Content */}
         <div className="pb-20">
+          {/* Main Tagline */}
           <motion.div
             variants={fadeInLeft}
             custom={0.2}
@@ -292,26 +298,49 @@ export default function Hero() {
             </span>
           </motion.div>
 
-          {/* Headline */}
+          {/* Headline - Main Tagline */}
           <div className="mb-5">
-            {['The Shines', 'that', 'find you'].map((text, i) => (
-              <motion.h1
-                key={text}
-                variants={fadeInUp}
-                custom={0.3 + i * 0.1}
-                className={`leading-[1] ${i < 2 ? 'mb-1 text-white' : ''}`}
-                style={{
-                  fontFamily: SERIF,
-                  fontWeight: 300,
-                  fontSize: i === 2 ? 'clamp(2.2rem, 10vw, 3.5rem)' : 'clamp(2.8rem, 12vw, 4.5rem)',
-                  letterSpacing: i === 2 ? '-0.02em' : '-0.03em',
-                  color: i === 2 ? 'rgba(255,255,255,0.15)' : undefined,
-                  fontStyle: i === 2 ? 'italic' : undefined,
-                }}
-              >
-                {text}
-              </motion.h1>
-            ))}
+            <motion.h1
+              variants={fadeInUp}
+              custom={0.3}
+              className="text-white leading-[1] mb-1"
+              style={{
+                fontFamily: SERIF,
+                fontWeight: 300,
+                fontSize: 'clamp(2.5rem, 11vw, 4rem)',
+                letterSpacing: '-0.03em',
+              }}
+            >
+              The Shine
+            </motion.h1>
+            <motion.h1
+              variants={fadeInUp}
+              custom={0.4}
+              className="text-white leading-[1] mb-1"
+              style={{
+                fontFamily: SERIF,
+                fontWeight: 300,
+                fontSize: 'clamp(2.5rem, 11vw, 4rem)',
+                letterSpacing: '-0.03em',
+              }}
+            >
+              That Finds
+            </motion.h1>
+            <motion.h1
+              variants={fadeInUp}
+              custom={0.5}
+              className="leading-[1]"
+              style={{
+                fontFamily: SERIF,
+                fontWeight: 300,
+                fontSize: 'clamp(2.2rem, 10vw, 3.5rem)',
+                letterSpacing: '-0.02em',
+                color: 'rgba(255,255,255,0.15)',
+                fontStyle: 'italic',
+              }}
+            >
+              You
+            </motion.h1>
           </div>
 
           {/* Divider */}
@@ -405,24 +434,14 @@ export default function Hero() {
           variants={fadeInLeft}
           custom={0.1}
         >
-          <div className="flex items-center gap-3">
-            <div className="w-6 h-6 rounded-full border border-white/20 flex items-center justify-center">
-              <Droplets size={12} className="text-white/40" />
-            </div>
-            <div>
-              <span
-                className="block text-white/40 tracking-[0.2em] uppercase"
-                style={{ fontSize: '8px', fontFamily: SANS, fontWeight: 500 }}
-              >
-                Wash2Door
-              </span>
-              <span
-                className="block text-white/20 tracking-[0.15em] uppercase"
-                style={{ fontSize: '6px', fontFamily: SANS }}
-              >
-                Duliajan, Assam
-              </span>
-            </div>
+          <div className="flex flex-col">
+            <Logo size="default" />
+            <span
+              className="text-white/20 tracking-[0.15em] uppercase mt-1"
+              style={{ fontSize: '6px', fontFamily: SANS }}
+            >
+              Duliajan, Assam
+            </span>
           </div>
 
           <div className="flex items-center gap-3 px-4 py-2 rounded-full border border-white/10 bg-white/[0.04]">
@@ -440,6 +459,7 @@ export default function Hero() {
 
         {/* Main Content */}
         <div className="pb-20">
+          {/* Tagline Badge */}
           <motion.div
             variants={fadeInLeft}
             custom={0.2}
@@ -450,7 +470,7 @@ export default function Hero() {
               className="text-white/40 tracking-[0.3em] uppercase"
               style={{ fontSize: '8px', fontFamily: SANS }}
             >
-              The Shines That Find You
+              {TAGLINE}
             </span>
           </motion.div>
 
@@ -467,7 +487,7 @@ export default function Hero() {
                 letterSpacing: '-0.03em',
               }}
             >
-              Pristine Car Care
+              The Shine That
             </motion.h1>
 
             <motion.h1
@@ -483,7 +503,7 @@ export default function Hero() {
                 fontStyle: 'italic',
               }}
             >
-              Delivered to Your Door
+              Finds You
             </motion.h1>
           </div>
 
@@ -562,24 +582,14 @@ export default function Hero() {
           variants={fadeInLeft}
           custom={0.1}
         >
-          <div className="flex items-center gap-4">
-            <div className="w-8 h-8 rounded-full border border-white/15 flex items-center justify-center">
-              <Droplets size={12} className="text-white/30" />
-            </div>
-            <div className="flex flex-col">
-              <span
-                className="text-white/35 tracking-[0.28em] uppercase"
-                style={{ fontSize: '8px', fontFamily: SANS, fontWeight: 500 }}
-              >
-                Wash2Door
-              </span>
-              <span
-                className="text-white/15 tracking-[0.15em] uppercase"
-                style={{ fontSize: '7px', fontFamily: SANS }}
-              >
-                Duliajan, Assam
-              </span>
-            </div>
+          <div className="flex flex-col">
+            <Logo size="large" />
+            <span
+              className="text-white/15 tracking-[0.15em] uppercase mt-1"
+              style={{ fontSize: '7px', fontFamily: SANS }}
+            >
+              Duliajan, Assam
+            </span>
           </div>
 
           <div className="flex items-center gap-4">
@@ -606,6 +616,7 @@ export default function Hero() {
 
         {/* Main Content */}
         <div className="shrink-0 pb-6">
+          {/* Tagline Badge */}
           <motion.div
             variants={fadeInLeft}
             custom={0.2}
@@ -616,30 +627,40 @@ export default function Hero() {
               className="text-white/40 tracking-[0.3em] uppercase"
               style={{ fontSize: '8px', fontFamily: SANS }}
             >
-              The Shines That Find You
+              {TAGLINE}
             </span>
-            <Zap size={12} className="text-white/20" strokeWidth={1.5} />
+            <div className="w-1.5 h-1.5 rounded-full bg-white/20" />
           </motion.div>
 
           {/* Headline + Right Column */}
           <div className="flex items-end justify-between gap-16 mb-16">
             <div className="shrink-0 max-w-[700px]">
-              {['Pristine', 'Car Care'].map((text, i) => (
-                <motion.h1
-                  key={text}
-                  variants={fadeInUp}
-                  custom={0.3 + i * 0.1}
-                  className="text-white leading-[0.9]"
-                  style={{
-                    fontFamily: SERIF,
-                    fontWeight: 300,
-                    fontSize: 'clamp(4rem, 7vw, 8rem)',
-                    letterSpacing: '-0.03em',
-                  }}
-                >
-                  {text}
-                </motion.h1>
-              ))}
+              <motion.h1
+                variants={fadeInUp}
+                custom={0.3}
+                className="text-white leading-[0.9]"
+                style={{
+                  fontFamily: SERIF,
+                  fontWeight: 300,
+                  fontSize: 'clamp(4rem, 7vw, 8rem)',
+                  letterSpacing: '-0.03em',
+                }}
+              >
+                The Shine
+              </motion.h1>
+              <motion.h1
+                variants={fadeInUp}
+                custom={0.4}
+                className="text-white leading-[0.9]"
+                style={{
+                  fontFamily: SERIF,
+                  fontWeight: 300,
+                  fontSize: 'clamp(4rem, 7vw, 8rem)',
+                  letterSpacing: '-0.03em',
+                }}
+              >
+                That Finds
+              </motion.h1>
 
               <motion.h1
                 variants={fadeInUp}
@@ -654,7 +675,7 @@ export default function Hero() {
                   fontStyle: 'italic',
                 }}
               >
-                Delivered to Your Door
+                You
               </motion.h1>
             </div>
 
