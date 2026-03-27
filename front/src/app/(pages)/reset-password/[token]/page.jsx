@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { Lock, Eye, EyeOff, Loader2, CheckCircle, XCircle, ArrowRight, Droplets } from "lucide-react"
+import { Lock, Eye, EyeOff, Loader2, CheckCircle, AlertCircle, ArrowRight } from "lucide-react"
 
 export default function ResetPasswordPage() {
   const params = useParams()
@@ -18,12 +18,12 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState("")
   const [success, setSuccess] = useState(false)
 
-  const handleChange = (e) => {
+  const handleChange = useCallback((e) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }))
     setError("")
-  }
+  }, [])
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = useCallback(async (e) => {
     e.preventDefault()
     setError("")
 
@@ -57,9 +57,7 @@ export default function ResetPasswordPage() {
         `${process.env.NEXT_PUBLIC_API_URL}/api/auth/reset-password/${token}`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ password }),
         }
       )
@@ -76,48 +74,28 @@ export default function ResetPasswordPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [formData, token])
 
-  // Success View
   if (success) {
     return (
-      <div 
-        className="min-h-screen bg-gray-50 flex items-center justify-center p-4"
-        style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
-      >
-        <div className="w-full max-w-md bg-white rounded-2xl p-8 md:p-10 shadow-sm border border-gray-100">
+      <div className="min-h-screen bg-white flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-white rounded-2xl p-8 md:p-10 border border-gray-100 shadow-sm">
           <div className="text-center">
-            {/* Logo */}
-            <div className="inline-flex items-center gap-2 mb-8">
-              <Droplets size={24} strokeWidth={1.5} className="text-blue-500" />
-              <span
-                className="text-black"
-                style={{
-                  fontFamily: 'Georgia, "Times New Roman", serif',
-                  fontSize: "20px",
-                  fontWeight: 300,
-                }}
-              >
-                Wash<span className="text-blue-500">2</span>Door
+            <div className="mb-8">
+              <span className="text-xl font-light text-black tracking-wide">
+                Wash<span className="font-medium">2</span>Door
               </span>
             </div>
 
-            <div className="w-16 h-16 mx-auto mb-6 bg-emerald-50 border border-emerald-200 rounded-full flex items-center justify-center">
-              <CheckCircle size={28} strokeWidth={1.5} className="text-emerald-600" />
+            <div className="w-16 h-16 mx-auto mb-6 bg-gray-100 border border-gray-200 rounded-full flex items-center justify-center">
+              <CheckCircle size={28} strokeWidth={1.5} className="text-gray-700" />
             </div>
 
-            <h2
-              className="text-black mb-3"
-              style={{
-                fontFamily: 'Georgia, "Times New Roman", serif',
-                fontWeight: 300,
-                fontSize: "24px",
-              }}
-            >
+            <h2 className="text-2xl font-light text-black mb-3">
               Password Reset Successfully
             </h2>
 
-            <p className="text-gray-400 mb-8" style={{ fontSize: "13px", lineHeight: 1.6 }}>
+            <p className="text-gray-500 text-sm mb-8 leading-relaxed">
               Your password has been changed. You can now sign in with your new password.
             </p>
 
@@ -125,19 +103,15 @@ export default function ResetPasswordPage() {
               onClick={() => router.push("/")}
               className="group inline-flex items-center justify-center gap-2 h-12 px-8
                          bg-black text-white rounded-full
-                         hover:bg-gray-800 active:scale-[0.97]
-                         transition-all duration-300"
+                         hover:bg-gray-800 transition-colors duration-150"
             >
-              <span
-                className="tracking-wider uppercase"
-                style={{ fontSize: "10px", fontWeight: 500 }}
-              >
+              <span className="text-xs tracking-wider uppercase font-medium">
                 Go to Home
               </span>
               <ArrowRight
                 size={14}
                 strokeWidth={1.5}
-                className="group-hover:translate-x-0.5 transition-transform duration-300"
+                className="group-hover:translate-x-0.5 transition-transform duration-150"
               />
             </button>
           </div>
@@ -147,25 +121,13 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div 
-      className="min-h-screen bg-gray-50 flex items-center justify-center p-4"
-      style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
-    >
-      <div className="w-full max-w-md bg-white rounded-2xl p-8 md:p-10 shadow-sm border border-gray-100">
+    <div className="min-h-screen bg-white flex items-center justify-center p-4">
+      <div className="w-full max-w-md bg-white rounded-2xl p-8 md:p-10 border border-gray-100 shadow-sm">
         {/* Header */}
         <div className="text-center mb-8">
-          {/* Logo */}
-          <div className="inline-flex items-center gap-2 mb-6">
-            <Droplets size={24} strokeWidth={1.5} className="text-blue-500" />
-            <span
-              className="text-black"
-              style={{
-                fontFamily: 'Georgia, "Times New Roman", serif',
-                fontSize: "20px",
-                fontWeight: 300,
-              }}
-            >
-              Wash<span className="text-blue-500">2</span>Door
+          <div className="mb-6">
+            <span className="text-xl font-light text-black tracking-wide">
+              Wash<span className="font-medium">2</span>Door
             </span>
           </div>
 
@@ -173,47 +135,34 @@ export default function ResetPasswordPage() {
             <Lock size={28} strokeWidth={1.5} className="text-gray-400" />
           </div>
 
-          <h2
-            className="text-black mb-2"
-            style={{
-              fontFamily: 'Georgia, "Times New Roman", serif',
-              fontWeight: 300,
-              fontSize: "28px",
-            }}
-          >
+          <h2 className="text-2xl font-light text-black mb-2">
             Reset Password
           </h2>
 
-          <p className="text-gray-400" style={{ fontSize: "13px" }}>
+          <p className="text-gray-500 text-sm">
             Enter your new password below
           </p>
         </div>
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Error */}
           {error && (
-            <div className="bg-red-50 border border-red-200 px-4 py-3 rounded-xl flex items-start gap-3">
-              <XCircle size={16} className="text-red-500 mt-0.5 flex-shrink-0" />
-              <p className="text-red-600" style={{ fontSize: "12px" }}>
-                {error}
-              </p>
+            <div className="bg-gray-50 border border-gray-300 px-4 py-3 rounded-xl flex items-start gap-3">
+              <AlertCircle size={16} className="text-gray-700 mt-0.5 flex-shrink-0" />
+              <p className="text-gray-700 text-sm">{error}</p>
             </div>
           )}
 
           {/* New Password */}
           <div>
-            <label
-              className="block text-gray-400 tracking-wider uppercase mb-2"
-              style={{ fontSize: "9px", letterSpacing: "0.3em" }}
-            >
+            <label className="block text-gray-500 tracking-wider uppercase mb-2 text-[10px]">
               New Password
             </label>
             <div className="relative">
               <Lock
                 size={16}
                 strokeWidth={1.5}
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300"
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
               />
               <input
                 type={showPassword ? "text" : "password"}
@@ -221,17 +170,19 @@ export default function ResetPasswordPage() {
                 value={formData.password}
                 onChange={handleChange}
                 placeholder="Min 8 characters"
+                disabled={loading}
+                autoComplete="new-password"
                 className="w-full bg-gray-50 border border-gray-200 pl-12 pr-12 h-12 
-                           text-black placeholder-gray-300 rounded-xl
+                           text-black placeholder-gray-400 rounded-xl text-sm
                            focus:outline-none focus:border-black 
-                           transition-colors duration-300"
-                style={{ fontSize: "13px" }}
+                           transition-colors duration-150 disabled:opacity-50"
               />
               <button
                 type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 
-                           hover:text-gray-500 transition-colors"
+                onClick={() => setShowPassword((s) => !s)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 
+                           hover:text-gray-600 transition-colors"
+                aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? (
                   <EyeOff size={16} strokeWidth={1.5} />
@@ -240,24 +191,21 @@ export default function ResetPasswordPage() {
                 )}
               </button>
             </div>
-            <p className="text-gray-300 mt-2" style={{ fontSize: "9px" }}>
+            <p className="text-gray-400 mt-2 text-[10px]">
               Must contain uppercase, lowercase, number & special character
             </p>
           </div>
 
           {/* Confirm Password */}
           <div>
-            <label
-              className="block text-gray-400 tracking-wider uppercase mb-2"
-              style={{ fontSize: "9px", letterSpacing: "0.3em" }}
-            >
+            <label className="block text-gray-500 tracking-wider uppercase mb-2 text-[10px]">
               Confirm Password
             </label>
             <div className="relative">
               <Lock
                 size={16}
                 strokeWidth={1.5}
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300"
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
               />
               <input
                 type={showPassword ? "text" : "password"}
@@ -265,11 +213,12 @@ export default function ResetPasswordPage() {
                 value={formData.confirmPassword}
                 onChange={handleChange}
                 placeholder="Re-enter password"
+                disabled={loading}
+                autoComplete="new-password"
                 className="w-full bg-gray-50 border border-gray-200 pl-12 pr-4 h-12 
-                           text-black placeholder-gray-300 rounded-xl
+                           text-black placeholder-gray-400 rounded-xl text-sm
                            focus:outline-none focus:border-black 
-                           transition-colors duration-300"
-                style={{ fontSize: "13px" }}
+                           transition-colors duration-150 disabled:opacity-50"
               />
             </div>
           </div>
@@ -280,23 +229,20 @@ export default function ResetPasswordPage() {
             disabled={loading}
             className="group w-full flex items-center justify-center gap-2 h-12 mt-6
                        bg-black text-white rounded-full
-                       hover:bg-gray-800 active:scale-[0.97]
-                       disabled:opacity-50 transition-all duration-300"
+                       hover:bg-gray-800 disabled:bg-gray-400
+                       transition-colors duration-150"
           >
             {loading ? (
               <Loader2 size={16} className="animate-spin" />
             ) : (
               <>
-                <span
-                  className="tracking-wider uppercase"
-                  style={{ fontSize: "10px", fontWeight: 500 }}
-                >
+                <span className="tracking-wider uppercase text-[10px] font-medium">
                   Reset Password
                 </span>
                 <ArrowRight
                   size={14}
                   strokeWidth={1.5}
-                  className="group-hover:translate-x-0.5 transition-transform duration-300"
+                  className="group-hover:translate-x-0.5 transition-transform duration-150"
                 />
               </>
             )}
@@ -307,8 +253,7 @@ export default function ResetPasswordPage() {
         <div className="mt-6 pt-6 border-t border-gray-100 text-center">
           <button
             onClick={() => router.push("/")}
-            className="text-gray-400 hover:text-black tracking-wider uppercase transition-colors"
-            style={{ fontSize: "10px" }}
+            className="text-gray-500 hover:text-black tracking-wider uppercase transition-colors text-[10px]"
           >
             Back to Home
           </button>
