@@ -25,7 +25,6 @@ import {
     Clock,
     Package,
     Loader2,
-    MoreVertical,
     IndianRupee,
     SlidersHorizontal,
     Check
@@ -52,11 +51,9 @@ export default function ServicesPage() {
     const [total, setTotal] = useState(0);
     const [pages, setPages] = useState(1);
 
-    // Local search input — debounced before it hits filters
     const [searchInput, setSearchInput] = useState('');
     const debouncedSearch = useDebounce(searchInput, 400);
 
-    // Filter drawer visible on mobile
     const [showFilterDrawer, setShowFilterDrawer] = useState(false);
 
     const [filters, setFilters] = useState({
@@ -157,13 +154,10 @@ export default function ServicesPage() {
         : null;
 
     // ── Handlers ──────────────────────────────────────────────────────────────
-    // ✅ FIX: Don't close drawer on category change - let user select subcategory too
     const handleCategoryChange = (categoryId) => {
         setFilters(prev => ({ ...prev, category: categoryId, subcategory: '', page: 1 }));
-        // Drawer stays open - filters apply immediately in background
     };
 
-    // ✅ FIX: Option to auto-close after subcategory selection (better UX)
     const handleSubcategoryChange = (subcategoryId, autoClose = false) => {
         setFilters(prev => ({ ...prev, subcategory: subcategoryId, page: 1 }));
         if (autoClose) {
@@ -360,8 +354,8 @@ export default function ServicesPage() {
                     )}
                 </header>
 
-                {/* SERVICES LIST */}
-                <div ref={listTopRef} className="px-4 py-4 pb-8">
+                {/* SERVICES GRID */}
+                <div ref={listTopRef} className="px-4 py-4 pb-28 sm:pb-8">
                     {/* Mobile active filters summary */}
                     {hasActiveFilters && (
                         <div className="sm:hidden flex items-center gap-2 mb-3 flex-wrap">
@@ -397,7 +391,7 @@ export default function ServicesPage() {
                     ) : services.length === 0 ? (
                         <EmptyState onClear={handleClearAll} hasFilters={!!hasActiveFilters} />
                     ) : (
-                        <div className="space-y-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
                             {services.map((service) => (
                                 <ServiceCard
                                     key={service._id}
@@ -421,7 +415,18 @@ export default function ServicesPage() {
                 </div>
             </div>
 
-            {/* ✅ IMPROVED MOBILE FILTER DRAWER */}
+            {/* Mobile FAB */}
+            <div className="sm:hidden fixed bottom-20 right-4 z-40">
+                <button
+                    onClick={() => setShowCreateModal(true)}
+                    className="w-14 h-14 bg-white text-black rounded-2xl shadow-2xl shadow-black/50 flex items-center justify-center active:scale-95 transition-transform"
+                    aria-label="Create new service"
+                >
+                    <Plus className="w-6 h-6" strokeWidth={2.5} />
+                </button>
+            </div>
+
+            {/* MOBILE FILTER DRAWER */}
             {showFilterDrawer && (
                 <FilterDrawer
                     categories={categories}
@@ -433,7 +438,7 @@ export default function ServicesPage() {
                     totalResults={total}
                     isLoading={loading}
                     onCategoryChange={handleCategoryChange}
-                    onSubcategoryChange={(id) => handleSubcategoryChange(id, true)} // Auto-close on subcategory
+                    onSubcategoryChange={(id) => handleSubcategoryChange(id, true)}
                     onClear={handleClearAll}
                     onClose={() => setShowFilterDrawer(false)}
                 />
@@ -484,7 +489,7 @@ export default function ServicesPage() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ✅ IMPROVED FILTER DRAWER - Real-time updates with live result count
+// FILTER DRAWER (Mobile)
 // ═══════════════════════════════════════════════════════════════════════════
 
 function FilterDrawer({
@@ -500,7 +505,7 @@ function FilterDrawer({
 
     return (
         <>
-            {/* Backdrop - slightly more transparent to show results updating */}
+            {/* Backdrop */}
             <div
                 className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
                 onClick={onClose}
@@ -561,7 +566,7 @@ function FilterDrawer({
                         ))}
                     </div>
 
-                    {/* Subcategory - only show when category selected */}
+                    {/* Subcategory */}
                     {activeCategory && (
                         <>
                             <p className="text-[11px] text-gray-500 uppercase tracking-wide mb-2">
@@ -598,7 +603,7 @@ function FilterDrawer({
                     )}
                 </div>
 
-                {/* ✅ Live results button - shows count updating in real-time */}
+                {/* Results button */}
                 <div className="shrink-0 px-4 pb-8 pt-3 border-t border-white/[0.06]">
                     <button
                         onClick={onClose}
@@ -610,9 +615,7 @@ function FilterDrawer({
                                 <span>Updating...</span>
                             </>
                         ) : (
-                            <>
-                                <span>Show {totalResults} result{totalResults !== 1 ? 's' : ''}</span>
-                            </>
+                            <span>Show {totalResults} result{totalResults !== 1 ? 's' : ''}</span>
                         )}
                     </button>
                 </div>
@@ -621,7 +624,6 @@ function FilterDrawer({
     );
 }
 
-// ✅ Reusable filter chip with checkmark for active state
 function FilterChip({ label, icon, isActive, onClick, variant = 'primary' }) {
     const baseStyles = variant === 'primary'
         ? isActive
@@ -648,7 +650,7 @@ function FilterChip({ label, icon, isActive, onClick, variant = 'primary' }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SHARED FILTER COMPONENTS
+// CATEGORY & SUBCATEGORY TABS (Desktop)
 // ═══════════════════════════════════════════════════════════════════════════
 
 function CategoryTabs({ categories, activeCategory, onSelect }) {
@@ -656,9 +658,8 @@ function CategoryTabs({ categories, activeCategory, onSelect }) {
         <div className="flex gap-2 min-w-max">
             <button
                 onClick={() => onSelect('')}
-                className={`h-8 px-4 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
-                    !activeCategory ? 'bg-white text-black' : 'bg-white/[0.06] text-gray-400 hover:text-white'
-                }`}
+                className={`h-8 px-4 rounded-full text-xs font-medium whitespace-nowrap transition-all ${!activeCategory ? 'bg-white text-black' : 'bg-white/[0.06] text-gray-400 hover:text-white'
+                    }`}
             >
                 All
             </button>
@@ -697,9 +698,8 @@ function SubcategoryTabs({ subcategories, activeSubcategory, loading, categoryNa
         <div className="flex gap-1.5 min-w-max">
             <button
                 onClick={() => onSelect('')}
-                className={`h-7 px-3 rounded-lg text-[11px] font-medium whitespace-nowrap transition-all ${
-                    !activeSubcategory ? 'bg-white/20 text-white' : 'bg-white/[0.04] text-gray-500 hover:text-white'
-                }`}
+                className={`h-7 px-3 rounded-lg text-[11px] font-medium whitespace-nowrap transition-all ${!activeSubcategory ? 'bg-white/20 text-white' : 'bg-white/[0.04] text-gray-500 hover:text-white'
+                    }`}
             >
                 All {categoryName}
             </button>
@@ -735,180 +735,183 @@ function FilterPill({ label, onRemove }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SERVICE CARD
+// SERVICE CARD (Vertical layout matching SubcategoryCard)
 // ═══════════════════════════════════════════════════════════════════════════
 
 function ServiceCard({ service, onView, onEdit, onDelete, onToggleActive }) {
-    const [showActions, setShowActions] = useState(false);
-    const menuRef = useRef(null);
     const primaryImage = service.images?.find(img => img.isPrimary) || service.images?.[0];
     const categoryName = service.category?.name || '';
     const subcategoryName = service.subcategory?.name || '';
-
-    useEffect(() => {
-        if (!showActions) return;
-        const handle = (e) => {
-            if (menuRef.current && !menuRef.current.contains(e.target)) {
-                setShowActions(false);
-            }
-        };
-        document.addEventListener('mousedown', handle);
-        document.addEventListener('touchstart', handle);
-        return () => {
-            document.removeEventListener('mousedown', handle);
-            document.removeEventListener('touchstart', handle);
-        };
-    }, [showActions]);
+    const isActive = service.isActive !== undefined ? service.isActive : true;
 
     return (
-        <div className={`relative bg-white/[0.03] rounded-2xl overflow-visible transition-opacity ${!service.isActive && 'opacity-50'}`}>
-            <div className="flex gap-3 p-3">
-                <button
-                    className="relative w-20 h-20 bg-white/[0.05] rounded-xl overflow-hidden shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
-                    onClick={() => onView(service)}
-                    aria-label={`View ${service.name}`}
-                >
-                    {primaryImage ? (
-                        <Image
-                            src={primaryImage.url}
-                            alt={service.name}
-                            fill
-                            className="object-cover"
-                        />
-                    ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                            <Package className="w-6 h-6 text-gray-700" />
-                        </div>
-                    )}
-                    {service.isFeatured && (
-                        <div className="absolute top-1 left-1">
-                            <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
-                        </div>
-                    )}
-                </button>
-
-                <div className="flex-1 min-w-0 py-0.5">
-                    <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                            <button
-                                className="text-sm font-medium text-white truncate block max-w-full text-left focus:outline-none"
-                                onClick={() => onView(service)}
-                            >
-                                {service.name}
-                            </button>
-                            <p className="text-[11px] text-gray-500 mt-0.5 truncate">
-                                {categoryName}{subcategoryName && ` · ${subcategoryName}`}
-                            </p>
-                        </div>
-
-                        <div className="relative shrink-0" ref={menuRef}>
-                            <button
-                                onClick={() => setShowActions(v => !v)}
-                                className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-500 hover:bg-white/[0.05] transition-colors"
-                                aria-label="More actions"
-                                aria-expanded={showActions}
-                            >
-                                <MoreVertical className="w-4 h-4" />
-                            </button>
-
-                            {showActions && (
-                                <div className="absolute right-0 top-8 z-20 bg-[#1a1a1a] rounded-xl border border-white/[0.08] shadow-xl overflow-hidden min-w-[148px]">
-                                    <ActionItem icon={Eye} label="View details" onClick={() => { onView(service); setShowActions(false); }} />
-                                    <ActionItem icon={Pencil} label="Edit service" onClick={() => { onEdit(service); setShowActions(false); }} />
-                                    <ActionItem
-                                        icon={service.isActive ? ToggleLeft : ToggleRight}
-                                        label={service.isActive ? 'Deactivate' : 'Activate'}
-                                        onClick={() => { onToggleActive(service); setShowActions(false); }}
-                                    />
-                                    <div className="h-px bg-white/[0.06] mx-2" />
-                                    <ActionItem
-                                        icon={Trash2}
-                                        label="Delete"
-                                        onClick={() => { onDelete(service._id); setShowActions(false); }}
-                                        danger
-                                    />
-                                </div>
-                            )}
+        <div className={`
+            bg-white/[0.02] border border-white/[0.08] rounded-xl sm:rounded-2xl 
+            flex flex-col overflow-hidden transition-all hover:bg-white/[0.04]
+            ${!isActive ? 'opacity-50' : ''}
+        `}>
+            {/* Image */}
+            <button
+                onClick={() => onView(service)}
+                className="relative h-32 sm:h-36 bg-white/[0.04] w-full focus:outline-none"
+            >
+                {primaryImage ? (
+                    <Image
+                        src={primaryImage.url}
+                        alt={service.name}
+                        fill
+                        className="object-cover"
+                    />
+                ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                        <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white/[0.04] flex items-center justify-center">
+                            <Package className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
                         </div>
                     </div>
+                )}
 
-                    <div className="flex items-center gap-3 mt-2">
-                        <div className="flex items-center gap-0.5 text-white">
-                            <IndianRupee className="w-3 h-3" />
-                            <span className="text-sm font-semibold">
-                                {service.price?.toLocaleString('en-IN')}
-                            </span>
-                        </div>
-                        <div className="flex items-center gap-1 text-gray-500">
-                            <Clock className="w-3 h-3" />
-                            <span className="text-xs">{service.duration} min</span>
-                        </div>
-                        {service.averageRating > 0 && (
-                            <div className="flex items-center gap-1 text-gray-500">
-                                <Star className="w-3 h-3" />
-                                <span className="text-xs">{service.averageRating?.toFixed(1)}</span>
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="flex items-center gap-2 mt-2">
-                        <span className={`
-                            text-[10px] px-2 py-0.5 rounded-full font-medium
-                            ${service.isActive
-                                ? 'bg-emerald-500/15 text-emerald-400'
-                                : 'bg-white/[0.05] text-gray-500'
-                            }
-                        `}>
-                            {service.isActive ? 'Active' : 'Inactive'}
+                {/* Featured Badge */}
+                {service.isFeatured && (
+                    <div className="absolute top-2 left-2">
+                        <span className="flex items-center gap-1 text-[9px] font-medium px-1.5 py-0.5 rounded bg-yellow-500/15 text-yellow-400 border border-yellow-500/20">
+                            <Star className="w-2.5 h-2.5 fill-yellow-400" />
+                            Featured
                         </span>
-                        {service.tier && service.tier !== 'basic' && (
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.05] text-gray-400 capitalize">
-                                {service.tier}
-                            </span>
-                        )}
                     </div>
+                )}
+
+                {/* Status Badge */}
+                <div className="absolute top-2 right-2">
+                    <span className={`
+                        text-[9px] font-medium px-1.5 py-0.5 rounded
+                        ${isActive
+                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
+                            : 'bg-red-500/15 text-red-400 border border-red-500/20'
+                        }
+                    `}>
+                        {isActive ? 'Active' : 'Inactive'}
+                    </span>
+                </div>
+            </button>
+
+            {/* Content */}
+            <div className="p-3 sm:p-4 flex-1 flex flex-col">
+                <div className="flex items-start justify-between gap-2 mb-1.5">
+                    <div className="flex-1 min-w-0">
+                        <p className="text-[10px] text-gray-600 truncate uppercase tracking-wider">
+                            {categoryName}{subcategoryName && ` · ${subcategoryName}`}
+                        </p>
+                        <button
+                            onClick={() => onView(service)}
+                            className="text-sm font-medium text-white truncate block max-w-full text-left mt-0.5 hover:underline focus:outline-none"
+                        >
+                            {service.name}
+                        </button>
+                    </div>
+                    {service.tier && service.tier !== 'basic' && (
+                        <div className="w-7 h-7 rounded-lg bg-white/[0.06] flex items-center justify-center shrink-0">
+                            <span className="text-[9px] font-medium text-gray-400 capitalize">
+                                {service.tier.charAt(0).toUpperCase()}
+                            </span>
+                        </div>
+                    )}
+                </div>
+
+                {/* Price & Duration */}
+                <div className="flex items-center gap-3 mb-2">
+                    <div className="flex items-center gap-0.5 text-white">
+                        <IndianRupee className="w-3 h-3" />
+                        <span className="text-sm font-semibold">
+                            {service.price?.toLocaleString('en-IN')}
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-1 text-gray-500">
+                        <Clock className="w-3 h-3" />
+                        <span className="text-[11px]">{service.duration} min</span>
+                    </div>
+                    {service.averageRating > 0 && (
+                        <div className="flex items-center gap-1 text-gray-500">
+                            <Star className="w-3 h-3" />
+                            <span className="text-[11px]">{service.averageRating?.toFixed(1)}</span>
+                        </div>
+                    )}
+                </div>
+
+                {service.description && (
+                    <p className="text-[10px] sm:text-xs text-gray-500 leading-relaxed mb-3 line-clamp-2">
+                        {service.description}
+                    </p>
+                )}
+
+                {/* Actions */}
+                <div className="flex items-center gap-1.5 mt-auto pt-3 border-t border-white/[0.06]">
+                    <button
+                        onClick={() => onView(service)}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[10px] text-gray-400 hover:text-white hover:bg-white/[0.08] transition-all"
+                    >
+                        <Eye className="w-3 h-3" />
+                        View
+                    </button>
+                    <button
+                        onClick={() => onEdit(service)}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[10px] text-gray-400 hover:text-white hover:bg-white/[0.08] transition-all"
+                    >
+                        <Pencil className="w-3 h-3" />
+                        Edit
+                    </button>
+                    <button
+                        onClick={() => onToggleActive(service)}
+                        className={`
+                            p-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-gray-400 transition-all
+                            ${isActive
+                                ? 'hover:text-yellow-400 hover:bg-yellow-500/10 hover:border-yellow-500/20'
+                                : 'hover:text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/20'
+                            }
+                        `}
+                        title={isActive ? 'Deactivate' : 'Activate'}
+                    >
+                        {isActive ? <ToggleRight className="w-3 h-3" /> : <ToggleLeft className="w-3 h-3" />}
+                    </button>
+                    <button
+                        onClick={() => onDelete(service._id)}
+                        className="p-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-gray-400 hover:text-red-400 hover:bg-red-500/10 hover:border-red-500/20 transition-all"
+                        title="Delete"
+                    >
+                        <Trash2 className="w-3 h-3" />
+                    </button>
                 </div>
             </div>
         </div>
     );
 }
 
-function ActionItem({ icon: Icon, label, onClick, danger = false }) {
-    return (
-        <button
-            onClick={onClick}
-            className={`w-full flex items-center gap-3 px-4 py-3 text-xs transition-colors ${
-                danger
-                    ? 'text-red-400 hover:bg-red-500/10'
-                    : 'text-gray-300 hover:bg-white/[0.05]'
-            }`}
-        >
-            <Icon className="w-4 h-4 shrink-0" />
-            {label}
-        </button>
-    );
-}
-
 // ═══════════════════════════════════════════════════════════════════════════
-// LOADING / EMPTY
+// LOADING GRID
 // ═══════════════════════════════════════════════════════════════════════════
 
 function LoadingGrid() {
     return (
-        <div className="space-y-3">
-            {[...Array(4)].map((_, i) => (
-                <div key={i} className="flex gap-3 p-3 bg-white/[0.02] rounded-2xl animate-pulse">
-                    <div className="w-20 h-20 bg-white/[0.05] rounded-xl shrink-0" />
-                    <div className="flex-1 space-y-2 py-1">
-                        <div className="h-4 w-3/4 bg-white/[0.05] rounded-lg" />
-                        <div className="h-3 w-1/2 bg-white/[0.04] rounded-lg" />
-                        <div className="h-3 w-1/3 bg-white/[0.03] rounded-lg" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+            {[...Array(8)].map((_, i) => (
+                <div
+                    key={i}
+                    className="bg-white/[0.02] border border-white/[0.08] rounded-xl sm:rounded-2xl overflow-hidden"
+                >
+                    <div className="h-32 sm:h-36 bg-white/[0.04] animate-pulse" />
+                    <div className="p-3 sm:p-4 space-y-3">
+                        <div className="h-3 w-16 bg-white/[0.06] rounded animate-pulse" />
+                        <div className="h-4 w-3/4 bg-white/[0.06] rounded animate-pulse" />
+                        <div className="h-3 w-1/2 bg-white/[0.04] rounded animate-pulse" />
                     </div>
                 </div>
             ))}
         </div>
     );
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EMPTY STATE
+// ═══════════════════════════════════════════════════════════════════════════
 
 function EmptyState({ onClear, hasFilters }) {
     return (
