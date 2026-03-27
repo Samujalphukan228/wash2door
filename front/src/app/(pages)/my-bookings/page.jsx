@@ -3,6 +3,7 @@
 import { useState, useEffect, memo, useCallback, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/context/AuthContext"
+import { useUserSocket } from "@/context/UserSocketContext"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Search,
@@ -140,7 +141,6 @@ const ModalWrapper = memo(function ModalWrapper({ isOpen, onClose, children }) {
                        max-h-[92dvh] overflow-hidden shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Mobile drag handle */}
             <div className="sm:hidden flex justify-center pt-3 pb-1">
               <div className="w-10 h-1 bg-gray-200 rounded-full" />
             </div>
@@ -174,7 +174,6 @@ const BookingDetailsModal = memo(function BookingDetailsModal({
 
   return (
     <ModalWrapper isOpen={isOpen} onClose={onClose}>
-      {/* Header */}
       <div className="px-5 pt-5 pb-4 border-b border-gray-100">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
@@ -227,9 +226,7 @@ const BookingDetailsModal = memo(function BookingDetailsModal({
         </div>
       </div>
 
-      {/* Content */}
       <div className="px-5 py-5 space-y-3">
-        {/* Schedule */}
         <div className="border border-gray-100 rounded-xl p-4">
           <p
             className="text-gray-400 tracking-wider uppercase mb-3"
@@ -256,7 +253,6 @@ const BookingDetailsModal = memo(function BookingDetailsModal({
           </div>
         </div>
 
-        {/* Location */}
         {booking.location && (
           <div className="border border-gray-100 rounded-xl p-4">
             <p
@@ -289,7 +285,6 @@ const BookingDetailsModal = memo(function BookingDetailsModal({
           </div>
         )}
 
-        {/* Special Notes */}
         {booking.specialNotes && (
           <div className="border border-gray-200 bg-gray-50 rounded-xl p-4">
             <p
@@ -307,7 +302,6 @@ const BookingDetailsModal = memo(function BookingDetailsModal({
           </div>
         )}
 
-        {/* Cancellation */}
         {booking.status === "cancelled" && (
           <div className="border border-red-200 bg-red-50 rounded-xl p-4">
             <p
@@ -320,17 +314,13 @@ const BookingDetailsModal = memo(function BookingDetailsModal({
               Cancelled by: {booking.cancelledBy || "User"}
             </p>
             {booking.cancellationReason && (
-              <p
-                className="text-red-500 mt-1"
-                style={{ fontSize: "12px" }}
-              >
+              <p className="text-red-500 mt-1" style={{ fontSize: "12px" }}>
                 Reason: {booking.cancellationReason}
               </p>
             )}
           </div>
         )}
 
-        {/* Payment */}
         <div className="flex items-center justify-between py-3 border-t border-gray-100">
           <div>
             <p className="text-black" style={{ fontSize: "12px" }}>
@@ -354,7 +344,6 @@ const BookingDetailsModal = memo(function BookingDetailsModal({
         </div>
       </div>
 
-      {/* Footer */}
       <div className="px-5 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-3">
         <a
           href={`tel:${PHONE_NUMBER}`}
@@ -396,9 +385,7 @@ const CancelBookingModal = memo(function CancelBookingModal({
   }, [isOpen])
 
   const handleConfirm = useCallback(() => {
-    if (booking) {
-      onConfirm(booking._id, reason)
-    }
+    if (booking) onConfirm(booking._id, reason)
   }, [booking, reason, onConfirm])
 
   if (!booking) return null
@@ -526,9 +513,7 @@ const EmptyState = memo(function EmptyState({ hasFilters }) {
         className="text-gray-400 mb-7 max-w-xs leading-relaxed"
         style={{ fontSize: "13px" }}
       >
-        {hasFilters
-          ? "Try adjusting your filters"
-          : "Book your first service today"}
+        {hasFilters ? "Try adjusting your filters" : "Book your first service today"}
       </p>
       {!hasFilters && (
         <motion.a
@@ -553,7 +538,6 @@ const EmptyState = memo(function EmptyState({ hasFilters }) {
 const HeroSection = memo(function HeroSection({ total }) {
   return (
     <section className="relative bg-black pt-20 pb-10 md:pt-28 md:pb-14 overflow-hidden">
-      {/* Background decoration */}
       <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
         <div
           className="absolute inset-0 opacity-[0.03]"
@@ -619,15 +603,10 @@ const HeroSection = memo(function HeroSection({ total }) {
             </motion.p>
           </div>
 
-          {/* Book New - Desktop only */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{
-              duration: 0.6,
-              delay: 0.25,
-              ease: [0.16, 1, 0.3, 1],
-            }}
+            transition={{ duration: 0.6, delay: 0.25, ease: [0.16, 1, 0.3, 1] }}
             className="hidden sm:block"
           >
             <motion.a
@@ -664,7 +643,6 @@ const FilterBar = memo(function FilterBar({
     <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-sm border-b border-gray-100">
       <div className="max-w-6xl mx-auto px-4 sm:px-8 md:px-12 py-3">
         <div className="flex flex-col gap-2.5">
-          {/* Search */}
           <div className="relative">
             <Search
               size={15}
@@ -684,7 +662,6 @@ const FilterBar = memo(function FilterBar({
             />
           </div>
 
-          {/* Filter Pills */}
           <div className="flex gap-2 overflow-x-auto pb-0.5 no-scrollbar">
             {FILTER_OPTIONS.map((opt) => (
               <motion.button
@@ -806,6 +783,9 @@ export default function MyBookingsPage() {
   const router = useRouter()
   const { user, loading: authLoading, openModal } = useAuth()
 
+  // ✅ Real-time socket
+  const { onBookingEvent } = useUserSocket()
+
   const [bookings, setBookings] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -837,36 +817,43 @@ export default function MyBookingsPage() {
     }
   }, [user, authLoading, openModal, router])
 
-  // Fetch bookings
-  useEffect(() => {
+  // ── Fetch bookings ─────────────────────────────────────
+  const fetchBookings = useCallback(async () => {
     if (!user) return
-
-    const fetchBookings = async () => {
-      try {
-        setLoading(true)
-        setError("")
-        const result = await getUserBookings(
-          statusFilter,
-          currentPage,
-          ITEMS_PER_PAGE
-        )
-        setBookings(result.bookings || [])
-        setTotalPages(result.pages || 1)
-        setTotal(result.total || 0)
-      } catch (err) {
-        const errorMessage =
-          err instanceof Error ? err.message : "Failed to fetch bookings"
-        if (process.env.NODE_ENV === "development") {
-          console.error("Fetch bookings error:", err)
-        }
-        setError(errorMessage)
-      } finally {
-        setLoading(false)
-      }
+    try {
+      setLoading(true)
+      setError("")
+      const result = await getUserBookings(statusFilter, currentPage, ITEMS_PER_PAGE)
+      setBookings(result.bookings || [])
+      setTotalPages(result.pages || 1)
+      setTotal(result.total || 0)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch bookings")
+    } finally {
+      setLoading(false)
     }
-
-    fetchBookings()
   }, [user, statusFilter, currentPage])
+
+  useEffect(() => {
+    fetchBookings()
+  }, [fetchBookings])
+
+  // ✅ Real-time: refetch silently when admin changes booking status
+  useEffect(() => {
+    const unsubscribe = onBookingEvent((event) => {
+      if (event.type === 'statusUpdated' || event.type === 'cancelled') {
+        // Silently refresh without showing loading spinner
+        getUserBookings(statusFilter, currentPage, ITEMS_PER_PAGE)
+          .then((result) => {
+            setBookings(result.bookings || [])
+            setTotalPages(result.pages || 1)
+            setTotal(result.total || 0)
+          })
+          .catch(() => {}) // fail silently, toast already shown by socket context
+      }
+    })
+    return unsubscribe
+  }, [onBookingEvent, statusFilter, currentPage])
 
   // Close modals
   const closeModals = useCallback(() => {
@@ -882,25 +869,14 @@ export default function MyBookingsPage() {
         setActionLoading(true)
         await cancelBooking(bookingId, reason)
         closeModals()
-
-        // Refresh bookings
-        const result = await getUserBookings(
-          statusFilter,
-          currentPage,
-          ITEMS_PER_PAGE
-        )
-        setBookings(result.bookings || [])
-        setTotalPages(result.pages || 1)
-        setTotal(result.total || 0)
+        fetchBookings()
       } catch (err) {
-        const errorMessage =
-          err instanceof Error ? err.message : "Failed to cancel booking"
-        setError(errorMessage)
+        setError(err instanceof Error ? err.message : "Failed to cancel booking")
       } finally {
         setActionLoading(false)
       }
     },
-    [statusFilter, currentPage, closeModals]
+    [closeModals, fetchBookings]
   )
 
   // Handle status filter change
@@ -912,7 +888,6 @@ export default function MyBookingsPage() {
   // Filter bookings by search query
   const filteredBookings = useMemo(() => {
     if (!searchQuery) return bookings
-
     const query = searchQuery.toLowerCase()
     return bookings.filter(
       (booking) =>
@@ -922,7 +897,6 @@ export default function MyBookingsPage() {
     )
   }, [bookings, searchQuery])
 
-  // Loading state
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
@@ -931,19 +905,13 @@ export default function MyBookingsPage() {
     )
   }
 
-  // Not authenticated
   if (!user) return null
 
   return (
     <>
       <style jsx global>{`
-        .no-scrollbar::-webkit-scrollbar {
-          display: none;
-        }
-        .no-scrollbar {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
 
       <main style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
@@ -958,7 +926,6 @@ export default function MyBookingsPage() {
 
         <section className="w-full bg-white">
           <div className="max-w-6xl mx-auto px-4 sm:px-8 md:px-12 py-6 pb-28 sm:pb-12">
-            {/* Error message */}
             <AnimatePresence mode="wait">
               {error && (
                 <motion.div
@@ -968,14 +935,11 @@ export default function MyBookingsPage() {
                   className="mb-5 flex items-center gap-3 p-4 border border-red-200 bg-red-50 rounded-xl"
                 >
                   <AlertCircle size={15} className="text-red-500 shrink-0" />
-                  <p className="text-red-600" style={{ fontSize: "13px" }}>
-                    {error}
-                  </p>
+                  <p className="text-red-600" style={{ fontSize: "13px" }}>{error}</p>
                 </motion.div>
               )}
             </AnimatePresence>
 
-            {/* Content */}
             {loading ? (
               <div className="flex items-center justify-center py-24">
                 <Loader2 size={26} className="animate-spin text-gray-300" />
