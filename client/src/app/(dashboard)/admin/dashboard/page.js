@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import DashboardLayout from '@/components/admin/layout/DashboardLayout';
 import RevenueChart from '@/components/admin/charts/RevenueChart';
 import CreateBookingModal from '@/components/admin/bookings/CreateBookingModal';
 import ExpenseListPopup from '@/components/admin/Expense/ExpenseList';
 import useDashboard from '@/hooks/useDashboard';
-import { useSocket } from '@/context/SocketContext';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import {
@@ -64,7 +63,6 @@ export default function DashboardPage() {
         weeklyData 
     } = useDashboard();
     
-    const { socket } = useSocket();
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showExpenses, setShowExpenses] = useState(false);
 
@@ -74,17 +72,6 @@ export default function DashboardPage() {
         if (hour < 17) return 'Good afternoon';
         return 'Good evening';
     }, []);
-
-    useEffect(() => {
-        if (!socket) return;
-        const handleUpdate = () => refetch();
-        socket.on('new_booking', handleUpdate);
-        socket.on('booking_status_updated', handleUpdate);
-        return () => {
-            socket.off('new_booking', handleUpdate);
-            socket.off('booking_status_updated', handleUpdate);
-        };
-    }, [socket, refetch]);
 
     const bookingStats = useMemo(() => {
         const byStatus = stats?.bookings?.byStatus || {};
@@ -122,11 +109,6 @@ export default function DashboardPage() {
             refetch();
             toast.success('Booking created');
         }, 100);
-    };
-
-    // ✅ Handle expense added - refresh dashboard
-    const handleExpenseAdded = () => {
-        refetch();
     };
 
     if (loading) {
@@ -188,7 +170,7 @@ export default function DashboardPage() {
                         </div>
                     </header>
 
-                    {/* Quick Stats - Updated with 5 cards */}
+                    {/* Quick Stats */}
                     <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-5">
                         <StatCard
                             icon={IndianRupee}
@@ -281,11 +263,10 @@ export default function DashboardPage() {
                 />
             )}
 
-            {/* ✅ UPDATED: Added onExpenseAdded callback */}
+            {/* ✅ Removed onExpenseAdded — socket handles updates automatically */}
             <ExpenseListPopup
                 isOpen={showExpenses}
                 onClose={() => setShowExpenses(false)}
-                onExpenseAdded={handleExpenseAdded}
             />
         </DashboardLayout>
     );
@@ -324,7 +305,6 @@ function StatCard({ icon: Icon, label, value, sub, trend, trendInverse, highligh
                         <span className="text-[10px] sm:text-xs text-gray-500 font-medium">{label}</span>
                     </div>
                     
-                    {/* Trend Badge */}
                     {trend !== undefined && trend !== null && (
                         <div className={`
                             flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-medium

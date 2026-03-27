@@ -1,5 +1,3 @@
-// src/hooks/useSocketEvents.js - COMPLETE FILE
-
 import { useEffect, useCallback } from 'react';
 import { useSocket } from '@/context/SocketContext';
 import toast from 'react-hot-toast';
@@ -105,7 +103,7 @@ export const useCategorySocket = (callbacks = {}) => {
 };
 
 // ============================================
-// SUBCATEGORY SOCKET HOOK - NEW
+// SUBCATEGORY SOCKET HOOK - ADDED
 // ============================================
 export const useSubcategorySocket = (callbacks = {}) => {
     const { socket, isConnected } = useSocket();
@@ -178,28 +176,10 @@ export const useServiceSocket = (callbacks = {}) => {
             callbacks.onDeleted?.(data);
         });
 
-        // Variant added
-        socket.on('service:variantAdded', (data) => {
-            callbacks.onVariantAdded?.(data);
-        });
-
-        // Variant updated
-        socket.on('service:variantUpdated', (data) => {
-            callbacks.onVariantUpdated?.(data);
-        });
-
-        // Variant deleted
-        socket.on('service:variantDeleted', (data) => {
-            callbacks.onVariantDeleted?.(data);
-        });
-
         return () => {
             socket.off('service:created');
             socket.off('service:updated');
             socket.off('service:deleted');
-            socket.off('service:variantAdded');
-            socket.off('service:variantUpdated');
-            socket.off('service:variantDeleted');
         };
     }, [socket, isConnected, callbacks]);
 

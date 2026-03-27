@@ -8,6 +8,7 @@ import ServiceDetailModal from '@/components/admin/services/ServiceDetailModal';
 import serviceService from '@/services/serviceService';
 import categoryService from '@/services/categoryService';
 import subcategoryService from '@/services/subcategoryService';
+import { useSocket } from '@/context/SocketContext'; // ✅ ADDED
 import Image from 'next/image';
 import {
     Plus,
@@ -70,6 +71,9 @@ export default function ServicesPage() {
     const [showDetailModal, setShowDetailModal] = useState(false);
 
     const listTopRef = useRef(null);
+
+    // ✅ ADDED: Get socket subscription method
+    const { onServiceEvent } = useSocket();
 
     // Sync debounced search → filters
     useEffect(() => {
@@ -143,6 +147,70 @@ export default function ServicesPage() {
         fetchServices();
     }, [fetchServices]);
 
+    // ============================================
+    // 🔥 ADDED: Real-time service updates
+    // ============================================
+    useEffect(() => {
+        const unsubscribe = onServiceEvent((event) => {
+            console.log('🛠️ Service event received:', event.type, event.data);
+
+            if (event.type === 'created') {
+                // Add new service to list if on first page
+                if (filters.page === 1) {
+                    setServices(prev => {
+                        const exists = prev.find(s => s._id === event.data.serviceId);
+                        if (exists) return prev;
+                        
+                        // Create service object from socket data
+                        const newService = {
+                            _id: event.data.serviceId,
+                            name: event.data.name,
+                            category: event.data.category,
+                            subcategory: event.data.subcategory,
+                            isActive: event.data.isActive,
+                            isFeatured: event.data.isFeatured,
+                            price: event.data.price,
+                            duration: event.data.duration,
+                            description: event.data.description,
+                            images: event.data.images || [],
+                            tier: event.data.tier,
+                            averageRating: event.data.averageRating || 0,
+                            ...event.data
+                        };
+                        
+                        const updated = [newService, ...prev];
+                        if (updated.length > filters.limit) updated.pop();
+                        return updated;
+                    });
+                    setTotal(prev => prev + 1);
+                }
+            } else if (event.type === 'updated') {
+                // Update existing service
+                setServices(prev => prev.map(s => 
+                    s._id === event.data.serviceId 
+                        ? { 
+                            ...s, 
+                            ...event.data, 
+                            _id: event.data.serviceId,
+                            // Preserve nested objects if not provided in update
+                            category: event.data.category || s.category,
+                            subcategory: event.data.subcategory || s.subcategory,
+                            images: event.data.images || s.images
+                        }
+                        : s
+                ));
+            } else if (event.type === 'deleted') {
+                // Remove deleted service
+                setServices(prev => prev.filter(s => 
+                    s._id !== event.data.serviceId && s._id !== event.data._id
+                ));
+                setTotal(prev => Math.max(0, prev - 1));
+            }
+        });
+
+        return unsubscribe;
+    }, [onServiceEvent, filters.page, filters.limit]);
+
     const hasActiveFilters = filters.category || filters.subcategory || filters.search;
 
     const selectedCategoryName = filters.category
@@ -184,7 +252,9 @@ export default function ServicesPage() {
         if (!confirm('Delete this service? This cannot be undone.')) return;
         try {
             await serviceService.delete(serviceId);
+            // ✅ Socket will handle the update
             toast.success('Service deleted');
+            // Optionally refresh for accurate counts
             fetchServices(true);
         } catch (error) {
             toast.error(error.response?.data?.message || 'Failed to delete');
@@ -196,8 +266,8 @@ export default function ServicesPage() {
             const formData = new FormData();
             formData.append('isActive', !service.isActive);
             await serviceService.update(service._id, formData);
+            // ✅ Socket will handle the update
             toast.success(`Service ${!service.isActive ? 'activated' : 'deactivated'}`);
-            fetchServices(true);
         } catch {
             toast.error('Failed to update');
         }
@@ -450,7 +520,9 @@ export default function ServicesPage() {
                     onClose={() => setShowCreateModal(false)}
                     onSuccess={() => {
                         setShowCreateModal(false);
+                        // ✅ Socket will add to list, but refresh for accurate data
                         fetchServices(true);
+                        toast.success('Service created');
                     }}
                 />
             )}
@@ -465,6 +537,7 @@ export default function ServicesPage() {
                     onSuccess={() => {
                         setShowEditModal(false);
                         setSelectedService(null);
+                        // ✅ Socket will update, but refresh for accurate data
                         fetchServices(true);
                         toast.success('Service updated!');
                     }}

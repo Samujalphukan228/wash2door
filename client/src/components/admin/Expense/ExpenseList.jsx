@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 
 // === MAIN POPUP COMPONENT ===
-export default function ExpenseListPopup({ isOpen, onClose, onExpenseAdded }) {
+export default function ExpenseListPopup({ isOpen, onClose }) {
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(false);
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -49,8 +49,7 @@ export default function ExpenseListPopup({ isOpen, onClose, onExpenseAdded }) {
                 toast.success('Category created');
                 setShowCreateModal(false);
                 loadCategories();
-                // ✅ Refresh dashboard
-                onExpenseAdded?.();
+                // ✅ Removed onExpenseAdded?.() — socket handles dashboard update
             }
         } catch (error) {
             toast.error(error.response?.data?.message || 'Failed to create');
@@ -65,8 +64,7 @@ export default function ExpenseListPopup({ isOpen, onClose, onExpenseAdded }) {
                 setShowAddExpenseModal(false);
                 setSelectedCategory(null);
                 loadCategories();
-                // ✅ Refresh dashboard stats
-                onExpenseAdded?.();
+                // ✅ Removed onExpenseAdded?.() — socket handles dashboard update
             }
         } catch (error) {
             toast.error(error.response?.data?.message || 'Failed to add');
@@ -167,7 +165,7 @@ export default function ExpenseListPopup({ isOpen, onClose, onExpenseAdded }) {
     );
 }
 
-// === EXPENSE CARD (Simplified) ===
+// === EXPENSE CARD ===
 function ExpenseCard({ category, onAddExpense }) {
     return (
         <div

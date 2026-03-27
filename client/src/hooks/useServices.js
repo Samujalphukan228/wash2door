@@ -1,7 +1,8 @@
-// src/hooks/useServices.js
+// src/hooks/useServices.js - FIXED WITH REAL-TIME
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import serviceService from '@/services/serviceService';
+import { useSocket } from '@/context/SocketContext';
 import toast from 'react-hot-toast';
 
 const useServices = () => {
@@ -13,6 +14,7 @@ const useServices = () => {
         pages: 0,
         page: 1
     });
+    const { onServiceEvent } = useSocket();
 
     // Fetch all services
     const fetchAll = useCallback(async (params = {}) => {
@@ -39,6 +41,28 @@ const useServices = () => {
         }
     }, []);
 
+    // 🔥 ADDED: Real-time service updates
+    useEffect(() => {
+        const unsubscribe = onServiceEvent((event) => {
+            console.log('🛠️ Service event:', event.type, event.data);
+
+            if (event.type === 'created') {
+                // Add new service to list
+                setServices(prev => [event.data, ...prev]);
+            } else if (event.type === 'updated') {
+                // Update existing service
+                setServices(prev => prev.map(s => 
+                    s._id === event.data._id ? event.data : s
+                ));
+            } else if (event.type === 'deleted') {
+                // Remove deleted service
+                setServices(prev => prev.filter(s => s._id !== event.data.serviceId));
+            }
+        });
+
+        return unsubscribe;
+    }, [onServiceEvent]);
+
     // Fetch single
     const fetchOne = useCallback(async (serviceId) => {
         try {
@@ -61,7 +85,7 @@ const useServices = () => {
             const response = await serviceService.create(formData);
             
             if (response.success) {
-                setServices(prev => [...prev, response.data]);
+                // Don't manually add - socket will handle it
                 toast.success('Service created successfully');
             }
             return response;
@@ -81,9 +105,7 @@ const useServices = () => {
             const response = await serviceService.update(serviceId, formData);
             
             if (response.success) {
-                setServices(prev =>
-                    prev.map(s => s._id === serviceId ? response.data : s)
-                );
+                // Don't manually update - socket will handle it
                 toast.success('Service updated successfully');
             }
             return response;
@@ -103,7 +125,7 @@ const useServices = () => {
             const response = await serviceService.delete(serviceId);
             
             if (response.success) {
-                setServices(prev => prev.filter(s => s._id !== serviceId));
+                // Don't manually remove - socket will handle it
                 toast.success('Service deleted successfully');
             }
             return response;
@@ -122,12 +144,7 @@ const useServices = () => {
             const response = await serviceService.toggleFeatured(serviceId);
             
             if (response.success) {
-                setServices(prev =>
-                    prev.map(s => s._id === serviceId 
-                        ? { ...s, isFeatured: !s.isFeatured }
-                        : s
-                    )
-                );
+                // Don't manually update - socket will handle it
                 toast.success('Featured status updated');
             }
             return response;
@@ -143,12 +160,7 @@ const useServices = () => {
             const response = await serviceService.toggleActive(serviceId);
             
             if (response.success) {
-                setServices(prev =>
-                    prev.map(s => s._id === serviceId 
-                        ? { ...s, isActive: !s.isActive }
-                        : s
-                    )
-                );
+                // Don't manually update - socket will handle it
                 toast.success('Active status updated');
             }
             return response;
@@ -179,9 +191,7 @@ const useServices = () => {
             const response = await serviceService.deleteImage(serviceId, imageId);
             
             if (response.success) {
-                setServices(prev =>
-                    prev.map(s => s._id === serviceId ? response.data : s)
-                );
+                // Socket will update
                 toast.success('Image deleted');
             }
             return response;
@@ -197,9 +207,7 @@ const useServices = () => {
             const response = await serviceService.setPrimaryImage(serviceId, imageId);
             
             if (response.success) {
-                setServices(prev =>
-                    prev.map(s => s._id === serviceId ? response.data : s)
-                );
+                // Socket will update
                 toast.success('Primary image updated');
             }
             return response;
@@ -215,9 +223,7 @@ const useServices = () => {
             const response = await serviceService.addVariant(serviceId, formData);
             
             if (response.success) {
-                setServices(prev =>
-                    prev.map(s => s._id === serviceId ? response.data : s)
-                );
+                // Socket will update
                 toast.success('Variant added successfully');
             }
             return response;
@@ -233,9 +239,7 @@ const useServices = () => {
             const response = await serviceService.updateVariant(serviceId, variantId, formData);
             
             if (response.success) {
-                setServices(prev =>
-                    prev.map(s => s._id === serviceId ? response.data : s)
-                );
+                // Socket will update
                 toast.success('Variant updated successfully');
             }
             return response;
@@ -251,9 +255,7 @@ const useServices = () => {
             const response = await serviceService.deleteVariant(serviceId, variantId);
             
             if (response.success) {
-                setServices(prev =>
-                    prev.map(s => s._id === serviceId ? response.data : s)
-                );
+                // Socket will update
                 toast.success('Variant deleted successfully');
             }
             return response;

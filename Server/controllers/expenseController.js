@@ -1,7 +1,12 @@
+// controllers/expenseController.js - FIXED WITH REAL-TIME SOCKET
+
 import ExpenseCategory from '../models/ExpenseCategory.js';
 import Expense from '../models/Expense.js';
+import { emitDashboardUpdate } from '../utils/socketEmitter.js';
 
-// ✅ Create category
+// ============================================
+// CREATE CATEGORY (🔥 ADDED SOCKET)
+// ============================================
 export const createCategory = async (req, res) => {
     try {
         const { categoryName } = req.body;
@@ -11,13 +16,24 @@ export const createCategory = async (req, res) => {
         });
 
         await category.save();
+
+        // 🔥 Real-time dashboard update
+        emitDashboardUpdate({ 
+            action: 'expense_category_created', 
+            categoryName 
+        });
+
+        console.log(`🔌 Real-time: Expense category created - ${categoryName}`);
+
         res.status(201).json({ success: true, category });
     } catch (error) {
         res.status(400).json({ success: false, message: error.message });
     }
 };
 
-// ✅ Get all categories
+// ============================================
+// GET ALL CATEGORIES
+// ============================================
 export const getAllCategories = async (req, res) => {
     try {
         const categories = await ExpenseCategory.find().sort({ createdAt: -1 });
@@ -27,14 +43,19 @@ export const getAllCategories = async (req, res) => {
     }
 };
 
-// ✅ Add expense
+// ============================================
+// ADD EXPENSE (🔥 ADDED SOCKET)
+// ============================================
 export const addExpense = async (req, res) => {
     try {
         const { categoryId, amount } = req.body;
 
         const category = await ExpenseCategory.findById(categoryId);
         if (!category) {
-            return res.status(404).json({ success: false, message: 'Category not found' });
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Category not found' 
+            });
         }
 
         const expense = new Expense({
@@ -49,13 +70,24 @@ export const addExpense = async (req, res) => {
         category.totalAmount += amount;
         await category.save();
 
+        // 🔥 Real-time dashboard update
+        emitDashboardUpdate({
+            action: 'expense_added',
+            amount,
+            categoryName: category.categoryName
+        });
+
+        console.log(`🔌 Real-time: Expense added - ${amount} to ${category.categoryName}`);
+
         res.status(201).json({ success: true, expense, category });
     } catch (error) {
         res.status(400).json({ success: false, message: error.message });
     }
 };
 
-// ✅ Delete old expenses (2 days old)
+// ============================================
+// CLEANUP OLD EXPENSES (🔥 ADDED SOCKET)
+// ============================================
 export const cleanupOldExpenses = async (req, res) => {
     try {
         const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
@@ -64,6 +96,16 @@ export const cleanupOldExpenses = async (req, res) => {
             createdAt: { $lt: twoDaysAgo }
         });
 
+        // 🔥 Real-time dashboard update (only if something was deleted)
+        if (result.deletedCount > 0) {
+            emitDashboardUpdate({ 
+                action: 'expenses_cleaned', 
+                count: result.deletedCount 
+            });
+
+            console.log(`🔌 Real-time: ${result.deletedCount} old expenses cleaned`);
+        }
+
         res.json({
             success: true,
             message: `${result.deletedCount} old expenses deleted`
@@ -71,4 +113,11 @@ export const cleanupOldExpenses = async (req, res) => {
     } catch (error) {
         res.status(400).json({ success: false, message: error.message });
     }
+};
+
+export default {
+    createCategory,
+    getAllCategories,
+    addExpense,
+    cleanupOldExpenses
 };

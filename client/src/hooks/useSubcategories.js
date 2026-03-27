@@ -1,13 +1,37 @@
-// src/hooks/useSubcategories.js
-
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import subcategoryService from '@/services/subcategoryService';
+import { useSocket } from '@/context/SocketContext';
 import toast from 'react-hot-toast';
 
 const useSubcategories = () => {
     const [subcategories, setSubcategories] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const { onSubcategoryEvent } = useSocket();
+
+    // ============================================
+    // 🔥 REAL-TIME SUBCATEGORY UPDATES
+    // ============================================
+    useEffect(() => {
+        const unsubscribe = onSubcategoryEvent((event) => {
+            console.log('📂 Subcategory event:', event.type, event.data);
+
+            if (event.type === 'created') {
+                // Add new subcategory to list
+                setSubcategories(prev => [event.data, ...prev]);
+            } else if (event.type === 'updated') {
+                // Update existing subcategory
+                setSubcategories(prev => prev.map(s => 
+                    s._id === event.data._id ? event.data : s
+                ));
+            } else if (event.type === 'deleted') {
+                // Remove deleted subcategory
+                setSubcategories(prev => prev.filter(s => s._id !== event.data._id));
+            }
+        });
+
+        return unsubscribe;
+    }, [onSubcategoryEvent]);
 
     // Fetch all subcategories
     const fetchAll = useCallback(async (params = {}) => {
@@ -17,7 +41,7 @@ const useSubcategories = () => {
             const response = await subcategoryService.getAll(params);
             
             if (response.success) {
-                setSubcategories(response.data);
+                setSubcategories(response.data.subcategories || []);
             }
             return response;
         } catch (err) {
@@ -37,7 +61,7 @@ const useSubcategories = () => {
             const response = await subcategoryService.getByCategory(categoryId);
             
             if (response.success) {
-                setSubcategories(response.data);
+                setSubcategories(response.data.subcategories || []);
             }
             return response;
         } catch (err) {
@@ -70,7 +94,7 @@ const useSubcategories = () => {
             const response = await subcategoryService.create(formData);
             
             if (response.success) {
-                setSubcategories(prev => [...prev, response.data]);
+                // Don't manually add - socket will handle it
                 toast.success('Subcategory created successfully');
             }
             return response;
@@ -90,9 +114,7 @@ const useSubcategories = () => {
             const response = await subcategoryService.update(subcategoryId, formData);
             
             if (response.success) {
-                setSubcategories(prev =>
-                    prev.map(s => s._id === subcategoryId ? response.data : s)
-                );
+                // Don't manually update - socket will handle it
                 toast.success('Subcategory updated successfully');
             }
             return response;
@@ -112,7 +134,7 @@ const useSubcategories = () => {
             const response = await subcategoryService.delete(subcategoryId);
             
             if (response.success) {
-                setSubcategories(prev => prev.filter(s => s._id !== subcategoryId));
+                // Don't manually remove - socket will handle it
                 toast.success('Subcategory deleted successfully');
             }
             return response;
@@ -131,12 +153,7 @@ const useSubcategories = () => {
             const response = await subcategoryService.toggleStatus(subcategoryId);
             
             if (response.success) {
-                setSubcategories(prev =>
-                    prev.map(s => s._id === subcategoryId 
-                        ? { ...s, isActive: !s.isActive }
-                        : s
-                    )
-                );
+                // Don't manually update - socket will handle it
                 toast.success('Status updated');
             }
             return response;

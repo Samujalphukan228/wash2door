@@ -1,4 +1,4 @@
-// utils/socketEvents.js - COMPLETE with all events
+// utils/socketEvents.js - COMPLETE & ALIGNED
 
 export const SOCKET_EVENTS = {
     // ============================================
@@ -11,71 +11,61 @@ export const SOCKET_EVENTS = {
     // ============================================
     // BOOKING EVENTS
     // ============================================
-    
-    // New booking created (admin notification)
-    NEW_BOOKING: 'new_booking',
-    
-    // Booking status changed (user + admin)
-    BOOKING_STATUS_UPDATED: 'booking_status_updated',
-    
-    // Booking cancelled
-    BOOKING_CANCELLED: 'booking_cancelled',
+    BOOKING_NEW: 'booking:new',
+    BOOKING_STATUS_UPDATED: 'booking:statusUpdated',
+    BOOKING_CANCELLED: 'booking:cancelled',
 
     // ============================================
-    // SLOT EVENTS (for real-time availability)
+    // SLOT AVAILABILITY EVENTS (Real-time)
     // ============================================
-    
-    // A slot was just booked (broadcast to all)
-    SLOT_BOOKED: 'slot_booked',
-    
-    // A slot became available (cancellation)
-    SLOT_AVAILABLE: 'slot_available',
-    
-    // Request to refresh slots (client can emit this)
-    REFRESH_SLOTS: 'refresh_slots',
-
-    // ============================================
-    // ADMIN DASHBOARD EVENTS
-    // ============================================
-    
-    // Dashboard stats changed
-    DASHBOARD_UPDATED: 'dashboard_updated',
-    
-    // New user registered
-    NEW_USER: 'new_user',
-
-    // ============================================
-    // SERVICE EVENTS
-    // ============================================
-    
-    // Service updated/created/deleted
-    SERVICE_UPDATED: 'service_updated',
-    SERVICE_CREATED: 'service_created',
-    SERVICE_DELETED: 'service_deleted',
-    
-    // Variant updated
-    VARIANT_UPDATED: 'variant_updated',
+    SLOT_BOOKED: 'slot:booked',
+    SLOT_AVAILABLE: 'slot:available',
+    SLOTS_REFRESH: 'slots:refresh',
 
     // ============================================
     // CATEGORY EVENTS
     // ============================================
-    CATEGORY_UPDATED: 'category_updated',
+    CATEGORY_CREATED: 'category:created',
+    CATEGORY_UPDATED: 'category:updated',
+    CATEGORY_DELETED: 'category:deleted',
+
+    // ============================================
+    // SUBCATEGORY EVENTS
+    // ============================================
+    SUBCATEGORY_CREATED: 'subcategory:created',
+    SUBCATEGORY_UPDATED: 'subcategory:updated',
+    SUBCATEGORY_DELETED: 'subcategory:deleted',
+
+    // ============================================
+    // SERVICE EVENTS
+    // ============================================
+    SERVICE_CREATED: 'service:created',
+    SERVICE_UPDATED: 'service:updated',
+    SERVICE_DELETED: 'service:deleted',
+    
+    // Variant events
+    SERVICE_VARIANT_CREATED: 'service:variantCreated',
+    SERVICE_VARIANT_UPDATED: 'service:variantUpdated',
+    SERVICE_VARIANT_DELETED: 'service:variantDeleted',
 
     // ============================================
     // REVIEW EVENTS
     // ============================================
-    NEW_REVIEW: 'new_review',
-    REVIEW_UPDATED: 'review_updated',
+    REVIEW_NEW: 'review:new',
+    REVIEW_UPDATED: 'review:updated',
+    REVIEW_DELETED: 'review:deleted',
 
     // ============================================
     // USER EVENTS
     // ============================================
-    
-    // Force user to logout (when blocked)
-    FORCE_LOGOUT: 'force_logout',
-    
-    // User profile updated
-    PROFILE_UPDATED: 'profile_updated',
+    USER_BLOCKED: 'user:blocked',
+    USER_ROLE_CHANGED: 'user:roleChanged',
+    USER_PROFILE_UPDATED: 'user:profileUpdated',
+
+    // ============================================
+    // DASHBOARD EVENTS
+    // ============================================
+    DASHBOARD_UPDATED: 'dashboard:updated',
 
     // ============================================
     // NOTIFICATION EVENTS

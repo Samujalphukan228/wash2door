@@ -5,6 +5,7 @@ import DashboardLayout from '@/components/admin/layout/DashboardLayout';
 import CreateCategoryModal from '@/components/admin/categories/CreateCategoryModal';
 import EditCategoryModal from '@/components/admin/categories/EditCategoryModal';
 import categoryService from '@/services/categoryService';
+import { useSocket } from '@/context/SocketContext'; // ✅ ADDED
 import Image from 'next/image';
 import {
     Plus,
@@ -48,6 +49,9 @@ export default function CategoriesPage() {
     const [showEditModal, setShowEditModal] = useState(false);
     const [showStats, setShowStats] = useState(false);
 
+    // ✅ ADDED: Get socket subscription method
+    const { onCategoryEvent } = useSocket();
+
     const fetchCategories = useCallback(async (isRefresh = false) => {
         try {
             isRefresh ? setRefreshing(true) : setLoading(true);
@@ -66,6 +70,50 @@ export default function CategoriesPage() {
     useEffect(() => {
         fetchCategories();
     }, [fetchCategories]);
+
+    // ============================================
+    // 🔥 ADDED: Real-time category updates
+    // ============================================
+    useEffect(() => {
+        const unsubscribe = onCategoryEvent((event) => {
+            console.log('📁 Category event received:', event.type, event.data);
+
+            if (event.type === 'created') {
+                // Add new category to list
+                setCategories(prev => {
+                    // Check if already exists (avoid duplicates)
+                    const exists = prev.find(c => c._id === event.data.categoryId);
+                    if (exists) return prev;
+                    
+                    // Create category object from socket data
+                    const newCategory = {
+                        _id: event.data.categoryId,
+                        name: event.data.name,
+                        isActive: event.data.isActive,
+                        totalServices: 0,
+                        totalSubcategories: 0,
+                        ...event.data
+                    };
+                    
+                    return [newCategory, ...prev];
+                });
+            } else if (event.type === 'updated') {
+                // Update existing category
+                setCategories(prev => prev.map(c => 
+                    c._id === event.data.categoryId 
+                        ? { ...c, ...event.data, _id: event.data.categoryId }
+                        : c
+                ));
+            } else if (event.type === 'deleted') {
+                // Remove deleted category
+                setCategories(prev => prev.filter(c => 
+                    c._id !== event.data.categoryId && c._id !== event.data._id
+                ));
+            }
+        });
+
+        return unsubscribe;
+    }, [onCategoryEvent]);
 
     const filteredCategories = useMemo(() => {
         if (!debouncedSearch.trim()) return categories;
@@ -92,7 +140,9 @@ export default function CategoriesPage() {
         if (!confirm('Delete this category? Services inside must be moved or deleted first.')) return;
         try {
             await categoryService.delete(categoryId);
+            // ✅ Socket will handle the update, but show success toast
             toast.success('Category deleted');
+            // Optionally refresh to get accurate data
             fetchCategories(true);
         } catch (error) {
             toast.error(error.response?.data?.message || 'Failed to delete category');
@@ -102,8 +152,8 @@ export default function CategoriesPage() {
     const handleToggleStatus = async (category) => {
         try {
             await categoryService.toggleStatus(category._id);
+            // ✅ Socket will handle the update
             toast.success(`Category ${category.isActive ? 'deactivated' : 'activated'}`);
-            fetchCategories(true);
         } catch (error) {
             toast.error('Failed to update category');
         }
@@ -117,6 +167,7 @@ export default function CategoriesPage() {
     const handleCreateSuccess = () => {
         setShowCreateModal(false);
         toast.success('Category created');
+        // ✅ Socket will handle adding to list, but refresh for full data
         fetchCategories(true);
     };
 
@@ -124,6 +175,7 @@ export default function CategoriesPage() {
         setShowEditModal(false);
         setSelectedCategory(null);
         toast.success('Category updated');
+        // ✅ Socket will handle update, but refresh for full data
         fetchCategories(true);
     };
 
@@ -348,7 +400,7 @@ function StatPill({ icon: Icon, label, value, highlight = false }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// CATEGORY CARD (Vertical layout matching SubcategoryCard)
+// CATEGORY CARD
 // ═══════════════════════════════════════════════════════════════════════════
 
 function CategoryCard({ category, onEdit, onDelete, onToggleStatus }) {

@@ -1,14 +1,20 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import adminService from '@/services/adminService';
+import { useSocket } from '@/context/SocketContext';
 
 const useDashboard = () => {
     const [stats, setStats] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(true); // only true on first load
     const [error, setError] = useState(null);
+    const { onDashboardUpdate } = useSocket();
+    const isFirstLoad = useRef(true);
 
     const fetchStats = useCallback(async () => {
         try {
-            setLoading(true);
+            // ✅ Only show loading spinner on very first fetch
+            if (isFirstLoad.current) {
+                setLoading(true);
+            }
             setError(null);
             const response = await adminService.getDashboardStats();
             if (response.success) {
@@ -19,6 +25,7 @@ const useDashboard = () => {
             setError(err.message);
         } finally {
             setLoading(false);
+            isFirstLoad.current = false; // ✅ Never show full loader again
         }
     }, []);
 
@@ -26,13 +33,20 @@ const useDashboard = () => {
         fetchStats();
     }, [fetchStats]);
 
+    // 🔥 Real-time — silently refetches, no loading spinner
+    useEffect(() => {
+        const unsubscribe = onDashboardUpdate((data) => {
+            console.log('📊 Dashboard update received:', data);
+            fetchStats(); // ✅ Won't show loader anymore
+        });
+        return unsubscribe;
+    }, [onDashboardUpdate, fetchStats]);
+
     return {
         stats,
         loading,
         error,
         refetch: fetchStats,
-        
-        // ✅ Helper getters for easier access
         revenue: stats?.revenue || {},
         expenses: stats?.expenses || {},
         profit: stats?.profit || {},

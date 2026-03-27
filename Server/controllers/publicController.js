@@ -1,8 +1,8 @@
-// controllers/publicController.js - UPDATED with SUBCATEGORY SUPPORT
+// controllers/publicController.js - COMPLETE FIXED VERSION
 
 import Service from '../models/Service.js';
 import Category from '../models/Category.js';
-import Subcategory from '../models/Subcategory.js';  // ✅ ADD THIS IMPORT
+import Subcategory from '../models/Subcategory.js';
 import Review from '../models/Review.js';
 import Booking from '../models/Booking.js';
 import mongoose from 'mongoose';
@@ -11,6 +11,14 @@ import { TIME_SLOTS } from '../utils/constants.js';
 const isValidObjectId = (id) =>
     mongoose.Types.ObjectId.isValid(id) &&
     /^[0-9a-fA-F]{24}$/.test(id);
+
+// 🔥 Helper: Get consistent YYYY-MM-DD string from Date
+const getLocalDateStr = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
 
 // ============================================
 // GET ALL ACTIVE SERVICES - WITH PAGINATION
@@ -136,7 +144,7 @@ export const getServiceDetails = async (req, res) => {
             isActive: true
         })
             .populate('category', 'name slug icon image')
-            .populate('subcategory', 'name slug icon image')  // ✅ ADD THIS
+            .populate('subcategory', 'name slug icon image')
             .select('-createdBy');
 
         if (!service) {
@@ -175,7 +183,7 @@ export const getServiceDetails = async (req, res) => {
             _id: { $ne: serviceId },
             isActive: true
         })
-            .populate('subcategory', 'name slug icon')  // ✅ ADD THIS
+            .populate('subcategory', 'name slug icon')
             .select('name shortDescription images price discountPrice duration averageRating tier subcategory')
             .limit(4);
 
@@ -188,14 +196,14 @@ export const getServiceDetails = async (req, res) => {
                     description: service.description,
                     shortDescription: service.shortDescription,
                     category: service.category,
-                    subcategory: service.subcategory,   // ✅ ADD THIS
+                    subcategory: service.subcategory,
                     tier: service.tier,
                     images: service.images,
                     primaryImage: service.primaryImage,
                     highlights: service.highlights,
                     includes: service.includes,
                     excludes: service.excludes,
-                    price: service.price,               // ✅ NO VARIANTS
+                    price: service.price,
                     discountPrice: service.discountPrice,
                     finalPrice: service.finalPrice,
                     duration: service.duration,
@@ -241,14 +249,14 @@ export const getCategories = async (req, res) => {
                         category: cat._id,
                         isActive: true
                     });
-                    const subcategoryCount = await Subcategory.countDocuments({  // ✅ ADD THIS
+                    const subcategoryCount = await Subcategory.countDocuments({
                         category: cat._id,
                         isActive: true
                     });
                     return {
                         ...cat,
                         totalServices: serviceCount,
-                        totalSubcategories: subcategoryCount   // ✅ ADD THIS
+                        totalSubcategories: subcategoryCount
                     };
                 })
             );
@@ -270,7 +278,7 @@ export const getCategories = async (req, res) => {
 };
 
 // ============================================
-// ✅ NEW: GET SUBCATEGORIES BY CATEGORY
+// GET SUBCATEGORIES BY CATEGORY
 // ============================================
 export const getSubcategoriesByCategory = async (req, res) => {
     try {
@@ -283,7 +291,6 @@ export const getSubcategoriesByCategory = async (req, res) => {
             });
         }
 
-        // Check category exists
         const category = await Category.findById(categoryId)
             .select('name slug icon')
             .lean();
@@ -303,7 +310,6 @@ export const getSubcategoriesByCategory = async (req, res) => {
             .sort({ displayOrder: 1 })
             .lean();
 
-        // Add live service count per subcategory
         const result = await Promise.all(
             subcategories.map(async (sub) => {
                 const serviceCount = await Service.countDocuments({
@@ -416,12 +422,13 @@ export const getServiceReviews = async (req, res) => {
 };
 
 // ============================================
-// CHECK AVAILABILITY (GLOBAL - ALL SERVICES)
+// 🔥 CHECK AVAILABILITY (FIXED - USES slotLockKey)
 // ============================================
 export const checkAvailability = async (req, res) => {
     try {
         const { date } = req.query;
 
+        // ✅ Validate date parameter
         if (!date) {
             return res.status(400).json({
                 success: false,
@@ -429,24 +436,38 @@ export const checkAvailability = async (req, res) => {
             });
         }
 
-        const bookingDate = new Date(date);
-        if (isNaN(bookingDate.getTime())) {
+        // ✅ Validate date format (YYYY-MM-DD)
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
             return res.status(400).json({
                 success: false,
                 message: 'Invalid date format. Use YYYY-MM-DD'
             });
         }
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        // ✅ Parse date correctly (avoid timezone issues)
+        const [year, month, day] = date.split('-').map(Number);
+        const bookingDate = new Date(year, month - 1, day, 12, 0, 0, 0);
 
-        if (bookingDate < today) {
+        if (isNaN(bookingDate.getTime())) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid date'
+            });
+        }
+
+        // ✅ Get today's date string for comparison
+        const now = new Date();
+        const todayStr = getLocalDateStr(now);
+
+        // ✅ Check if date is in the past
+        if (date < todayStr) {
             return res.status(400).json({
                 success: false,
                 message: 'Cannot check availability for past dates'
             });
         }
 
+        // ✅ Check if Sunday (closed)
         if (bookingDate.getDay() === 0) {
             return res.status(200).json({
                 success: true,
@@ -466,17 +487,16 @@ export const checkAvailability = async (req, res) => {
             });
         }
 
-        const startOfDay = new Date(bookingDate);
-        startOfDay.setHours(0, 0, 0, 0);
-
-        const endOfDay = new Date(bookingDate);
-        endOfDay.setHours(23, 59, 59, 999);
-
+        // ============================================
+        // 🔥 CRITICAL FIX: Use slotLockKey instead of date range
+        // slotLockKey format: "YYYY-MM-DD|HH:MM-HH:MM"
+        // ============================================
         const bookedSlots = await Booking.find({
-            bookingDate: { $gte: startOfDay, $lte: endOfDay },
-            status: { $nin: ['cancelled'] }
+            slotLockKey: { $regex: `^${date}\\|` },
+            status: { $in: ['pending', 'confirmed', 'in-progress'] }
         }).select('timeSlot serviceName');
 
+        // ✅ Build booked slot map
         const bookedSlotMap = {};
         bookedSlots.forEach(booking => {
             bookedSlotMap[booking.timeSlot] = {
@@ -484,22 +504,21 @@ export const checkAvailability = async (req, res) => {
             };
         });
 
-        const now = new Date();
-        const isToday = bookingDate.toDateString() === now.toDateString();
+        // ✅ Check if today for past-time filtering
+        const isToday = date === todayStr;
 
+        // ✅ Build slots array with availability
         const slots = TIME_SLOTS.map(slot => {
             const [startTime] = slot.split('-');
-            const [hours] = startTime.split(':');
-            const slotHour = parseInt(hours);
+            const [hours, minutes] = startTime.split(':').map(Number);
 
             const isBooked = bookedSlotMap[slot] !== undefined;
 
+            // Check if slot time has passed (for today only)
             let isPast = false;
             if (isToday) {
-                const currentHour = now.getHours();
-                if (slotHour <= currentHour + 1) {
-                    isPast = true;
-                }
+                const slotDateTime = new Date(year, month - 1, day, hours, minutes || 0, 0, 0);
+                isPast = now.getTime() >= slotDateTime.getTime();
             }
 
             let available = true;
@@ -556,7 +575,7 @@ export const getFeaturedServices = async (req, res) => {
             isFeatured: true
         })
             .populate('category', 'name slug icon')
-            .populate('subcategory', 'name slug icon')  // ✅ ADD THIS
+            .populate('subcategory', 'name slug icon')
             .select('name shortDescription images price discountPrice duration averageRating totalReviews tier subcategory')
             .sort({ displayOrder: 1 })
             .limit(limitNum);
@@ -569,7 +588,7 @@ export const getFeaturedServices = async (req, res) => {
                 name: service.name,
                 shortDescription: service.shortDescription,
                 category: service.category,
-                subcategory: service.subcategory,   // ✅ ADD THIS
+                subcategory: service.subcategory,
                 tier: service.tier,
                 primaryImage: service.primaryImage,
                 price: service.price,
@@ -591,12 +610,13 @@ export const getFeaturedServices = async (req, res) => {
 };
 
 // ============================================
-// GET AVAILABLE SLOTS FOR DATE (GLOBAL)
+// 🔥 GET AVAILABLE SLOTS (FIXED - USES slotLockKey)
 // ============================================
 export const getAvailableSlots = async (req, res) => {
     try {
         const { date } = req.query;
 
+        // ✅ Validate date parameter
         if (!date) {
             return res.status(400).json({
                 success: false,
@@ -604,7 +624,18 @@ export const getAvailableSlots = async (req, res) => {
             });
         }
 
-        const bookingDate = new Date(date);
+        // ✅ Validate date format (YYYY-MM-DD)
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid date format. Use YYYY-MM-DD'
+            });
+        }
+
+        // ✅ Parse date correctly (avoid timezone issues)
+        const [year, month, day] = date.split('-').map(Number);
+        const bookingDate = new Date(year, month - 1, day, 12, 0, 0, 0);
+
         if (isNaN(bookingDate.getTime())) {
             return res.status(400).json({
                 success: false,
@@ -612,16 +643,19 @@ export const getAvailableSlots = async (req, res) => {
             });
         }
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        // ✅ Get today's date string for comparison
+        const now = new Date();
+        const todayStr = getLocalDateStr(now);
 
-        if (bookingDate < today) {
+        // ✅ Check if date is in the past
+        if (date < todayStr) {
             return res.status(400).json({
                 success: false,
                 message: 'Cannot check slots for past dates'
             });
         }
 
+        // ✅ Check if Sunday (closed)
         if (bookingDate.getDay() === 0) {
             return res.status(200).json({
                 success: true,
@@ -634,31 +668,31 @@ export const getAvailableSlots = async (req, res) => {
             });
         }
 
-        const startOfDay = new Date(bookingDate);
-        startOfDay.setHours(0, 0, 0, 0);
-
-        const endOfDay = new Date(bookingDate);
-        endOfDay.setHours(23, 59, 59, 999);
-
+        // ============================================
+        // 🔥 CRITICAL FIX: Use slotLockKey instead of date range
+        // slotLockKey format: "YYYY-MM-DD|HH:MM-HH:MM"
+        // ============================================
         const bookedSlots = await Booking.find({
-            bookingDate: { $gte: startOfDay, $lte: endOfDay },
-            status: { $nin: ['cancelled'] }
+            slotLockKey: { $regex: `^${date}\\|` },
+            status: { $in: ['pending', 'confirmed', 'in-progress'] }
         }).select('timeSlot');
 
         const bookedSlotNames = bookedSlots.map(b => b.timeSlot);
 
-        const now = new Date();
-        const isToday = bookingDate.toDateString() === now.toDateString();
+        // ✅ Check if today for past-time filtering
+        const isToday = date === todayStr;
 
+        // ✅ Filter available slots
         const availableSlots = TIME_SLOTS.filter(slot => {
+            // Check if already booked
             if (bookedSlotNames.includes(slot)) return false;
 
+            // Check if time has passed (for today only)
             if (isToday) {
                 const [startTime] = slot.split('-');
-                const [hours] = startTime.split(':');
-                const slotHour = parseInt(hours);
-                const currentHour = now.getHours();
-                if (slotHour <= currentHour + 1) return false;
+                const [hours, minutes] = startTime.split(':').map(Number);
+                const slotDateTime = new Date(year, month - 1, day, hours, minutes || 0, 0, 0);
+                if (now.getTime() >= slotDateTime.getTime()) return false;
             }
 
             return true;
@@ -689,7 +723,7 @@ export default {
     getActiveServices,
     getServiceDetails,
     getCategories,
-    getSubcategoriesByCategory,  // ✅ ADD THIS
+    getSubcategoriesByCategory,
     getServiceReviews,
     checkAvailability,
     getFeaturedServices,

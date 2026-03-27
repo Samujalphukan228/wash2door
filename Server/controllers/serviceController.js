@@ -1,10 +1,15 @@
+// controllers/serviceController.js - COMPLETE WITH REAL-TIME SOCKET
+
 import Service from '../models/Service.js';
 import Category from '../models/Category.js';
 import Subcategory from '../models/Subcategory.js';
 import Booking from '../models/Booking.js';
 import mongoose from 'mongoose';
 import { deleteCloudinaryImage } from '../config/cloudinary.js';
-import { emitServiceUpdate } from '../utils/socketEmitter.js';
+import {
+    emitServiceUpdate,
+    emitDashboardUpdate
+} from '../utils/socketEmitter.js';
 
 const isValidObjectId = (id) =>
     mongoose.Types.ObjectId.isValid(id) && /^[0-9a-fA-F]{24}$/.test(id);
@@ -48,9 +53,11 @@ export const getAllServicesAdmin = async (req, res) => {
             .lean();
 
         res.status(200).json({
-            success: true, total,
+            success: true,
+            total,
             pages: Math.ceil(total / limitNum),
-            page: pageNum, data: services
+            page: pageNum,
+            data: services
         });
 
     } catch (error) {
@@ -88,7 +95,7 @@ export const getServiceById = async (req, res) => {
 };
 
 // ============================================
-// CREATE SERVICE (ADMIN)
+// CREATE SERVICE (ADMIN) - 🔥 FIXED SOCKET
 // ============================================
 export const createService = async (req, res) => {
     try {
@@ -165,6 +172,16 @@ export const createService = async (req, res) => {
             createdBy: req.user._id
         });
 
+        // Update counts
+        await updateCategoryCounts(category);
+        await updateSubcategoryServiceCount(subcategory);
+
+        // 🔥 Real-time socket emissions
+        emitServiceUpdate(service, 'created');
+        emitDashboardUpdate({ action: 'service_created', serviceName: service.name });
+
+        console.log(`🔌 Real-time: Service created - ${service.name}`);
+
         res.status(201).json({
             success: true,
             message: 'Service created successfully',
@@ -178,7 +195,7 @@ export const createService = async (req, res) => {
 };
 
 // ============================================
-// UPDATE SERVICE (ADMIN)
+// UPDATE SERVICE (ADMIN) - 🔥 FIXED SOCKET
 // ============================================
 export const updateService = async (req, res) => {
     try {
@@ -204,6 +221,10 @@ export const updateService = async (req, res) => {
                 message: 'Service not found'
             });
         }
+
+        // Track old category/subcategory for count updates
+        const oldCategory = service.category?.toString();
+        const oldSubcategory = service.subcategory?.toString();
 
         // Check duplicate tier if tier or subcategory changed
         if (tier || subcategory) {
@@ -255,6 +276,26 @@ export const updateService = async (req, res) => {
 
         await service.save();
 
+        // Update counts for old and new category/subcategory
+        const newCategory = service.category?.toString();
+        const newSubcategory = service.subcategory?.toString();
+
+        await updateCategoryCounts(newCategory);
+        await updateSubcategoryServiceCount(newSubcategory);
+
+        // If category or subcategory changed, update old ones too
+        if (oldCategory && oldCategory !== newCategory) {
+            await updateCategoryCounts(oldCategory);
+        }
+        if (oldSubcategory && oldSubcategory !== newSubcategory) {
+            await updateSubcategoryServiceCount(oldSubcategory);
+        }
+
+        // 🔥 Real-time socket emissions
+        emitServiceUpdate(service, 'updated');
+
+        console.log(`🔌 Real-time: Service updated - ${service.name}`);
+
         res.status(200).json({
             success: true,
             message: 'Service updated successfully',
@@ -268,7 +309,7 @@ export const updateService = async (req, res) => {
 };
 
 // ============================================
-// DELETE SERVICE (ADMIN)
+// DELETE SERVICE (ADMIN) - 🔥 ALREADY HAD SOCKET
 // ============================================
 export const deleteService = async (req, res) => {
     try {
@@ -297,18 +338,38 @@ export const deleteService = async (req, res) => {
 
         const categoryId = service.category;
         const subcategoryId = service.subcategory;
+        const serviceName = service.name;
 
+        // Delete images from cloudinary
         for (const image of service.images) {
-            if (image.publicId) await deleteCloudinaryImage(image.publicId);
+            if (image.publicId) {
+                try {
+                    await deleteCloudinaryImage(image.publicId);
+                } catch (imgErr) {
+                    console.error(`Failed to delete image ${image.publicId}:`, imgErr.message);
+                }
+            }
         }
 
         await service.deleteOne();
+
+        // Update counts
         await updateCategoryCounts(categoryId);
         await updateSubcategoryServiceCount(subcategoryId);
 
-        emitServiceUpdate({ _id: service._id, name: service.name, category: categoryId, subcategory: subcategoryId }, 'deleted');
+        // 🔥 Real-time socket emissions
+        emitServiceUpdate(
+            { _id: serviceId, name: serviceName, category: categoryId, subcategory: subcategoryId },
+            'deleted'
+        );
+        emitDashboardUpdate({ action: 'service_deleted', serviceName });
 
-        res.status(200).json({ success: true, message: 'Service deleted successfully' });
+        console.log(`🔌 Real-time: Service deleted - ${serviceName}`);
+
+        res.status(200).json({
+            success: true,
+            message: 'Service deleted successfully'
+        });
 
     } catch (error) {
         console.error('deleteService ERROR:', error.message);
@@ -328,16 +389,28 @@ export const setPrimaryImage = async (req, res) => {
         }
 
         const service = await Service.findById(serviceId);
-        if (!service) return res.status(404).json({ success: false, message: 'Service not found' });
+        if (!service) {
+            return res.status(404).json({ success: false, message: 'Service not found' });
+        }
 
         service.images.forEach(img => img.isPrimary = false);
+
         const image = service.images.id(imageId);
-        if (!image) return res.status(404).json({ success: false, message: 'Image not found' });
+        if (!image) {
+            return res.status(404).json({ success: false, message: 'Image not found' });
+        }
 
         image.isPrimary = true;
         await service.save();
 
-        res.status(200).json({ success: true, message: 'Primary image updated', data: service });
+        // 🔥 Real-time socket emission
+        emitServiceUpdate(service, 'updated');
+
+        res.status(200).json({
+            success: true,
+            message: 'Primary image updated',
+            data: service
+        });
 
     } catch (error) {
         console.error('setPrimaryImage ERROR:', error.message);
@@ -357,20 +430,40 @@ export const deleteImage = async (req, res) => {
         }
 
         const service = await Service.findById(serviceId);
-        if (!service) return res.status(404).json({ success: false, message: 'Service not found' });
+        if (!service) {
+            return res.status(404).json({ success: false, message: 'Service not found' });
+        }
 
         const image = service.images.id(imageId);
-        if (!image) return res.status(404).json({ success: false, message: 'Image not found' });
+        if (!image) {
+            return res.status(404).json({ success: false, message: 'Image not found' });
+        }
 
-        if (image.publicId) await deleteCloudinaryImage(image.publicId);
+        if (image.publicId) {
+            try {
+                await deleteCloudinaryImage(image.publicId);
+            } catch (imgErr) {
+                console.error(`Failed to delete image ${image.publicId}:`, imgErr.message);
+            }
+        }
 
         const wasPrimary = image.isPrimary;
         service.images.pull(imageId);
-        if (wasPrimary && service.images.length > 0) service.images[0].isPrimary = true;
+
+        if (wasPrimary && service.images.length > 0) {
+            service.images[0].isPrimary = true;
+        }
 
         await service.save();
 
-        res.status(200).json({ success: true, message: 'Image deleted successfully', data: service });
+        // 🔥 Real-time socket emission
+        emitServiceUpdate(service, 'updated');
+
+        res.status(200).json({
+            success: true,
+            message: 'Image deleted successfully',
+            data: service
+        });
 
     } catch (error) {
         console.error('deleteImage ERROR:', error.message);
@@ -384,18 +477,29 @@ export const deleteImage = async (req, res) => {
 export const toggleFeatured = async (req, res) => {
     try {
         const { serviceId } = req.params;
+
         if (!isValidObjectId(serviceId)) {
             return res.status(400).json({ success: false, message: 'Invalid service ID' });
         }
 
         const service = await Service.findById(serviceId);
-        if (!service) return res.status(404).json({ success: false, message: 'Service not found' });
+        if (!service) {
+            return res.status(404).json({ success: false, message: 'Service not found' });
+        }
 
         service.isFeatured = !service.isFeatured;
         await service.save();
+
+        // 🔥 Real-time socket emission
         emitServiceUpdate(service, 'updated');
 
-        res.status(200).json({ success: true, message: `Service ${service.isFeatured ? 'featured' : 'unfeatured'}`, data: service });
+        console.log(`🔌 Real-time: Service ${service.isFeatured ? 'featured' : 'unfeatured'} - ${service.name}`);
+
+        res.status(200).json({
+            success: true,
+            message: `Service ${service.isFeatured ? 'featured' : 'unfeatured'}`,
+            data: service
+        });
 
     } catch (error) {
         console.error('toggleFeatured ERROR:', error.message);
@@ -409,29 +513,42 @@ export const toggleFeatured = async (req, res) => {
 export const toggleActive = async (req, res) => {
     try {
         const { serviceId } = req.params;
+
         if (!isValidObjectId(serviceId)) {
             return res.status(400).json({ success: false, message: 'Invalid service ID' });
         }
 
         const service = await Service.findById(serviceId);
-        if (!service) return res.status(404).json({ success: false, message: 'Service not found' });
+        if (!service) {
+            return res.status(404).json({ success: false, message: 'Service not found' });
+        }
 
+        // If activating → check parent category & subcategory
         if (!service.isActive) {
             const parentCategory = await Category.findById(service.category);
             if (!parentCategory || !parentCategory.isActive) {
-                return res.status(400).json({ success: false, message: 'Cannot activate service when parent category is inactive' });
+                return res.status(400).json({
+                    success: false,
+                    message: 'Cannot activate service when parent category is inactive'
+                });
             }
+
             const parentSubcategory = await Subcategory.findById(service.subcategory);
             if (!parentSubcategory || !parentSubcategory.isActive) {
-                return res.status(400).json({ success: false, message: 'Cannot activate service when parent subcategory is inactive' });
+                return res.status(400).json({
+                    success: false,
+                    message: 'Cannot activate service when parent subcategory is inactive'
+                });
             }
         }
 
+        // If deactivating → check active bookings
         if (service.isActive) {
             const activeBookings = await Booking.countDocuments({
                 serviceId,
                 status: { $in: ['pending', 'confirmed', 'in-progress'] }
             });
+
             if (activeBookings > 0) {
                 return res.status(400).json({
                     success: false,
@@ -442,11 +559,25 @@ export const toggleActive = async (req, res) => {
 
         service.isActive = !service.isActive;
         await service.save();
+
+        // Update counts
         await updateCategoryCounts(service.category);
         await updateSubcategoryServiceCount(service.subcategory);
-        emitServiceUpdate(service, 'updated');
 
-        res.status(200).json({ success: true, message: `Service ${service.isActive ? 'activated' : 'deactivated'}`, data: service });
+        // 🔥 Real-time socket emissions
+        emitServiceUpdate(service, 'updated');
+        emitDashboardUpdate({
+            action: service.isActive ? 'service_activated' : 'service_deactivated',
+            serviceName: service.name
+        });
+
+        console.log(`🔌 Real-time: Service ${service.isActive ? 'activated' : 'deactivated'} - ${service.name}`);
+
+        res.status(200).json({
+            success: true,
+            message: `Service ${service.isActive ? 'activated' : 'deactivated'}`,
+            data: service
+        });
 
     } catch (error) {
         console.error('toggleActive ERROR:', error.message);
@@ -460,17 +591,27 @@ export const toggleActive = async (req, res) => {
 export const reorderServices = async (req, res) => {
     try {
         const { orderedIds } = req.body;
+
         if (!orderedIds || !Array.isArray(orderedIds)) {
-            return res.status(400).json({ success: false, message: 'orderedIds array is required' });
+            return res.status(400).json({
+                success: false,
+                message: 'orderedIds array is required'
+            });
         }
 
         const bulkOps = orderedIds.map((id, index) => ({
-            updateOne: { filter: { _id: id }, update: { displayOrder: index } }
+            updateOne: {
+                filter: { _id: id },
+                update: { displayOrder: index }
+            }
         }));
 
         await Service.bulkWrite(bulkOps);
 
-        res.status(200).json({ success: true, message: 'Services reordered successfully' });
+        res.status(200).json({
+            success: true,
+            message: 'Services reordered successfully'
+        });
 
     } catch (error) {
         console.error('reorderServices ERROR:', error.message);
@@ -483,20 +624,40 @@ export const reorderServices = async (req, res) => {
 // ============================================
 const updateCategoryCounts = async (categoryId) => {
     try {
-        const subcategoryCount = await Subcategory.countDocuments({ category: categoryId, isActive: true });
-        const serviceCount = await Service.countDocuments({ category: categoryId, isActive: true });
-        await Category.findByIdAndUpdate(categoryId, { totalSubcategories: subcategoryCount, totalServices: serviceCount });
+        if (!categoryId) return;
+
+        const subcategoryCount = await Subcategory.countDocuments({
+            category: categoryId,
+            isActive: true
+        });
+        const serviceCount = await Service.countDocuments({
+            category: categoryId,
+            isActive: true
+        });
+
+        await Category.findByIdAndUpdate(categoryId, {
+            totalSubcategories: subcategoryCount,
+            totalServices: serviceCount
+        });
     } catch (err) {
-        console.error('Error updating category counts:', err);
+        console.error('Error updating category counts:', err.message);
     }
 };
 
 const updateSubcategoryServiceCount = async (subcategoryId) => {
     try {
-        const count = await Service.countDocuments({ subcategory: subcategoryId, isActive: true });
-        await Subcategory.findByIdAndUpdate(subcategoryId, { totalServices: count });
+        if (!subcategoryId) return;
+
+        const count = await Service.countDocuments({
+            subcategory: subcategoryId,
+            isActive: true
+        });
+
+        await Subcategory.findByIdAndUpdate(subcategoryId, {
+            totalServices: count
+        });
     } catch (err) {
-        console.error('Error updating subcategory service count:', err);
+        console.error('Error updating subcategory service count:', err.message);
     }
 };
 

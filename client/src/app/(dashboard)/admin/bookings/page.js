@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import DashboardLayout from '@/components/admin/layout/DashboardLayout';
 import adminService from '@/services/adminService';
-import { useBookingSocket } from '@/hooks/useSocketEvents';
+import { useSocket } from '@/context/SocketContext'; // ✅ Use SocketContext
 import Link from 'next/link';
 import { format } from 'date-fns';
 import {
@@ -72,6 +72,9 @@ export default function BookingsPage() {
     const [showDetailModal, setShowDetailModal] = useState(false);
     const [showStatusModal, setShowStatusModal] = useState(false);
 
+    // ✅ Use SocketContext instead of useBookingSocket
+    const { onBookingEvent } = useSocket();
+
     const greeting = useMemo(() => {
         const hour = new Date().getHours();
         if (hour < 12) return 'Good morning';
@@ -134,58 +137,82 @@ export default function BookingsPage() {
         fetchStats();
     }, [fetchBookings, fetchStats]);
 
+    // Initial fetch
     useEffect(() => {
         fetchBookings();
         fetchStats();
     }, [fetchBookings, fetchStats]);
 
-    // Socket handlers
-    const handleNewBooking = useCallback((data) => {
-        if (filters.page === 1) {
-            setBookings((prev) => {
-                const exists = prev.find((b) => b._id === data.bookingId);
-                if (exists) return prev;
-                const updated = [data, ...prev];
-                if (updated.length > filters.limit) updated.pop();
-                return updated;
-            });
-            setTotal((prev) => prev + 1);
-        }
-        setStats((prev) => ({
-            ...prev,
-            total: prev.total + 1,
-            pending: prev.pending + 1,
-            todayBookings: prev.todayBookings + 1,
-        }));
-    }, [filters.page, filters.limit]);
+    // ============================================
+    // 🔥 FIXED: Real-time booking updates using SocketContext
+    // ============================================
+    useEffect(() => {
+        const unsubscribe = onBookingEvent((event) => {
+            console.log('📋 Booking event received:', event.type, event.data);
 
-    const handleStatusUpdate = useCallback((data) => {
-        setBookings((prev) =>
-            prev.map((b) =>
-                b._id === data.bookingId ? { ...b, status: data.status } : b
-            )
-        );
-        fetchStats();
-    }, [fetchStats]);
+            if (event.type === 'new') {
+                // New booking created
+                if (filters.page === 1) {
+                    setBookings((prev) => {
+                        const exists = prev.find((b) => b._id === event.data.bookingId);
+                        if (exists) return prev;
+                        
+                        // Create booking object from socket data
+                        const newBooking = {
+                            _id: event.data.bookingId,
+                            bookingCode: event.data.bookingCode,
+                            serviceName: event.data.serviceName,
+                            status: event.data.status || 'pending',
+                            price: event.data.price,
+                            bookingDate: event.data.bookingDate,
+                            timeSlot: event.data.timeSlot,
+                            createdAt: event.data.createdAt,
+                            // For display purposes
+                            walkInCustomer: { name: event.data.customerName }
+                        };
+                        
+                        const updated = [newBooking, ...prev];
+                        if (updated.length > filters.limit) updated.pop();
+                        return updated;
+                    });
+                    setTotal((prev) => prev + 1);
+                }
+                setStats((prev) => ({
+                    ...prev,
+                    total: prev.total + 1,
+                    pending: prev.pending + 1,
+                    todayBookings: prev.todayBookings + 1,
+                }));
+            } else if (event.type === 'statusUpdated') {
+                // Status updated
+                setBookings((prev) =>
+                    prev.map((b) =>
+                        b._id === event.data.bookingId 
+                            ? { ...b, status: event.data.status } 
+                            : b
+                    )
+                );
+                // Refetch stats for accurate counts
+                fetchStats();
+            } else if (event.type === 'cancelled') {
+                // Booking cancelled
+                setBookings((prev) =>
+                    prev.map((b) =>
+                        b._id === event.data.bookingId 
+                            ? { ...b, status: 'cancelled' } 
+                            : b
+                    )
+                );
+                setStats((prev) => ({
+                    ...prev,
+                    cancelled: prev.cancelled + 1,
+                    pending: Math.max(0, prev.pending - 1),
+                }));
+            }
+        });
 
-    const handleBookingCancelled = useCallback((data) => {
-        setBookings((prev) =>
-            prev.map((b) =>
-                b._id === data.bookingId ? { ...b, status: 'cancelled' } : b
-            )
-        );
-        setStats((prev) => ({
-            ...prev,
-            cancelled: prev.cancelled + 1,
-            pending: Math.max(0, prev.pending - 1),
-        }));
-    }, []);
-
-    useBookingSocket({
-        onNewBooking: handleNewBooking,
-        onStatusUpdate: handleStatusUpdate,
-        onCancelled: handleBookingCancelled,
-    });
+        return unsubscribe;
+    }, [onBookingEvent, filters.page, filters.limit, fetchStats]);
 
     // Handlers
     const handleFilterChange = (newFilters) => {
@@ -230,6 +257,7 @@ export default function BookingsPage() {
 
     const handleCreateSuccess = () => {
         setShowCreateModal(false);
+        // Socket will handle the update, but we can also refresh for full data
         setTimeout(() => {
             refreshAll();
             toast.success('Booking created');
@@ -259,7 +287,6 @@ export default function BookingsPage() {
 
     return (
         <DashboardLayout>
-            {/* ✅ FIXED: Removed pb-20, let DashboardLayout handle spacing */}
             <div className="min-h-screen bg-black">
                 <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6">
 
@@ -350,7 +377,7 @@ export default function BookingsPage() {
                 </div>
             </div>
 
-            {/* ✅ FIXED: Mobile FAB Button - Positioned above mobile nav (z-41) */}
+            {/* Mobile FAB Button */}
             <div className="lg:hidden fixed bottom-24 right-4 z-41">
                 <button
                     onClick={() => setShowCreateModal(true)}
@@ -753,7 +780,6 @@ function BookingsList({ bookings, loading, total, pages, currentPage, onPageChan
     );
 }
 
-// ✅ UPDATED: BookingRow with proper 12-hour format display
 function BookingRow({ booking, isFirst, onView, onUpdateStatus }) {
     const statusMap = {
         pending: { bg: 'bg-yellow-500/10', text: 'text-yellow-500', dot: 'bg-yellow-500', label: 'Pending' },
@@ -830,7 +856,6 @@ function BookingRow({ booking, isFirst, onView, onUpdateStatus }) {
                         <span className="flex items-center gap-1 text-[10px] text-gray-600">
                             <Clock className="w-3 h-3" />
                             {isToday ? 'Today' : bookingDate?.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                            {/* ✅ UPDATED: Display 12-hour format time slot directly */}
                             {booking.timeSlot && ` · ${booking.timeSlot}`}
                         </span>
                         {booking.location?.city && (

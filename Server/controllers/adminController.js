@@ -1,4 +1,4 @@
-// controllers/adminController.js - FIXED: Removed developer role
+// controllers/adminController.js
 
 import User from '../models/User.js';
 import Service from '../models/Service.js';
@@ -9,12 +9,17 @@ import {
     TIME_SLOTS,
     BOOKING_STATUSES,
     isValidTimeSlot,
-    isClosedDay
+    isClosedDay,
+    convertTo24Hour
 } from '../utils/constants.js';
 import {
     emitNewBooking,
     emitBookingStatusUpdate,
-    emitUserBlocked
+    emitBookingCancelled,
+    emitSlotBooked,
+    emitSlotAvailable,
+    emitUserBlocked,
+    emitDashboardUpdate
 } from '../utils/socketEmitter.js';
 import ExpenseCategory from '../models/ExpenseCategory.js';
 import Expense from '../models/Expense.js';
@@ -23,6 +28,13 @@ import mongoose from 'mongoose';
 const isValidObjectId = (id) =>
     mongoose.Types.ObjectId.isValid(id) &&
     /^[0-9a-fA-F]{24}$/.test(id);
+
+const getLocalDateStr = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
 
 // ============================================
 // DASHBOARD STATS
@@ -39,7 +51,6 @@ export const getDashboardStats = async (req, res) => {
         const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
         const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59, 999);
 
-        // ========== EXISTING QUERIES ==========
         const [
             totalUsers,
             totalAdmins,
@@ -76,7 +87,6 @@ export const getDashboardStats = async (req, res) => {
             Booking.countDocuments({ createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd } })
         ]);
 
-        // ========== REVENUE ==========
         const [revenueThisMonth, revenueLastMonth, totalRevenue, revenueToday] = await Promise.all([
             Booking.aggregate([
                 {
@@ -115,7 +125,6 @@ export const getDashboardStats = async (req, res) => {
             ])
         ]);
 
-        // ========== EXPENSES ==========
         const [expensesThisMonth, expensesLastMonth, totalExpenses, expensesToday, expenseCategories] = await Promise.all([
             Expense.aggregate([
                 { $match: { createdAt: { $gte: thisMonthStart } } },
@@ -135,7 +144,6 @@ export const getDashboardStats = async (req, res) => {
             ExpenseCategory.find().sort({ totalAmount: -1 }).lean()
         ]);
 
-        // ========== EXPENSE BY CATEGORY (This Month) ==========
         const expensesByCategory = await Expense.aggregate([
             { $match: { createdAt: { $gte: thisMonthStart } } },
             {
@@ -148,7 +156,6 @@ export const getDashboardStats = async (req, res) => {
             { $sort: { amount: -1 } }
         ]);
 
-        // ========== CALCULATE NET PROFIT ==========
         const revenueTotalVal = totalRevenue[0]?.total || 0;
         const revenueThisMonthVal = revenueThisMonth[0]?.total || 0;
         const revenueLastMonthVal = revenueLastMonth[0]?.total || 0;
@@ -164,7 +171,6 @@ export const getDashboardStats = async (req, res) => {
         const netProfitLastMonth = revenueLastMonthVal - expenseLastMonthVal;
         const netProfitToday = revenueTodayVal - expenseTodayVal;
 
-        // Profit margin percentage
         const profitMarginThisMonth = revenueThisMonthVal > 0
             ? Math.round((netProfitThisMonth / revenueThisMonthVal) * 100)
             : 0;
@@ -173,7 +179,6 @@ export const getDashboardStats = async (req, res) => {
             ? Math.round((netProfitTotal / revenueTotalVal) * 100)
             : 0;
 
-        // ========== WEEKLY DATA WITH EXPENSES ==========
         const weeklyRevenue = await Booking.aggregate([
             {
                 $match: {
@@ -206,7 +211,6 @@ export const getDashboardStats = async (req, res) => {
             { $sort: { _id: 1 } }
         ]);
 
-        // Merge weekly data
         const expenseMap = {};
         weeklyExpenses.forEach(e => {
             expenseMap[e._id] = e.expenses;
@@ -220,7 +224,6 @@ export const getDashboardStats = async (req, res) => {
             profit: day.revenue - (expenseMap[day._id] || 0)
         }));
 
-        // ========== MONTHLY TREND (Last 6 months) ==========
         const sixMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 5, 1);
 
         const monthlyRevenue = await Booking.aggregate([
@@ -268,7 +271,6 @@ export const getDashboardStats = async (req, res) => {
             profit: month.revenue - (monthlyExpenseMap[month._id] || 0)
         }));
 
-        // ========== EXISTING QUERIES ==========
         const recentBookings = await Booking.find()
             .sort({ createdAt: -1 })
             .limit(10)
@@ -322,7 +324,6 @@ export const getDashboardStats = async (req, res) => {
             .limit(10)
             .lean();
 
-        // ========== RESPONSE ==========
         res.status(200).json({
             success: true,
             data: {
@@ -401,6 +402,7 @@ export const getDashboardStats = async (req, res) => {
         });
     }
 };
+
 // ============================================
 // GET ALL USERS
 // ============================================
@@ -420,7 +422,6 @@ export const getAllUsers = async (req, res) => {
         const pageNum = parseInt(page);
         const limitNum = parseInt(limit);
 
-        // Role-aware query — only user or admin allowed
         let query;
         if (role === 'admin') {
             query = { role: 'admin' };
@@ -451,7 +452,6 @@ export const getAllUsers = async (req, res) => {
             .limit(limitNum)
             .skip((pageNum - 1) * limitNum);
 
-        // ✅ Single aggregate instead of N+1 queries
         const bookingStats = await Booking.aggregate([
             { $match: { customerId: { $in: users.map(u => u._id) } } },
             {
@@ -638,7 +638,7 @@ export const blockUser = async (req, res) => {
         user.refreshToken = undefined;
         await user.save({ validateBeforeSave: false });
 
-        // Force logout via socket
+        // 🔥 Force logout via socket
         emitUserBlocked(userId, user.blockedReason);
 
         const userResponse = user.toObject();
@@ -735,7 +735,6 @@ export const changeUserRole = async (req, res) => {
             });
         }
 
-        // ✅ Only allow 'user' and 'admin' roles
         if (!['user', 'admin'].includes(role)) {
             return res.status(400).json({
                 success: false,
@@ -851,7 +850,6 @@ export const getAllBookings = async (req, res) => {
             query.$or = [
                 { bookingCode: { $regex: search, $options: 'i' } },
                 { serviceName: { $regex: search, $options: 'i' } },
-                { variantName: { $regex: search, $options: 'i' } },
                 { 'walkInCustomer.name': { $regex: search, $options: 'i' } },
                 { 'walkInCustomer.phone': { $regex: search, $options: 'i' } }
             ];
@@ -913,7 +911,6 @@ export const getBookingById = async (req, res) => {
             });
         }
 
-        // Get customer's booking history if online booking
         let customerHistory = null;
         if (booking.customerId) {
             customerHistory = await Booking.find({
@@ -944,7 +941,7 @@ export const getBookingById = async (req, res) => {
 };
 
 // ============================================
-// UPDATE BOOKING STATUS
+// UPDATE BOOKING STATUS (🔥 FIXED REAL-TIME)
 // ============================================
 
 export const updateBookingStatus = async (req, res) => {
@@ -992,6 +989,12 @@ export const updateBookingStatus = async (req, res) => {
             });
         }
 
+        // ✅ FIX: Save old slot info BEFORE any modifications
+        const oldStatus = booking.status;
+        const oldDateStr = getLocalDateStr(new Date(booking.bookingDate));
+        const oldTimeSlot = booking.timeSlot;
+        const oldServiceId = booking.serviceId;
+
         // Update booking
         booking.status = status;
 
@@ -1008,17 +1011,36 @@ export const updateBookingStatus = async (req, res) => {
 
         await booking.save();
 
-        // Socket events
+        // ============================================
+        // 🔥 REAL-TIME SOCKET EMISSIONS
+        // ============================================
+
+        // 1. Always emit status update
         emitBookingStatusUpdate(booking, booking.customerId?._id);
 
-        // Send email
-        try {
-            if (booking.customerId?.email) {
-                await sendBookingStatusEmail(booking.customerId, booking);
-            }
-        } catch (emailError) {
-            console.error('Status email failed:', emailError.message);
+        // 2. If cancelled → release the OLD slot
+        if (status === 'cancelled' && ['pending', 'confirmed', 'in-progress'].includes(oldStatus)) {
+            emitBookingCancelled(booking, 'admin');
+            emitSlotAvailable(oldDateStr, oldTimeSlot, oldServiceId);
+            console.log(`🔌 Real-time: Admin cancelled → OLD slot released ${oldDateStr} ${oldTimeSlot}`);
         }
+
+        // 3. Emit dashboard update for all status changes
+        emitDashboardUpdate({ action: 'booking_status_changed', status });
+
+        console.log(`🔌 Real-time: Status ${booking.bookingCode} → ${status}`);
+
+        // Send email async
+        setImmediate(async () => {
+            try {
+                if (booking.customerId?.email) {
+                    await sendBookingStatusEmail(booking.customerId, booking);
+                    console.log('✉️ Status email sent');
+                }
+            } catch (emailError) {
+                console.error('Status email failed:', emailError.message);
+            }
+        });
 
         res.status(200).json({
             success: true,
@@ -1037,7 +1059,7 @@ export const updateBookingStatus = async (req, res) => {
 };
 
 // ============================================
-// CREATE ADMIN BOOKING
+// CREATE ADMIN BOOKING (🔥 FIXED REAL-TIME)
 // ============================================
 
 export const createAdminBooking = async (req, res) => {
@@ -1146,13 +1168,6 @@ export const createAdminBooking = async (req, res) => {
             });
         }
 
-        const getLocalDateStr = (date) => {
-            const y = date.getFullYear();
-            const m = String(date.getMonth() + 1).padStart(2, '0');
-            const d = String(date.getDate()).padStart(2, '0');
-            return `${y}-${m}-${d}`;
-        };
-
         const now = new Date();
         const todayStr = getLocalDateStr(now);
 
@@ -1173,7 +1188,7 @@ export const createAdminBooking = async (req, res) => {
         if (!isValidTimeSlot(timeSlot)) {
             return res.status(400).json({
                 success: false,
-                message: `Invalid time slot`
+                message: 'Invalid time slot'
             });
         }
 
@@ -1188,60 +1203,83 @@ export const createAdminBooking = async (req, res) => {
         if (slotTaken) {
             return res.status(400).json({
                 success: false,
-                message: `Time slot already booked`
+                message: 'Time slot already booked'
             });
         }
 
-        // ✅ FIXED location (no landmark)
         const bookingLocation = {
             address: location?.address || 'Walk-in / At Shop',
             city: location?.city || 'Walk-in'
         };
 
-        // Create booking
-        const booking = await Booking.create({
-            bookingType,
-            customerId: bookingType === 'online' ? customerId : null,
-            walkInCustomer: bookingType === 'walkin'
-                ? { name: walkInCustomer.name, phone: phone }
-                : { name: '', phone: '' },
+        let booking;
 
-            categoryId: service.category._id,
-            categoryName: service.category.name,
+        try {
+            booking = await Booking.create({
+                bookingType,
+                customerId: bookingType === 'online' ? customerId : null,
+                walkInCustomer: bookingType === 'walkin'
+                    ? { name: walkInCustomer.name, phone: phone }
+                    : { name: '', phone: '' },
 
-            subcategoryId: service.subcategory._id,
-            subcategoryName: service.subcategory.name,
+                categoryId: service.category._id,
+                categoryName: service.category.name,
 
-            serviceId: service._id,
-            serviceName: service.name,
-            serviceTier: service.tier || 'basic',
+                subcategoryId: service.subcategory._id,
+                subcategoryName: service.subcategory.name,
 
-            price: finalPrice,
-            duration,
+                serviceId: service._id,
+                serviceName: service.name,
+                serviceTier: service.tier || 'basic',
 
-            bookingDate: requestedDate,
-            timeSlot,
+                price: finalPrice,
+                duration,
 
-            location: bookingLocation,
+                bookingDate: requestedDate,
+                timeSlot,
 
-            phone: phone, // ✅ consistent
+                location: bookingLocation,
+                phone,
 
-            paymentMethod: paymentMethod || 'cash',
-            paymentStatus: paymentStatus || 'pending',
+                paymentMethod: paymentMethod || 'cash',
+                paymentStatus: paymentStatus || 'pending',
 
-            createdBy: req.user._id,
-            status: 'confirmed'
-        });
+                createdBy: req.user._id,
+                status: 'confirmed'
+            });
+        } catch (createError) {
+            if (createError.code === 11000) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Time slot ${timeSlot} on ${bookingDate} was just booked`
+                });
+            }
+            throw createError;
+        }
 
         // Increment service count
         await Service.findByIdAndUpdate(serviceId, {
             $inc: { totalBookings: 1 }
         });
 
-        emitNewBooking(booking, bookingType === 'walkin'
+        // ============================================
+        // 🔥 REAL-TIME SOCKET EMISSIONS
+        // ============================================
+
+        const customerName = bookingType === 'walkin'
             ? walkInCustomer.name
-            : 'Online Customer'
-        );
+            : 'Online Customer';
+
+        // 1. Notify admins about new booking
+        emitNewBooking(booking, customerName);
+
+        // 2. Broadcast slot is now booked
+        emitSlotBooked(bookingDate, timeSlot, serviceId);
+
+        // 3. Dashboard update
+        emitDashboardUpdate({ action: 'new_booking', bookingType });
+
+        console.log(`🔌 Real-time: Admin booking created + slot booked ${bookingDate} ${timeSlot}`);
 
         res.status(201).json({
             success: true,
@@ -1251,7 +1289,6 @@ export const createAdminBooking = async (req, res) => {
 
     } catch (error) {
         console.error('Admin create booking error:', error);
-
         res.status(500).json({
             success: false,
             message: error.message || 'Failed to create booking'
@@ -1316,18 +1353,6 @@ export const getRevenueReport = async (req, res) => {
             { $limit: 10 }
         ]);
 
-        const revenueByVariant = await Booking.aggregate([
-            { $match: matchCondition },
-            {
-                $group: {
-                    _id: '$variantName',
-                    revenue: { $sum: '$price' },
-                    bookings: { $sum: 1 }
-                }
-            },
-            { $sort: { revenue: -1 } }
-        ]);
-
         const revenueByCity = await Booking.aggregate([
             { $match: matchCondition },
             {
@@ -1368,7 +1393,6 @@ export const getRevenueReport = async (req, res) => {
                 revenueData,
                 revenueByCategory,
                 revenueByService,
-                revenueByVariant,
                 revenueByCity,
                 revenueByPaymentMethod
             }
@@ -1403,18 +1427,6 @@ export const getBookingReport = async (req, res) => {
         const byStatus = await Booking.aggregate([
             { $match: matchCondition },
             { $group: { _id: '$status', count: { $sum: 1 } } }
-        ]);
-
-        const byVariant = await Booking.aggregate([
-            { $match: matchCondition },
-            {
-                $group: {
-                    _id: '$variantName',
-                    count: { $sum: 1 },
-                    revenue: { $sum: '$price' }
-                }
-            },
-            { $sort: { count: -1 } }
         ]);
 
         const byService = await Booking.aggregate([
@@ -1475,7 +1487,6 @@ export const getBookingReport = async (req, res) => {
             success: true,
             data: {
                 byStatus,
-                byVariant,
                 byService,
                 byTimeSlot,
                 byCity,
