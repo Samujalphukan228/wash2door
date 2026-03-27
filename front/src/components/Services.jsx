@@ -1,7 +1,7 @@
 // components/Services.jsx
 "use client"
 
-import { useEffect, useState, useCallback, memo, useRef } from "react"
+import { useEffect, useState, useCallback, memo, useRef, useMemo } from "react"
 import { motion, useInView, AnimatePresence } from "framer-motion"
 import {
   ArrowUpRight,
@@ -10,7 +10,6 @@ import {
   Clock,
   Sparkles,
   RotateCcw,
-  Droplets,
   Star,
 } from "lucide-react"
 import { getCategories } from "@/lib/services.api"
@@ -26,118 +25,122 @@ const MAX_VISIBLE = 6
 const SERIF = 'Georgia, "Times New Roman", serif'
 const SANS = "'Helvetica Neue', Helvetica, Arial, sans-serif"
 
-// ── Animation ──────────────────────────────────────────────
-const EASE = [0.22, 1, 0.36, 1]
-
+// ── Animation Variants (defined outside component) ─────────
 const stagger = {
   hidden: {},
-  visible: { transition: { staggerChildren: 0.1, delayChildren: 0.05 } },
+  visible: { transition: { staggerChildren: 0.08, delayChildren: 0.02 } },
 }
 
 const fadeUp = {
-  hidden: { opacity: 0, y: 30 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.7, ease: EASE } },
+  hidden: { opacity: 0, y: 24 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] } },
 }
 
 const fadeLeft = {
-  hidden: { opacity: 0, x: -20 },
-  visible: { opacity: 1, x: 0, transition: { duration: 0.6, ease: EASE } },
+  hidden: { opacity: 0, x: -15 },
+  visible: { opacity: 1, x: 0, transition: { duration: 0.5 } },
 }
 
-const cardReveal = {
-  hidden: { opacity: 0, y: 24, scale: 0.97 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: { duration: 0.65, ease: EASE },
-  },
+const cardVariant = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] } },
 }
 
-const scaleIn = {
-  hidden: { opacity: 0, scale: 0.9 },
-  visible: { opacity: 1, scale: 1, transition: { duration: 0.5, ease: EASE } },
+// ── Grid Layout Helpers (memoizable) ───────────────────────
+const DESKTOP_LAYOUTS = {
+  featured: { col: "md:col-span-2 md:row-span-2", variant: "featured" },
+  tall: { col: "md:col-span-1 md:row-span-2", variant: "tall" },
+  wide: { col: "md:col-span-2 md:row-span-1", variant: "wide" },
+  default: { col: "md:col-span-1 md:row-span-1", variant: "default" },
 }
 
-// ── Grid helpers ───────────────────────────────────────────
-function desktopLayout(index, total) {
+function getDesktopLayout(index, total) {
   if (total <= 3) {
-    if (index === 0) return { col: "md:col-span-2 md:row-span-2", variant: "featured" }
-    return { col: "md:col-span-2 md:row-span-1", variant: "wide" }
+    return index === 0 ? DESKTOP_LAYOUTS.featured : DESKTOP_LAYOUTS.wide
   }
   if (total === 4) {
-    if (index === 0) return { col: "md:col-span-2 md:row-span-2", variant: "featured" }
-    if (index === 1) return { col: "md:col-span-1 md:row-span-2", variant: "tall" }
-    return { col: "md:col-span-1 md:row-span-1", variant: "default" }
+    if (index === 0) return DESKTOP_LAYOUTS.featured
+    if (index === 1) return DESKTOP_LAYOUTS.tall
+    return DESKTOP_LAYOUTS.default
   }
-  if (index === 0) return { col: "md:col-span-2 md:row-span-2", variant: "featured" }
-  if (index === 5) return { col: "md:col-span-2 md:row-span-1", variant: "wide" }
-  return { col: "md:col-span-1 md:row-span-1", variant: "default" }
+  if (index === 0) return DESKTOP_LAYOUTS.featured
+  if (index === 5) return DESKTOP_LAYOUTS.wide
+  return DESKTOP_LAYOUTS.default
 }
 
-function mobileLayout(index, total) {
+function getMobileLayout(index, total) {
   if (index === 0) return "col-span-2 row-span-2"
   if (index === 3 && total > 4) return "row-span-2"
   if (index === 4 && total > 5) return "col-span-2"
   return ""
 }
 
-// ── Subcomponents ──────────────────────────────────────────
-const CardImage = memo(function CardImage({ src, alt, icon, animateHover }) {
-  const [err, setErr] = useState(false)
+// ── Simple Image Component ─────────────────────────────────
+const CardImage = memo(function CardImage({ src, alt, icon }) {
+  const [error, setError] = useState(false)
+  const [loaded, setLoaded] = useState(false)
 
-  if (src && !err) {
+  if (!src || error) {
     return (
-      <img
-        src={src}
-        alt={alt}
-        className={`w-full h-full object-cover object-center ${
-          animateHover
-            ? "transition-transform duration-[1200ms] ease-out group-hover:scale-[1.06]"
-            : ""
-        }`}
-        loading="lazy"
-        decoding="async"
-        onError={() => setErr(true)}
-      />
+      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
+        <span className="text-5xl opacity-60">{icon || "🚗"}</span>
+      </div>
     )
   }
 
   return (
-    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
-      <span className="text-5xl opacity-60">{icon || "🚗"}</span>
-    </div>
+    <>
+      {!loaded && (
+        <div className="absolute inset-0 bg-gray-100 animate-pulse" />
+      )}
+      <img
+        src={src}
+        alt={alt}
+        className={`w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105 ${
+          loaded ? "opacity-100" : "opacity-0"
+        }`}
+        loading="lazy"
+        decoding="async"
+        onLoad={() => setLoaded(true)}
+        onError={() => setError(true)}
+      />
+    </>
   )
 })
 
+// ── Arrow Circle (simplified) ──────────────────────────────
 const ArrowCircle = memo(function ArrowCircle({ size = "sm" }) {
-  const dim = size === "lg" ? "w-12 h-12" : size === "md" ? "w-10 h-10" : "w-8 h-8"
-  const ico = size === "lg" ? 18 : size === "md" ? 15 : 13
+  const dimensions = {
+    sm: { dim: "w-8 h-8", icon: 13 },
+    md: { dim: "w-10 h-10", icon: 15 },
+    lg: { dim: "w-12 h-12", icon: 18 },
+  }
+  const { dim, icon } = dimensions[size]
 
   return (
     <div
-      className={`${dim} rounded-full border border-white/20 bg-white/10 backdrop-blur-md
-                   flex items-center justify-center shrink-0
-                   group-hover:bg-white group-hover:border-white group-hover:shadow-lg group-hover:shadow-black/10
-                   transition-all duration-500`}
+      className={`${dim} rounded-full border border-white/20 bg-white/10 
+                  flex items-center justify-center shrink-0
+                  group-hover:bg-white group-hover:border-white
+                  transition-colors duration-300`}
     >
       <ArrowUpRight
-        size={ico}
+        size={icon}
         strokeWidth={1.5}
-        className="text-white group-hover:text-black
-                   group-hover:translate-x-0.5 group-hover:-translate-y-0.5
-                   transition-all duration-500"
+        className="text-white group-hover:text-black transition-colors duration-300"
       />
     </div>
   )
 })
 
+// ── Count Badge ────────────────────────────────────────────
 const CountBadge = memo(function CountBadge({ count, large }) {
   if (!count || count <= 0) return null
+  
   return (
     <span
       className={`inline-flex items-center rounded-full border border-white/15
-                  bg-white/10 backdrop-blur-md ${large ? "px-3.5 py-1.5" : "px-2.5 py-1"}`}
+                  bg-white/10 ${large ? "px-3.5 py-1.5" : "px-2.5 py-1"}`}
     >
       <span
         className="text-white/80 tracking-wider uppercase"
@@ -149,70 +152,59 @@ const CountBadge = memo(function CountBadge({ count, large }) {
   )
 })
 
-function Overlay({ featured }) {
-  return (
-    <div
-      className={`absolute inset-0 transition-opacity duration-700
-        ${
-          featured
-            ? "bg-gradient-to-t from-black/90 via-black/40 to-black/5 group-hover:from-black/95"
-            : "bg-gradient-to-t from-black/85 via-black/30 to-transparent group-hover:from-black/90"
-        }`}
-      aria-hidden="true"
-    />
-  )
-}
-
 // ── Desktop Card ───────────────────────────────────────────
-const DesktopCard = memo(function DesktopCard({ category, index, total }) {
-  const { col, variant } = desktopLayout(index, total)
+const DesktopCard = memo(function DesktopCard({ category, layout }) {
+  const { col, variant } = layout
   const featured = variant === "featured"
   const wide = variant === "wide"
   const tall = variant === "tall"
 
-  const pad = featured ? "p-8 xl:p-10" : wide ? "p-7 xl:p-8" : "p-5 xl:p-6"
-  const fsize = featured
-    ? "clamp(26px, 3vw, 40px)"
-    : wide
-    ? "clamp(20px, 2.5vw, 28px)"
-    : tall
-    ? "clamp(18px, 2vw, 24px)"
-    : "clamp(16px, 1.8vw, 22px)"
-  const radius = featured ? "rounded-3xl" : "rounded-2xl"
+  const styles = useMemo(() => ({
+    padding: featured ? "p-8 xl:p-10" : wide ? "p-7 xl:p-8" : "p-5 xl:p-6",
+    fontSize: featured
+      ? "clamp(26px, 3vw, 40px)"
+      : wide
+      ? "clamp(20px, 2.5vw, 28px)"
+      : tall
+      ? "clamp(18px, 2vw, 24px)"
+      : "clamp(16px, 1.8vw, 22px)",
+    radius: featured ? "rounded-3xl" : "rounded-2xl",
+    iconSize: featured ? "text-4xl" : wide || tall ? "text-2xl" : "text-xl",
+    descClass: featured
+      ? "line-clamp-3 text-sm"
+      : wide
+      ? "line-clamp-2 text-[13px]"
+      : "line-clamp-2 text-xs",
+  }), [featured, wide, tall])
 
   return (
     <motion.a
-      variants={cardReveal}
+      variants={cardVariant}
       href={`/services?category=${category._id}`}
-      className={`group block relative overflow-hidden no-underline will-change-transform
-                  ${radius} ${col}`}
+      className={`group block relative overflow-hidden ${styles.radius} ${col}`}
     >
       {/* Image */}
       <div className="absolute inset-0 overflow-hidden bg-gray-100">
-        <CardImage src={category.image?.url} alt={category.name} icon={category.icon} animateHover />
+        <CardImage src={category.image?.url} alt={category.name} icon={category.icon} />
       </div>
 
-      <Overlay featured={featured} />
-
-      {/* Hover border glow */}
+      {/* Overlay - simplified gradient */}
       <div
-        className="absolute inset-0 rounded-[inherit] opacity-0 group-hover:opacity-100
-                   transition-opacity duration-600 pointer-events-none
-                   shadow-[inset_0_0_0_1px_rgba(255,255,255,0.15)]"
-        aria-hidden="true"
+        className={`absolute inset-0 ${
+          featured
+            ? "bg-gradient-to-t from-black/90 via-black/40 to-black/5"
+            : "bg-gradient-to-t from-black/85 via-black/30 to-transparent"
+        }`}
       />
 
       {/* Content */}
-      <div className={`relative z-10 h-full flex flex-col justify-between ${pad}`}>
+      <div className={`relative z-10 h-full flex flex-col justify-between ${styles.padding}`}>
         {/* Top row */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2 flex-wrap">
             <CountBadge count={category.totalServices} large={featured} />
             {featured && (
-              <span
-                className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full
-                           bg-amber-400/20 backdrop-blur-md border border-amber-400/20"
-              >
+              <span className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-400/20 border border-amber-400/20">
                 <Star size={9} className="text-amber-400 fill-amber-400" />
                 <span
                   className="text-amber-200/90 tracking-wider uppercase"
@@ -229,11 +221,7 @@ const DesktopCard = memo(function DesktopCard({ category, index, total }) {
         {/* Bottom content */}
         <div>
           {category.icon && (
-            <span
-              className={`block mb-2.5 transition-transform duration-600 group-hover:scale-110 origin-left
-                ${featured ? "text-4xl" : wide || tall ? "text-2xl" : "text-xl"}`}
-              aria-hidden="true"
-            >
+            <span className={`block mb-2.5 ${styles.iconSize}`} aria-hidden="true">
               {category.icon}
             </span>
           )}
@@ -243,7 +231,7 @@ const DesktopCard = memo(function DesktopCard({ category, index, total }) {
             style={{
               fontFamily: SERIF,
               fontWeight: 400,
-              fontSize: fsize,
+              fontSize: styles.fontSize,
               letterSpacing: "-0.025em",
             }}
           >
@@ -251,37 +239,20 @@ const DesktopCard = memo(function DesktopCard({ category, index, total }) {
           </h3>
 
           {category.description && (
-            <p
-              className={`text-white/45 leading-relaxed group-hover:text-white/65
-                          transition-colors duration-600
-                ${
-                  featured
-                    ? "line-clamp-3 text-sm"
-                    : wide
-                    ? "line-clamp-2 text-[13px]"
-                    : "line-clamp-2 text-xs"
-                }`}
-            >
+            <p className={`text-white/45 leading-relaxed ${styles.descClass}`}>
               {category.description}
             </p>
           )}
 
           {(featured || wide) && (
-            <div
-              className="mt-5 inline-flex items-center gap-2.5 text-white/30
-                         group-hover:text-white/70 transition-colors duration-500"
-            >
+            <div className="mt-5 inline-flex items-center gap-2.5 text-white/30 group-hover:text-white/70 transition-colors duration-300">
               <span
                 className="uppercase tracking-[0.15em]"
                 style={{ fontSize: "10px", fontWeight: 500 }}
               >
                 Explore Services
               </span>
-              <ArrowRight
-                size={13}
-                strokeWidth={1.5}
-                className="group-hover:translate-x-1.5 transition-transform duration-400"
-              />
+              <ArrowRight size={13} strokeWidth={1.5} />
             </div>
           )}
         </div>
@@ -291,28 +262,19 @@ const DesktopCard = memo(function DesktopCard({ category, index, total }) {
 })
 
 // ── Mobile Card ────────────────────────────────────────────
-const MobileCard = memo(function MobileCard({ category, index, total }) {
-  const span = mobileLayout(index, total)
-  const isLarge = index === 0
-  const isTall = span.includes("row-span-2")
-
+const MobileCard = memo(function MobileCard({ category, span, isLarge, isTall }) {
   return (
     <motion.a
-      variants={cardReveal}
+      variants={cardVariant}
       href={`/services?category=${category._id}`}
-      className={`group block relative overflow-hidden rounded-2xl
-                  active:scale-[0.97] transition-transform duration-200
-                  no-underline will-change-transform ${span}`}
+      className={`group block relative overflow-hidden rounded-2xl active:scale-[0.98] transition-transform duration-200 ${span}`}
       style={{ WebkitTapHighlightColor: "transparent" }}
     >
       <div className="absolute inset-0 bg-gray-100">
         <CardImage src={category.image?.url} alt={category.name} icon={category.icon} />
       </div>
 
-      <div
-        className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent"
-        aria-hidden="true"
-      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
 
       <div className={`relative z-10 h-full flex flex-col justify-between ${isLarge ? "p-5" : "p-4"}`}>
         <div className="flex items-start justify-between">
@@ -322,10 +284,7 @@ const MobileCard = memo(function MobileCard({ category, index, total }) {
 
         <div>
           {category.icon && (
-            <span
-              className={`block mb-1.5 ${isLarge ? "text-2xl" : "text-lg"}`}
-              aria-hidden="true"
-            >
+            <span className={`block mb-1.5 ${isLarge ? "text-2xl" : "text-lg"}`} aria-hidden="true">
               {category.icon}
             </span>
           )}
@@ -341,10 +300,7 @@ const MobileCard = memo(function MobileCard({ category, index, total }) {
             {category.name}
           </h3>
           {isLarge && category.description && (
-            <p
-              className="text-white/40 line-clamp-2 mt-1.5 leading-relaxed"
-              style={{ fontSize: "12px" }}
-            >
+            <p className="text-white/40 line-clamp-2 mt-1.5 leading-relaxed" style={{ fontSize: "12px" }}>
               {category.description}
             </p>
           )}
@@ -354,46 +310,46 @@ const MobileCard = memo(function MobileCard({ category, index, total }) {
   )
 })
 
-// ── Skeleton ───────────────────────────────────────────────
-function Skeleton() {
+// ── Skeleton (CSS-only animation) ──────────────────────────
+const Skeleton = memo(function Skeleton() {
   return (
     <>
+      <style jsx>{`
+        @keyframes shimmer {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
+        .skeleton {
+          background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+          background-size: 200% 100%;
+          animation: shimmer 1.5s infinite;
+        }
+      `}</style>
+      
       {/* Mobile */}
       <div className="md:hidden grid grid-cols-2 gap-3 auto-rows-[150px]">
-        {[...Array(4)].map((_, i) => (
+        {[0, 1, 2, 3].map((i) => (
           <div
             key={i}
-            className={`bg-gray-100/80 animate-pulse rounded-2xl ${
-              i === 0 ? "col-span-2 row-span-2" : ""
-            }`}
+            className={`skeleton rounded-2xl ${i === 0 ? "col-span-2 row-span-2" : ""}`}
           />
         ))}
       </div>
+      
       {/* Desktop */}
       <div className="hidden md:grid md:grid-cols-4 gap-5 lg:gap-6 auto-rows-[190px] lg:auto-rows-[210px]">
-        {[
-          "md:col-span-2 md:row-span-2",
-          "md:col-span-1 md:row-span-1",
-          "md:col-span-1 md:row-span-1",
-          "md:col-span-1 md:row-span-1",
-          "md:col-span-1 md:row-span-1",
-        ].map((cls, i) => (
-          <div key={i} className={`bg-gray-100/80 animate-pulse rounded-2xl ${cls}`} />
+        {["md:col-span-2 md:row-span-2", "", "", "", ""].map((cls, i) => (
+          <div key={i} className={`skeleton rounded-2xl ${cls}`} />
         ))}
       </div>
     </>
   )
-}
+})
 
 // ── State Message ──────────────────────────────────────────
-function StateMessage({ type, onRetry }) {
+const StateMessage = memo(function StateMessage({ type, onRetry }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="text-center py-24"
-    >
+    <div className="text-center py-24">
       <div className="w-20 h-20 mx-auto mb-6 rounded-3xl bg-gray-50 flex items-center justify-center">
         <span className="text-4xl">{type === "error" ? "⚠️" : "🧹"}</span>
       </div>
@@ -405,35 +361,29 @@ function StateMessage({ type, onRetry }) {
       </h3>
       <p className="text-gray-400 mb-8 max-w-xs mx-auto" style={{ fontSize: "14px", lineHeight: 1.6 }}>
         {type === "error"
-          ? "We couldn't load our services. Please check your connection and try again."
+          ? "We couldn't load our services. Please try again."
           : "We're setting things up. Check back soon!"}
       </p>
       {type === "error" && onRetry && (
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.96 }}
+        <button
           onClick={onRetry}
           className="inline-flex items-center gap-2.5 h-12 px-8 bg-black text-white
                      rounded-full tracking-wider uppercase hover:bg-gray-800
-                     transition-colors duration-300"
+                     active:scale-95 transition-all duration-200"
           style={{ fontSize: "10px", fontWeight: 500, letterSpacing: "0.12em" }}
         >
           <RotateCcw size={14} strokeWidth={1.5} />
           Try Again
-        </motion.button>
+        </button>
       )}
-    </motion.div>
+    </div>
   )
-}
+})
 
 // ── Section Header ─────────────────────────────────────────
-const SectionHeader = memo(function SectionHeader() {
-  const ref = useRef(null)
-  const inView = useInView(ref, { once: true, margin: "-60px" })
-
+const SectionHeader = memo(function SectionHeader({ inView }) {
   return (
     <motion.header
-      ref={ref}
       variants={stagger}
       initial="hidden"
       animate={inView ? "visible" : "hidden"}
@@ -441,7 +391,7 @@ const SectionHeader = memo(function SectionHeader() {
     >
       {/* Tag */}
       <motion.div variants={fadeLeft} className="flex items-center gap-4 mb-6">
-        <span className="block w-10 h-px bg-black/20" aria-hidden="true" />
+        <span className="block w-10 h-px bg-black/20" />
         <span
           className="tracking-[0.35em] uppercase text-gray-400"
           style={{ fontFamily: SANS, fontSize: "10px", fontWeight: 500 }}
@@ -490,7 +440,7 @@ const SectionHeader = memo(function SectionHeader() {
             style={{ fontSize: "14px", fontFamily: SANS }}
           >
             From exterior washes to deep interior detailing — we bring professional cleaning
-            solutions right to your doorstep. Fast, safe &amp; hassle-free.
+            solutions right to your doorstep.
           </p>
 
           {/* Mini stats on desktop */}
@@ -500,10 +450,7 @@ const SectionHeader = memo(function SectionHeader() {
               { val: "4.8★", lbl: "Avg rating" },
             ].map((s, i) => (
               <div key={i} className="flex items-baseline gap-2">
-                <span
-                  className="text-black"
-                  style={{ fontFamily: SERIF, fontSize: "18px", fontWeight: 400 }}
-                >
+                <span className="text-black" style={{ fontFamily: SERIF, fontSize: "18px" }}>
                   {s.val}
                 </span>
                 <span className="text-gray-300 uppercase tracking-widest" style={{ fontSize: "9px" }}>
@@ -519,21 +466,16 @@ const SectionHeader = memo(function SectionHeader() {
 })
 
 // ── Trust Bar ──────────────────────────────────────────────
-const TrustBar = memo(function TrustBar() {
-  const ref = useRef(null)
-  const inView = useInView(ref, { once: true, margin: "-40px" })
-
+const TrustBar = memo(function TrustBar({ inView }) {
   return (
     <motion.div
-      ref={ref}
       variants={stagger}
       initial="hidden"
       animate={inView ? "visible" : "hidden"}
       className="mt-12 md:mt-20 pt-10 md:pt-12 border-t border-gray-100"
     >
-      {/* Section label */}
       <motion.div variants={fadeLeft} className="flex items-center gap-3 mb-8">
-        <span className="block w-6 h-px bg-black/15" aria-hidden="true" />
+        <span className="block w-6 h-px bg-black/15" />
         <span
           className="tracking-[0.3em] uppercase text-gray-300"
           style={{ fontSize: "9px", fontFamily: SANS, fontWeight: 500 }}
@@ -549,14 +491,10 @@ const TrustBar = memo(function TrustBar() {
             variants={fadeUp}
             className="group flex items-start gap-4 p-5 sm:p-6 rounded-2xl
                        bg-gray-50/70 hover:bg-gray-50 border border-transparent
-                       hover:border-gray-100 transition-all duration-500"
+                       hover:border-gray-100 transition-colors duration-300"
           >
-            <div
-              className="w-11 h-11 rounded-xl bg-white shadow-sm flex items-center
-                         justify-center shrink-0 group-hover:shadow-md
-                         transition-shadow duration-500"
-            >
-              <Icon size={18} strokeWidth={1.3} className="text-gray-400 group-hover:text-black transition-colors duration-500" />
+            <div className="w-11 h-11 rounded-xl bg-white shadow-sm flex items-center justify-center shrink-0">
+              <Icon size={18} strokeWidth={1.3} className="text-gray-400" />
             </div>
             <div>
               <p
@@ -577,74 +515,73 @@ const TrustBar = memo(function TrustBar() {
 })
 
 // ── View All CTA ───────────────────────────────────────────
-const ViewAll = memo(function ViewAll() {
-  const ref = useRef(null)
-  const inView = useInView(ref, { once: true, margin: "-40px" })
-
+const ViewAll = memo(function ViewAll({ inView }) {
   return (
     <motion.div
-      ref={ref}
-      initial={{ opacity: 0, y: 18 }}
+      initial={{ opacity: 0, y: 15 }}
       animate={inView ? { opacity: 1, y: 0 } : {}}
-      transition={{ duration: 0.6, delay: 0.1 }}
+      transition={{ duration: 0.5, delay: 0.1 }}
       className="flex justify-center mt-12 md:mt-16"
     >
       <a
         href="/services"
         className="group relative inline-flex items-center justify-center gap-3
                    w-full sm:w-auto h-14 px-10 bg-black text-white
-                   rounded-full overflow-hidden no-underline
-                   hover:shadow-2xl hover:shadow-black/15 transition-shadow duration-600"
+                   rounded-full overflow-hidden hover:bg-gray-800
+                   active:scale-[0.98] transition-all duration-300"
       >
-        {/* Sweep bg */}
-        <div
-          className="absolute inset-0 bg-gradient-to-r from-gray-800 to-gray-700
-                     -translate-x-full group-hover:translate-x-0
-                     transition-transform duration-600 ease-out"
-          aria-hidden="true"
-        />
         <span
-          className="relative z-10 tracking-[0.14em] uppercase"
+          className="tracking-[0.14em] uppercase"
           style={{ fontSize: "11px", fontWeight: 500 }}
         >
           View All Services
         </span>
-        <ArrowRight
-          size={15}
-          strokeWidth={1.5}
-          className="relative z-10 group-hover:translate-x-1.5 transition-transform duration-400"
-        />
+        <ArrowRight size={15} strokeWidth={1.5} />
       </a>
     </motion.div>
   )
 })
 
 // ── Services Grid ──────────────────────────────────────────
-const ServicesGrid = memo(function ServicesGrid({ categories }) {
-  const ref = useRef(null)
-  const inView = useInView(ref, { once: true, margin: "-40px" })
+const ServicesGrid = memo(function ServicesGrid({ categories, inView }) {
+  // Pre-calculate layouts
+  const layoutData = useMemo(() => {
+    return categories.map((cat, i) => ({
+      category: cat,
+      desktopLayout: getDesktopLayout(i, categories.length),
+      mobileSpan: getMobileLayout(i, categories.length),
+      isLarge: i === 0,
+      isTall: getMobileLayout(i, categories.length).includes("row-span-2"),
+    }))
+  }, [categories])
 
   return (
     <motion.div
-      ref={ref}
       variants={stagger}
       initial="hidden"
       animate={inView ? "visible" : "hidden"}
     >
       {/* Mobile */}
       <div className="md:hidden grid grid-cols-2 gap-3 auto-rows-[150px]">
-        {categories.map((cat, i) => (
-          <MobileCard key={cat._id} category={cat} index={i} total={categories.length} />
+        {layoutData.map(({ category, mobileSpan, isLarge, isTall }) => (
+          <MobileCard
+            key={category._id}
+            category={category}
+            span={mobileSpan}
+            isLarge={isLarge}
+            isTall={isTall}
+          />
         ))}
       </div>
 
       {/* Desktop */}
-      <div
-        className="hidden md:grid md:grid-cols-4 gap-5 lg:gap-6
-                   auto-rows-[190px] lg:auto-rows-[210px] xl:auto-rows-[220px]"
-      >
-        {categories.map((cat, i) => (
-          <DesktopCard key={cat._id} category={cat} index={i} total={categories.length} />
+      <div className="hidden md:grid md:grid-cols-4 gap-5 lg:gap-6 auto-rows-[190px] lg:auto-rows-[210px] xl:auto-rows-[220px]">
+        {layoutData.map(({ category, desktopLayout }) => (
+          <DesktopCard
+            key={category._id}
+            category={category}
+            layout={desktopLayout}
+          />
         ))}
       </div>
     </motion.div>
@@ -656,6 +593,10 @@ export default function Services() {
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+  
+  // Single ref for entire section
+  const sectionRef = useRef(null)
+  const inView = useInView(sectionRef, { once: true, margin: "-100px" })
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -672,49 +613,90 @@ export default function Services() {
   }, [])
 
   useEffect(() => {
-    let alive = true
+    let mounted = true
+    
     getCategories()
       .then((data) => {
-        if (alive) setCategories(Array.isArray(data) ? data.slice(0, MAX_VISIBLE) : [])
+        if (mounted) {
+          setCategories(Array.isArray(data) ? data.slice(0, MAX_VISIBLE) : [])
+        }
       })
       .catch(() => {
-        if (alive) setError(true)
+        if (mounted) setError(true)
       })
       .finally(() => {
-        if (alive) setLoading(false)
+        if (mounted) setLoading(false)
       })
-    return () => {
-      alive = false
-    }
+    
+    return () => { mounted = false }
   }, [])
+
+  // Determine what to render
+  const content = useMemo(() => {
+    if (loading) return { type: "loading" }
+    if (error) return { type: "error" }
+    if (categories.length === 0) return { type: "empty" }
+    return { type: "content", categories }
+  }, [loading, error, categories])
 
   return (
     <section
+      ref={sectionRef}
       className="w-full bg-white py-20 md:py-28 lg:py-36"
       style={{ fontFamily: SANS }}
       aria-labelledby="services-heading"
     >
       <div className="max-w-7xl mx-auto px-5 sm:px-8 md:px-12 lg:px-16 xl:px-20">
-        <SectionHeader />
+        <SectionHeader inView={inView} />
 
         <AnimatePresence mode="wait">
-          {loading ? (
-            <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+          {content.type === "loading" && (
+            <motion.div
+              key="loading"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
               <Skeleton />
             </motion.div>
-          ) : error ? (
-            <motion.div key="error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+          )}
+          
+          {content.type === "error" && (
+            <motion.div
+              key="error"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
               <StateMessage type="error" onRetry={load} />
             </motion.div>
-          ) : categories.length === 0 ? (
-            <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+          )}
+          
+          {content.type === "empty" && (
+            <motion.div
+              key="empty"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
               <StateMessage type="empty" />
             </motion.div>
-          ) : (
-            <motion.div key="content" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <ServicesGrid categories={categories} />
-              <ViewAll />
-              <TrustBar />
+          )}
+          
+          {content.type === "content" && (
+            <motion.div
+              key="content"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <ServicesGrid categories={content.categories} inView={inView} />
+              <ViewAll inView={inView} />
+              <TrustBar inView={inView} />
             </motion.div>
           )}
         </AnimatePresence>
