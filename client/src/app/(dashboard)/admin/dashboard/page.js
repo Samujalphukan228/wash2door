@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import DashboardLayout from '@/components/admin/layout/DashboardLayout';
 import RevenueChart from '@/components/admin/charts/RevenueChart';
 import CreateBookingModal from '@/components/admin/bookings/CreateBookingModal';
+import ExpenseListPopup from '@/components/admin/Expense/ExpenseList';
 import useDashboard from '@/hooks/useDashboard';
 import { useSocket } from '@/context/SocketContext';
 import Link from 'next/link';
@@ -26,6 +27,7 @@ import {
     IndianRupee,
     Wrench,
     ArrowUpRight,
+    ArrowDownRight,
     ChevronRight,
     Zap,
     Activity,
@@ -35,7 +37,9 @@ import {
     Timer,
     XCircle,
     Sparkles,
-    Plus
+    Plus,
+    Wallet,
+    TrendingUp
 } from 'lucide-react';
 
 ChartJS.register(
@@ -50,16 +54,19 @@ ChartJS.register(
 );
 
 export default function DashboardPage() {
-    const { stats, loading, refetch } = useDashboard();
+    const { 
+        stats, 
+        loading, 
+        refetch,
+        revenue,
+        expenses,
+        profit,
+        weeklyData 
+    } = useDashboard();
+    
     const { socket } = useSocket();
     const [showCreateModal, setShowCreateModal] = useState(false);
-
-    // ← DEBUG: Check what stats contains
-    useEffect(() => {
-        console.log('📊 Full Stats Object:', stats);
-        console.log('📅 weeklyData in stats:', stats?.weeklyData);
-        console.log('📁 bookingsByCategory in stats:', stats?.bookingsByCategory);
-    }, [stats]);
+    const [showExpenses, setShowExpenses] = useState(false);
 
     const greeting = useMemo(() => {
         const hour = new Date().getHours();
@@ -79,7 +86,6 @@ export default function DashboardPage() {
         };
     }, [socket, refetch]);
 
-    // Booking stats
     const bookingStats = useMemo(() => {
         const byStatus = stats?.bookings?.byStatus || {};
         return {
@@ -92,7 +98,6 @@ export default function DashboardPage() {
         };
     }, [stats]);
 
-    // Category data for chart
     const categoryData = useMemo(() => {
         if (!stats?.bookingsByCategory) return [];
         return stats.bookingsByCategory
@@ -104,13 +109,6 @@ export default function DashboardPage() {
             .sort((a, b) => b.revenue - a.revenue);
     }, [stats]);
 
-    // ← WEEKLY DATA FOR CHART
-    const weeklyData = useMemo(() => {
-        console.log('🗓️ Extracting weeklyData:', stats?.weeklyData);
-        return stats?.weeklyData || [];
-    }, [stats]);
-
-    // Totals
     const totals = useMemo(() => {
         const totalBookings = categoryData.reduce((sum, item) => sum + item.bookings, 0);
         const totalRevenue = categoryData.reduce((sum, item) => sum + item.revenue, 0);
@@ -118,7 +116,6 @@ export default function DashboardPage() {
         return { totalBookings, totalRevenue, avgPerBooking };
     }, [categoryData]);
 
-    // Handle create booking success
     const handleCreateSuccess = () => {
         setShowCreateModal(false);
         setTimeout(() => {
@@ -127,7 +124,11 @@ export default function DashboardPage() {
         }, 100);
     };
 
-    // Loading state
+    // ✅ Handle expense added - refresh dashboard
+    const handleExpenseAdded = () => {
+        refetch();
+    };
+
     if (loading) {
         return (
             <DashboardLayout>
@@ -170,7 +171,13 @@ export default function DashboardPage() {
                                     })}
                                 </p>
                             </div>
-                            {/* New Booking Button - Desktop */}
+                            <button
+                                onClick={() => setShowExpenses(true)}
+                                className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.06] text-gray-400 hover:bg-white/[0.1] hover:text-white border border-white/[0.08] text-xs font-medium transition-colors"
+                            >
+                                <Wallet className="w-3.5 h-3.5 text-orange-400" />
+                                Expenses
+                            </button>
                             <button
                                 onClick={() => setShowCreateModal(true)}
                                 className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-lg bg-white text-black text-xs font-medium hover:bg-gray-200 transition-colors"
@@ -181,13 +188,31 @@ export default function DashboardPage() {
                         </div>
                     </header>
 
-                    {/* Quick Stats */}
-                    <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+                    {/* Quick Stats - Updated with 5 cards */}
+                    <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-5">
                         <StatCard
                             icon={IndianRupee}
                             label="Revenue"
-                            value={`₹${(stats?.revenue?.total || 0).toLocaleString('en-IN')}`}
-                            sub={totals.avgPerBooking > 0 ? `₹${totals.avgPerBooking.toLocaleString('en-IN')} avg` : 'No bookings'}
+                            value={`₹${(revenue.thisMonth || 0).toLocaleString('en-IN')}`}
+                            sub="This month"
+                            trend={revenue.growth}
+                        />
+                        <StatCard
+                            icon={Wallet}
+                            label="Expenses"
+                            value={`₹${(expenses.thisMonth || 0).toLocaleString('en-IN')}`}
+                            sub="This month"
+                            trend={expenses.growth}
+                            trendInverse
+                        />
+                        <StatCard
+                            icon={TrendingUp}
+                            label="Net Profit"
+                            value={`₹${(profit.thisMonth || 0).toLocaleString('en-IN')}`}
+                            sub={`${profit.marginThisMonth || 0}% margin`}
+                            trend={profit.growth}
+                            highlight={profit.thisMonth !== undefined}
+                            highlightColor={profit.thisMonth < 0 ? 'red' : 'green'}
                         />
                         <StatCard
                             icon={CalendarDays}
@@ -195,6 +220,7 @@ export default function DashboardPage() {
                             value={bookingStats.total}
                             sub={`${bookingStats.completed} completed`}
                             highlight={bookingStats.pending > 0}
+                            highlightColor="yellow"
                             badge={bookingStats.pending > 0 ? `${bookingStats.pending} pending` : null}
                         />
                         <StatCard
@@ -203,30 +229,25 @@ export default function DashboardPage() {
                             value={stats?.users?.total || 0}
                             sub="Registered users"
                         />
-                        <StatCard
-                            icon={Wrench}
-                            label="Services"
-                            value={stats?.services?.total || 0}
-                            sub="Active services"
-                        />
                     </div>
 
-                    {/* ← REVENUE CHART - WITH WEEKLY DATA */}
+                    {/* Revenue Chart */}
                     <RevenueChart
-                        categoryData={categoryData}
                         weeklyData={weeklyData}
                         totals={totals}
                     />
 
                     {/* Two Column Layout */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
-                        {/* Recent Bookings */}
                         <div className="lg:col-span-2">
                             <RecentBookings bookings={stats?.recentBookings} />
                         </div>
-
-                        {/* Right Column */}
                         <div className="space-y-3 sm:space-y-4">
+                            <ProfitSummary 
+                                profit={profit}
+                                revenue={revenue}
+                                expenses={expenses}
+                            />
                             <BookingStatus data={bookingStats} />
                             <PopularServices services={stats?.popularServices} />
                         </div>
@@ -235,8 +256,15 @@ export default function DashboardPage() {
                 </div>
             </div>
 
-            {/* Mobile FAB Button - New Booking */}
-            <div className="lg:hidden fixed bottom-24 right-4 z-41">
+            {/* Mobile FAB Buttons */}
+            <div className="lg:hidden fixed bottom-24 right-4 z-40 flex flex-col gap-3">
+                <button
+                    onClick={() => setShowExpenses(true)}
+                    className="w-12 h-12 rounded-2xl bg-white/10 text-gray-400 border border-white/20 shadow-2xl shadow-black/50 flex items-center justify-center active:scale-95 transition-all"
+                    aria-label="Open expenses"
+                >
+                    <Wallet className="w-5 h-5 text-orange-400" />
+                </button>
                 <button
                     onClick={() => setShowCreateModal(true)}
                     className="w-14 h-14 bg-white text-black rounded-2xl shadow-2xl shadow-black/50 flex items-center justify-center active:scale-95 transition-transform hover:shadow-2xl hover:shadow-white/20"
@@ -246,25 +274,47 @@ export default function DashboardPage() {
                 </button>
             </div>
 
-            {/* Create Booking Modal */}
             {showCreateModal && (
                 <CreateBookingModal
                     onClose={() => setShowCreateModal(false)}
                     onSuccess={handleCreateSuccess}
                 />
             )}
+
+            {/* ✅ UPDATED: Added onExpenseAdded callback */}
+            <ExpenseListPopup
+                isOpen={showExpenses}
+                onClose={() => setShowExpenses(false)}
+                onExpenseAdded={handleExpenseAdded}
+            />
         </DashboardLayout>
     );
 }
 
-// === STAT CARD ===
-function StatCard({ icon: Icon, label, value, sub, highlight, badge }) {
+// === STAT CARD WITH TREND ===
+function StatCard({ icon: Icon, label, value, sub, trend, trendInverse, highlight, highlightColor, badge }) {
+    const isPositiveTrend = trendInverse ? trend < 0 : trend > 0;
+    const isNegativeTrend = trendInverse ? trend > 0 : trend < 0;
+    
     return (
-        <div className={`relative overflow-hidden bg-white/[0.02] border rounded-xl sm:rounded-2xl p-3 sm:p-4 transition-all hover:bg-white/[0.04] hover:border-white/[0.12] ${highlight ? 'border-yellow-500/30 bg-yellow-500/[0.02]' : 'border-white/[0.08]'}`}>
-            {highlight && (
+        <div className={`
+            relative overflow-hidden bg-white/[0.02] border rounded-xl sm:rounded-2xl p-3 sm:p-4 
+            transition-all hover:bg-white/[0.04] hover:border-white/[0.12]
+            ${highlight && highlightColor === 'red' ? 'border-red-500/30 bg-red-500/[0.02]' : ''}
+            ${highlight && highlightColor === 'green' ? 'border-emerald-500/30 bg-emerald-500/[0.02]' : ''}
+            ${highlight && highlightColor === 'yellow' ? 'border-yellow-500/30 bg-yellow-500/[0.02]' : ''}
+            ${!highlight ? 'border-white/[0.08]' : ''}
+        `}>
+            {highlight && highlightColor === 'green' && (
+                <div className="absolute top-0 right-0 w-20 h-20 bg-emerald-500/10 rounded-full blur-2xl -mr-10 -mt-10" />
+            )}
+            {highlight && highlightColor === 'red' && (
+                <div className="absolute top-0 right-0 w-20 h-20 bg-red-500/10 rounded-full blur-2xl -mr-10 -mt-10" />
+            )}
+            {highlight && highlightColor === 'yellow' && (
                 <div className="absolute top-0 right-0 w-20 h-20 bg-yellow-500/10 rounded-full blur-2xl -mr-10 -mt-10" />
             )}
-
+            
             <div className="relative">
                 <div className="flex items-center justify-between mb-2 sm:mb-3">
                     <div className="flex items-center gap-1.5 sm:gap-2">
@@ -273,12 +323,26 @@ function StatCard({ icon: Icon, label, value, sub, highlight, badge }) {
                         </div>
                         <span className="text-[10px] sm:text-xs text-gray-500 font-medium">{label}</span>
                     </div>
+                    
+                    {/* Trend Badge */}
+                    {trend !== undefined && trend !== null && (
+                        <div className={`
+                            flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-medium
+                            ${isPositiveTrend ? 'bg-emerald-500/15 text-emerald-400' : ''}
+                            ${isNegativeTrend ? 'bg-red-500/15 text-red-400' : ''}
+                            ${trend === 0 ? 'bg-gray-500/15 text-gray-400' : ''}
+                        `}>
+                            {isPositiveTrend && <ArrowUpRight className="w-2.5 h-2.5" />}
+                            {isNegativeTrend && <ArrowDownRight className="w-2.5 h-2.5" />}
+                            {Math.abs(trend)}%
+                        </div>
+                    )}
                 </div>
-
+                
                 <p className="text-lg sm:text-xl lg:text-2xl font-bold text-white tracking-tight truncate">
                     {value}
                 </p>
-
+                
                 <div className="flex items-center justify-between mt-0.5 sm:mt-1">
                     <p className="text-[10px] sm:text-xs text-gray-600 truncate">{sub}</p>
                     {badge && (
@@ -286,6 +350,76 @@ function StatCard({ icon: Icon, label, value, sub, highlight, badge }) {
                             {badge}
                         </span>
                     )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// === PROFIT SUMMARY ===
+function ProfitSummary({ profit, revenue, expenses }) {
+    const isProfit = (profit?.thisMonth || 0) >= 0;
+    
+    return (
+        <div className="bg-white/[0.02] border border-white/[0.08] rounded-xl sm:rounded-2xl overflow-hidden">
+            <div className="flex items-center justify-between p-3 sm:p-4 border-b border-white/[0.06]">
+                <div className="flex items-center gap-2">
+                    <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center ${isProfit ? 'bg-emerald-500/10' : 'bg-red-500/10'}`}>
+                        <TrendingUp className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isProfit ? 'text-emerald-400' : 'text-red-400'}`} />
+                    </div>
+                    <div>
+                        <p className="text-xs sm:text-sm font-medium text-white">Monthly Summary</p>
+                        <p className="text-[10px] text-gray-600">This month's financials</p>
+                    </div>
+                </div>
+            </div>
+
+            <div className="p-3 sm:p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                        <span className="text-[10px] sm:text-xs text-gray-400">Revenue</span>
+                    </div>
+                    <span className="text-xs sm:text-sm font-semibold text-emerald-400 tabular-nums">
+                        +₹{(revenue?.thisMonth || 0).toLocaleString('en-IN')}
+                    </span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-red-500" />
+                        <span className="text-[10px] sm:text-xs text-gray-400">Expenses</span>
+                    </div>
+                    <span className="text-xs sm:text-sm font-semibold text-red-400 tabular-nums">
+                        -₹{(expenses?.thisMonth || 0).toLocaleString('en-IN')}
+                    </span>
+                </div>
+
+                <div className="border-t border-white/[0.06]" />
+
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${isProfit ? 'bg-blue-500' : 'bg-orange-500'}`} />
+                        <span className="text-[10px] sm:text-xs text-gray-400">Net Profit</span>
+                    </div>
+                    <span className={`text-sm sm:text-base font-bold tabular-nums ${isProfit ? 'text-white' : 'text-red-400'}`}>
+                        {isProfit ? '+' : ''}₹{(profit?.thisMonth || 0).toLocaleString('en-IN')}
+                    </span>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-white/[0.06]">
+                    <span className="text-[10px] text-gray-500">Profit Margin</span>
+                    <div className="flex items-center gap-2">
+                        <div className="w-16 h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+                            <div 
+                                className={`h-full rounded-full ${isProfit ? 'bg-emerald-500' : 'bg-red-500'}`}
+                                style={{ width: `${Math.min(Math.abs(profit?.marginThisMonth || 0), 100)}%` }}
+                            />
+                        </div>
+                        <span className={`text-[10px] font-medium tabular-nums ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>
+                            {profit?.marginThisMonth || 0}%
+                        </span>
+                    </div>
                 </div>
             </div>
         </div>

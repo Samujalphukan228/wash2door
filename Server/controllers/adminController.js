@@ -16,6 +16,8 @@ import {
     emitBookingStatusUpdate,
     emitUserBlocked
 } from '../utils/socketEmitter.js';
+import ExpenseCategory from '../models/ExpenseCategory.js';
+import Expense from '../models/Expense.js';
 import mongoose from 'mongoose';
 
 const isValidObjectId = (id) =>
@@ -37,6 +39,7 @@ export const getDashboardStats = async (req, res) => {
         const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
         const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59, 999);
 
+        // ========== EXISTING QUERIES ==========
         const [
             totalUsers,
             totalAdmins,
@@ -73,39 +76,204 @@ export const getDashboardStats = async (req, res) => {
             Booking.countDocuments({ createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd } })
         ]);
 
-        const revenueThisMonth = await Booking.aggregate([
-            {
-                $match: {
-                    status: { $in: ['pending', 'confirmed', 'in-progress', 'completed'] },
-                    createdAt: { $gte: thisMonthStart }
-                }
-            },
-            { $group: { _id: null, total: { $sum: '$price' } } }
+        // ========== REVENUE ==========
+        const [revenueThisMonth, revenueLastMonth, totalRevenue, revenueToday] = await Promise.all([
+            Booking.aggregate([
+                {
+                    $match: {
+                        status: { $in: ['pending', 'confirmed', 'in-progress', 'completed'] },
+                        createdAt: { $gte: thisMonthStart }
+                    }
+                },
+                { $group: { _id: null, total: { $sum: '$price' } } }
+            ]),
+            Booking.aggregate([
+                {
+                    $match: {
+                        status: { $in: ['pending', 'confirmed', 'in-progress', 'completed'] },
+                        createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd }
+                    }
+                },
+                { $group: { _id: null, total: { $sum: '$price' } } }
+            ]),
+            Booking.aggregate([
+                {
+                    $match: {
+                        status: { $in: ['pending', 'confirmed', 'in-progress', 'completed'] }
+                    }
+                },
+                { $group: { _id: null, total: { $sum: '$price' } } }
+            ]),
+            Booking.aggregate([
+                {
+                    $match: {
+                        status: { $in: ['pending', 'confirmed', 'in-progress', 'completed'] },
+                        createdAt: { $gte: today, $lte: todayEnd }
+                    }
+                },
+                { $group: { _id: null, total: { $sum: '$price' } } }
+            ])
         ]);
 
-        const revenueLastMonth = await Booking.aggregate([
-            {
-                $match: {
-                    status: { $in: ['pending', 'confirmed', 'in-progress', 'completed'] },
-                    createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd }
-                }
-            },
-            { $group: { _id: null, total: { $sum: '$price' } } }
+        // ========== EXPENSES ==========
+        const [expensesThisMonth, expensesLastMonth, totalExpenses, expensesToday, expenseCategories] = await Promise.all([
+            Expense.aggregate([
+                { $match: { createdAt: { $gte: thisMonthStart } } },
+                { $group: { _id: null, total: { $sum: '$amount' } } }
+            ]),
+            Expense.aggregate([
+                { $match: { createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd } } },
+                { $group: { _id: null, total: { $sum: '$amount' } } }
+            ]),
+            Expense.aggregate([
+                { $group: { _id: null, total: { $sum: '$amount' } } }
+            ]),
+            Expense.aggregate([
+                { $match: { createdAt: { $gte: today, $lte: todayEnd } } },
+                { $group: { _id: null, total: { $sum: '$amount' } } }
+            ]),
+            ExpenseCategory.find().sort({ totalAmount: -1 }).lean()
         ]);
 
-        const totalRevenue = await Booking.aggregate([
+        // ========== EXPENSE BY CATEGORY (This Month) ==========
+        const expensesByCategory = await Expense.aggregate([
+            { $match: { createdAt: { $gte: thisMonthStart } } },
             {
-                $match: {
-                    status: { $in: ['pending', 'confirmed', 'in-progress', 'completed'] }
+                $group: {
+                    _id: '$categoryName',
+                    amount: { $sum: '$amount' },
+                    count: { $sum: 1 }
                 }
             },
-            { $group: { _id: null, total: { $sum: '$price' } } }
+            { $sort: { amount: -1 } }
         ]);
 
+        // ========== CALCULATE NET PROFIT ==========
+        const revenueTotalVal = totalRevenue[0]?.total || 0;
+        const revenueThisMonthVal = revenueThisMonth[0]?.total || 0;
+        const revenueLastMonthVal = revenueLastMonth[0]?.total || 0;
+        const revenueTodayVal = revenueToday[0]?.total || 0;
+
+        const expenseTotalVal = totalExpenses[0]?.total || 0;
+        const expenseThisMonthVal = expensesThisMonth[0]?.total || 0;
+        const expenseLastMonthVal = expensesLastMonth[0]?.total || 0;
+        const expenseTodayVal = expensesToday[0]?.total || 0;
+
+        const netProfitTotal = revenueTotalVal - expenseTotalVal;
+        const netProfitThisMonth = revenueThisMonthVal - expenseThisMonthVal;
+        const netProfitLastMonth = revenueLastMonthVal - expenseLastMonthVal;
+        const netProfitToday = revenueTodayVal - expenseTodayVal;
+
+        // Profit margin percentage
+        const profitMarginThisMonth = revenueThisMonthVal > 0
+            ? Math.round((netProfitThisMonth / revenueThisMonthVal) * 100)
+            : 0;
+
+        const profitMarginTotal = revenueTotalVal > 0
+            ? Math.round((netProfitTotal / revenueTotalVal) * 100)
+            : 0;
+
+        // ========== WEEKLY DATA WITH EXPENSES ==========
+        const weeklyRevenue = await Booking.aggregate([
+            {
+                $match: {
+                    status: { $nin: ['cancelled'] },
+                    createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
+                }
+            },
+            {
+                $group: {
+                    _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+                    revenue: { $sum: '$price' },
+                    bookings: { $sum: 1 }
+                }
+            },
+            { $sort: { _id: 1 } }
+        ]);
+
+        const weeklyExpenses = await Expense.aggregate([
+            {
+                $match: {
+                    createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
+                }
+            },
+            {
+                $group: {
+                    _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+                    expenses: { $sum: '$amount' }
+                }
+            },
+            { $sort: { _id: 1 } }
+        ]);
+
+        // Merge weekly data
+        const expenseMap = {};
+        weeklyExpenses.forEach(e => {
+            expenseMap[e._id] = e.expenses;
+        });
+
+        const weeklyData = weeklyRevenue.map(day => ({
+            day: day._id,
+            revenue: day.revenue,
+            bookings: day.bookings,
+            expenses: expenseMap[day._id] || 0,
+            profit: day.revenue - (expenseMap[day._id] || 0)
+        }));
+
+        // ========== MONTHLY TREND (Last 6 months) ==========
+        const sixMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 5, 1);
+
+        const monthlyRevenue = await Booking.aggregate([
+            {
+                $match: {
+                    status: { $nin: ['cancelled'] },
+                    createdAt: { $gte: sixMonthsAgo }
+                }
+            },
+            {
+                $group: {
+                    _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
+                    revenue: { $sum: '$price' },
+                    bookings: { $sum: 1 }
+                }
+            },
+            { $sort: { _id: 1 } }
+        ]);
+
+        const monthlyExpenses = await Expense.aggregate([
+            {
+                $match: {
+                    createdAt: { $gte: sixMonthsAgo }
+                }
+            },
+            {
+                $group: {
+                    _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
+                    expenses: { $sum: '$amount' }
+                }
+            },
+            { $sort: { _id: 1 } }
+        ]);
+
+        const monthlyExpenseMap = {};
+        monthlyExpenses.forEach(e => {
+            monthlyExpenseMap[e._id] = e.expenses;
+        });
+
+        const monthlyData = monthlyRevenue.map(month => ({
+            month: month._id,
+            revenue: month.revenue,
+            bookings: month.bookings,
+            expenses: monthlyExpenseMap[month._id] || 0,
+            profit: month.revenue - (monthlyExpenseMap[month._id] || 0)
+        }));
+
+        // ========== EXISTING QUERIES ==========
         const recentBookings = await Booking.find()
             .sort({ createdAt: -1 })
             .limit(10)
-            .populate('customerId', 'firstName lastName email avatar');
+            .populate('customerId', 'firstName lastName email avatar')
+            .lean();
 
         const popularServices = await Booking.aggregate([
             { $match: { status: { $ne: 'cancelled' } } },
@@ -145,42 +313,16 @@ export const getDashboardStats = async (req, res) => {
             { $sort: { count: -1 } }
         ]);
 
-        // WEEKLY DATA - all non-cancelled bookings by createdAt
-        const weeklyData = await Booking.aggregate([
-            {
-                $match: {
-                    status: { $nin: ['cancelled'] },
-                    createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
-                }
-            },
-            {
-                $group: {
-                    _id: {
-                        $dateToString: { format: '%Y-%m-%d', date: '$createdAt' }
-                    },
-                    revenue: { $sum: '$price' },
-                    bookings: { $sum: 1 }
-                }
-            },
-            { $sort: { _id: 1 } },
-            {
-                $project: {
-                    _id: 0,
-                    day: '$_id',
-                    revenue: 1,
-                    bookings: 1
-                }
-            }
-        ]);
-
         const upcomingToday = await Booking.find({
             bookingDate: { $gte: today, $lte: todayEnd },
             status: { $in: ['pending', 'confirmed'] }
         })
             .populate('customerId', 'firstName lastName email')
             .sort({ timeSlot: 1 })
-            .limit(10);
+            .limit(10)
+            .lean();
 
+        // ========== RESPONSE ==========
         res.status(200).json({
             success: true,
             data: {
@@ -210,19 +352,43 @@ export const getDashboardStats = async (req, res) => {
                     }
                 },
                 revenue: {
-                    total: totalRevenue[0]?.total || 0,
-                    thisMonth: revenueThisMonth[0]?.total || 0,
-                    lastMonth: revenueLastMonth[0]?.total || 0,
-                    growth: (revenueLastMonth[0]?.total || 0) > 0
-                        ? Math.round((((revenueThisMonth[0]?.total || 0) - (revenueLastMonth[0]?.total || 0)) / (revenueLastMonth[0]?.total || 1)) * 100)
+                    total: revenueTotalVal,
+                    today: revenueTodayVal,
+                    thisMonth: revenueThisMonthVal,
+                    lastMonth: revenueLastMonthVal,
+                    growth: revenueLastMonthVal > 0
+                        ? Math.round(((revenueThisMonthVal - revenueLastMonthVal) / revenueLastMonthVal) * 100)
                         : 100
+                },
+                expenses: {
+                    total: expenseTotalVal,
+                    today: expenseTodayVal,
+                    thisMonth: expenseThisMonthVal,
+                    lastMonth: expenseLastMonthVal,
+                    growth: expenseLastMonthVal > 0
+                        ? Math.round(((expenseThisMonthVal - expenseLastMonthVal) / expenseLastMonthVal) * 100)
+                        : 0,
+                    byCategory: expensesByCategory,
+                    categories: expenseCategories
+                },
+                profit: {
+                    total: netProfitTotal,
+                    today: netProfitToday,
+                    thisMonth: netProfitThisMonth,
+                    lastMonth: netProfitLastMonth,
+                    marginThisMonth: profitMarginThisMonth,
+                    marginTotal: profitMarginTotal,
+                    growth: netProfitLastMonth !== 0
+                        ? Math.round(((netProfitThisMonth - netProfitLastMonth) / Math.abs(netProfitLastMonth)) * 100)
+                        : (netProfitThisMonth > 0 ? 100 : 0)
                 },
                 recentBookings,
                 upcomingToday,
                 popularServices,
                 bookingsByCategory,
                 bookingsByTimeSlot,
-                weeklyData
+                weeklyData,
+                monthlyData
             }
         });
 
@@ -235,7 +401,6 @@ export const getDashboardStats = async (req, res) => {
         });
     }
 };
-
 // ============================================
 // GET ALL USERS
 // ============================================

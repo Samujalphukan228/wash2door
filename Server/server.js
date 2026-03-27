@@ -20,6 +20,7 @@ import serviceRoutes from './routes/serviceRoutes.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { generalLimiter } from './middleware/rateLimiter.js';
 import { startCleanupScheduler } from './utils/cleanup.js';
+import expenseRoutes from './routes/expenseRoutes.js';
 
 dotenv.config();
 
@@ -77,6 +78,7 @@ app.use('/api/reviews', reviewRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/subcategories', subcategoryRoutes);
 app.use('/api/services', serviceRoutes);
+app.use('/api/expenses', expenseRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

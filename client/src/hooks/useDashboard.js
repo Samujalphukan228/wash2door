@@ -9,11 +9,13 @@ const useDashboard = () => {
     const fetchStats = useCallback(async () => {
         try {
             setLoading(true);
+            setError(null);
             const response = await adminService.getDashboardStats();
             if (response.success) {
                 setStats(response.data);
             }
         } catch (err) {
+            console.error('Dashboard fetch error:', err);
             setError(err.message);
         } finally {
             setLoading(false);
@@ -24,7 +26,26 @@ const useDashboard = () => {
         fetchStats();
     }, [fetchStats]);
 
-    return { stats, loading, error, refetch: fetchStats };
+    return {
+        stats,
+        loading,
+        error,
+        refetch: fetchStats,
+        
+        // ✅ Helper getters for easier access
+        revenue: stats?.revenue || {},
+        expenses: stats?.expenses || {},
+        profit: stats?.profit || {},
+        bookings: stats?.bookings || {},
+        users: stats?.users || {},
+        services: stats?.services || {},
+        weeklyData: stats?.weeklyData || [],
+        monthlyData: stats?.monthlyData || [],
+        recentBookings: stats?.recentBookings || [],
+        popularServices: stats?.popularServices || [],
+        bookingsByCategory: stats?.bookingsByCategory || [],
+        upcomingToday: stats?.upcomingToday || []
+    };
 };
 
 export default useDashboard;
