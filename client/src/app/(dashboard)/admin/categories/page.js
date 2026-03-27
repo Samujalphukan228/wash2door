@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import DashboardLayout from '@/components/admin/layout/DashboardLayout';
 import CreateCategoryModal from '@/components/admin/categories/CreateCategoryModal';
 import EditCategoryModal from '@/components/admin/categories/EditCategoryModal';
@@ -17,12 +17,12 @@ import {
     Search,
     X,
     Loader2,
-    MoreVertical,
     Eye,
     ChevronDown,
     ChevronUp,
     Hash,
-    Package
+    Package,
+    FolderOpen
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -233,7 +233,7 @@ export default function CategoriesPage() {
                 </header>
 
                 {/* ══════════════════════════════════════════════════════════ */}
-                {/* CATEGORIES LIST                                            */}
+                {/* CATEGORIES GRID                                            */}
                 {/* ══════════════════════════════════════════════════════════ */}
                 <div className="px-4 py-4 pb-28 sm:pb-8">
                     {/* Search Result Info */}
@@ -263,7 +263,7 @@ export default function CategoriesPage() {
                             onCreate={() => setShowCreateModal(true)}
                         />
                     ) : (
-                        <div className="space-y-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
                             {filteredCategories.map((category) => (
                                 <CategoryCard
                                     key={category._id}
@@ -348,202 +348,165 @@ function StatPill({ icon: Icon, label, value, highlight = false }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// CATEGORY CARD
+// CATEGORY CARD (Vertical layout matching SubcategoryCard)
 // ═══════════════════════════════════════════════════════════════════════════
 
 function CategoryCard({ category, onEdit, onDelete, onToggleStatus }) {
-    const [showActions, setShowActions] = useState(false);
-    const menuRef = useRef(null);
+    const isActive = category.isActive !== undefined ? category.isActive : true;
     const hasImage = category.image?.url && !category.image.url.includes('default');
-    const canDelete = category.totalServices === 0;
-
-    // Close menu on outside click
-    useEffect(() => {
-        if (!showActions) return;
-        const handle = (e) => {
-            if (menuRef.current && !menuRef.current.contains(e.target)) {
-                setShowActions(false);
-            }
-        };
-        document.addEventListener('mousedown', handle);
-        document.addEventListener('touchstart', handle);
-        return () => {
-            document.removeEventListener('mousedown', handle);
-            document.removeEventListener('touchstart', handle);
-        };
-    }, [showActions]);
+    const canDelete = (category.totalServices || 0) === 0;
 
     return (
         <div className={`
-            relative bg-white/[0.03] rounded-2xl overflow-visible transition-all
-            ${!category.isActive && 'opacity-50'}
+            bg-white/[0.02] border border-white/[0.08] rounded-xl sm:rounded-2xl 
+            flex flex-col overflow-hidden transition-all hover:bg-white/[0.04]
+            ${!isActive ? 'opacity-50' : ''}
         `}>
-            <div className="flex gap-3 p-3">
-                {/* Image / Icon */}
-                <div className="relative w-16 h-16 sm:w-20 sm:h-20 bg-white/[0.05] rounded-xl overflow-hidden shrink-0">
-                    {hasImage ? (
-                        <Image
-                            src={category.image.url}
-                            alt={category.name}
-                            fill
-                            className="object-cover"
-                        />
-                    ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                            {category.icon ? (
-                                <span className="text-2xl sm:text-3xl">{category.icon}</span>
-                            ) : (
-                                <Layers className="w-6 h-6 text-gray-700" />
-                            )}
-                        </div>
-                    )}
+            {/* Image */}
+            <div className="relative h-32 sm:h-36 bg-white/[0.04]">
+                {hasImage ? (
+                    <Image
+                        src={category.image.url}
+                        alt={category.name}
+                        fill
+                        className="object-cover"
+                    />
+                ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                        {category.icon ? (
+                            <span className="text-4xl">{category.icon}</span>
+                        ) : (
+                            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white/[0.04] flex items-center justify-center">
+                                <Layers className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
+                            </div>
+                        )}
+                    </div>
+                )}
 
-                    {/* Order Badge */}
-                    {category.displayOrder !== undefined && (
-                        <div className="absolute bottom-1 left-1">
-                            <span className="text-[8px] font-mono px-1 py-0.5 rounded bg-black/70 text-white/60 flex items-center gap-0.5">
-                                <Hash className="w-2 h-2" />
-                                {category.displayOrder}
-                            </span>
+                {/* Display Order Badge */}
+                {category.displayOrder !== undefined && (
+                    <div className="absolute top-2 left-2">
+                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-black/60 text-white/70 flex items-center gap-0.5">
+                            <Hash className="w-2.5 h-2.5" />
+                            {category.displayOrder}
+                        </span>
+                    </div>
+                )}
+
+                {/* Status Badge */}
+                <div className="absolute top-2 right-2">
+                    <span className={`
+                        text-[9px] font-medium px-1.5 py-0.5 rounded
+                        ${isActive
+                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
+                            : 'bg-red-500/15 text-red-400 border border-red-500/20'
+                        }
+                    `}>
+                        {isActive ? 'Active' : 'Inactive'}
+                    </span>
+                </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-3 sm:p-4 flex-1 flex flex-col">
+                <div className="flex items-start justify-between gap-2 mb-1.5">
+                    <div className="flex-1 min-w-0">
+                        <h3 className="text-sm font-medium text-white truncate">
+                            {category.name}
+                        </h3>
+                    </div>
+                    {category.icon && (
+                        <div className="w-7 h-7 rounded-lg bg-white/[0.06] flex items-center justify-center shrink-0">
+                            <span className="text-sm">{category.icon}</span>
                         </div>
                     )}
                 </div>
 
-                {/* Content */}
-                <div className="flex-1 min-w-0 py-0.5">
-                    <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                                <h3 className="text-sm font-medium text-white truncate">
-                                    {category.name}
-                                </h3>
-                                {category.icon && (
-                                    <span className="text-sm shrink-0">{category.icon}</span>
-                                )}
-                            </div>
-                            {category.description && (
-                                <p className="text-[11px] text-gray-500 mt-0.5 line-clamp-1">
-                                    {category.description}
-                                </p>
-                            )}
-                        </div>
+                {category.description && (
+                    <p className="text-[10px] sm:text-xs text-gray-500 leading-relaxed mb-3 line-clamp-2">
+                        {category.description}
+                    </p>
+                )}
 
-                        {/* Actions Menu */}
-                        <div className="relative shrink-0" ref={menuRef}>
-                            <button
-                                onClick={() => setShowActions(v => !v)}
-                                className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-500 hover:bg-white/[0.05] transition-colors"
-                                aria-label="More actions"
-                            >
-                                <MoreVertical className="w-4 h-4" />
-                            </button>
-
-                            {showActions && (
-                                <div className="absolute right-0 top-8 z-20 bg-[#1a1a1a] rounded-xl border border-white/[0.08] shadow-xl overflow-hidden min-w-[160px] animate-in fade-in slide-in-from-top-2 duration-150">
-                                    <ActionItem
-                                        icon={Pencil}
-                                        label="Edit category"
-                                        onClick={() => { onEdit(category); setShowActions(false); }}
-                                    />
-                                    <ActionItem
-                                        icon={category.isActive ? ToggleLeft : ToggleRight}
-                                        label={category.isActive ? 'Deactivate' : 'Activate'}
-                                        onClick={() => { onToggleStatus(category); setShowActions(false); }}
-                                    />
-                                    <div className="h-px bg-white/[0.06] mx-2" />
-                                    <ActionItem
-                                        icon={Trash2}
-                                        label={canDelete ? 'Delete' : 'Has services'}
-                                        onClick={() => {
-                                            if (canDelete) {
-                                                onDelete(category._id);
-                                            } else {
-                                                toast.error('Remove services first');
-                                            }
-                                            setShowActions(false);
-                                        }}
-                                        danger
-                                        disabled={!canDelete}
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Meta Row */}
-                    <div className="flex items-center gap-3 mt-2">
-                        <div className="flex items-center gap-1 text-gray-500">
-                            <Package className="w-3 h-3" />
-                            <span className="text-xs">
-                                {category.totalServices || 0} service{category.totalServices !== 1 ? 's' : ''}
-                            </span>
-                        </div>
-                    </div>
-
-                    {/* Status Badge */}
-                    <div className="flex items-center gap-2 mt-2">
-                        <span className={`
-                            text-[10px] px-2 py-0.5 rounded-full font-medium
-                            ${category.isActive
-                                ? 'bg-emerald-500/15 text-emerald-400'
-                                : 'bg-white/[0.05] text-gray-500'
-                            }
-                        `}>
-                            {category.isActive ? 'Active' : 'Inactive'}
+                <div className="mt-auto flex items-center gap-3">
+                    <span className="text-[10px] text-gray-600 flex items-center gap-1">
+                        <Package className="w-3 h-3" />
+                        {category.totalServices || 0} service{category.totalServices !== 1 ? 's' : ''}
+                    </span>
+                    {category.subcategoryCount > 0 && (
+                        <span className="text-[10px] text-gray-600 flex items-center gap-1">
+                            <FolderOpen className="w-3 h-3" />
+                            {category.subcategoryCount} sub
                         </span>
-                        {category.subcategoryCount > 0 && (
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.05] text-gray-400">
-                                {category.subcategoryCount} subcategories
-                            </span>
-                        )}
-                    </div>
+                    )}
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-white/[0.06]">
+                    <button
+                        onClick={() => onEdit(category)}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[10px] text-gray-400 hover:text-white hover:bg-white/[0.08] transition-all"
+                    >
+                        <Pencil className="w-3 h-3" />
+                        Edit
+                    </button>
+                    <button
+                        onClick={() => onToggleStatus(category)}
+                        className={`
+                            flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[10px] text-gray-400 transition-all
+                            ${isActive
+                                ? 'hover:text-yellow-400 hover:bg-yellow-500/10 hover:border-yellow-500/20'
+                                : 'hover:text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/20'
+                            }
+                        `}
+                    >
+                        {isActive
+                            ? <ToggleRight className="w-3 h-3" />
+                            : <ToggleLeft className="w-3 h-3" />
+                        }
+                        {isActive ? 'Disable' : 'Enable'}
+                    </button>
+                    <button
+                        onClick={() => onDelete(category._id)}
+                        disabled={!canDelete}
+                        className="p-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-gray-400 hover:text-red-400 hover:bg-red-500/10 hover:border-red-500/20 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-gray-400 disabled:hover:bg-white/[0.04] disabled:hover:border-white/[0.08] transition-all"
+                        title={canDelete ? 'Delete' : 'Remove services first'}
+                    >
+                        <Trash2 className="w-3 h-3" />
+                    </button>
                 </div>
             </div>
         </div>
     );
 }
 
-function ActionItem({ icon: Icon, label, onClick, danger = false, disabled = false }) {
-    return (
-        <button
-            onClick={onClick}
-            disabled={disabled}
-            className={`
-                w-full flex items-center gap-3 px-4 py-3 text-xs transition-colors
-                ${disabled
-                    ? 'opacity-40 cursor-not-allowed'
-                    : danger
-                        ? 'text-red-400 hover:bg-red-500/10'
-                        : 'text-gray-300 hover:bg-white/[0.05]'
-                }
-            `}
-        >
-            <Icon className="w-4 h-4 shrink-0" />
-            {label}
-        </button>
-    );
-}
-
 // ═══════════════════════════════════════════════════════════════════════════
-// LOADING / EMPTY STATES
+// LOADING GRID
 // ═══════════════════════════════════════════════════════════════════════════
 
 function LoadingGrid() {
     return (
-        <div className="space-y-3">
-            {[...Array(4)].map((_, i) => (
-                <div key={i} className="flex gap-3 p-3 bg-white/[0.02] rounded-2xl animate-pulse">
-                    <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white/[0.05] rounded-xl shrink-0" />
-                    <div className="flex-1 space-y-2 py-1">
-                        <div className="h-4 w-2/3 bg-white/[0.05] rounded-lg" />
-                        <div className="h-3 w-1/2 bg-white/[0.04] rounded-lg" />
-                        <div className="h-3 w-1/4 bg-white/[0.03] rounded-lg" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+            {[...Array(8)].map((_, i) => (
+                <div
+                    key={i}
+                    className="bg-white/[0.02] border border-white/[0.08] rounded-xl sm:rounded-2xl overflow-hidden"
+                >
+                    <div className="h-32 sm:h-36 bg-white/[0.04] animate-pulse" />
+                    <div className="p-3 sm:p-4 space-y-3">
+                        <div className="h-4 w-3/4 bg-white/[0.06] rounded animate-pulse" />
+                        <div className="h-3 w-1/2 bg-white/[0.04] rounded animate-pulse" />
+                        <div className="h-3 w-1/3 bg-white/[0.03] rounded animate-pulse" />
                     </div>
                 </div>
             ))}
         </div>
     );
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EMPTY STATE
+// ═══════════════════════════════════════════════════════════════════════════
 
 function EmptyState({ searchQuery, onClear, onCreate }) {
     return (
