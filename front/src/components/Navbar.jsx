@@ -109,7 +109,12 @@ function NavLink({ link, onProtectedClick }) {
   }
 
   return (
-    <a href={link.href} onClick={handleClick} className="relative px-4 xl:px-5 py-2 tracking-[0.18em] uppercase text-gray-400 hover:text-black transition-colors duration-300 no-underline group focus:outline-none focus:text-black" style={{ fontSize: "10px", fontWeight: 500 }}>
+    <a 
+      href={link.href} 
+      onClick={handleClick} 
+      className="relative px-4 xl:px-5 py-2 tracking-[0.18em] uppercase text-gray-400 hover:text-black transition-colors duration-300 no-underline group focus:outline-none focus:text-black" 
+      style={{ fontSize: "10px", fontWeight: 500 }}
+    >
       {link.label}
       <motion.span
         className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-black"
@@ -266,7 +271,9 @@ export default function Navbar() {
         role="navigation"
         aria-label="Main navigation"
       >
-        {/* MOBILE */}
+        {/* ═══════════════════════════════════════════════════════════════ */}
+        {/* MOBILE NAVBAR */}
+        {/* ═══════════════════════════════════════════════════════════════ */}
         <div className="lg:hidden">
           <div className="flex items-center justify-between px-4 h-14">
 
@@ -274,11 +281,29 @@ export default function Navbar() {
               <MobileMenuButton onClick={() => setMobileOpen(true)} />
             </div>
 
-            <a href="/" onClick={(e) => { e.preventDefault(); navigate("/") }} className="no-underline shrink-0" aria-label="Wash2Door Home">
-              <span className="text-black tracking-[0.3em]" style={{ fontFamily: SERIF, fontWeight: 400, fontSize: "15px" }}>
+            {/* ─────────────────────────────────────────────────────────── */}
+            {/* MOBILE LOGO                                                 */}
+            {/* Change fontSize below to make it bigger or smaller          */}
+            {/* Current: 18px                                               */}
+            {/* ─────────────────────────────────────────────────────────── */}
+            <a 
+              href="/" 
+              onClick={(e) => { e.preventDefault(); navigate("/") }} 
+              className="no-underline shrink-0" 
+              aria-label="Wash2Door Home"
+            >
+              <span 
+                className="text-black tracking-[0.3em]" 
+                style={{ 
+                  fontFamily: SERIF, 
+                  fontWeight: 400, 
+                  fontSize: "18px"  // ← MOBILE LOGO SIZE
+                }}
+              >
                 W2D
               </span>
             </a>
+            {/* ─────────────────────────────────────────────────────────── */}
 
             <div className="w-24 flex justify-end">
               {loading ? (
@@ -302,16 +327,35 @@ export default function Navbar() {
           </div>
         </div>
 
-        {/* DESKTOP */}
+        {/* ═══════════════════════════════════════════════════════════════ */}
+        {/* DESKTOP NAVBAR */}
+        {/* ═══════════════════════════════════════════════════════════════ */}
         <div className="hidden lg:block">
           <div className="max-w-[1400px] mx-auto">
             <div className="flex items-center h-16 xl:h-[72px] px-8 xl:px-12">
 
-              <a href="/" onClick={(e) => { e.preventDefault(); navigate("/") }} className="no-underline group shrink-0" aria-label="Wash2Door Home">
+              {/* ─────────────────────────────────────────────────────────── */}
+              {/* DESKTOP LOGO                                                */}
+              {/* Change fontSize below to make it bigger or smaller          */}
+              {/* Current: clamp(22px, 1.8vw, 26px)                           */}
+              {/* Format: clamp(min, preferred, max)                          */}
+              {/* ─────────────────────────────────────────────────────────── */}
+              <a 
+                href="/" 
+                onClick={(e) => { e.preventDefault(); navigate("/") }} 
+                className="no-underline group shrink-0" 
+                aria-label="Wash2Door Home"
+              >
                 <div className="flex items-baseline gap-2.5">
                   <motion.span
                     className="text-black"
-                    style={{ fontFamily: SERIF, fontWeight: 400, fontSize: "clamp(18px, 1.5vw, 22px)", letterSpacing: "0.3em", display: "inline-block" }}
+                    style={{ 
+                      fontFamily: SERIF, 
+                      fontWeight: 400, 
+                      fontSize: "clamp(22px, 1.8vw, 26px)",  // ← DESKTOP LOGO SIZE
+                      letterSpacing: "0.3em", 
+                      display: "inline-block" 
+                    }}
                     whileHover={{ letterSpacing: "0.45em" }}
                     transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
                   >
@@ -325,6 +369,7 @@ export default function Navbar() {
                   />
                 </div>
               </a>
+              {/* ─────────────────────────────────────────────────────────── */}
 
               <div className="flex-1 flex items-center justify-center">
                 <div className="flex items-center gap-0.5 xl:gap-1">
@@ -335,7 +380,11 @@ export default function Navbar() {
               </div>
 
               <div className="flex items-center gap-3 xl:gap-4 shrink-0">
-                <a href="tel:6900706456" className="flex items-center gap-2 text-gray-400 hover:text-black transition-colors duration-300 no-underline p-2 -m-2 focus:outline-none focus:text-black" aria-label="Call us">
+                <a 
+                  href="tel:6900706456" 
+                  className="flex items-center gap-2 text-gray-400 hover:text-black transition-colors duration-300 no-underline p-2 -m-2 focus:outline-none focus:text-black" 
+                  aria-label="Call us"
+                >
                   <Phone size={14} strokeWidth={1.5} />
                   <span className="tracking-[0.15em] uppercase hidden xl:inline" style={{ fontSize: "10px" }}>
                     Call Us
