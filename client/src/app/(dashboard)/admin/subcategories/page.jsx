@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import DashboardLayout from '@/components/admin/layout/DashboardLayout';
+import SubcategoryCard from '@/components/admin/subcategories/SubcategoryCard';
 import CreateSubcategoryModal from '@/components/admin/subcategories/CreateSubcategoryModal';
 import EditSubcategoryModal from '@/components/admin/subcategories/EditSubcategoryModal';
 import subcategoryService from '@/services/subcategoryService';
 import categoryService from '@/services/categoryService';
-import Image from 'next/image';
 import {
     Plus,
     RefreshCw,
@@ -14,14 +14,7 @@ import {
     Search,
     X,
     Loader2,
-    MoreVertical,
-    Pencil,
-    Trash2,
-    ToggleLeft,
-    ToggleRight,
     FolderOpen,
-    Package,
-    Hash,
     Check
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -59,7 +52,6 @@ export default function SubcategoriesPage() {
             const cats = response.data?.categories || response.data || [];
             setCategories(cats);
 
-            // Set first category as default
             if (cats.length > 0 && !selectedCategory) {
                 setSelectedCategory(cats[0]._id);
             }
@@ -309,7 +301,7 @@ export default function SubcategoriesPage() {
                 </header>
 
                 {/* ══════════════════════════════════════════════════════════ */}
-                {/* SUBCATEGORIES LIST                                         */}
+                {/* SUBCATEGORIES GRID                                         */}
                 {/* ══════════════════════════════════════════════════════════ */}
                 <div className="px-4 py-4 pb-28 sm:pb-8">
                     {/* Search Result Info */}
@@ -346,7 +338,8 @@ export default function SubcategoriesPage() {
                             categoryName={currentCategory?.name}
                         />
                     ) : (
-                        <div className="space-y-3">
+                        /* ✅ Original Grid Layout with Original Card Component */
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
                             {filteredSubcategories.map((subcategory) => (
                                 <SubcategoryCard
                                     key={subcategory._id}
@@ -429,197 +422,32 @@ function StatPill({ label, value, highlight = false }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SUBCATEGORY CARD
-// ═══════════════════════════════════════════════════════════════════════════
-
-function SubcategoryCard({ subcategory, categoryName, onEdit, onDelete, onToggleStatus }) {
-    const [showActions, setShowActions] = useState(false);
-    const menuRef = useRef(null);
-    const hasImage = subcategory.image?.url && !subcategory.image.url.includes('default');
-    const canDelete = (subcategory.totalServices || 0) === 0;
-
-    // Close menu on outside click
-    useEffect(() => {
-        if (!showActions) return;
-        const handle = (e) => {
-            if (menuRef.current && !menuRef.current.contains(e.target)) {
-                setShowActions(false);
-            }
-        };
-        document.addEventListener('mousedown', handle);
-        document.addEventListener('touchstart', handle);
-        return () => {
-            document.removeEventListener('mousedown', handle);
-            document.removeEventListener('touchstart', handle);
-        };
-    }, [showActions]);
-
-    return (
-        <div className={`
-            relative bg-white/[0.03] rounded-2xl overflow-visible transition-all
-            ${!subcategory.isActive && 'opacity-50'}
-        `}>
-            <div className="flex gap-3 p-3">
-                {/* Image / Icon */}
-                <div className="relative w-16 h-16 sm:w-20 sm:h-20 bg-white/[0.05] rounded-xl overflow-hidden shrink-0">
-                    {hasImage ? (
-                        <Image
-                            src={subcategory.image.url}
-                            alt={subcategory.name}
-                            fill
-                            className="object-cover"
-                        />
-                    ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                            {subcategory.icon ? (
-                                <span className="text-2xl sm:text-3xl">{subcategory.icon}</span>
-                            ) : (
-                                <FolderOpen className="w-6 h-6 text-gray-700" />
-                            )}
-                        </div>
-                    )}
-
-                    {/* Order Badge */}
-                    {subcategory.displayOrder !== undefined && (
-                        <div className="absolute bottom-1 left-1">
-                            <span className="text-[8px] font-mono px-1 py-0.5 rounded bg-black/70 text-white/60 flex items-center gap-0.5">
-                                <Hash className="w-2 h-2" />
-                                {subcategory.displayOrder}
-                            </span>
-                        </div>
-                    )}
-                </div>
-
-                {/* Content */}
-                <div className="flex-1 min-w-0 py-0.5">
-                    <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                                <h3 className="text-sm font-medium text-white truncate">
-                                    {subcategory.name}
-                                </h3>
-                                {subcategory.icon && (
-                                    <span className="text-sm shrink-0">{subcategory.icon}</span>
-                                )}
-                            </div>
-                            {subcategory.description && (
-                                <p className="text-[11px] text-gray-500 mt-0.5 line-clamp-1">
-                                    {subcategory.description}
-                                </p>
-                            )}
-                        </div>
-
-                        {/* Actions Menu */}
-                        <div className="relative shrink-0" ref={menuRef}>
-                            <button
-                                onClick={() => setShowActions(v => !v)}
-                                className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-500 hover:bg-white/[0.05] transition-colors"
-                                aria-label="More actions"
-                            >
-                                <MoreVertical className="w-4 h-4" />
-                            </button>
-
-                            {showActions && (
-                                <div className="absolute right-0 top-8 z-20 bg-[#1a1a1a] rounded-xl border border-white/[0.08] shadow-xl overflow-hidden min-w-[160px] animate-in fade-in slide-in-from-top-2 duration-150">
-                                    <ActionItem
-                                        icon={Pencil}
-                                        label="Edit subcategory"
-                                        onClick={() => { onEdit(subcategory); setShowActions(false); }}
-                                    />
-                                    <ActionItem
-                                        icon={subcategory.isActive ? ToggleLeft : ToggleRight}
-                                        label={subcategory.isActive ? 'Deactivate' : 'Activate'}
-                                        onClick={() => { onToggleStatus(subcategory); setShowActions(false); }}
-                                    />
-                                    <div className="h-px bg-white/[0.06] mx-2" />
-                                    <ActionItem
-                                        icon={Trash2}
-                                        label={canDelete ? 'Delete' : 'Has services'}
-                                        onClick={() => {
-                                            if (canDelete) {
-                                                onDelete(subcategory._id);
-                                            } else {
-                                                toast.error('Remove services first');
-                                            }
-                                            setShowActions(false);
-                                        }}
-                                        danger
-                                        disabled={!canDelete}
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Meta Row */}
-                    <div className="flex items-center gap-3 mt-2">
-                        <div className="flex items-center gap-1 text-gray-500">
-                            <Package className="w-3 h-3" />
-                            <span className="text-xs">
-                                {subcategory.totalServices || 0} service{(subcategory.totalServices || 0) !== 1 ? 's' : ''}
-                            </span>
-                        </div>
-                    </div>
-
-                    {/* Status Badge */}
-                    <div className="flex items-center gap-2 mt-2">
-                        <span className={`
-                            text-[10px] px-2 py-0.5 rounded-full font-medium
-                            ${subcategory.isActive
-                                ? 'bg-emerald-500/15 text-emerald-400'
-                                : 'bg-white/[0.05] text-gray-500'
-                            }
-                        `}>
-                            {subcategory.isActive ? 'Active' : 'Inactive'}
-                        </span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-function ActionItem({ icon: Icon, label, onClick, danger = false, disabled = false }) {
-    return (
-        <button
-            onClick={onClick}
-            disabled={disabled}
-            className={`
-                w-full flex items-center gap-3 px-4 py-3 text-xs transition-colors
-                ${disabled
-                    ? 'opacity-40 cursor-not-allowed'
-                    : danger
-                        ? 'text-red-400 hover:bg-red-500/10'
-                        : 'text-gray-300 hover:bg-white/[0.05]'
-                }
-            `}
-        >
-            <Icon className="w-4 h-4 shrink-0" />
-            {label}
-        </button>
-    );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// LOADING / EMPTY STATES
+// LOADING GRID (matches original card style)
 // ═══════════════════════════════════════════════════════════════════════════
 
 function LoadingGrid() {
     return (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
             {[...Array(4)].map((_, i) => (
-                <div key={i} className="flex gap-3 p-3 bg-white/[0.02] rounded-2xl animate-pulse">
-                    <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white/[0.05] rounded-xl shrink-0" />
-                    <div className="flex-1 space-y-2 py-1">
-                        <div className="h-4 w-2/3 bg-white/[0.05] rounded-lg" />
-                        <div className="h-3 w-1/2 bg-white/[0.04] rounded-lg" />
-                        <div className="h-3 w-1/4 bg-white/[0.03] rounded-lg" />
+                <div
+                    key={i}
+                    className="bg-white/[0.02] border border-white/[0.08] rounded-xl sm:rounded-2xl overflow-hidden"
+                >
+                    <div className="h-32 sm:h-36 bg-white/[0.04] animate-pulse" />
+                    <div className="p-3 sm:p-4 space-y-3">
+                        <div className="h-3 w-16 bg-white/[0.06] rounded animate-pulse" />
+                        <div className="h-4 w-3/4 bg-white/[0.06] rounded animate-pulse" />
+                        <div className="h-3 w-1/2 bg-white/[0.04] rounded animate-pulse" />
                     </div>
                 </div>
             ))}
         </div>
     );
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EMPTY STATE
+// ═══════════════════════════════════════════════════════════════════════════
 
 function EmptyState({ type, searchQuery, onClear, onCreate, categoryName }) {
     const config = {
