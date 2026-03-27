@@ -22,12 +22,11 @@ import {
     ToggleLeft,
     ToggleRight,
     Star,
-    Tag,
     Clock,
     Package,
-    CheckCircle2,
-    XCircle,
-    Loader2
+    Loader2,
+    MoreVertical,
+    IndianRupee
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -130,7 +129,6 @@ export default function ServicesPage() {
     const stats = useMemo(() => ({
         total: total,
         active: services.filter(s => s.isActive).length,
-        inactive: services.filter(s => !s.isActive).length,
         featured: services.filter(s => s.isFeatured).length
     }), [services, total]);
 
@@ -139,7 +137,7 @@ export default function ServicesPage() {
         setFilters(prev => ({ 
             ...prev, 
             category: categoryId, 
-            subcategory: '', // Reset subcategory when category changes
+            subcategory: '',
             page: 1 
         }));
     };
@@ -209,23 +207,23 @@ export default function ServicesPage() {
         }));
     };
 
-    // Get selected category name
     const selectedCategoryName = filters.category 
         ? categories.find(c => c._id === filters.category)?.name 
         : null;
 
-    // Get selected subcategory name
     const selectedSubcategoryName = filters.subcategory 
         ? subcategories.find(s => s._id === filters.subcategory)?.name 
         : null;
+
+    const hasActiveFilters = filters.category || filters.subcategory || filters.search;
 
     if (loading && services.length === 0) {
         return (
             <DashboardLayout>
                 <div className="min-h-screen bg-black flex items-center justify-center">
-                    <div className="flex flex-col items-center gap-3">
-                        <div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                        <p className="text-xs text-gray-600">Loading services...</p>
+                    <div className="flex flex-col items-center gap-4">
+                        <Loader2 className="w-6 h-6 text-white animate-spin" />
+                        <p className="text-sm text-gray-500">Loading services...</p>
                     </div>
                 </div>
             </DashboardLayout>
@@ -235,229 +233,220 @@ export default function ServicesPage() {
     return (
         <DashboardLayout>
             <div className="min-h-screen bg-black">
-                <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6">
-
-                    {/* Header */}
-                    <header className="flex items-center justify-between px-3 sm:px-4 md:px-6 pt-4 sm:pt-6">
+                
+                {/* ═══════════════════════════════════════════════════════════════ */}
+                {/* HEADER - Clean & Simple                                         */}
+                {/* ═══════════════════════════════════════════════════════════════ */}
+                <header className="sticky top-0 z-30 bg-black/95 backdrop-blur-sm border-b border-white/[0.06]">
+                    <div className="px-4 py-3 flex items-center justify-between">
                         <div>
-                            <p className="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wider mb-0.5 sm:mb-1">
-                                Manage
+                            <h1 className="text-base font-semibold text-white">Services</h1>
+                            <p className="text-[11px] text-gray-500 mt-0.5">
+                                {total} total · {stats.active} active
                             </p>
-                            <h1 className="text-lg sm:text-xl font-semibold text-white tracking-tight">
-                                Services
-                            </h1>
                         </div>
+                        
                         <div className="flex items-center gap-2">
-                            {refreshing && (
-                                <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white/[0.04] border border-white/[0.08]">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                    <span className="text-[10px] text-gray-500">Syncing</span>
-                                </div>
-                            )}
                             <button
                                 onClick={handleRefresh}
                                 disabled={refreshing}
-                                className="p-2 rounded-lg border border-white/[0.08] bg-white/[0.02] text-gray-500 hover:text-white hover:bg-white/[0.04] disabled:opacity-40 transition-all"
+                                className="w-9 h-9 rounded-xl flex items-center justify-center bg-white/[0.05] text-gray-400 hover:text-white disabled:opacity-50 transition-all"
                             >
                                 <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
                             </button>
+                            
+                            {/* Desktop only - New Service button */}
                             <button
                                 onClick={() => setShowCreateModal(true)}
-                                className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-lg bg-white text-black text-xs font-medium hover:bg-gray-200 transition-colors"
+                                className="hidden sm:flex items-center gap-2 h-9 px-4 rounded-xl bg-white text-black text-xs font-medium hover:bg-gray-100 transition-colors"
                             >
                                 <Plus className="w-3.5 h-3.5" />
-                                New Service
+                                Add New
                             </button>
                         </div>
-                    </header>
-
-                    {/* Quick Stats */}
-                    <div className="grid grid-cols-4 gap-2 sm:gap-3 px-3 sm:px-4 md:px-6">
-                        <StatCard icon={Package} value={stats.total} label="Total" />
-                        <StatCard icon={CheckCircle2} value={stats.active} label="Active" />
-                        <StatCard icon={XCircle} value={stats.inactive} label="Inactive" highlight={stats.inactive > 0} />
-                        <StatCard icon={Star} value={stats.featured} label="Featured" />
                     </div>
 
-                    {/* ═══════════════════════════════════════════════════════════════ */}
-                    {/* FILTER BAR                                                      */}
-                    {/* ═══════════════════════════════════════════════════════════════ */}
-                    <div className="px-3 sm:px-4 md:px-6 space-y-3">
-                        
-                        {/* Search */}
+                    {/* Search */}
+                    <div className="px-4 pb-3">
                         <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                             <input
                                 type="text"
                                 value={filters.search}
                                 onChange={(e) => handleSearch(e.target.value)}
                                 placeholder="Search services..."
-                                className="w-full bg-white/[0.02] border border-white/[0.08] text-white text-sm placeholder-gray-600 pl-10 pr-10 py-2.5 rounded-xl focus:outline-none focus:border-white/[0.15] transition-colors"
+                                className="w-full h-10 bg-white/[0.05] border-0 text-white text-sm placeholder-gray-500 pl-10 pr-10 rounded-xl focus:outline-none focus:ring-1 focus:ring-white/20 transition-all"
                             />
                             {filters.search && (
                                 <button
                                     onClick={() => handleSearch('')}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-white transition-colors"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
                                 >
-                                    <X className="w-4 h-4" />
+                                    <X className="w-3 h-3" />
                                 </button>
                             )}
                         </div>
+                    </div>
+                </header>
 
-                        {/* ─────────────────────────────────────────────────────────── */}
-                        {/* CATEGORY BUTTONS - Row 1                                    */}
-                        {/* ─────────────────────────────────────────────────────────── */}
-                        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                            {/* All Button */}
+                {/* ═══════════════════════════════════════════════════════════════ */}
+                {/* CATEGORY TABS                                                   */}
+                {/* ═══════════════════════════════════════════════════════════════ */}
+                <div className="sticky top-[105px] z-20 bg-black border-b border-white/[0.04]">
+                    <div className="px-4 py-2.5 overflow-x-auto scrollbar-hide">
+                        <div className="flex gap-2 min-w-max">
                             <button
                                 onClick={() => handleCategoryChange('')}
                                 className={`
-                                    shrink-0 px-4 py-2 rounded-lg text-xs font-medium transition-all
+                                    h-8 px-4 rounded-full text-xs font-medium whitespace-nowrap transition-all
                                     ${!filters.category
                                         ? 'bg-white text-black'
-                                        : 'bg-white/[0.04] border border-white/[0.08] text-gray-400 hover:text-white hover:bg-white/[0.08]'
+                                        : 'bg-white/[0.06] text-gray-400 active:bg-white/[0.1]'
                                     }
                                 `}
                             >
-                                All Services
+                                All
                             </button>
 
-                            {/* Category Buttons */}
                             {categories.map((cat) => (
                                 <button
                                     key={cat._id}
                                     onClick={() => handleCategoryChange(cat._id)}
                                     className={`
-                                        shrink-0 px-4 py-2 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5
+                                        h-8 px-4 rounded-full text-xs font-medium whitespace-nowrap transition-all flex items-center gap-1.5
                                         ${filters.category === cat._id
                                             ? 'bg-white text-black'
-                                            : 'bg-white/[0.04] border border-white/[0.08] text-gray-400 hover:text-white hover:bg-white/[0.08]'
+                                            : 'bg-white/[0.06] text-gray-400 active:bg-white/[0.1]'
                                         }
                                     `}
                                 >
-                                    {cat.icon && <span>{cat.icon}</span>}
+                                    {cat.icon && <span className="text-sm">{cat.icon}</span>}
                                     {cat.name}
                                 </button>
                             ))}
                         </div>
+                    </div>
 
-                        {/* ─────────────────────────────────────────────────────────── */}
-                        {/* SUBCATEGORY BUTTONS - Row 2 (Only shows when category selected) */}
-                        {/* ─────────────────────────────────────────────────────────── */}
-                        {filters.category && (
-                            <div className="pl-4 border-l-2 border-white/[0.08]">
-                                {loadingSubcategories ? (
-                                    <div className="flex items-center gap-2 py-2">
-                                        <Loader2 className="w-3.5 h-3.5 text-gray-500 animate-spin" />
-                                        <span className="text-xs text-gray-500">Loading...</span>
-                                    </div>
-                                ) : subcategories.length > 0 ? (
-                                    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                                        {/* All in this category */}
+                    {/* Subcategory Pills */}
+                    {filters.category && (
+                        <div className="px-4 pb-2.5 overflow-x-auto scrollbar-hide">
+                            {loadingSubcategories ? (
+                                <div className="flex items-center gap-2 h-7">
+                                    <Loader2 className="w-3 h-3 text-gray-500 animate-spin" />
+                                    <span className="text-[11px] text-gray-500">Loading...</span>
+                                </div>
+                            ) : subcategories.length > 0 ? (
+                                <div className="flex gap-1.5 min-w-max">
+                                    <button
+                                        onClick={() => handleSubcategoryChange('')}
+                                        className={`
+                                            h-7 px-3 rounded-lg text-[11px] font-medium whitespace-nowrap transition-all
+                                            ${!filters.subcategory
+                                                ? 'bg-white/20 text-white'
+                                                : 'bg-white/[0.04] text-gray-500 active:bg-white/[0.08]'
+                                            }
+                                        `}
+                                    >
+                                        All {selectedCategoryName}
+                                    </button>
+
+                                    {subcategories.map((sub) => (
                                         <button
-                                            onClick={() => handleSubcategoryChange('')}
+                                            key={sub._id}
+                                            onClick={() => handleSubcategoryChange(sub._id)}
                                             className={`
-                                                shrink-0 px-3 py-1.5 rounded-md text-[11px] font-medium transition-all
-                                                ${!filters.subcategory
-                                                    ? 'bg-white/90 text-black'
-                                                    : 'bg-white/[0.03] border border-white/[0.06] text-gray-500 hover:text-white hover:bg-white/[0.06]'
+                                                h-7 px-3 rounded-lg text-[11px] font-medium whitespace-nowrap transition-all flex items-center gap-1
+                                                ${filters.subcategory === sub._id
+                                                    ? 'bg-white/20 text-white'
+                                                    : 'bg-white/[0.04] text-gray-500 active:bg-white/[0.08]'
                                                 }
                                             `}
                                         >
-                                            All {selectedCategoryName}
+                                            {sub.icon && <span>{sub.icon}</span>}
+                                            {sub.name}
                                         </button>
-
-                                        {/* Subcategory Buttons */}
-                                        {subcategories.map((sub) => (
-                                            <button
-                                                key={sub._id}
-                                                onClick={() => handleSubcategoryChange(sub._id)}
-                                                className={`
-                                                    shrink-0 px-3 py-1.5 rounded-md text-[11px] font-medium transition-all flex items-center gap-1
-                                                    ${filters.subcategory === sub._id
-                                                        ? 'bg-white/90 text-black'
-                                                        : 'bg-white/[0.03] border border-white/[0.06] text-gray-500 hover:text-white hover:bg-white/[0.06]'
-                                                    }
-                                                `}
-                                            >
-                                                {sub.icon && <span>{sub.icon}</span>}
-                                                {sub.name}
-                                            </button>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <p className="text-[11px] text-gray-600 py-1.5">
-                                        No subcategories in {selectedCategoryName}
-                                    </p>
-                                )}
-                            </div>
-                        )}
-
-                        {/* Active Filter Info */}
-                        {(filters.category || filters.subcategory || filters.search) && (
-                            <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-white/[0.02] border border-white/[0.06]">
-                                <p className="text-xs text-gray-500">
-                                    <span className="text-white font-medium">{total}</span>
-                                    {' '}{total === 1 ? 'service' : 'services'}
-                                    {selectedCategoryName && (
-                                        <>
-                                            {' '}in{' '}
-                                            <span className="text-white">{selectedCategoryName}</span>
-                                        </>
-                                    )}
-                                    {selectedSubcategoryName && (
-                                        <>
-                                            {' '}→{' '}
-                                            <span className="text-white">{selectedSubcategoryName}</span>
-                                        </>
-                                    )}
-                                    {filters.search && (
-                                        <>
-                                            {' '}matching{' '}
-                                            <span className="text-white">"{filters.search}"</span>
-                                        </>
-                                    )}
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-[11px] text-gray-600 h-7 flex items-center">
+                                    No subcategories
                                 </p>
-                                <button
-                                    onClick={handleClearAll}
-                                    className="text-xs text-gray-500 hover:text-white transition-colors flex items-center gap-1"
-                                >
-                                    <X className="w-3 h-3" />
-                                    Clear
-                                </button>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Services Grid */}
-                    <div className="px-3 sm:px-4 md:px-6 pb-24 sm:pb-6">
-                        <ServicesGrid
-                            services={services}
-                            loading={loading}
-                            total={total}
-                            pages={pages}
-                            currentPage={filters.page}
-                            onPageChange={handlePageChange}
-                            onView={handleView}
-                            onEdit={handleEdit}
-                            onDelete={handleDelete}
-                            onToggleActive={handleToggleActive}
-                        />
-                    </div>
-
+                            )}
+                        </div>
+                    )}
                 </div>
+
+                {/* ═══════════════════════════════════════════════════════════════ */}
+                {/* ACTIVE FILTERS BAR                                              */}
+                {/* ═══════════════════════════════════════════════════════════════ */}
+                {hasActiveFilters && (
+                    <div className="px-4 py-2 bg-white/[0.02]">
+                        <div className="flex items-center justify-between">
+                            <p className="text-xs text-gray-400">
+                                <span className="text-white font-medium">{total}</span>
+                                {' '}result{total !== 1 ? 's' : ''}
+                                {selectedCategoryName && (
+                                    <span className="text-gray-500"> in {selectedCategoryName}</span>
+                                )}
+                                {selectedSubcategoryName && (
+                                    <span className="text-gray-500"> › {selectedSubcategoryName}</span>
+                                )}
+                            </p>
+                            <button
+                                onClick={handleClearAll}
+                                className="text-[11px] text-gray-500 hover:text-white transition-colors"
+                            >
+                                Clear all
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* ═══════════════════════════════════════════════════════════════ */}
+                {/* SERVICES LIST                                                   */}
+                {/* ═══════════════════════════════════════════════════════════════ */}
+                <div className="px-4 py-4 pb-28 sm:pb-6">
+                    {loading ? (
+                        <LoadingGrid />
+                    ) : services.length === 0 ? (
+                        <EmptyState />
+                    ) : (
+                        <div className="space-y-3">
+                            {services.map((service) => (
+                                <ServiceCard
+                                    key={service._id}
+                                    service={service}
+                                    onView={handleView}
+                                    onEdit={handleEdit}
+                                    onDelete={handleDelete}
+                                    onToggleActive={handleToggleActive}
+                                />
+                            ))}
+
+                            {/* Pagination */}
+                            {pages > 1 && (
+                                <Pagination
+                                    currentPage={filters.page}
+                                    totalPages={pages}
+                                    onPageChange={handlePageChange}
+                                />
+                            )}
+                        </div>
+                    )}
+                </div>
+
             </div>
 
-            {/* Mobile FAB Button */}
-            <div className="sm:hidden fixed bottom-24 right-4 z-41">
-                <button
-                    onClick={() => setShowCreateModal(true)}
-                    className="w-14 h-14 bg-white text-black rounded-2xl shadow-2xl shadow-black/50 flex items-center justify-center active:scale-95 transition-transform"
-                    aria-label="Create new service"
-                >
-                    <Plus className="w-6 h-6" strokeWidth={2.5} />
-                </button>
-            </div>
+            {/* ═══════════════════════════════════════════════════════════════ */}
+            {/* MOBILE FAB                                                      */}
+            {/* ═══════════════════════════════════════════════════════════════ */}
+            <button
+                onClick={() => setShowCreateModal(true)}
+                className="sm:hidden fixed bottom-24 right-4 z-40 w-14 h-14 bg-white text-black rounded-2xl shadow-xl shadow-black/50 flex items-center justify-center active:scale-95 transition-transform"
+                aria-label="Add new service"
+            >
+                <Plus className="w-6 h-6" strokeWidth={2} />
+            </button>
 
             {/* Modals */}
             {showCreateModal && (
@@ -503,248 +492,237 @@ export default function ServicesPage() {
     );
 }
 
-// === COMPONENTS ===
+// ═══════════════════════════════════════════════════════════════════════════
+// COMPONENTS
+// ═══════════════════════════════════════════════════════════════════════════
 
-function StatCard({ icon: Icon, value, label, highlight }) {
+function LoadingGrid() {
     return (
-        <div className={`
-            bg-white/[0.02] border rounded-xl p-2.5 sm:p-3 transition-all text-center
-            ${highlight ? 'border-yellow-500/30' : 'border-white/[0.08]'}
-        `}>
-            <Icon className="w-3.5 h-3.5 text-gray-500 mx-auto mb-1" />
-            <p className="text-base sm:text-lg font-bold text-white">{value}</p>
-            <p className="text-[9px] sm:text-[10px] text-gray-600 uppercase tracking-wider">{label}</p>
+        <div className="space-y-3">
+            {[...Array(4)].map((_, i) => (
+                <div key={i} className="flex gap-3 p-3 bg-white/[0.02] rounded-2xl animate-pulse">
+                    <div className="w-20 h-20 bg-white/[0.05] rounded-xl shrink-0" />
+                    <div className="flex-1 space-y-2 py-1">
+                        <div className="h-4 w-3/4 bg-white/[0.05] rounded-lg" />
+                        <div className="h-3 w-1/2 bg-white/[0.04] rounded-lg" />
+                        <div className="h-3 w-1/3 bg-white/[0.03] rounded-lg" />
+                    </div>
+                </div>
+            ))}
         </div>
     );
 }
 
-function ServicesGrid({ services, loading, total, pages, currentPage, onPageChange, onView, onEdit, onDelete, onToggleActive }) {
-    if (loading) {
-        return (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                {[...Array(6)].map((_, i) => (
-                    <div key={i} className="bg-white/[0.02] border border-white/[0.08] rounded-xl sm:rounded-2xl overflow-hidden">
-                        <div className="h-40 sm:h-44 bg-white/[0.04] animate-pulse" />
-                        <div className="p-3 sm:p-4 space-y-3">
-                            <div className="h-4 w-3/4 bg-white/[0.06] animate-pulse rounded-lg" />
-                            <div className="h-3 w-1/2 bg-white/[0.04] animate-pulse rounded-lg" />
-                        </div>
-                    </div>
-                ))}
-            </div>
-        );
-    }
-
-    if (!services || services.length === 0) {
-        return (
-            <div className="bg-white/[0.02] border border-white/[0.08] rounded-xl sm:rounded-2xl p-6 sm:p-8">
-                <div className="flex flex-col items-center justify-center py-8 sm:py-12">
-                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white/[0.04] flex items-center justify-center mb-3 sm:mb-4">
-                        <Package className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
-                    </div>
-                    <p className="text-sm sm:text-base text-gray-400 mb-1">No services found</p>
-                    <p className="text-[10px] sm:text-xs text-gray-600 text-center">
-                        Try a different category or create a new service
-                    </p>
-                </div>
-            </div>
-        );
-    }
-
+function EmptyState() {
     return (
-        <div className="space-y-4 sm:space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                {services.map((service) => (
-                    <ServiceCard
-                        key={service._id}
-                        service={service}
-                        onView={onView}
-                        onEdit={onEdit}
-                        onDelete={onDelete}
-                        onToggleActive={onToggleActive}
-                    />
-                ))}
+        <div className="flex flex-col items-center justify-center py-16">
+            <div className="w-16 h-16 rounded-2xl bg-white/[0.04] flex items-center justify-center mb-4">
+                <Package className="w-7 h-7 text-gray-600" />
             </div>
-
-            {/* Pagination */}
-            {pages > 1 && (
-                <div className="flex items-center justify-between pt-4 border-t border-white/[0.06]">
-                    <p className="text-[10px] sm:text-xs text-gray-500">
-                        Page {currentPage} of {pages}
-                    </p>
-                    <div className="flex items-center gap-1">
-                        <button
-                            onClick={() => onPageChange(currentPage - 1)}
-                            disabled={currentPage === 1}
-                            className="w-8 h-8 rounded-lg flex items-center justify-center border border-white/[0.08] bg-white/[0.02] text-gray-500 hover:text-white hover:bg-white/[0.04] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                        >
-                            <ChevronLeft className="w-4 h-4" />
-                        </button>
-                        {Array.from({ length: Math.min(5, pages) }, (_, i) => {
-                            let page;
-                            if (pages <= 5) {
-                                page = i + 1;
-                            } else if (currentPage <= 3) {
-                                page = i + 1;
-                            } else if (currentPage >= pages - 2) {
-                                page = pages - 4 + i;
-                            } else {
-                                page = currentPage - 2 + i;
-                            }
-                            return (
-                                <button
-                                    key={page}
-                                    onClick={() => onPageChange(page)}
-                                    className={`
-                                        w-8 h-8 text-xs font-medium rounded-lg transition-all
-                                        ${currentPage === page
-                                            ? 'bg-white text-black'
-                                            : 'text-gray-500 hover:text-white hover:bg-white/[0.04]'
-                                        }
-                                    `}
-                                >
-                                    {page}
-                                </button>
-                            );
-                        })}
-                        <button
-                            onClick={() => onPageChange(currentPage + 1)}
-                            disabled={currentPage === pages}
-                            className="w-8 h-8 rounded-lg flex items-center justify-center border border-white/[0.08] bg-white/[0.02] text-gray-500 hover:text-white hover:bg-white/[0.04] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                        >
-                            <ChevronRight className="w-4 h-4" />
-                        </button>
-                    </div>
-                </div>
-            )}
+            <p className="text-sm text-gray-400 mb-1">No services found</p>
+            <p className="text-xs text-gray-600 text-center max-w-[200px]">
+                Try a different category or add a new service
+            </p>
         </div>
     );
 }
 
 function ServiceCard({ service, onView, onEdit, onDelete, onToggleActive }) {
+    const [showActions, setShowActions] = useState(false);
     const primaryImage = service.images?.find(img => img.isPrimary) || service.images?.[0];
-    const categoryName = service.category?.name || 'Uncategorized';
-    const categoryIcon = service.category?.icon || '';
+    const categoryName = service.category?.name || '';
     const subcategoryName = service.subcategory?.name || '';
-    const subcategoryIcon = service.subcategory?.icon || '';
 
     return (
-        <div className={`
-            bg-white/[0.02] border rounded-xl sm:rounded-2xl overflow-hidden transition-all
-            hover:bg-white/[0.04] hover:border-white/[0.12] group
-            ${service.isActive ? 'border-white/[0.08]' : 'border-white/[0.05] opacity-60'}
-        `}>
-            {/* Image */}
-            <div className="relative h-36 sm:h-44 bg-white/[0.02]">
-                {primaryImage ? (
-                    <Image
-                        src={primaryImage.url}
-                        alt={service.name}
-                        fill
-                        className="object-cover group-hover:scale-[1.02] transition-transform duration-500"
-                    />
-                ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                        <Package className="w-8 h-8 text-gray-700" />
-                    </div>
-                )}
-
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-
-                {/* Category & Subcategory */}
-                <div className="absolute top-2 left-2 flex flex-col gap-1">
-                    <span className="text-[9px] sm:text-[10px] border border-white/[0.12] bg-black/60 backdrop-blur-sm text-white/70 px-2 py-1 rounded-lg">
-                        {categoryIcon} {categoryName}
-                    </span>
-                    {subcategoryName && (
-                        <span className="text-[8px] sm:text-[9px] border border-white/[0.08] bg-black/50 backdrop-blur-sm text-white/50 px-1.5 py-0.5 rounded-md">
-                            {subcategoryIcon} {subcategoryName}
-                        </span>
+        <div 
+            className={`
+                relative bg-white/[0.03] rounded-2xl overflow-hidden transition-all
+                ${!service.isActive && 'opacity-50'}
+            `}
+        >
+            <div className="flex gap-3 p-3">
+                {/* Image */}
+                <div 
+                    className="relative w-20 h-20 bg-white/[0.05] rounded-xl overflow-hidden shrink-0 cursor-pointer"
+                    onClick={() => onView(service)}
+                >
+                    {primaryImage ? (
+                        <Image
+                            src={primaryImage.url}
+                            alt={service.name}
+                            fill
+                            className="object-cover"
+                        />
+                    ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                            <Package className="w-6 h-6 text-gray-700" />
+                        </div>
+                    )}
+                    
+                    {/* Featured badge */}
+                    {service.isFeatured && (
+                        <div className="absolute top-1 left-1">
+                            <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
+                        </div>
                     )}
                 </div>
 
-                {/* Status */}
-                <div className="absolute top-2 right-2">
-                    <span className={`
-                        text-[9px] sm:text-[10px] px-2 py-1 rounded-lg font-medium
-                        ${service.isActive
-                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                            : 'bg-white/[0.06] text-gray-500 border border-white/[0.08]'
-                        }
-                    `}>
-                        {service.isActive ? 'Active' : 'Inactive'}
-                    </span>
-                </div>
-
-                {/* Featured */}
-                {service.isFeatured && (
-                    <div className="absolute bottom-2 left-2">
-                        <span className="text-[9px] sm:text-[10px] bg-white text-black px-2 py-1 rounded-lg font-medium">
-                            ★ Featured
-                        </span>
+                {/* Content */}
+                <div className="flex-1 min-w-0 py-0.5">
+                    <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                            <h3 
+                                className="text-sm font-medium text-white truncate cursor-pointer"
+                                onClick={() => onView(service)}
+                            >
+                                {service.name}
+                            </h3>
+                            <p className="text-[11px] text-gray-500 mt-0.5 truncate">
+                                {categoryName}{subcategoryName && ` · ${subcategoryName}`}
+                            </p>
+                        </div>
+                        
+                        {/* More button */}
+                        <button
+                            onClick={() => setShowActions(!showActions)}
+                            className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-500 hover:bg-white/[0.05] transition-colors shrink-0"
+                        >
+                            <MoreVertical className="w-4 h-4" />
+                        </button>
                     </div>
-                )}
-            </div>
 
-            {/* Content */}
-            <div className="p-3 sm:p-4">
-                <h3 className="text-sm font-medium text-white truncate mb-2">
-                    {service.name}
-                </h3>
+                    {/* Price & Duration */}
+                    <div className="flex items-center gap-3 mt-2">
+                        <div className="flex items-center gap-1 text-white">
+                            <IndianRupee className="w-3 h-3" />
+                            <span className="text-sm font-semibold">
+                                {service.price?.toLocaleString('en-IN')}
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-1 text-gray-500">
+                            <Clock className="w-3 h-3" />
+                            <span className="text-xs">{service.duration} min</span>
+                        </div>
+                        {service.averageRating > 0 && (
+                            <div className="flex items-center gap-1 text-gray-500">
+                                <Star className="w-3 h-3" />
+                                <span className="text-xs">{service.averageRating?.toFixed(1)}</span>
+                            </div>
+                        )}
+                    </div>
 
-                {/* Stats */}
-                <div className="flex items-center gap-3 mb-3">
-                    <div className="flex items-center gap-1">
-                        <Tag className="w-3 h-3 text-gray-600" />
-                        <span className="text-[10px] sm:text-xs text-gray-500">
-                            ₹{service.price?.toLocaleString('en-IN')}
+                    {/* Status */}
+                    <div className="flex items-center gap-2 mt-2">
+                        <span className={`
+                            text-[10px] px-2 py-0.5 rounded-full font-medium
+                            ${service.isActive
+                                ? 'bg-emerald-500/15 text-emerald-400'
+                                : 'bg-white/[0.05] text-gray-500'
+                            }
+                        `}>
+                            {service.isActive ? 'Active' : 'Inactive'}
                         </span>
+                        {service.tier && service.tier !== 'basic' && (
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.05] text-gray-400 capitalize">
+                                {service.tier}
+                            </span>
+                        )}
                     </div>
-                    <div className="flex items-center gap-1">
-                        <Clock className="w-3 h-3 text-gray-600" />
-                        <span className="text-[10px] sm:text-xs text-gray-500">
-                            {service.duration}min
-                        </span>
-                    </div>
-                    <div className="flex items-center gap-1 ml-auto">
-                        <Star className="w-3 h-3 text-gray-600" />
-                        <span className="text-[10px] sm:text-xs text-gray-500">
-                            {service.averageRating?.toFixed(1) || '0.0'}
-                        </span>
-                    </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center gap-1 pt-3 border-t border-white/[0.06]">
-                    <button
-                        onClick={() => onView(service)}
-                        className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[10px] sm:text-xs text-gray-400 hover:text-white hover:bg-white/[0.08] transition-all"
-                    >
-                        <Eye className="w-3 h-3" />
-                        View
-                    </button>
-                    <button
-                        onClick={() => onEdit(service)}
-                        className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[10px] sm:text-xs text-gray-400 hover:text-white hover:bg-white/[0.08] transition-all"
-                    >
-                        <Pencil className="w-3 h-3" />
-                        Edit
-                    </button>
-                    <button
-                        onClick={() => onToggleActive(service)}
-                        className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[10px] sm:text-xs text-gray-400 hover:text-white hover:bg-white/[0.08] transition-all"
-                    >
-                        {service.isActive ? <ToggleRight className="w-3 h-3" /> : <ToggleLeft className="w-3 h-3" />}
-                        {service.isActive ? 'Off' : 'On'}
-                    </button>
-                    <button
-                        onClick={() => onDelete(service._id)}
-                        className="p-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-gray-600 hover:text-red-400 hover:bg-red-500/10 hover:border-red-500/20 transition-all"
-                    >
-                        <Trash2 className="w-3 h-3" />
-                    </button>
                 </div>
             </div>
+
+            {/* Actions Panel */}
+            {showActions && (
+                <>
+                    <div 
+                        className="fixed inset-0 z-10" 
+                        onClick={() => setShowActions(false)} 
+                    />
+                    <div className="absolute right-3 top-12 z-20 bg-[#1a1a1a] rounded-xl border border-white/[0.08] shadow-xl overflow-hidden min-w-[140px]">
+                        <button
+                            onClick={() => { onView(service); setShowActions(false); }}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-xs text-gray-300 hover:bg-white/[0.05] transition-colors"
+                        >
+                            <Eye className="w-4 h-4" />
+                            View Details
+                        </button>
+                        <button
+                            onClick={() => { onEdit(service); setShowActions(false); }}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-xs text-gray-300 hover:bg-white/[0.05] transition-colors"
+                        >
+                            <Pencil className="w-4 h-4" />
+                            Edit Service
+                        </button>
+                        <button
+                            onClick={() => { onToggleActive(service); setShowActions(false); }}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-xs text-gray-300 hover:bg-white/[0.05] transition-colors"
+                        >
+                            {service.isActive ? <ToggleLeft className="w-4 h-4" /> : <ToggleRight className="w-4 h-4" />}
+                            {service.isActive ? 'Deactivate' : 'Activate'}
+                        </button>
+                        <div className="h-px bg-white/[0.06] mx-2" />
+                        <button
+                            onClick={() => { onDelete(service._id); setShowActions(false); }}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-xs text-red-400 hover:bg-red-500/10 transition-colors"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                            Delete
+                        </button>
+                    </div>
+                </>
+            )}
+        </div>
+    );
+}
+
+function Pagination({ currentPage, totalPages, onPageChange }) {
+    return (
+        <div className="flex items-center justify-center gap-1 pt-4">
+            <button
+                onClick={() => onPageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="w-9 h-9 rounded-xl flex items-center justify-center bg-white/[0.05] text-gray-400 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            >
+                <ChevronLeft className="w-4 h-4" />
+            </button>
+            
+            <div className="flex items-center gap-1 px-2">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let page;
+                    if (totalPages <= 5) {
+                        page = i + 1;
+                    } else if (currentPage <= 3) {
+                        page = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                        page = totalPages - 4 + i;
+                    } else {
+                        page = currentPage - 2 + i;
+                    }
+                    return (
+                        <button
+                            key={page}
+                            onClick={() => onPageChange(page)}
+                            className={`
+                                w-9 h-9 rounded-xl text-xs font-medium transition-all
+                                ${currentPage === page
+                                    ? 'bg-white text-black'
+                                    : 'text-gray-500 hover:bg-white/[0.05]'
+                                }
+                            `}
+                        >
+                            {page}
+                        </button>
+                    );
+                })}
+            </div>
+
+            <button
+                onClick={() => onPageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="w-9 h-9 rounded-xl flex items-center justify-center bg-white/[0.05] text-gray-400 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            >
+                <ChevronRight className="w-4 h-4" />
+            </button>
         </div>
     );
 }
