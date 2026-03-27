@@ -7,6 +7,7 @@ import EditServiceModal from '@/components/admin/services/EditServiceModal';
 import ServiceDetailModal from '@/components/admin/services/ServiceDetailModal';
 import serviceService from '@/services/serviceService';
 import categoryService from '@/services/categoryService';
+import subcategoryService from '@/services/subcategoryService';
 import Image from 'next/image';
 import {
     Plus,
@@ -15,7 +16,6 @@ import {
     X,
     ChevronRight,
     ChevronLeft,
-    ChevronDown,
     Eye,
     Pencil,
     Trash2,
@@ -27,15 +27,17 @@ import {
     Package,
     CheckCircle2,
     XCircle,
-    SlidersHorizontal
+    Loader2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function ServicesPage() {
     const [services, setServices] = useState([]);
     const [categories, setCategories] = useState([]);
+    const [subcategories, setSubcategories] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [loadingSubcategories, setLoadingSubcategories] = useState(false);
     const [total, setTotal] = useState(0);
     const [pages, setPages] = useState(1);
 
@@ -43,12 +45,10 @@ export default function ServicesPage() {
         page: 1,
         limit: 12,
         category: '',
-        tier: '',
-        isActive: '',
+        subcategory: '',
         search: ''
     });
 
-    const [showFilters, setShowFilters] = useState(false);
     const [selectedService, setSelectedService] = useState(null);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
@@ -59,13 +59,47 @@ export default function ServicesPage() {
         const fetchCategories = async () => {
             try {
                 const response = await categoryService.getAll({ isActive: true, limit: 100 });
-                if (response.success) setCategories(response.data);
+                if (response.success) {
+                    const cats = response.data?.categories || response.data || [];
+                    setCategories(Array.isArray(cats) ? cats : []);
+                }
             } catch (error) {
                 console.error('Failed to load categories');
             }
         };
         fetchCategories();
     }, []);
+
+    // Fetch subcategories when category changes
+    useEffect(() => {
+        if (!filters.category) {
+            setSubcategories([]);
+            return;
+        }
+
+        const fetchSubcategories = async () => {
+            try {
+                setLoadingSubcategories(true);
+                const response = await subcategoryService.getByCategory(filters.category);
+                
+                let subs = [];
+                if (response.data?.subcategories && Array.isArray(response.data.subcategories)) {
+                    subs = response.data.subcategories;
+                } else if (Array.isArray(response.data)) {
+                    subs = response.data;
+                }
+                
+                setSubcategories(Array.isArray(subs) ? subs : []);
+            } catch (error) {
+                console.error('Failed to load subcategories:', error);
+                setSubcategories([]);
+            } finally {
+                setLoadingSubcategories(false);
+            }
+        };
+        
+        fetchSubcategories();
+    }, [filters.category]);
 
     // Fetch services
     const fetchServices = useCallback(async (isRefresh = false) => {
@@ -101,8 +135,25 @@ export default function ServicesPage() {
     }), [services, total]);
 
     // Handlers
-    const handleFilterChange = (newFilters) => {
-        setFilters(prev => ({ ...prev, ...newFilters, page: 1 }));
+    const handleCategoryChange = (categoryId) => {
+        setFilters(prev => ({ 
+            ...prev, 
+            category: categoryId, 
+            subcategory: '', // Reset subcategory when category changes
+            page: 1 
+        }));
+    };
+
+    const handleSubcategoryChange = (subcategoryId) => {
+        setFilters(prev => ({ 
+            ...prev, 
+            subcategory: subcategoryId, 
+            page: 1 
+        }));
+    };
+
+    const handleSearch = (search) => {
+        setFilters(prev => ({ ...prev, search, page: 1 }));
     };
 
     const handlePageChange = (page) => {
@@ -148,7 +199,25 @@ export default function ServicesPage() {
         toast.success('Refreshed', { duration: 1200 });
     };
 
-    const activeFiltersCount = [filters.category, filters.tier, filters.isActive, filters.search].filter(Boolean).length;
+    const handleClearAll = () => {
+        setFilters(prev => ({ 
+            ...prev, 
+            category: '', 
+            subcategory: '', 
+            search: '', 
+            page: 1 
+        }));
+    };
+
+    // Get selected category name
+    const selectedCategoryName = filters.category 
+        ? categories.find(c => c._id === filters.category)?.name 
+        : null;
+
+    // Get selected subcategory name
+    const selectedSubcategoryName = filters.subcategory 
+        ? subcategories.find(s => s._id === filters.subcategory)?.name 
+        : null;
 
     if (loading && services.length === 0) {
         return (
@@ -203,43 +272,162 @@ export default function ServicesPage() {
                     </header>
 
                     {/* Quick Stats */}
-                    <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4 px-3 sm:px-4 md:px-6">
-                        <StatCard
-                            icon={Package}
-                            label="Total"
-                            value={stats.total}
-                            sub="Services"
-                        />
-                        <StatCard
-                            icon={CheckCircle2}
-                            label="Active"
-                            value={stats.active}
-                            sub="Visible"
-                        />
-                        <StatCard
-                            icon={XCircle}
-                            label="Inactive"
-                            value={stats.inactive}
-                            sub="Hidden"
-                            highlight={stats.inactive > 0}
-                        />
-                        <StatCard
-                            icon={Star}
-                            label="Featured"
-                            value={stats.featured}
-                            sub="Highlighted"
-                        />
+                    <div className="grid grid-cols-4 gap-2 sm:gap-3 px-3 sm:px-4 md:px-6">
+                        <StatCard icon={Package} value={stats.total} label="Total" />
+                        <StatCard icon={CheckCircle2} value={stats.active} label="Active" />
+                        <StatCard icon={XCircle} value={stats.inactive} label="Inactive" highlight={stats.inactive > 0} />
+                        <StatCard icon={Star} value={stats.featured} label="Featured" />
                     </div>
 
-                    {/* Filters */}
-                    <FilterBar
-                        filters={filters}
-                        categories={categories}
-                        onFilterChange={handleFilterChange}
-                        showFilters={showFilters}
-                        setShowFilters={setShowFilters}
-                        activeCount={activeFiltersCount}
-                    />
+                    {/* ═══════════════════════════════════════════════════════════════ */}
+                    {/* FILTER BAR                                                      */}
+                    {/* ═══════════════════════════════════════════════════════════════ */}
+                    <div className="px-3 sm:px-4 md:px-6 space-y-3">
+                        
+                        {/* Search */}
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
+                            <input
+                                type="text"
+                                value={filters.search}
+                                onChange={(e) => handleSearch(e.target.value)}
+                                placeholder="Search services..."
+                                className="w-full bg-white/[0.02] border border-white/[0.08] text-white text-sm placeholder-gray-600 pl-10 pr-10 py-2.5 rounded-xl focus:outline-none focus:border-white/[0.15] transition-colors"
+                            />
+                            {filters.search && (
+                                <button
+                                    onClick={() => handleSearch('')}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-white transition-colors"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            )}
+                        </div>
+
+                        {/* ─────────────────────────────────────────────────────────── */}
+                        {/* CATEGORY BUTTONS - Row 1                                    */}
+                        {/* ─────────────────────────────────────────────────────────── */}
+                        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                            {/* All Button */}
+                            <button
+                                onClick={() => handleCategoryChange('')}
+                                className={`
+                                    shrink-0 px-4 py-2 rounded-lg text-xs font-medium transition-all
+                                    ${!filters.category
+                                        ? 'bg-white text-black'
+                                        : 'bg-white/[0.04] border border-white/[0.08] text-gray-400 hover:text-white hover:bg-white/[0.08]'
+                                    }
+                                `}
+                            >
+                                All Services
+                            </button>
+
+                            {/* Category Buttons */}
+                            {categories.map((cat) => (
+                                <button
+                                    key={cat._id}
+                                    onClick={() => handleCategoryChange(cat._id)}
+                                    className={`
+                                        shrink-0 px-4 py-2 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5
+                                        ${filters.category === cat._id
+                                            ? 'bg-white text-black'
+                                            : 'bg-white/[0.04] border border-white/[0.08] text-gray-400 hover:text-white hover:bg-white/[0.08]'
+                                        }
+                                    `}
+                                >
+                                    {cat.icon && <span>{cat.icon}</span>}
+                                    {cat.name}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* ─────────────────────────────────────────────────────────── */}
+                        {/* SUBCATEGORY BUTTONS - Row 2 (Only shows when category selected) */}
+                        {/* ─────────────────────────────────────────────────────────── */}
+                        {filters.category && (
+                            <div className="pl-4 border-l-2 border-white/[0.08]">
+                                {loadingSubcategories ? (
+                                    <div className="flex items-center gap-2 py-2">
+                                        <Loader2 className="w-3.5 h-3.5 text-gray-500 animate-spin" />
+                                        <span className="text-xs text-gray-500">Loading...</span>
+                                    </div>
+                                ) : subcategories.length > 0 ? (
+                                    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                                        {/* All in this category */}
+                                        <button
+                                            onClick={() => handleSubcategoryChange('')}
+                                            className={`
+                                                shrink-0 px-3 py-1.5 rounded-md text-[11px] font-medium transition-all
+                                                ${!filters.subcategory
+                                                    ? 'bg-white/90 text-black'
+                                                    : 'bg-white/[0.03] border border-white/[0.06] text-gray-500 hover:text-white hover:bg-white/[0.06]'
+                                                }
+                                            `}
+                                        >
+                                            All {selectedCategoryName}
+                                        </button>
+
+                                        {/* Subcategory Buttons */}
+                                        {subcategories.map((sub) => (
+                                            <button
+                                                key={sub._id}
+                                                onClick={() => handleSubcategoryChange(sub._id)}
+                                                className={`
+                                                    shrink-0 px-3 py-1.5 rounded-md text-[11px] font-medium transition-all flex items-center gap-1
+                                                    ${filters.subcategory === sub._id
+                                                        ? 'bg-white/90 text-black'
+                                                        : 'bg-white/[0.03] border border-white/[0.06] text-gray-500 hover:text-white hover:bg-white/[0.06]'
+                                                    }
+                                                `}
+                                            >
+                                                {sub.icon && <span>{sub.icon}</span>}
+                                                {sub.name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-[11px] text-gray-600 py-1.5">
+                                        No subcategories in {selectedCategoryName}
+                                    </p>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Active Filter Info */}
+                        {(filters.category || filters.subcategory || filters.search) && (
+                            <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-white/[0.02] border border-white/[0.06]">
+                                <p className="text-xs text-gray-500">
+                                    <span className="text-white font-medium">{total}</span>
+                                    {' '}{total === 1 ? 'service' : 'services'}
+                                    {selectedCategoryName && (
+                                        <>
+                                            {' '}in{' '}
+                                            <span className="text-white">{selectedCategoryName}</span>
+                                        </>
+                                    )}
+                                    {selectedSubcategoryName && (
+                                        <>
+                                            {' '}→{' '}
+                                            <span className="text-white">{selectedSubcategoryName}</span>
+                                        </>
+                                    )}
+                                    {filters.search && (
+                                        <>
+                                            {' '}matching{' '}
+                                            <span className="text-white">"{filters.search}"</span>
+                                        </>
+                                    )}
+                                </p>
+                                <button
+                                    onClick={handleClearAll}
+                                    className="text-xs text-gray-500 hover:text-white transition-colors flex items-center gap-1"
+                                >
+                                    <X className="w-3 h-3" />
+                                    Clear
+                                </button>
+                            </div>
+                        )}
+                    </div>
 
                     {/* Services Grid */}
                     <div className="px-3 sm:px-4 md:px-6 pb-24 sm:pb-6">
@@ -260,11 +448,11 @@ export default function ServicesPage() {
                 </div>
             </div>
 
-            {/* ✅ FIXED: Mobile FAB Button - Above mobile nav */}
+            {/* Mobile FAB Button */}
             <div className="sm:hidden fixed bottom-24 right-4 z-41">
                 <button
                     onClick={() => setShowCreateModal(true)}
-                    className="w-14 h-14 bg-white text-black rounded-2xl shadow-2xl shadow-black/50 flex items-center justify-center active:scale-95 transition-transform hover:shadow-2xl hover:shadow-white/20"
+                    className="w-14 h-14 bg-white text-black rounded-2xl shadow-2xl shadow-black/50 flex items-center justify-center active:scale-95 transition-transform"
                     aria-label="Create new service"
                 >
                     <Plus className="w-6 h-6" strokeWidth={2.5} />
@@ -317,274 +505,16 @@ export default function ServicesPage() {
 
 // === COMPONENTS ===
 
-function StatCard({ icon: Icon, label, value, sub, highlight }) {
+function StatCard({ icon: Icon, value, label, highlight }) {
     return (
         <div className={`
-            bg-white/[0.02] border rounded-xl sm:rounded-2xl p-3 sm:p-4 transition-all
-            hover:bg-white/[0.04]
-            ${highlight ? 'border-yellow-500/30 bg-yellow-500/[0.02]' : 'border-white/[0.08]'}
+            bg-white/[0.02] border rounded-xl p-2.5 sm:p-3 transition-all text-center
+            ${highlight ? 'border-yellow-500/30' : 'border-white/[0.08]'}
         `}>
-            <div className="flex items-center gap-1.5 sm:gap-2 mb-2 sm:mb-3">
-                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-white/[0.06] flex items-center justify-center">
-                    <Icon className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-gray-400" />
-                </div>
-                <span className="text-[10px] sm:text-xs text-gray-500 font-medium">{label}</span>
-            </div>
-            <p className="text-lg sm:text-xl lg:text-2xl font-bold text-white tracking-tight truncate">
-                {value}
-            </p>
-            <p className="text-[10px] sm:text-xs text-gray-600 mt-0.5 sm:mt-1 truncate">{sub}</p>
+            <Icon className="w-3.5 h-3.5 text-gray-500 mx-auto mb-1" />
+            <p className="text-base sm:text-lg font-bold text-white">{value}</p>
+            <p className="text-[9px] sm:text-[10px] text-gray-600 uppercase tracking-wider">{label}</p>
         </div>
-    );
-}
-
-function FilterBar({ filters, categories, onFilterChange, showFilters, setShowFilters, activeCount }) {
-    const [searchInput, setSearchInput] = useState(filters.search || '');
-
-    const handleSearch = (e) => {
-        if (e.key === 'Enter') {
-            onFilterChange({ search: searchInput });
-        }
-    };
-
-    const clearAll = () => {
-        setSearchInput('');
-        onFilterChange({
-            search: '',
-            category: '',
-            tier: '',
-            isActive: ''
-        });
-    };
-
-    const tierOptions = [
-        { value: '', label: 'All Tiers' },
-        { value: 'basic', label: 'Basic' },
-        { value: 'standard', label: 'Standard' },
-        { value: 'premium', label: 'Premium' },
-        { value: 'custom', label: 'Custom' }
-    ];
-
-    const statusOptions = [
-        { value: '', label: 'All Status' },
-        { value: 'true', label: 'Active' },
-        { value: 'false', label: 'Inactive' }
-    ];
-
-    return (
-        <div className="space-y-3 px-3 sm:px-4 md:px-6">
-            {/* Search & Filter Row */}
-            <div className="flex items-center gap-2">
-                {/* Search */}
-                <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
-                    <input
-                        type="text"
-                        value={searchInput}
-                        onChange={(e) => setSearchInput(e.target.value)}
-                        onKeyDown={handleSearch}
-                        onBlur={() => onFilterChange({ search: searchInput })}
-                        placeholder="Search services..."
-                        className="w-full bg-white/[0.02] border border-white/[0.08] text-white text-sm placeholder-gray-600 pl-10 pr-10 py-2.5 rounded-xl focus:outline-none focus:border-white/[0.15] transition-colors"
-                    />
-                    {searchInput && (
-                        <button
-                            onClick={() => {
-                                setSearchInput('');
-                                onFilterChange({ search: '' });
-                            }}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-white transition-colors"
-                        >
-                            <X className="w-4 h-4" />
-                        </button>
-                    )}
-                </div>
-
-                {/* Category - Desktop */}
-                <div className="hidden sm:block relative">
-                    <select
-                        value={filters.category}
-                        onChange={(e) => onFilterChange({ category: e.target.value })}
-                        className="appearance-none bg-white/[0.02] border border-white/[0.08] text-white text-xs pl-3 pr-8 py-2.5 rounded-xl focus:outline-none focus:border-white/[0.15] cursor-pointer"
-                    >
-                        <option value="" className="bg-black">All Categories</option>
-                        {categories.map((cat) => (
-                            <option key={cat._id} value={cat._id} className="bg-black">
-                                {cat.name}
-                            </option>
-                        ))}
-                    </select>
-                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500 pointer-events-none" />
-                </div>
-
-                {/* Tier - Desktop */}
-                <div className="hidden sm:block relative">
-                    <select
-                        value={filters.tier}
-                        onChange={(e) => onFilterChange({ tier: e.target.value })}
-                        className="appearance-none bg-white/[0.02] border border-white/[0.08] text-white text-xs pl-3 pr-8 py-2.5 rounded-xl focus:outline-none focus:border-white/[0.15] cursor-pointer"
-                    >
-                        {tierOptions.map((opt) => (
-                            <option key={opt.value} value={opt.value} className="bg-black">
-                                {opt.label}
-                            </option>
-                        ))}
-                    </select>
-                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500 pointer-events-none" />
-                </div>
-
-                {/* Status - Desktop */}
-                <div className="hidden lg:block relative">
-                    <select
-                        value={filters.isActive}
-                        onChange={(e) => onFilterChange({ isActive: e.target.value })}
-                        className="appearance-none bg-white/[0.02] border border-white/[0.08] text-white text-xs pl-3 pr-8 py-2.5 rounded-xl focus:outline-none focus:border-white/[0.15] cursor-pointer"
-                    >
-                        {statusOptions.map((opt) => (
-                            <option key={opt.value} value={opt.value} className="bg-black">
-                                {opt.label}
-                            </option>
-                        ))}
-                    </select>
-                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500 pointer-events-none" />
-                </div>
-
-                {/* Filter Toggle - Mobile */}
-                <button
-                    onClick={() => setShowFilters(!showFilters)}
-                    className={`
-                        sm:hidden flex items-center gap-1.5 px-3 py-2.5 rounded-xl border text-xs font-medium transition-all
-                        ${showFilters
-                            ? 'border-white/[0.15] bg-white/[0.06] text-white'
-                            : 'border-white/[0.08] bg-white/[0.02] text-gray-400'
-                        }
-                    `}
-                >
-                    <SlidersHorizontal className="w-4 h-4" />
-                    {activeCount > 0 && (
-                        <span className="w-4 h-4 rounded-full bg-white text-black text-[10px] font-semibold flex items-center justify-center">
-                            {activeCount}
-                        </span>
-                    )}
-                </button>
-
-                {/* Clear - Desktop */}
-                {activeCount > 0 && (
-                    <button
-                        onClick={clearAll}
-                        className="hidden sm:flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-white/[0.08] text-xs text-gray-400 hover:text-white hover:border-white/[0.15] transition-all"
-                    >
-                        <X className="w-3.5 h-3.5" />
-                        Clear
-                    </button>
-                )}
-            </div>
-
-            {/* Mobile Filters */}
-            {showFilters && (
-                <div className="sm:hidden grid grid-cols-2 gap-2 p-3 rounded-xl border border-white/[0.08] bg-white/[0.02]">
-                    <div className="relative">
-                        <select
-                            value={filters.category}
-                            onChange={(e) => onFilterChange({ category: e.target.value })}
-                            className="w-full appearance-none bg-white/[0.04] border border-white/[0.08] text-white text-xs pl-3 pr-8 py-2 rounded-lg focus:outline-none cursor-pointer"
-                        >
-                            <option value="" className="bg-black">All Categories</option>
-                            {categories.map((cat) => (
-                                <option key={cat._id} value={cat._id} className="bg-black">
-                                    {cat.name}
-                                </option>
-                            ))}
-                        </select>
-                        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-500 pointer-events-none" />
-                    </div>
-                    <div className="relative">
-                        <select
-                            value={filters.tier}
-                            onChange={(e) => onFilterChange({ tier: e.target.value })}
-                            className="w-full appearance-none bg-white/[0.04] border border-white/[0.08] text-white text-xs pl-3 pr-8 py-2 rounded-lg focus:outline-none cursor-pointer"
-                        >
-                            {tierOptions.map((opt) => (
-                                <option key={opt.value} value={opt.value} className="bg-black">
-                                    {opt.label}
-                                </option>
-                            ))}
-                        </select>
-                        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-500 pointer-events-none" />
-                    </div>
-                    <div className="relative col-span-2">
-                        <select
-                            value={filters.isActive}
-                            onChange={(e) => onFilterChange({ isActive: e.target.value })}
-                            className="w-full appearance-none bg-white/[0.04] border border-white/[0.08] text-white text-xs pl-3 pr-8 py-2 rounded-lg focus:outline-none cursor-pointer"
-                        >
-                            {statusOptions.map((opt) => (
-                                <option key={opt.value} value={opt.value} className="bg-black">
-                                    {opt.label}
-                                </option>
-                            ))}
-                        </select>
-                        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-500 pointer-events-none" />
-                    </div>
-                    {activeCount > 0 && (
-                        <button
-                            onClick={clearAll}
-                            className="col-span-2 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs text-gray-400 hover:text-white transition-colors"
-                        >
-                            <X className="w-3.5 h-3.5" />
-                            Clear all filters
-                        </button>
-                    )}
-                </div>
-            )}
-
-            {/* Active Filter Pills */}
-            {activeCount > 0 && (
-                <div className="flex items-center gap-2 flex-wrap">
-                    {filters.category && (
-                        <FilterPill
-                            label={categories.find(c => c._id === filters.category)?.name || 'Category'}
-                            onRemove={() => onFilterChange({ category: '' })}
-                        />
-                    )}
-                    {filters.tier && (
-                        <FilterPill
-                            label={filters.tier}
-                            onRemove={() => onFilterChange({ tier: '' })}
-                        />
-                    )}
-                    {filters.isActive && (
-                        <FilterPill
-                            label={filters.isActive === 'true' ? 'Active' : 'Inactive'}
-                            onRemove={() => onFilterChange({ isActive: '' })}
-                        />
-                    )}
-                    {filters.search && (
-                        <FilterPill
-                            label={`"${filters.search}"`}
-                            onRemove={() => {
-                                setSearchInput('');
-                                onFilterChange({ search: '' });
-                            }}
-                        />
-                    )}
-                </div>
-            )}
-        </div>
-    );
-}
-
-function FilterPill({ label, onRemove }) {
-    return (
-        <span className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full border border-white/[0.08] bg-white/[0.02] text-[10px] sm:text-xs text-gray-400">
-            <span className="capitalize">{label}</span>
-            <button
-                onClick={onRemove}
-                className="w-4 h-4 rounded-full flex items-center justify-center hover:bg-white/[0.08] transition-colors"
-            >
-                <X className="w-3 h-3" />
-            </button>
-        </span>
     );
 }
 
@@ -614,7 +544,7 @@ function ServicesGrid({ services, loading, total, pages, currentPage, onPageChan
                     </div>
                     <p className="text-sm sm:text-base text-gray-400 mb-1">No services found</p>
                     <p className="text-[10px] sm:text-xs text-gray-600 text-center">
-                        Create your first service to get started
+                        Try a different category or create a new service
                     </p>
                 </div>
             </div>
@@ -623,7 +553,6 @@ function ServicesGrid({ services, loading, total, pages, currentPage, onPageChan
 
     return (
         <div className="space-y-4 sm:space-y-6">
-            {/* Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                 {services.map((service) => (
                     <ServiceCard
@@ -641,7 +570,7 @@ function ServicesGrid({ services, loading, total, pages, currentPage, onPageChan
             {pages > 1 && (
                 <div className="flex items-center justify-between pt-4 border-t border-white/[0.06]">
                     <p className="text-[10px] sm:text-xs text-gray-500">
-                        Page {currentPage} of {pages} · {total} services
+                        Page {currentPage} of {pages}
                     </p>
                     <div className="flex items-center gap-1">
                         <button
@@ -696,13 +625,8 @@ function ServiceCard({ service, onView, onEdit, onDelete, onToggleActive }) {
     const primaryImage = service.images?.find(img => img.isPrimary) || service.images?.[0];
     const categoryName = service.category?.name || 'Uncategorized';
     const categoryIcon = service.category?.icon || '';
-
-    const tierStyles = {
-        basic: 'border-white/[0.08] text-gray-500',
-        standard: 'border-white/[0.12] text-gray-400',
-        premium: 'border-white/25 text-white',
-        custom: 'border-white/[0.15] text-gray-300'
-    };
+    const subcategoryName = service.subcategory?.name || '';
+    const subcategoryIcon = service.subcategory?.icon || '';
 
     return (
         <div className={`
@@ -725,24 +649,34 @@ function ServiceCard({ service, onView, onEdit, onDelete, onToggleActive }) {
                     </div>
                 )}
 
-                {/* Gradient Overlay */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
 
-                {/* Category Badge */}
-                <div className="absolute top-2 left-2">
+                {/* Category & Subcategory */}
+                <div className="absolute top-2 left-2 flex flex-col gap-1">
                     <span className="text-[9px] sm:text-[10px] border border-white/[0.12] bg-black/60 backdrop-blur-sm text-white/70 px-2 py-1 rounded-lg">
                         {categoryIcon} {categoryName}
                     </span>
+                    {subcategoryName && (
+                        <span className="text-[8px] sm:text-[9px] border border-white/[0.08] bg-black/50 backdrop-blur-sm text-white/50 px-1.5 py-0.5 rounded-md">
+                            {subcategoryIcon} {subcategoryName}
+                        </span>
+                    )}
                 </div>
 
-                {/* Tier Badge */}
+                {/* Status */}
                 <div className="absolute top-2 right-2">
-                    <span className={`text-[9px] sm:text-[10px] border px-2 py-1 rounded-lg bg-black/60 backdrop-blur-sm capitalize ${tierStyles[service.tier] || tierStyles.basic}`}>
-                        {service.tier || 'basic'}
+                    <span className={`
+                        text-[9px] sm:text-[10px] px-2 py-1 rounded-lg font-medium
+                        ${service.isActive
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                            : 'bg-white/[0.06] text-gray-500 border border-white/[0.08]'
+                        }
+                    `}>
+                        {service.isActive ? 'Active' : 'Inactive'}
                     </span>
                 </div>
 
-                {/* Featured Badge */}
+                {/* Featured */}
                 {service.isFeatured && (
                     <div className="absolute bottom-2 left-2">
                         <span className="text-[9px] sm:text-[10px] bg-white text-black px-2 py-1 rounded-lg font-medium">
@@ -750,28 +684,15 @@ function ServiceCard({ service, onView, onEdit, onDelete, onToggleActive }) {
                         </span>
                     </div>
                 )}
-
-                {/* Image Count */}
-                {service.images?.length > 1 && (
-                    <div className="absolute bottom-2 right-2">
-                        <span className="text-[9px] sm:text-[10px] bg-black/60 backdrop-blur-sm text-white/50 px-2 py-1 rounded-lg">
-                            {service.images.length} photos
-                        </span>
-                    </div>
-                )}
             </div>
 
             {/* Content */}
             <div className="p-3 sm:p-4">
-                <h3 className="text-sm font-medium text-white truncate mb-1">
+                <h3 className="text-sm font-medium text-white truncate mb-2">
                     {service.name}
                 </h3>
 
-                <p className="text-[10px] sm:text-xs text-gray-500 leading-relaxed mb-3">
-                    {service.tier.charAt(0).toUpperCase() + service.tier.slice(1)} Tier Service
-                </p>
-
-                {/* Stats Row */}
+                {/* Stats */}
                 <div className="flex items-center gap-3 mb-3">
                     <div className="flex items-center gap-1">
                         <Tag className="w-3 h-3 text-gray-600" />
@@ -782,7 +703,7 @@ function ServiceCard({ service, onView, onEdit, onDelete, onToggleActive }) {
                     <div className="flex items-center gap-1">
                         <Clock className="w-3 h-3 text-gray-600" />
                         <span className="text-[10px] sm:text-xs text-gray-500">
-                            {service.duration} min
+                            {service.duration}min
                         </span>
                     </div>
                     <div className="flex items-center gap-1 ml-auto">
@@ -791,19 +712,6 @@ function ServiceCard({ service, onView, onEdit, onDelete, onToggleActive }) {
                             {service.averageRating?.toFixed(1) || '0.0'}
                         </span>
                     </div>
-                </div>
-
-                {/* Status Badge */}
-                <div className="mb-3">
-                    <span className={`
-                        text-[9px] sm:text-[10px] px-2 py-1 rounded-lg font-medium
-                        ${service.isActive
-                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
-                            : 'bg-white/[0.06] text-gray-500 border border-white/[0.08]'
-                        }
-                    `}>
-                        {service.isActive ? 'Active' : 'Inactive'}
-                    </span>
                 </div>
 
                 {/* Actions */}
