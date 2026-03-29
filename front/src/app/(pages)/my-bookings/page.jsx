@@ -611,7 +611,7 @@ const HeroSection = memo(function HeroSection({ total }) {
           >
             <motion.a
               whileTap={{ scale: 0.96 }}
-              href="/bookings"
+              href="/services"
               className="inline-flex items-center gap-2 h-11 px-5
                          bg-white text-black rounded-full
                          hover:bg-gray-100 transition-colors duration-200"
@@ -761,7 +761,7 @@ const MobileCTA = memo(function MobileCTA() {
     >
       <motion.a
         whileTap={{ scale: 0.97 }}
-        href="/bookings"
+        href="/services"
         className="flex items-center justify-center gap-2 w-full h-12
                    bg-black text-white rounded-full hover:bg-gray-800 transition-colors"
       >
