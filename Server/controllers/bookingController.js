@@ -7,7 +7,7 @@ import {
     TIME_SLOTS,
     BOOKING_STATUSES,
     LIMITS,
-    CLOSED_DAY_MESSAGE, // ✅ ADDED: Import the constant
+    CLOSED_DAY_MESSAGE,
     isValidTimeSlot,
     isClosedDay,
     convertTo24Hour
@@ -29,7 +29,6 @@ const isValidObjectId = (id) =>
     mongoose.Types.ObjectId.isValid(id) &&
     /^[0-9a-fA-F]{24}$/.test(id);
 
-// ✅ HELPER: Get local date string from Date object
 const getLocalDateStr = (date) => {
     const d = new Date(date);
     const year = d.getFullYear();
@@ -38,12 +37,10 @@ const getLocalDateStr = (date) => {
     return `${year}-${month}-${day}`;
 };
 
-// ✅ ADDED: Helper to check if slot is in past (with buffer)
 const isSlotInPast = (dateStr, timeSlot, bufferMinutes = LIMITS.MIN_BOOKING_BUFFER_MINUTES || 30) => {
     const now = new Date();
     const todayStr = getLocalDateStr(now);
     
-    // If not today, it's not in past
     if (dateStr !== todayStr) {
         return { isPast: false, reason: null };
     }
@@ -149,7 +146,6 @@ export const checkAvailability = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Cannot check availability for past dates' });
         }
 
-        // ✅ FIXED: Using CLOSED_DAY_MESSAGE constant
         if (isClosedDay(bookingDate)) {
             return res.status(200).json({
                 success: true,
@@ -242,7 +238,6 @@ export const createBooking = async (req, res) => {
     try {
         const { serviceId, bookingDate, timeSlot, location, phone } = req.body;
 
-        // ✅ Required fields check
         if (!serviceId || !bookingDate || !timeSlot || !location) {
             return res.status(400).json({
                 success: false,
@@ -250,7 +245,6 @@ export const createBooking = async (req, res) => {
             });
         }
 
-        // ✅ Phone required + validation
         if (!phone || !/^\+?[\d\s\-]{7,15}$/.test(phone)) {
             return res.status(400).json({
                 success: false,
@@ -276,7 +270,6 @@ export const createBooking = async (req, res) => {
             });
         }
 
-        // ✅ Validate date format
         if (!/^\d{4}-\d{2}-\d{2}$/.test(bookingDate)) {
             return res.status(400).json({
                 success: false,
@@ -284,7 +277,6 @@ export const createBooking = async (req, res) => {
             });
         }
 
-        // ✅ Parse date
         const [year, month, day] = bookingDate.split('-').map(Number);
         const requestedDate = new Date(year, month - 1, day, 12, 0, 0, 0);
 
@@ -305,7 +297,6 @@ export const createBooking = async (req, res) => {
             });
         }
 
-        // ✅ FIXED: Changed "Sundays" to use CLOSED_DAY_MESSAGE constant
         if (isClosedDay(requestedDate)) {
             return res.status(400).json({
                 success: false,
@@ -313,7 +304,6 @@ export const createBooking = async (req, res) => {
             });
         }
 
-        // ✅ Max advance booking limit
         const maxDate = new Date();
         maxDate.setDate(maxDate.getDate() + LIMITS.MAX_BOOKING_ADVANCE_DAYS);
         const maxDateStr = getLocalDateStr(maxDate);
@@ -325,7 +315,6 @@ export const createBooking = async (req, res) => {
             });
         }
 
-        // ✅ IMPROVED: Prevent past time slot booking (with buffer)
         const slotCheck = isSlotInPast(bookingDate, timeSlot);
         if (slotCheck.isPast) {
             return res.status(400).json({
@@ -334,7 +323,6 @@ export const createBooking = async (req, res) => {
             });
         }
 
-        // ✅ Limit active bookings per user
         const activeBookings = await Booking.countDocuments({
             customerId: req.user._id,
             status: { $in: ['pending', 'confirmed'] }
@@ -347,7 +335,6 @@ export const createBooking = async (req, res) => {
             });
         }
 
-        // ✅ Get service
         const service = await Service.findOne({ _id: serviceId, isActive: true })
             .populate('category', 'name slug')
             .populate('subcategory', 'name slug');
@@ -366,7 +353,6 @@ export const createBooking = async (req, res) => {
             });
         }
 
-        // ✅ Slot locking check
         const slotLockKey = `${bookingDate}|${timeSlot}`;
 
         const existingBooking = await Booking.findOne({
@@ -381,7 +367,6 @@ export const createBooking = async (req, res) => {
             });
         }
 
-        // ✅ Pricing
         const finalPrice = service.discountPrice || service.price || 0;
         const duration = service.duration || 60;
 
@@ -429,26 +414,15 @@ export const createBooking = async (req, res) => {
             throw createError;
         }
 
-        // ✅ Increment booking count
         await Service.findByIdAndUpdate(serviceId, {
             $inc: { totalBookings: 1 }
         });
 
-        // ============================================
-        // 🔥 REAL-TIME SOCKET EMISSIONS
-        // ============================================
-        
-        // 1. Notify admins about new booking
         emitNewBooking(booking, `${req.user.firstName} ${req.user.lastName}`);
-        
-        // 2. Broadcast slot is now booked (for real-time availability)
         emitSlotBooked(bookingDate, timeSlot, serviceId);
 
         console.log(`🔌 Real-time: Emitted new booking + slot booked for ${bookingDate} ${timeSlot}`);
 
-        // ============================================
-        // ✅ NOTIFICATIONS
-        // ============================================
         const emailData = {
             bookingCode: booking.bookingCode,
             serviceName: booking.serviceName,
@@ -462,7 +436,6 @@ export const createBooking = async (req, res) => {
             phone: booking.phone
         };
 
-        // Send emails async (don't block response)
         setImmediate(async () => {
             try {
                 await sendBookingConfirmationEmail(req.user, emailData);
@@ -479,7 +452,6 @@ export const createBooking = async (req, res) => {
             }
         });
 
-        // ✅ Response
         res.status(201).json({
             success: true,
             message: 'Booking created successfully!',
@@ -628,7 +600,7 @@ export const getBookingById = async (req, res) => {
 };
 
 // ============================================
-// CANCEL BOOKING
+// CANCEL BOOKING (DELETES FROM DB)
 // ============================================
 export const cancelBooking = async (req, res) => {
     try {
@@ -669,28 +641,32 @@ export const cancelBooking = async (req, res) => {
             });
         }
 
-        // Save old slot info before updating
+        // Save info BEFORE deleting
         const oldDateStr = getLocalDateStr(booking.bookingDate);
         const oldSlot = booking.timeSlot;
         const oldServiceId = booking.serviceId;
+        const bookingCode = booking.bookingCode;
+        const serviceName = booking.serviceName;
+        const bookingDate = booking.bookingDate;
+        const timeSlot = booking.timeSlot;
 
-        booking.status = 'cancelled';
-        booking.cancellationReason = reason || 'Cancelled by customer';
-        booking.cancelledBy = 'user';
-        booking.cancelledAt = new Date();
-        await booking.save();
+        // ✅ DELETE the booking instead of soft delete
+        await Booking.deleteOne({ _id: bookingId });
 
-        console.log(`🗑️ Slot freed: ${oldDateStr} | ${oldSlot}`);
+        console.log(`🗑️ Booking ${bookingCode} DELETED (cancelled by user)`);
+        console.log(`🔓 Slot freed: ${oldDateStr} | ${oldSlot}`);
 
-        // ============================================
-        // 🔥 REAL-TIME SOCKET EMISSIONS
-        // ============================================
-        
-        // 1. Notify about cancellation (this also emits slot available)
-        emitBookingCancelled(booking, 'user');
-        
-        // 2. Explicitly emit slot is now available
+        // Real-time socket emissions
         emitSlotAvailable(oldDateStr, oldSlot, oldServiceId);
+
+        emitBookingCancelled({
+            _id: bookingId,
+            bookingCode,
+            serviceName,
+            bookingDate,
+            timeSlot,
+            customerId: req.user._id
+        }, 'user');
 
         console.log(`🔌 Real-time: Emitted cancellation + slot available for ${oldDateStr} ${oldSlot}`);
 
@@ -698,11 +674,11 @@ export const cancelBooking = async (req, res) => {
         setImmediate(async () => {
             try {
                 await sendBookingCancellationEmail(req.user, {
-                    bookingCode: booking.bookingCode,
-                    serviceName: booking.serviceName,
-                    bookingDate: booking.bookingDate,
-                    timeSlot: booking.timeSlot,
-                    cancellationReason: booking.cancellationReason
+                    bookingCode,
+                    serviceName,
+                    bookingDate,
+                    timeSlot,
+                    cancellationReason: reason || 'Cancelled by customer'
                 });
                 console.log('✉️ Cancellation email sent');
             } catch (e) {
@@ -712,8 +688,14 @@ export const cancelBooking = async (req, res) => {
 
         res.status(200).json({
             success: true,
-            message: 'Booking cancelled successfully. The slot is now available for others.',
-            data: booking
+            message: 'Booking cancelled and removed successfully. The slot is now available for others.',
+            data: {
+                bookingCode,
+                serviceName,
+                bookingDate,
+                timeSlot,
+                status: 'deleted'
+            }
         });
 
     } catch (error) {
@@ -742,7 +724,6 @@ export const rescheduleBooking = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Invalid time slot' });
         }
 
-        // ✅ Validate date format
         if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
             return res.status(400).json({
                 success: false,
@@ -777,7 +758,6 @@ export const rescheduleBooking = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Cannot reschedule to a past date' });
         }
 
-        // ✅ FIXED: Changed "Sundays" to use CLOSED_DAY_MESSAGE constant
         if (isClosedDay(requestedDate)) {
             return res.status(400).json({ 
                 success: false, 
@@ -796,7 +776,6 @@ export const rescheduleBooking = async (req, res) => {
             });
         }
 
-        // ✅ IMPROVED: Check if slot is in past (with buffer)
         const slotCheck = isSlotInPast(newDate, newTimeSlot);
         if (slotCheck.isPast) {
             return res.status(400).json({ 
@@ -832,17 +811,8 @@ export const rescheduleBooking = async (req, res) => {
 
             console.log(`📅 Booking rescheduled from ${oldDateStr} ${oldTimeSlot} to ${newDate} ${newTimeSlot}`);
 
-            // ============================================
-            // 🔥 REAL-TIME SOCKET EMISSIONS
-            // ============================================
-            
-            // 1. Old slot is now available
             emitSlotAvailable(oldDateStr, oldTimeSlot, serviceId);
-            
-            // 2. New slot is now booked
             emitSlotBooked(newDate, newTimeSlot, serviceId);
-            
-            // 3. Notify about the reschedule (optional - for admin dashboard)
             emitBookingStatusUpdate(booking, req.user._id);
 
             console.log(`🔌 Real-time: Rescheduled ${oldDateStr} ${oldTimeSlot} -> ${newDate} ${newTimeSlot}`);

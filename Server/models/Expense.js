@@ -15,6 +15,11 @@ const expenseSchema = new mongoose.Schema({
         required: [true, 'Amount is required'],
         min: [0, 'Amount cannot be negative']
     },
+    note: {
+        type: String,
+        default: '',
+        maxlength: 200
+    },
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
@@ -22,8 +27,9 @@ const expenseSchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 
-expenseSchema.index({ createdAt: 1 });
+expenseSchema.index({ createdAt: -1 });
 expenseSchema.index({ category: 1 });
+expenseSchema.index({ createdAt: 1, category: 1 });
 
 const Expense = mongoose.model('Expense', expenseSchema);
 

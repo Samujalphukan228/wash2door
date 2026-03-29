@@ -1,13 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Plus } from 'lucide-react';
+import { X, Edit2 } from 'lucide-react';
 
-export default function AddExpenseModal({ category, onClose, onSubmit }) {
+export default function EditExpenseModal({ expense, categories, onClose, onSubmit }) {
     const [formData, setFormData] = useState({
-        categoryId: category._id,
-        amount: '',
-        note: ''
+        categoryId: expense.category,
+        amount: expense.amount,
+        note: expense.note || ''
     });
     const [loading, setLoading] = useState(false);
 
@@ -23,8 +23,6 @@ export default function AddExpenseModal({ category, onClose, onSubmit }) {
         }
     };
 
-    const newTotal = (category.totalAmount || 0) + (parseInt(formData.amount) || 0);
-
     return (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
             <div className="bg-[#111] border border-white/[0.08] rounded-2xl w-full max-w-sm overflow-hidden">
@@ -33,12 +31,9 @@ export default function AddExpenseModal({ category, onClose, onSubmit }) {
                 <div className="flex items-center justify-between p-4 border-b border-white/[0.06]">
                     <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
-                            <Plus className="w-4 h-4 text-orange-400" />
+                            <Edit2 className="w-4 h-4 text-orange-400" />
                         </div>
-                        <div>
-                            <p className="text-sm font-medium text-white">Add Expense</p>
-                            <p className="text-[10px] text-gray-600">{category.categoryName}</p>
-                        </div>
+                        <p className="text-sm font-medium text-white">Edit Expense</p>
                     </div>
                     <button
                         onClick={onClose}
@@ -50,7 +45,26 @@ export default function AddExpenseModal({ category, onClose, onSubmit }) {
 
                 {/* Form */}
                 <form onSubmit={handleSubmit} className="p-4 space-y-4">
-                    {/* Amount Input */}
+                    {/* Category */}
+                    <div>
+                        <label className="text-[10px] text-gray-500 font-medium uppercase tracking-wider mb-1.5 block">
+                            Category
+                        </label>
+                        <select
+                            value={formData.categoryId}
+                            onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
+                            required
+                            className="w-full px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-white focus:outline-none focus:border-orange-500/50 focus:bg-white/[0.06] transition-all"
+                        >
+                            {categories.map(cat => (
+                                <option key={cat._id} value={cat._id}>
+                                    {cat.categoryName}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Amount */}
                     <div>
                         <label className="text-[10px] text-gray-500 font-medium uppercase tracking-wider mb-1.5 block">
                             Amount
@@ -62,9 +76,8 @@ export default function AddExpenseModal({ category, onClose, onSubmit }) {
                                 value={formData.amount}
                                 onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                                 required
-                                placeholder="0"
                                 min="1"
-                                className="w-full pl-7 pr-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-white placeholder-gray-600 focus:outline-none focus:border-orange-500/50 focus:bg-white/[0.06] transition-all"
+                                className="w-full pl-7 pr-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-white focus:outline-none focus:border-orange-500/50 focus:bg-white/[0.06] transition-all"
                             />
                         </div>
                     </div>
@@ -87,24 +100,6 @@ export default function AddExpenseModal({ category, onClose, onSubmit }) {
                         </p>
                     </div>
 
-                    {/* Info Card */}
-                    <div className="bg-white/[0.03] rounded-xl p-3 space-y-2">
-                        <div className="flex items-center justify-between">
-                            <span className="text-[10px] text-gray-500">Current Total</span>
-                            <span className="text-xs text-white font-medium tabular-nums">
-                                ₹{(category.totalAmount || 0).toLocaleString('en-IN')}
-                            </span>
-                        </div>
-                        {formData.amount && parseInt(formData.amount) > 0 && (
-                            <div className="flex items-center justify-between pt-2 border-t border-white/[0.06]">
-                                <span className="text-[10px] text-gray-500">New Total</span>
-                                <span className="text-xs font-medium tabular-nums text-orange-400">
-                                    ₹{newTotal.toLocaleString('en-IN')}
-                                </span>
-                            </div>
-                        )}
-                    </div>
-
                     {/* Buttons */}
                     <div className="flex gap-2 pt-2">
                         <button
@@ -119,7 +114,7 @@ export default function AddExpenseModal({ category, onClose, onSubmit }) {
                             disabled={loading || !formData.amount || parseInt(formData.amount) <= 0}
                             className="flex-1 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-xs font-medium text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                         >
-                            {loading ? 'Adding...' : 'Add Expense'}
+                            {loading ? 'Updating...' : 'Update Expense'}
                         </button>
                     </div>
                 </form>

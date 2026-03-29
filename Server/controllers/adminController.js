@@ -65,7 +65,6 @@ export const getDashboardStats = async (req, res) => {
             pendingBookings,
             confirmedBookings,
             completedBookings,
-            cancelledBookings,
             bookingsThisMonth,
             bookingsLastMonth
         ] = await Promise.all([
@@ -83,12 +82,10 @@ export const getDashboardStats = async (req, res) => {
             Booking.countDocuments({ status: 'pending' }),
             Booking.countDocuments({ status: 'confirmed' }),
             Booking.countDocuments({ status: 'completed' }),
-            Booking.countDocuments({ status: 'cancelled' }),
             Booking.countDocuments({ createdAt: { $gte: thisMonthStart } }),
             Booking.countDocuments({ createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd } })
         ]);
 
-        // ✅ FIXED: Revenue ONLY counts 'completed' bookings
         const [revenueThisMonth, revenueLastMonth, totalRevenue, revenueToday] = await Promise.all([
             Booking.aggregate([
                 {
@@ -181,7 +178,6 @@ export const getDashboardStats = async (req, res) => {
             ? Math.round((netProfitTotal / revenueTotalVal) * 100)
             : 0;
 
-        // ✅ FIXED: Weekly revenue only from 'completed' bookings
         const weeklyRevenue = await Booking.aggregate([
             {
                 $match: {
@@ -229,7 +225,6 @@ export const getDashboardStats = async (req, res) => {
 
         const sixMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 5, 1);
 
-        // ✅ FIXED: Monthly revenue only from 'completed' bookings
         const monthlyRevenue = await Booking.aggregate([
             {
                 $match: {
@@ -351,8 +346,7 @@ export const getDashboardStats = async (req, res) => {
                     byStatus: {
                         pending: pendingBookings,
                         confirmed: confirmedBookings,
-                        completed: completedBookings,
-                        cancelled: cancelledBookings
+                        completed: completedBookings
                     }
                 },
                 revenue: {
@@ -523,10 +517,9 @@ export const getUserById = async (req, res) => {
             });
         }
 
-        const [totalBookings, completedBookings, cancelledBookings, pendingBookings, totalSpent] = await Promise.all([
+        const [totalBookings, completedBookings, pendingBookings, totalSpent] = await Promise.all([
             Booking.countDocuments({ customerId: userId }),
             Booking.countDocuments({ customerId: userId, status: 'completed' }),
-            Booking.countDocuments({ customerId: userId, status: 'cancelled' }),
             Booking.countDocuments({ customerId: userId, status: { $in: ['pending', 'confirmed'] } }),
             Booking.aggregate([
                 {
@@ -552,7 +545,7 @@ export const getUserById = async (req, res) => {
             {
                 $match: {
                     customerId: new mongoose.Types.ObjectId(userId),
-                    status: { $ne: 'cancelled' }
+                    status: 'completed'
                 }
             },
             {
@@ -573,7 +566,6 @@ export const getUserById = async (req, res) => {
                 stats: {
                     totalBookings,
                     completedBookings,
-                    cancelledBookings,
                     pendingBookings,
                     totalSpent: totalSpent[0]?.total || 0,
                     completionRate: totalBookings > 0
@@ -943,7 +935,7 @@ export const getBookingById = async (req, res) => {
 };
 
 // ============================================
-// UPDATE BOOKING STATUS
+// UPDATE BOOKING STATUS (DELETES IF CANCELLED)
 // ============================================
 
 export const updateBookingStatus = async (req, res) => {
@@ -975,7 +967,6 @@ export const updateBookingStatus = async (req, res) => {
             });
         }
 
-        // ✅ FIXED: Removed 'in-progress' from valid transitions
         const validTransitions = {
             'pending': ['confirmed', 'cancelled'],
             'confirmed': ['completed', 'cancelled'],
@@ -995,6 +986,58 @@ export const updateBookingStatus = async (req, res) => {
         const oldTimeSlot = booking.timeSlot;
         const oldServiceId = booking.serviceId;
 
+        // ✅ If cancelling, DELETE the booking
+        if (status === 'cancelled') {
+            const bookingData = {
+                _id: booking._id,
+                bookingCode: booking.bookingCode,
+                serviceName: booking.serviceName,
+                bookingDate: booking.bookingDate,
+                timeSlot: booking.timeSlot,
+                price: booking.price,
+                customerId: booking.customerId,
+                cancelledBy: 'admin',
+                cancellationReason: reason || 'Cancelled by admin'
+            };
+
+            // Delete the booking
+            await Booking.deleteOne({ _id: bookingId });
+
+            console.log(`🗑️ Booking ${bookingData.bookingCode} DELETED (cancelled by admin)`);
+
+            // Real-time socket emissions
+            emitBookingCancelled(bookingData, 'admin');
+            emitSlotAvailable(oldDateStr, oldTimeSlot, oldServiceId);
+            emitDashboardUpdate({ action: 'booking_cancelled' });
+
+            console.log(`🔌 Real-time: Admin cancelled → Slot released ${oldDateStr} ${oldTimeSlot}`);
+
+            // Send email async
+            setImmediate(async () => {
+                try {
+                    if (bookingData.customerId?.email) {
+                        await sendBookingStatusEmail(bookingData.customerId, {
+                            ...bookingData,
+                            status: 'cancelled'
+                        });
+                        console.log('✉️ Cancellation email sent');
+                    }
+                } catch (emailError) {
+                    console.error('Cancellation email failed:', emailError.message);
+                }
+            });
+
+            return res.status(200).json({
+                success: true,
+                message: 'Booking cancelled and deleted successfully',
+                data: {
+                    ...bookingData,
+                    status: 'deleted'
+                }
+            });
+        }
+
+        // ✅ For other status changes (confirmed, completed)
         booking.status = status;
 
         if (status === 'completed') {
@@ -1002,23 +1045,10 @@ export const updateBookingStatus = async (req, res) => {
             booking.paymentStatus = 'completed';
         }
 
-        if (status === 'cancelled') {
-            booking.cancelledAt = new Date();
-            booking.cancelledBy = 'admin';
-            booking.cancellationReason = reason || 'Cancelled by admin';
-        }
-
         await booking.save();
 
         // Real-time socket emissions
         emitBookingStatusUpdate(booking, booking.customerId?._id);
-
-        if (status === 'cancelled' && ['pending', 'confirmed'].includes(oldStatus)) {
-            emitBookingCancelled(booking, 'admin');
-            emitSlotAvailable(oldDateStr, oldTimeSlot, oldServiceId);
-            console.log(`🔌 Real-time: Admin cancelled → OLD slot released ${oldDateStr} ${oldTimeSlot}`);
-        }
-
         emitDashboardUpdate({ action: 'booking_status_changed', status });
 
         console.log(`🔌 Real-time: Status ${booking.bookingCode} → ${status}`);
@@ -1070,7 +1100,6 @@ export const createAdminBooking = async (req, res) => {
             paymentStatus
         } = req.body;
 
-        // Validate booking type
         if (!bookingType || !['walkin', 'online'].includes(bookingType)) {
             return res.status(400).json({
                 success: false,
@@ -1078,7 +1107,6 @@ export const createAdminBooking = async (req, res) => {
             });
         }
 
-        // Validate customer
         if (bookingType === 'walkin') {
             if (!walkInCustomer?.name) {
                 return res.status(400).json({
@@ -1105,7 +1133,6 @@ export const createAdminBooking = async (req, res) => {
             }
         }
 
-        // Validate phone
         if (!phone || !/^\+?[\d\s\-]{7,15}$/.test(phone)) {
             return res.status(400).json({
                 success: false,
@@ -1113,7 +1140,6 @@ export const createAdminBooking = async (req, res) => {
             });
         }
 
-        // Validate service
         if (!serviceId || !isValidObjectId(serviceId)) {
             return res.status(400).json({
                 success: false,
@@ -1139,7 +1165,6 @@ export const createAdminBooking = async (req, res) => {
             });
         }
 
-        // Pricing
         const finalPrice = service.discountPrice ?? service.price ?? 0;
         const duration = service.duration ?? 60;
 
@@ -1150,7 +1175,6 @@ export const createAdminBooking = async (req, res) => {
             });
         }
 
-        // Validate date
         const [year, month, day] = bookingDate.split('-').map(Number);
         const requestedDate = new Date(year, month - 1, day, 12, 0, 0, 0);
 
@@ -1171,7 +1195,6 @@ export const createAdminBooking = async (req, res) => {
             });
         }
 
-        // ✅ FIXED: Using CLOSED_DAY_MESSAGE constant
         if (isClosedDay(requestedDate)) {
             return res.status(400).json({
                 success: false,
@@ -1186,7 +1209,6 @@ export const createAdminBooking = async (req, res) => {
             });
         }
 
-        // Slot check
         const slotLockKey = `${bookingDate}|${timeSlot}`;
 
         const slotTaken = await Booking.findOne({
@@ -1201,7 +1223,6 @@ export const createAdminBooking = async (req, res) => {
             });
         }
 
-        // ✅ FIXED: Default city changed to 'Duliajan'
         const bookingLocation = {
             address: location?.address || 'Walk-in / At Shop',
             city: location?.city || 'Duliajan'
@@ -1252,12 +1273,10 @@ export const createAdminBooking = async (req, res) => {
             throw createError;
         }
 
-        // Increment service count
         await Service.findByIdAndUpdate(serviceId, {
             $inc: { totalBookings: 1 }
         });
 
-        // ✅ NEW: Auto-save walk-in customer to database
         if (bookingType === 'walkin' && walkInCustomer?.name && phone) {
             try {
                 let walkinCustomerDoc = await WalkInCustomer.findOne({
@@ -1266,14 +1285,12 @@ export const createAdminBooking = async (req, res) => {
                 });
 
                 if (walkinCustomerDoc) {
-                    // Update name and increment booking count
                     walkinCustomerDoc.name = walkInCustomer.name.trim();
                     walkinCustomerDoc.totalBookings += 1;
                     walkinCustomerDoc.lastBookingDate = new Date();
                     await walkinCustomerDoc.save();
                     console.log(`👤 Walk-in customer updated: ${walkinCustomerDoc.name} (bookings: ${walkinCustomerDoc.totalBookings})`);
                 } else {
-                    // Create new walk-in customer
                     await WalkInCustomer.create({
                         name: walkInCustomer.name.trim(),
                         phone: phone.trim(),
@@ -1284,12 +1301,10 @@ export const createAdminBooking = async (req, res) => {
                     console.log(`👤 New walk-in customer saved: ${walkInCustomer.name} (${phone})`);
                 }
             } catch (walkinError) {
-                // Don't fail the booking, just log
                 console.error('Walk-in customer save error:', walkinError.message);
             }
         }
 
-        // Real-time socket emissions
         const customerName = bookingType === 'walkin'
             ? walkInCustomer.name
             : 'Online Customer';
@@ -1639,6 +1654,122 @@ export const toggleReviewVisibility = async (req, res) => {
     }
 };
 
+// ============================================
+// CLEANUP OLD COMPLETED BOOKINGS
+// ============================================
+
+export const cleanupOldBookings = async (req, res) => {
+    try {
+        const { 
+            olderThanDays = 90,
+            status = 'completed',
+            dryRun = 'false'
+        } = req.query;
+
+        const days = parseInt(olderThanDays);
+        
+        if (isNaN(days) || days < 30) {
+            return res.status(400).json({
+                success: false,
+                message: 'olderThanDays must be at least 30'
+            });
+        }
+
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - days);
+
+        const query = {
+            status: status,
+            createdAt: { $lt: cutoffDate }
+        };
+
+        const count = await Booking.countDocuments(query);
+
+        if (dryRun === 'true') {
+            return res.status(200).json({
+                success: true,
+                message: `DRY RUN: Would delete ${count} ${status} bookings older than ${days} days`,
+                wouldDelete: count,
+                dryRun: true
+            });
+        }
+
+        const result = await Booking.deleteMany(query);
+
+        console.log(`🧹 Cleanup: Deleted ${result.deletedCount} old ${status} bookings`);
+
+        res.status(200).json({
+            success: true,
+            message: `Deleted ${result.deletedCount} ${status} bookings older than ${days} days`,
+            deletedCount: result.deletedCount
+        });
+
+    } catch (error) {
+        console.error('Cleanup error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error cleaning up bookings',
+            error: error.message
+        });
+    }
+};
+
+// ============================================
+// GET BOOKING CLEANUP STATS
+// ============================================
+
+export const getBookingCleanupStats = async (req, res) => {
+    try {
+        const now = new Date();
+        const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+        const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+
+        const [
+            totalBookings,
+            completedOlderThan30,
+            completedOlderThan60,
+            completedOlderThan90,
+            pendingBookings,
+            confirmedBookings
+        ] = await Promise.all([
+            Booking.countDocuments(),
+            Booking.countDocuments({ status: 'completed', createdAt: { $lt: thirtyDaysAgo } }),
+            Booking.countDocuments({ status: 'completed', createdAt: { $lt: sixtyDaysAgo } }),
+            Booking.countDocuments({ status: 'completed', createdAt: { $lt: ninetyDaysAgo } }),
+            Booking.countDocuments({ status: 'pending' }),
+            Booking.countDocuments({ status: 'confirmed' })
+        ]);
+
+        res.status(200).json({
+            success: true,
+            data: {
+                totalBookings,
+                activeBookings: {
+                    pending: pendingBookings,
+                    confirmed: confirmedBookings
+                },
+                cleanupCandidates: {
+                    completedOlderThan30Days: completedOlderThan30,
+                    completedOlderThan60Days: completedOlderThan60,
+                    completedOlderThan90Days: completedOlderThan90
+                },
+                recommendation: completedOlderThan90 > 100 
+                    ? `Consider cleaning up ${completedOlderThan90} old completed bookings`
+                    : 'No cleanup needed at this time'
+            }
+        });
+
+    } catch (error) {
+        console.error('Cleanup stats error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error fetching cleanup stats',
+            error: error.message
+        });
+    }
+};
+
 export default {
     getDashboardStats,
     getAllUsers,
@@ -1653,5 +1784,7 @@ export default {
     getRevenueReport,
     getBookingReport,
     getAllReviews,
-    toggleReviewVisibility
+    toggleReviewVisibility,
+    cleanupOldBookings,
+    getBookingCleanupStats
 };

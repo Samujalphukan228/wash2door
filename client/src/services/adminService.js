@@ -73,6 +73,25 @@ const adminService = {
     },
 
     // ============================================
+    // Booking Cleanup
+    // ============================================
+    getBookingCleanupStats: async () => {
+        const response = await axiosInstance.get('/admin/bookings/cleanup/stats');
+        return response.data;
+    },
+
+    cleanupOldBookings: async (olderThanDays = 90, status = 'completed', dryRun = false) => {
+        const response = await axiosInstance.delete('/admin/bookings/cleanup', {
+            params: { 
+                olderThanDays, 
+                status, 
+                dryRun: dryRun ? 'true' : 'false' 
+            }
+        });
+        return response.data;
+    },
+
+    // ============================================
     // Walk-in Customers
     // ============================================
     searchWalkInCustomers: async (query) => {

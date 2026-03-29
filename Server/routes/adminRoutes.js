@@ -14,7 +14,9 @@ import {
     getRevenueReport,
     getBookingReport,
     getAllReviews,
-    toggleReviewVisibility
+    toggleReviewVisibility,
+    cleanupOldBookings,
+    getBookingCleanupStats
 } from '../controllers/adminController.js';
 
 import { protect, isAdmin } from '../middleware/auth.js';
@@ -46,6 +48,12 @@ router.post('/bookings', createAdminBooking);
 router.put('/bookings/:bookingId/status', updateBookingStatus);
 
 // ============================================
+// BOOKING CLEANUP (NEW)
+// ============================================
+router.get('/bookings/cleanup/stats', getBookingCleanupStats);
+router.delete('/bookings/cleanup', cleanupOldBookings);
+
+// ============================================
 // REVIEWS
 // ============================================
 router.get('/reviews', getAllReviews);
@@ -57,11 +65,6 @@ router.put('/reviews/:reviewId/toggle', toggleReviewVisibility);
 router.get('/reports/revenue', getRevenueReport);
 router.get('/reports/bookings', getBookingReport);
 
-// ============================================
-// NOTE: Service CRUD is handled by /api/services routes
-// See routes/serviceRoutes.js
-// Category CRUD is handled by /api/categories routes
-// See routes/categoryRoutes.js
-// ============================================
+
 
 export default router;

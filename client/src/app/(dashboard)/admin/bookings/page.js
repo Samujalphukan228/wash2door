@@ -44,7 +44,6 @@ export default function BookingsPage() {
     const [total, setTotal] = useState(0);
     const [pages, setPages] = useState(1);
 
-    // ✅ FIXED: Removed inProgress from stats
     const [stats, setStats] = useState({
         total: 0,
         pending: 0,
@@ -109,7 +108,6 @@ export default function BookingsPage() {
         }
     }, [filters]);
 
-    // ✅ FIXED: Removed inProgress from stats
     const fetchStats = useCallback(async () => {
         try {
             const response = await adminService.getDashboardStats();
@@ -186,18 +184,22 @@ export default function BookingsPage() {
                 );
                 fetchStats();
             } else if (event.type === 'cancelled') {
-                setBookings((prev) =>
-                    prev.map((b) =>
-                        b._id === event.data.bookingId 
-                            ? { ...b, status: 'cancelled' } 
-                            : b
-                    )
+                // ✅ FIXED: Remove from list since booking is deleted from DB
+                setBookings((prev) => 
+                    prev.filter((b) => b._id !== event.data.bookingId)
                 );
+                setTotal((prev) => Math.max(0, prev - 1));
                 setStats((prev) => ({
                     ...prev,
-                    cancelled: prev.cancelled + 1,
+                    total: Math.max(0, prev.total - 1),
                     pending: Math.max(0, prev.pending - 1),
                 }));
+                
+                // Show toast notification
+                toast.success(`Booking ${event.data.bookingCode || ''} cancelled & removed`, {
+                    duration: 3000,
+                    icon: '🗑️'
+                });
             }
         });
 
@@ -313,7 +315,7 @@ export default function BookingsPage() {
                         </div>
                     </header>
 
-                    {/* ✅ FIXED: Quick Stats - Removed "In Progress" */}
+                    {/* Quick Stats */}
                     <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
                         <StatCard
                             icon={CalendarDays}
@@ -457,7 +459,6 @@ function FilterBar({ filters, onFilterChange, showFilters, setShowFilters, activ
         });
     };
 
-    // ✅ FIXED: Removed 'in-progress' from status options
     const statusOptions = [
         { value: '', label: 'All Status' },
         { value: 'pending', label: 'Pending' },
@@ -770,7 +771,6 @@ function BookingsList({ bookings, loading, total, pages, currentPage, onPageChan
 }
 
 function BookingRow({ booking, isFirst, onView, onUpdateStatus }) {
-    // ✅ FIXED: Removed 'in-progress' from status map
     const statusMap = {
         pending: { bg: 'bg-yellow-500/10', text: 'text-yellow-500', dot: 'bg-yellow-500', label: 'Pending' },
         confirmed: { bg: 'bg-blue-500/10', text: 'text-blue-500', dot: 'bg-blue-500', label: 'Confirmed' },

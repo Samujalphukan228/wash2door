@@ -18,10 +18,11 @@ const TIME_SLOTS = [
     '04:00 PM-05:30 PM',
 ];
 
+// ✅ REORDERED: Customer → Service → Schedule
 const STEPS = [
-    { label: 'Schedule', desc: 'When?', icon: Calendar },
+    { label: 'Customer', desc: 'Who?', icon: User },
     { label: 'Service', desc: 'What?', icon: Package },
-    { label: 'Customer', desc: 'Who & Where?', icon: User }
+    { label: 'Schedule', desc: 'When?', icon: Calendar }
 ];
 
 // Animation variants
@@ -325,19 +326,7 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
     const [loading, setLoading] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
 
-    // Step 1 - Schedule
-    const [bookingDate, setBookingDate] = useState('');
-    const [timeSlot, setTimeSlot] = useState('');
-    const [availability, setAvailability] = useState([]);
-    const [availabilityLoading, setAvailabilityLoading] = useState(false);
-    const [paymentMethod, setPaymentMethod] = useState('cash');
-
-    // Step 2 - Service
-    const [services, setServices] = useState([]);
-    const [selectedService, setSelectedService] = useState(null);
-    const [servicesLoading, setServicesLoading] = useState(false);
-
-    // Step 3 - Customer & Location
+    // Step 1 - Customer & Location (NOW FIRST)
     const [bookingType, setBookingType] = useState('walkin');
     const [walkInCustomer, setWalkInCustomer] = useState({ name: '', phone: '' });
     const [customerSearch, setCustomerSearch] = useState('');
@@ -354,6 +343,18 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
     const [selectedWalkinCustomer, setSelectedWalkinCustomer] = useState(null);
     const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
     const [deletingCustomerId, setDeletingCustomerId] = useState(null);
+
+    // Step 2 - Service (NOW SECOND)
+    const [services, setServices] = useState([]);
+    const [selectedService, setSelectedService] = useState(null);
+    const [servicesLoading, setServicesLoading] = useState(false);
+
+    // Step 3 - Schedule (NOW THIRD)
+    const [bookingDate, setBookingDate] = useState('');
+    const [timeSlot, setTimeSlot] = useState('');
+    const [availability, setAvailability] = useState([]);
+    const [availabilityLoading, setAvailabilityLoading] = useState(false);
+    const [paymentMethod, setPaymentMethod] = useState('cash');
 
     // Refresh time every minute
     useEffect(() => {
@@ -462,14 +463,18 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
         return found ? found.available : true;
     }, [availability]);
 
+    // ✅ UPDATED: canProceed for new step order
     const canProceed = useMemo(() => ({
-        1: bookingDate && timeSlot,
-        2: selectedService !== null,
-        3: (bookingType === 'walkin' 
+        // Step 1: Customer
+        1: (bookingType === 'walkin' 
             ? (selectedWalkinCustomer !== null || (showNewCustomerForm && walkInCustomer.name.trim() && walkInCustomer.phone.trim()))
             : selectedCustomer !== null) &&
-            location.address.trim() && location.city.trim()
-    }), [bookingDate, timeSlot, selectedService, bookingType, walkInCustomer, selectedCustomer, selectedWalkinCustomer, showNewCustomerForm, location]);
+            location.address.trim() && location.city.trim(),
+        // Step 2: Service
+        2: selectedService !== null,
+        // Step 3: Schedule
+        3: bookingDate && timeSlot
+    }), [bookingType, walkInCustomer, selectedCustomer, selectedWalkinCustomer, showNewCustomerForm, location, selectedService, bookingDate, timeSlot]);
 
     const goToStep = useCallback((newStep) => {
         setDirection(newStep > step ? 1 : -1);
@@ -647,135 +652,10 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                                 exit="exit"
                                 className="px-4 py-5 space-y-6 pb-28 sm:pb-6"
                             >
-                                {/* STEP 1 - Schedule */}
+                                {/* ========================================== */}
+                                {/* STEP 1 - Customer & Location (NOW FIRST) */}
+                                {/* ========================================== */}
                                 {step === 1 && (
-                                    <>
-                                        <div className="space-y-2">
-                                            <label className="flex items-center gap-2 text-[10px] text-white/30 uppercase tracking-widest font-medium">
-                                                <Calendar className="w-3 h-3" />
-                                                Booking Date
-                                            </label>
-                                            <input
-                                                type="date"
-                                                value={bookingDate}
-                                                min={todayString}
-                                                onChange={(e) => { setBookingDate(e.target.value); setTimeSlot(''); }}
-                                                className="w-full bg-white/[0.03] border border-white/[0.08] text-white/80 text-sm px-4 py-3 rounded-xl focus:outline-none focus:border-white/20 transition-all [color-scheme:dark]"
-                                            />
-                                        </div>
-
-                                        <AnimatePresence>
-                                            {bookingDate && (
-                                                <motion.div
-                                                    initial={{ opacity: 0, height: 0 }}
-                                                    animate={{ opacity: 1, height: 'auto' }}
-                                                    exit={{ opacity: 0, height: 0 }}
-                                                    className="space-y-3"
-                                                >
-                                                    <div className="flex items-center justify-between">
-                                                        <label className="flex items-center gap-2 text-[10px] text-white/30 uppercase tracking-widest font-medium">
-                                                            <Clock className="w-3 h-3" />
-                                                            Time Slot
-                                                        </label>
-                                                        <div className="flex items-center gap-3">
-                                                            {isToday && (
-                                                                <span className="text-[10px] text-white/25 font-mono">
-                                                                    {currentTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
-                                                                </span>
-                                                            )}
-                                                            {availabilityLoading && (
-                                                                <Loader2 className="w-3 h-3 text-white/25 animate-spin" />
-                                                            )}
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="grid grid-cols-2 gap-2">
-                                                        {TIME_SLOTS.map((slot) => {
-                                                            const available = isSlotAvailable(slot);
-                                                            const passed = isSlotPassed(slot, bookingDate);
-                                                            return (
-                                                                <TimeSlotButton
-                                                                    key={slot}
-                                                                    slot={slot}
-                                                                    selected={timeSlot === slot}
-                                                                    disabled={!available || passed}
-                                                                    passed={passed}
-                                                                    booked={!available && !passed}
-                                                                    onClick={() => setTimeSlot(slot)}
-                                                                />
-                                                            );
-                                                        })}
-                                                    </div>
-                                                </motion.div>
-                                            )}
-                                        </AnimatePresence>
-
-                                        <div className="h-px bg-white/[0.05]" />
-
-                                        <div className="space-y-3">
-                                            <label className="flex items-center gap-2 text-[10px] text-white/30 uppercase tracking-widest font-medium">
-                                                <CreditCard className="w-3 h-3" />
-                                                Payment Method
-                                            </label>
-                                            <div className="grid grid-cols-3 gap-2">
-                                                {['cash', 'card', 'online'].map((m) => (
-                                                    <motion.button
-                                                        key={m}
-                                                        onClick={() => setPaymentMethod(m)}
-                                                        className={`
-                                                            p-3 rounded-xl border text-xs font-medium capitalize transition-all
-                                                            ${paymentMethod === m
-                                                                ? 'border-white/25 bg-white/[0.08] text-white/90'
-                                                                : 'border-white/[0.07] bg-white/[0.02] text-white/40 hover:border-white/[0.12]'
-                                                            }
-                                                        `}
-                                                        whileTap={{ scale: 0.98 }}
-                                                    >
-                                                        {m}
-                                                    </motion.button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </>
-                                )}
-
-                                {/* STEP 2 - Service */}
-                                {step === 2 && (
-                                    <div className="space-y-3">
-                                        <label className="flex items-center gap-2 text-[10px] text-white/30 uppercase tracking-widest font-medium">
-                                            <Package className="w-3 h-3" />
-                                            Select Service
-                                        </label>
-
-                                        {servicesLoading ? (
-                                            <div className="space-y-2">
-                                                {[...Array(4)].map((_, i) => (
-                                                    <div key={i} className="h-[72px] rounded-xl bg-white/[0.03] animate-pulse" />
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
-                                                {services.map((s, i) => (
-                                                    <motion.div
-                                                        key={s._id}
-                                                        initial={{ opacity: 0, y: 10 }}
-                                                        animate={{ opacity: 1, y: 0 }}
-                                                        transition={{ delay: i * 0.03 }}
-                                                    >
-                                                        <ServiceCard
-                                                            service={s}
-                                                            selected={selectedService?._id === s._id}
-                                                            onClick={() => setSelectedService(s)}
-                                                        />
-                                                    </motion.div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-
-                                {/* STEP 3 - Customer & Location */}
-                                {step === 3 && (
                                     <>
                                         {/* Booking Type */}
                                         <div className="space-y-3">
@@ -1068,6 +948,137 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                                                 required
                                             />
                                         </div>
+                                    </>
+                                )}
+
+                                {/* ========================================== */}
+                                {/* STEP 2 - Service (NOW SECOND) */}
+                                {/* ========================================== */}
+                                {step === 2 && (
+                                    <div className="space-y-3">
+                                        <label className="flex items-center gap-2 text-[10px] text-white/30 uppercase tracking-widest font-medium">
+                                            <Package className="w-3 h-3" />
+                                            Select Service
+                                        </label>
+
+                                        {servicesLoading ? (
+                                            <div className="space-y-2">
+                                                {[...Array(4)].map((_, i) => (
+                                                    <div key={i} className="h-[72px] rounded-xl bg-white/[0.03] animate-pulse" />
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+                                                {services.map((s, i) => (
+                                                    <motion.div
+                                                        key={s._id}
+                                                        initial={{ opacity: 0, y: 10 }}
+                                                        animate={{ opacity: 1, y: 0 }}
+                                                        transition={{ delay: i * 0.03 }}
+                                                    >
+                                                        <ServiceCard
+                                                            service={s}
+                                                            selected={selectedService?._id === s._id}
+                                                            onClick={() => setSelectedService(s)}
+                                                        />
+                                                    </motion.div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* ========================================== */}
+                                {/* STEP 3 - Schedule (NOW THIRD) */}
+                                {/* ========================================== */}
+                                {step === 3 && (
+                                    <>
+                                        <div className="space-y-2">
+                                            <label className="flex items-center gap-2 text-[10px] text-white/30 uppercase tracking-widest font-medium">
+                                                <Calendar className="w-3 h-3" />
+                                                Booking Date
+                                            </label>
+                                            <input
+                                                type="date"
+                                                value={bookingDate}
+                                                min={todayString}
+                                                onChange={(e) => { setBookingDate(e.target.value); setTimeSlot(''); }}
+                                                className="w-full bg-white/[0.03] border border-white/[0.08] text-white/80 text-sm px-4 py-3 rounded-xl focus:outline-none focus:border-white/20 transition-all [color-scheme:dark]"
+                                            />
+                                        </div>
+
+                                        <AnimatePresence>
+                                            {bookingDate && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, height: 0 }}
+                                                    animate={{ opacity: 1, height: 'auto' }}
+                                                    exit={{ opacity: 0, height: 0 }}
+                                                    className="space-y-3"
+                                                >
+                                                    <div className="flex items-center justify-between">
+                                                        <label className="flex items-center gap-2 text-[10px] text-white/30 uppercase tracking-widest font-medium">
+                                                            <Clock className="w-3 h-3" />
+                                                            Time Slot
+                                                        </label>
+                                                        <div className="flex items-center gap-3">
+                                                            {isToday && (
+                                                                <span className="text-[10px] text-white/25 font-mono">
+                                                                    {currentTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                                                                </span>
+                                                            )}
+                                                            {availabilityLoading && (
+                                                                <Loader2 className="w-3 h-3 text-white/25 animate-spin" />
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        {TIME_SLOTS.map((slot) => {
+                                                            const available = isSlotAvailable(slot);
+                                                            const passed = isSlotPassed(slot, bookingDate);
+                                                            return (
+                                                                <TimeSlotButton
+                                                                    key={slot}
+                                                                    slot={slot}
+                                                                    selected={timeSlot === slot}
+                                                                    disabled={!available || passed}
+                                                                    passed={passed}
+                                                                    booked={!available && !passed}
+                                                                    onClick={() => setTimeSlot(slot)}
+                                                                />
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+
+                                        <div className="h-px bg-white/[0.05]" />
+
+                                        <div className="space-y-3">
+                                            <label className="flex items-center gap-2 text-[10px] text-white/30 uppercase tracking-widest font-medium">
+                                                <CreditCard className="w-3 h-3" />
+                                                Payment Method
+                                            </label>
+                                            <div className="grid grid-cols-3 gap-2">
+                                                {['cash', 'card', 'online'].map((m) => (
+                                                    <motion.button
+                                                        key={m}
+                                                        onClick={() => setPaymentMethod(m)}
+                                                        className={`
+                                                            p-3 rounded-xl border text-xs font-medium capitalize transition-all
+                                                            ${paymentMethod === m
+                                                                ? 'border-white/25 bg-white/[0.08] text-white/90'
+                                                                : 'border-white/[0.07] bg-white/[0.02] text-white/40 hover:border-white/[0.12]'
+                                                            }
+                                                        `}
+                                                        whileTap={{ scale: 0.98 }}
+                                                    >
+                                                        {m}
+                                                    </motion.button>
+                                                ))}
+                                            </div>
+                                        </div>
 
                                         <div className="h-px bg-white/[0.05]" />
 
@@ -1077,9 +1088,6 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                                                 Summary
                                             </label>
                                             <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-4 space-y-2.5">
-                                                <SummaryRow label="Date" value={bookingDate} mono />
-                                                <SummaryRow label="Time" value={timeSlot} mono />
-                                                <SummaryRow label="Service" value={selectedService?.name} />
                                                 <SummaryRow
                                                     label="Customer"
                                                     value={bookingType === 'walkin'
@@ -1094,6 +1102,9 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                                                         : location.address
                                                     }
                                                 />
+                                                <SummaryRow label="Service" value={selectedService?.name} />
+                                                <SummaryRow label="Date" value={bookingDate} mono />
+                                                <SummaryRow label="Time" value={timeSlot} mono />
                                                 <div className="h-px bg-white/[0.05]" />
                                                 <SummaryRow
                                                     label="Total"
