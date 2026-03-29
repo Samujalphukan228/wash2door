@@ -131,10 +131,7 @@ const Handle = () => (
 
 const Header = ({ onHome, onClose }) => (
   <div className="flex items-center justify-between px-5 py-3">
-    <button onClick={onHome} className="group flex items-center gap-2">
-      <div className="w-8 h-8 rounded-lg bg-black flex items-center justify-center">
-        <Sparkles size={14} className="text-white" />
-      </div>
+    <button onClick={onHome} className="group">
       <span
         className="tracking-[0.2em] uppercase text-black group-hover:opacity-60 transition-opacity"
         style={{ fontFamily: FONT.serif, fontSize: "12px", fontWeight: 400 }}
@@ -151,7 +148,6 @@ const Header = ({ onHome, onClose }) => (
     </motion.button>
   </div>
 )
-
 const UserSection = ({ user, onProfile, onLogout }) => {
   const initial = user?.firstName?.charAt(0)?.toUpperCase() || "U"
   const name = `${user?.firstName || ""} ${user?.lastName || ""}`.trim()
