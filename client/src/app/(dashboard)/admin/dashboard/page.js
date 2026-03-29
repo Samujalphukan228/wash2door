@@ -156,7 +156,7 @@ export default function DashboardPage() {
                                 onClick={() => setShowExpenses(true)}
                                 className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.06] text-gray-400 hover:bg-white/[0.1] hover:text-white border border-white/[0.08] text-xs font-medium transition-colors"
                             >
-                                <Wallet className="w-3.5 h-3.5 text-orange-400" />
+                                <Wallet className="w-3.5 h-3.5 text-white" />
                                 Expenses
                             </button>
                             <button
@@ -244,7 +244,7 @@ export default function DashboardPage() {
                     className="w-12 h-12 rounded-2xl bg-white/10 text-gray-400 border border-white/20 shadow-2xl shadow-black/50 flex items-center justify-center active:scale-95 transition-all"
                     aria-label="Open expenses"
                 >
-                    <Wallet className="w-5 h-5 text-orange-400" />
+                    <Wallet className="w-5 h-5 text-white" />
                 </button>
                 <button
                     onClick={() => setShowCreateModal(true)}
