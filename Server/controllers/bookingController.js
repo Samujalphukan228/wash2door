@@ -7,6 +7,7 @@ import {
     TIME_SLOTS,
     BOOKING_STATUSES,
     LIMITS,
+    CLOSED_DAY_MESSAGE, // ✅ ADDED: Import the constant
     isValidTimeSlot,
     isClosedDay,
     convertTo24Hour
@@ -30,10 +31,42 @@ const isValidObjectId = (id) =>
 
 // ✅ HELPER: Get local date string from Date object
 const getLocalDateStr = (date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
+    const d = new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+};
+
+// ✅ ADDED: Helper to check if slot is in past (with buffer)
+const isSlotInPast = (dateStr, timeSlot, bufferMinutes = LIMITS.MIN_BOOKING_BUFFER_MINUTES || 30) => {
+    const now = new Date();
+    const todayStr = getLocalDateStr(now);
+    
+    // If not today, it's not in past
+    if (dateStr !== todayStr) {
+        return { isPast: false, reason: null };
+    }
+    
+    const { start } = convertTo24Hour(timeSlot);
+    const [hours, minutes] = start.split(':').map(Number);
+    const [year, month, day] = dateStr.split('-').map(Number);
+    
+    const slotDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
+    const minBookingTime = new Date(slotDateTime.getTime() - bufferMinutes * 60 * 1000);
+    
+    if (now >= slotDateTime) {
+        return { isPast: true, reason: 'This time slot has already passed' };
+    }
+    
+    if (now >= minBookingTime) {
+        return { 
+            isPast: true, 
+            reason: `Please book at least ${bufferMinutes} minutes before the slot starts` 
+        };
+    }
+    
+    return { isPast: false, reason: null };
 };
 
 // ============================================
@@ -106,7 +139,7 @@ export const checkAvailability = async (req, res) => {
         const bookingDate = new Date(year, month - 1, day, 12, 0, 0, 0);
 
         console.log('📅 Parsed booking date:', bookingDate.toLocaleDateString());
-        console.log('📅 Day of week:', bookingDate.getDay(), '(0=Sun)');
+        console.log('📅 Day of week:', bookingDate.getDay(), '(0=Sun, 1=Mon)');
 
         if (isNaN(bookingDate.getTime())) {
             return res.status(400).json({ success: false, message: 'Invalid date' });
@@ -116,6 +149,7 @@ export const checkAvailability = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Cannot check availability for past dates' });
         }
 
+        // ✅ FIXED: Using CLOSED_DAY_MESSAGE constant
         if (isClosedDay(bookingDate)) {
             return res.status(200).json({
                 success: true,
@@ -123,7 +157,7 @@ export const checkAvailability = async (req, res) => {
                     date,
                     isAvailable: false,
                     isClosed: true,
-                    message: 'We are closed on Mondays',
+                    message: CLOSED_DAY_MESSAGE,
                     availableSlots: 0,
                     totalSlots: TIME_SLOTS.length,
                     slots: TIME_SLOTS.map(slot => ({ slot, available: false, reason: 'Closed' }))
@@ -144,6 +178,7 @@ export const checkAvailability = async (req, res) => {
         });
 
         const isToday = date === todayStr;
+        const bufferMinutes = LIMITS.MIN_BOOKING_BUFFER_MINUTES || 30;
 
         const slots = TIME_SLOTS.map(slot => {
             const { start } = convertTo24Hour(slot);
@@ -151,17 +186,29 @@ export const checkAvailability = async (req, res) => {
 
             const isBooked = lockedSlotMap[slot] !== undefined;
             let isPast = false;
+            let isTooClose = false;
 
             if (isToday) {
                 const slotDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
+                const minBookingTime = new Date(slotDateTime.getTime() - bufferMinutes * 60 * 1000);
+                
                 isPast = now.getTime() >= slotDateTime.getTime();
+                isTooClose = !isPast && now.getTime() >= minBookingTime.getTime();
             }
 
             let available = true;
             let reason = null;
 
-            if (isPast) { available = false; reason = 'Past'; }
-            else if (isBooked) { available = false; reason = 'Booked'; }
+            if (isPast) { 
+                available = false; 
+                reason = 'Past'; 
+            } else if (isTooClose) { 
+                available = false; 
+                reason = 'Too close to start time'; 
+            } else if (isBooked) { 
+                available = false; 
+                reason = 'Booked'; 
+            }
 
             return { slot, available, reason };
         });
@@ -229,6 +276,14 @@ export const createBooking = async (req, res) => {
             });
         }
 
+        // ✅ Validate date format
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(bookingDate)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid date format. Use YYYY-MM-DD'
+            });
+        }
+
         // ✅ Parse date
         const [year, month, day] = bookingDate.split('-').map(Number);
         const requestedDate = new Date(year, month - 1, day, 12, 0, 0, 0);
@@ -250,10 +305,11 @@ export const createBooking = async (req, res) => {
             });
         }
 
+        // ✅ FIXED: Changed "Sundays" to use CLOSED_DAY_MESSAGE constant
         if (isClosedDay(requestedDate)) {
             return res.status(400).json({
                 success: false,
-                message: 'We are closed on Sundays'
+                message: CLOSED_DAY_MESSAGE
             });
         }
 
@@ -269,21 +325,13 @@ export const createBooking = async (req, res) => {
             });
         }
 
-        // ✅ Prevent past time slot booking (today)
-        const isToday = bookingDate === todayStr;
-        if (isToday) {
-            const { start } = convertTo24Hour(timeSlot);
-            const [hours, minutes] = start.split(':').map(Number);
-
-            if (
-                now.getHours() > hours ||
-                (now.getHours() === hours && now.getMinutes() >= minutes)
-            ) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'This time slot has already passed for today'
-                });
-            }
+        // ✅ IMPROVED: Prevent past time slot booking (with buffer)
+        const slotCheck = isSlotInPast(bookingDate, timeSlot);
+        if (slotCheck.isPast) {
+            return res.status(400).json({
+                success: false,
+                message: slotCheck.reason
+            });
         }
 
         // ✅ Limit active bookings per user
@@ -622,7 +670,7 @@ export const cancelBooking = async (req, res) => {
         }
 
         // Save old slot info before updating
-        const oldDateStr = getLocalDateStr(new Date(booking.bookingDate));
+        const oldDateStr = getLocalDateStr(booking.bookingDate);
         const oldSlot = booking.timeSlot;
         const oldServiceId = booking.serviceId;
 
@@ -694,6 +742,14 @@ export const rescheduleBooking = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Invalid time slot' });
         }
 
+        // ✅ Validate date format
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid date format. Use YYYY-MM-DD'
+            });
+        }
+
         const booking = await Booking.findOne({ _id: bookingId, customerId: req.user._id });
 
         if (!booking) {
@@ -721,8 +777,12 @@ export const rescheduleBooking = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Cannot reschedule to a past date' });
         }
 
+        // ✅ FIXED: Changed "Sundays" to use CLOSED_DAY_MESSAGE constant
         if (isClosedDay(requestedDate)) {
-            return res.status(400).json({ success: false, message: 'We are closed on Sundays' });
+            return res.status(400).json({ 
+                success: false, 
+                message: CLOSED_DAY_MESSAGE 
+            });
         }
 
         const maxDate = new Date();
@@ -736,13 +796,13 @@ export const rescheduleBooking = async (req, res) => {
             });
         }
 
-        const isToday = newDate === todayStr;
-        if (isToday) {
-            const { start } = convertTo24Hour(newTimeSlot);
-            const [hours, minutes] = start.split(':').map(Number);
-            if (now.getHours() > hours || (now.getHours() === hours && now.getMinutes() >= minutes)) {
-                return res.status(400).json({ success: false, message: 'This time slot has already passed for today' });
-            }
+        // ✅ IMPROVED: Check if slot is in past (with buffer)
+        const slotCheck = isSlotInPast(newDate, newTimeSlot);
+        if (slotCheck.isPast) {
+            return res.status(400).json({ 
+                success: false, 
+                message: slotCheck.reason 
+            });
         }
 
         const newSlotLockKey = `${newDate}|${newTimeSlot}`;
@@ -761,7 +821,7 @@ export const rescheduleBooking = async (req, res) => {
         }
 
         // Save old slot info BEFORE updating
-        const oldDateStr = getLocalDateStr(new Date(booking.bookingDate));
+        const oldDateStr = getLocalDateStr(booking.bookingDate);
         const oldTimeSlot = booking.timeSlot;
         const serviceId = booking.serviceId;
 

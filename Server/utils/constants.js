@@ -1,3 +1,5 @@
+// utils/constants.js
+
 // ============================================
 // TIME SLOTS - 12 HOUR FORMAT
 // ============================================
@@ -99,6 +101,7 @@ export const LIMITS = {
     MAX_ACTIVE_BOOKINGS_PER_USER: 3,
     MAX_BOOKING_ADVANCE_DAYS: 90,
     MIN_CANCEL_HOURS_BEFORE: 2,
+    MIN_BOOKING_BUFFER_MINUTES: 30, // ✅ ADDED: Buffer time for same-day bookings
     MAX_SERVICE_IMAGES: 3,
     MAX_IMAGE_SIZE_MB: 5,
     MAX_AVATAR_SIZE_MB: 2,
@@ -113,11 +116,22 @@ export const LIMITS = {
 // ============================================
 // CLOSED DAYS
 // ============================================
-export const CLOSED_DAYS = [1]; // 0 = Sunday
+// ✅ FIXED: Updated comment to be accurate
+// Day numbers: 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday
+export const CLOSED_DAYS = [1]; // 1 = Monday (We are closed on Mondays)
+
+// ✅ ADDED: Closed day message constant for consistency
+export const CLOSED_DAY_MESSAGE = 'We are closed on Mondays';
 
 export const isClosedDay = (date) => {
     const day = new Date(date).getDay();
     return CLOSED_DAYS.includes(day);
+};
+
+// ✅ ADDED: Get closed day name(s) dynamically
+export const getClosedDayNames = () => {
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    return CLOSED_DAYS.map(day => dayNames[day]);
 };
 
 export default {
@@ -131,11 +145,13 @@ export default {
     REGISTRATION_STATUSES,
     LIMITS,
     CLOSED_DAYS,
+    CLOSED_DAY_MESSAGE,
     isValidTimeSlot,
     isValidBookingStatus,
     isValidServiceTier,
     isValidRole,
     isClosedDay,
+    getClosedDayNames,
     convertTo24Hour,
     convertTimeTo24
 };
