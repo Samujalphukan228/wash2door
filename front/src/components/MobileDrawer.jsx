@@ -42,7 +42,6 @@ const EASE_IN_OUT = [0.65, 0, 0.35, 1]
 const EASE_OUT_BACK = [0.34, 1.56, 0.64, 1]
 
 // Spring configurations
-const SPRING_SMOOTH = { type: "spring", damping: 30, stiffness: 300 }
 const SPRING_BOUNCY = { type: "spring", damping: 25, stiffness: 400 }
 
 const variants = {
@@ -105,24 +104,6 @@ const variants = {
       }
     },
   },
-  content: {
-    hidden: { opacity: 0 },
-    visible: { 
-      opacity: 1,
-      transition: {
-        duration: 0.3,
-        delay: 0.15,
-        ease: EASE_OUT_QUINT
-      }
-    },
-    exit: {
-      opacity: 0,
-      transition: {
-        duration: 0.15,
-        ease: EASE_IN_OUT
-      }
-    }
-  },
   handle: {
     hidden: { opacity: 0, scaleX: 0.5 },
     visible: { 
@@ -159,6 +140,26 @@ const variants = {
       y: -5,
       transition: {
         duration: 0.12,
+        ease: EASE_IN_OUT
+      }
+    }
+  },
+  divider: {
+    hidden: { scaleX: 0, opacity: 0 },
+    visible: { 
+      scaleX: 1, 
+      opacity: 1,
+      transition: {
+        delay: 0.2,
+        duration: 0.5,
+        ease: EASE_OUT_QUINT
+      }
+    },
+    exit: {
+      scaleX: 0,
+      opacity: 0,
+      transition: {
+        duration: 0.15,
         ease: EASE_IN_OUT
       }
     }
@@ -225,6 +226,26 @@ const variants = {
       scale: 0.98,
       transition: {
         duration: 0.15,
+        ease: EASE_IN_OUT
+      }
+    }
+  },
+  footer: {
+    hidden: { opacity: 0, y: 20 },
+    visible: { 
+      opacity: 1, 
+      y: 0,
+      transition: {
+        delay: 0.3,
+        duration: 0.4,
+        ease: EASE_OUT_QUINT
+      }
+    },
+    exit: {
+      opacity: 0,
+      y: 10,
+      transition: {
+        duration: 0.12,
         ease: EASE_IN_OUT
       }
     }
@@ -359,6 +380,9 @@ function useFocusTrap(active, ref) {
 const Handle = () => (
   <motion.div 
     variants={variants.handle}
+    initial="hidden"
+    animate="visible"
+    exit="exit"
     className="flex justify-center pt-3 pb-1"
   >
     <motion.div 
@@ -372,6 +396,9 @@ const Handle = () => (
 const Header = ({ onHome, onClose }) => (
   <motion.div 
     variants={variants.header}
+    initial="hidden"
+    animate="visible"
+    exit="exit"
     className="flex items-center justify-between px-5 py-3"
   >
     <motion.button 
@@ -389,6 +416,9 @@ const Header = ({ onHome, onClose }) => (
     </motion.button>
     <motion.button
       variants={variants.closeButton}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
       whileHover={{ scale: 1.1, backgroundColor: "#000" }}
       whileTap={{ scale: 0.9 }}
       onClick={onClose}
@@ -399,6 +429,16 @@ const Header = ({ onHome, onClose }) => (
   </motion.div>
 )
 
+const Divider = () => (
+  <motion.div 
+    variants={variants.divider}
+    initial="hidden"
+    animate="visible"
+    exit="exit"
+    className="h-px bg-black/5 mx-5 origin-left"
+  />
+)
+
 const UserSection = ({ user, onProfile, onLogout }) => {
   const initial = user?.firstName?.charAt(0)?.toUpperCase() || "U"
   const name = `${user?.firstName || ""} ${user?.lastName || ""}`.trim()
@@ -406,6 +446,9 @@ const UserSection = ({ user, onProfile, onLogout }) => {
   return (
     <motion.div
       variants={variants.userCard}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
       className="mx-4 mb-3"
     >
       <motion.div 
@@ -420,7 +463,7 @@ const UserSection = ({ user, onProfile, onLogout }) => {
           <div className="flex items-center gap-3 mb-4">
             <motion.div 
               className="w-11 h-11 rounded-full bg-white/15 flex items-center justify-center ring-2 ring-white/10"
-              whileHover={{ scale: 1.05, ring: "3px" }}
+              whileHover={{ scale: 1.05 }}
               transition={SPRING_BOUNCY}
             >
               <span style={{ fontFamily: FONT.serif, fontSize: "15px" }}>{initial}</span>
@@ -514,6 +557,9 @@ const NavItem = ({ link, index, locked, onClick }) => (
 const QuickActions = () => (
   <motion.div
     variants={variants.quickActions}
+    initial="hidden"
+    animate="visible"
+    exit="exit"
     className="mx-4 mb-4"
   >
     <div className="flex gap-2">
@@ -604,36 +650,11 @@ const BottomCTA = ({ user, onNavigate, onSignIn }) => {
   )
 }
 
-const Divider = () => (
-  <motion.div 
-    className="h-px bg-black/5 mx-5"
-    initial={{ scaleX: 0, opacity: 0 }}
-    animate={{ 
-      scaleX: 1, 
-      opacity: 1,
-      transition: {
-        delay: 0.2,
-        duration: 0.5,
-        ease: EASE_OUT_QUINT
-      }
-    }}
-    exit={{
-      scaleX: 0,
-      opacity: 0,
-      transition: {
-        duration: 0.15,
-        ease: EASE_IN_OUT
-      }
-    }}
-  />
-)
-
 // Main Component
 export default function MobileDrawer({ isOpen, onClose }) {
   const { user, openModal, logout } = useAuth()
   const navigate = useNavigate()
   const panelRef = useRef(null)
-  const shouldReduceMotion = useReducedMotion()
 
   useLockScroll(isOpen)
   useEscapeKey(isOpen, onClose)
@@ -691,74 +712,64 @@ export default function MobileDrawer({ isOpen, onClose }) {
               boxShadow: "0 -10px 60px -10px rgba(0,0,0,0.3), 0 -2px 10px rgba(0,0,0,0.1)"
             }}
           >
-            <motion.div variants={variants.content}>
-              <Handle />
-              <Header onHome={() => handleNavigate("/")} onClose={onClose} />
-              
-              <Divider />
+            <Handle />
+            <Header onHome={() => handleNavigate("/")} onClose={onClose} />
+            
+            <Divider />
 
-              {/* Scrollable Content */}
-              <div className="flex-1 overflow-y-auto overscroll-contain py-3">
-                {user && (
-                  <UserSection 
-                    user={user} 
-                    onProfile={() => handleNavigate("/profile")} 
-                    onLogout={handleLogout} 
-                  />
-                )}
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto overscroll-contain py-3">
+              {user && (
+                <UserSection 
+                  user={user} 
+                  onProfile={() => handleNavigate("/profile")} 
+                  onLogout={handleLogout} 
+                />
+              )}
 
-                {/* Navigation */}
-                <nav className="px-3">
-                  <motion.div 
-                    variants={variants.stagger}
-                  >
-                    {NAV_LINKS.map((link, i) => (
-                      <NavItem
-                        key={link.href}
-                        link={link}
-                        index={i}
-                        locked={link.protected && !user}
-                        onClick={handleLinkClick}
-                      />
-                    ))}
-                  </motion.div>
-                </nav>
-              </div>
-
-              {/* Footer */}
-              <motion.div 
-                className="shrink-0 border-t border-black/5 bg-white pt-3"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ 
-                  opacity: 1, 
-                  y: 0,
-                  transition: {
-                    delay: 0.3,
-                    duration: 0.4,
-                    ease: EASE_OUT_QUINT
-                  }
-                }}
-                exit={{
-                  opacity: 0,
-                  y: 10,
-                  transition: {
-                    duration: 0.12,
-                    ease: EASE_IN_OUT
-                  }
-                }}
-              >
-                <QuickActions />
-                
+              {/* Navigation */}
+              <nav className="px-3">
                 <motion.div 
-                  variants={variants.cta}
-                  className="px-4 pb-4"
+                  variants={variants.stagger}
+                  initial="hidden"
+                  animate="visible"
+                  exit="exit"
                 >
-                  <BottomCTA user={user} onNavigate={handleNavigate} onSignIn={handleSignIn} />
+                  {NAV_LINKS.map((link, i) => (
+                    <NavItem
+                      key={link.href}
+                      link={link}
+                      index={i}
+                      locked={link.protected && !user}
+                      onClick={handleLinkClick}
+                    />
+                  ))}
                 </motion.div>
+              </nav>
+            </div>
 
-                {/* Safe area */}
-                <div className="h-[env(safe-area-inset-bottom)]" />
+            {/* Footer */}
+            <motion.div 
+              variants={variants.footer}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              className="shrink-0 border-t border-black/5 bg-white pt-3"
+            >
+              <QuickActions />
+              
+              <motion.div 
+                variants={variants.cta}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                className="px-4 pb-4"
+              >
+                <BottomCTA user={user} onNavigate={handleNavigate} onSignIn={handleSignIn} />
               </motion.div>
+
+              {/* Safe area */}
+              <div className="h-[env(safe-area-inset-bottom)]" />
             </motion.div>
           </motion.div>
         </motion.div>
