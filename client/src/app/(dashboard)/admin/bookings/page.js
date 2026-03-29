@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import DashboardLayout from '@/components/admin/layout/DashboardLayout';
 import adminService from '@/services/adminService';
-import { useSocket } from '@/context/SocketContext'; // ✅ Use SocketContext
+import { useSocket } from '@/context/SocketContext';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import {
@@ -44,11 +44,11 @@ export default function BookingsPage() {
     const [total, setTotal] = useState(0);
     const [pages, setPages] = useState(1);
 
+    // ✅ FIXED: Removed inProgress from stats
     const [stats, setStats] = useState({
         total: 0,
         pending: 0,
         confirmed: 0,
-        inProgress: 0,
         completed: 0,
         cancelled: 0,
         revenue: 0,
@@ -72,7 +72,6 @@ export default function BookingsPage() {
     const [showDetailModal, setShowDetailModal] = useState(false);
     const [showStatusModal, setShowStatusModal] = useState(false);
 
-    // ✅ Use SocketContext instead of useBookingSocket
     const { onBookingEvent } = useSocket();
 
     const greeting = useMemo(() => {
@@ -110,7 +109,7 @@ export default function BookingsPage() {
         }
     }, [filters]);
 
-    // Fetch stats
+    // ✅ FIXED: Removed inProgress from stats
     const fetchStats = useCallback(async () => {
         try {
             const response = await adminService.getDashboardStats();
@@ -120,7 +119,6 @@ export default function BookingsPage() {
                     total: bookingStats?.total || 0,
                     pending: bookingStats?.byStatus?.pending || 0,
                     confirmed: bookingStats?.byStatus?.confirmed || 0,
-                    inProgress: bookingStats?.byStatus?.inProgress || 0,
                     completed: bookingStats?.byStatus?.completed || 0,
                     cancelled: bookingStats?.byStatus?.cancelled || 0,
                     revenue: revenue?.total || 0,
@@ -143,21 +141,17 @@ export default function BookingsPage() {
         fetchStats();
     }, [fetchBookings, fetchStats]);
 
-    // ============================================
-    // 🔥 FIXED: Real-time booking updates using SocketContext
-    // ============================================
+    // Real-time booking updates
     useEffect(() => {
         const unsubscribe = onBookingEvent((event) => {
             console.log('📋 Booking event received:', event.type, event.data);
 
             if (event.type === 'new') {
-                // New booking created
                 if (filters.page === 1) {
                     setBookings((prev) => {
                         const exists = prev.find((b) => b._id === event.data.bookingId);
                         if (exists) return prev;
                         
-                        // Create booking object from socket data
                         const newBooking = {
                             _id: event.data.bookingId,
                             bookingCode: event.data.bookingCode,
@@ -167,7 +161,6 @@ export default function BookingsPage() {
                             bookingDate: event.data.bookingDate,
                             timeSlot: event.data.timeSlot,
                             createdAt: event.data.createdAt,
-                            // For display purposes
                             walkInCustomer: { name: event.data.customerName }
                         };
                         
@@ -184,7 +177,6 @@ export default function BookingsPage() {
                     todayBookings: prev.todayBookings + 1,
                 }));
             } else if (event.type === 'statusUpdated') {
-                // Status updated
                 setBookings((prev) =>
                     prev.map((b) =>
                         b._id === event.data.bookingId 
@@ -192,10 +184,8 @@ export default function BookingsPage() {
                             : b
                     )
                 );
-                // Refetch stats for accurate counts
                 fetchStats();
             } else if (event.type === 'cancelled') {
-                // Booking cancelled
                 setBookings((prev) =>
                     prev.map((b) =>
                         b._id === event.data.bookingId 
@@ -257,7 +247,6 @@ export default function BookingsPage() {
 
     const handleCreateSuccess = () => {
         setShowCreateModal(false);
-        // Socket will handle the update, but we can also refresh for full data
         setTimeout(() => {
             refreshAll();
             toast.success('Booking created');
@@ -324,7 +313,7 @@ export default function BookingsPage() {
                         </div>
                     </header>
 
-                    {/* Quick Stats */}
+                    {/* ✅ FIXED: Quick Stats - Removed "In Progress" */}
                     <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
                         <StatCard
                             icon={CalendarDays}
@@ -340,10 +329,10 @@ export default function BookingsPage() {
                             highlight={stats.pending > 0}
                         />
                         <StatCard
-                            icon={Timer}
-                            label="In Progress"
-                            value={stats.inProgress}
-                            sub={`${stats.confirmed} confirmed`}
+                            icon={CheckCircle2}
+                            label="Confirmed"
+                            value={stats.confirmed}
+                            sub="Ready for service"
                         />
                         <StatCard
                             icon={IndianRupee}
@@ -468,11 +457,11 @@ function FilterBar({ filters, onFilterChange, showFilters, setShowFilters, activ
         });
     };
 
+    // ✅ FIXED: Removed 'in-progress' from status options
     const statusOptions = [
         { value: '', label: 'All Status' },
         { value: 'pending', label: 'Pending' },
         { value: 'confirmed', label: 'Confirmed' },
-        { value: 'in-progress', label: 'In Progress' },
         { value: 'completed', label: 'Completed' },
         { value: 'cancelled', label: 'Cancelled' },
     ];
@@ -781,11 +770,10 @@ function BookingsList({ bookings, loading, total, pages, currentPage, onPageChan
 }
 
 function BookingRow({ booking, isFirst, onView, onUpdateStatus }) {
+    // ✅ FIXED: Removed 'in-progress' from status map
     const statusMap = {
         pending: { bg: 'bg-yellow-500/10', text: 'text-yellow-500', dot: 'bg-yellow-500', label: 'Pending' },
         confirmed: { bg: 'bg-blue-500/10', text: 'text-blue-500', dot: 'bg-blue-500', label: 'Confirmed' },
-        'in-progress': { bg: 'bg-purple-500/10', text: 'text-purple-500', dot: 'bg-purple-500', label: 'Progress' },
-        inProgress: { bg: 'bg-purple-500/10', text: 'text-purple-500', dot: 'bg-purple-500', label: 'Progress' },
         completed: { bg: 'bg-emerald-500/10', text: 'text-emerald-500', dot: 'bg-emerald-500', label: 'Done' },
         cancelled: { bg: 'bg-red-500/10', text: 'text-red-500', dot: 'bg-red-500', label: 'Cancelled' }
     };

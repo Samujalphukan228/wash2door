@@ -33,7 +33,6 @@ import {
     Star,
     CheckCircle2,
     AlertCircle,
-    Timer,
     XCircle,
     Sparkles,
     Plus,
@@ -73,12 +72,12 @@ export default function DashboardPage() {
         return 'Good evening';
     }, []);
 
+    // ✅ FIXED: Removed inProgress from bookingStats
     const bookingStats = useMemo(() => {
         const byStatus = stats?.bookings?.byStatus || {};
         return {
             pending: byStatus.pending || 0,
             confirmed: byStatus.confirmed || 0,
-            inProgress: byStatus.inProgress || 0,
             completed: byStatus.completed || 0,
             cancelled: byStatus.cancelled || 0,
             total: stats?.bookings?.total || 0
@@ -263,7 +262,6 @@ export default function DashboardPage() {
                 />
             )}
 
-            {/* ✅ Removed onExpenseAdded — socket handles updates automatically */}
             <ExpenseListPopup
                 isOpen={showExpenses}
                 onClose={() => setShowExpenses(false)}
@@ -407,11 +405,11 @@ function ProfitSummary({ profit, revenue, expenses }) {
 }
 
 // === BOOKING STATUS ===
+// ✅ FIXED: Removed 'inProgress' status completely
 function BookingStatus({ data }) {
     const statuses = [
         { key: 'pending', label: 'Pending', color: '#EAB308', icon: AlertCircle },
         { key: 'confirmed', label: 'Confirmed', color: '#3B82F6', icon: CheckCircle2 },
-        { key: 'inProgress', label: 'In Progress', color: '#A855F7', icon: Timer },
         { key: 'completed', label: 'Completed', color: '#22C55E', icon: CheckCircle2 },
         { key: 'cancelled', label: 'Cancelled', color: '#EF4444', icon: XCircle }
     ];
@@ -583,12 +581,11 @@ function RecentBookings({ bookings }) {
     );
 }
 
+// ✅ FIXED: Removed 'in-progress' and 'inProgress' from statusMap
 function BookingRow({ booking, isFirst }) {
     const statusMap = {
         pending: { bg: 'bg-yellow-500/10', text: 'text-yellow-500', label: 'Pending', dot: 'bg-yellow-500' },
         confirmed: { bg: 'bg-blue-500/10', text: 'text-blue-500', label: 'Confirmed', dot: 'bg-blue-500' },
-        'in-progress': { bg: 'bg-purple-500/10', text: 'text-purple-500', label: 'Progress', dot: 'bg-purple-500' },
-        inProgress: { bg: 'bg-purple-500/10', text: 'text-purple-500', label: 'Progress', dot: 'bg-purple-500' },
         completed: { bg: 'bg-emerald-500/10', text: 'text-emerald-500', label: 'Done', dot: 'bg-emerald-500' },
         cancelled: { bg: 'bg-red-500/10', text: 'text-red-500', label: 'Cancelled', dot: 'bg-red-500' }
     };

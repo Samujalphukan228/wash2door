@@ -6,20 +6,21 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import {
     X, MapPin, Clock, CreditCard, User, Package, Tag,
-    RefreshCw, History, CheckCircle, XCircle, Play, Loader2,
+    RefreshCw, History, CheckCircle, XCircle, Loader2,
     Phone, Mail, Calendar, FileText, AlertTriangle
 } from 'lucide-react';
 import adminService from '@/services/adminService';
 import toast from 'react-hot-toast';
 
+// ✅ FIXED: Removed 'in-progress' from status config
 const statusConfig = {
     pending: { bg: 'bg-amber-500/10', text: 'text-amber-400', ring: 'ring-amber-500/20', dot: 'bg-amber-400', label: 'Pending' },
     confirmed: { bg: 'bg-blue-500/10', text: 'text-blue-400', ring: 'ring-blue-500/20', dot: 'bg-blue-400', label: 'Confirmed' },
-    'in-progress': { bg: 'bg-purple-500/10', text: 'text-purple-400', ring: 'ring-purple-500/20', dot: 'bg-purple-400', label: 'In Progress' },
     completed: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', ring: 'ring-emerald-500/20', dot: 'bg-emerald-400', label: 'Completed' },
     cancelled: { bg: 'bg-red-500/10', text: 'text-red-400', ring: 'ring-red-500/20', dot: 'bg-red-400', label: 'Cancelled' }
 };
 
+// ✅ FIXED: Removed 'in-progress' from quick actions
 const getQuickActions = (currentStatus) => {
     const actions = {
         pending: [
@@ -27,10 +28,6 @@ const getQuickActions = (currentStatus) => {
             { status: 'cancelled', label: 'Cancel', icon: XCircle, variant: 'danger', needsReason: true }
         ],
         confirmed: [
-            { status: 'in-progress', label: 'Start Service', icon: Play, variant: 'primary' },
-            { status: 'cancelled', label: 'Cancel', icon: XCircle, variant: 'danger', needsReason: true }
-        ],
-        'in-progress': [
             { status: 'completed', label: 'Complete', icon: CheckCircle, variant: 'success' },
             { status: 'cancelled', label: 'Cancel', icon: XCircle, variant: 'danger', needsReason: true }
         ]
@@ -201,8 +198,7 @@ export default function BookingDetailModal({ booking, customerHistory, onClose, 
             
             const messages = {
                 completed: 'Booking completed! Revenue added.',
-                confirmed: 'Booking confirmed!',
-                'in-progress': 'Service started!'
+                confirmed: 'Booking confirmed!'
             };
             toast.success(messages[action.status] || `Booking ${action.status}`);
             

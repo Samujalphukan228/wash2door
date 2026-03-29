@@ -21,6 +21,8 @@ import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { generalLimiter } from './middleware/rateLimiter.js';
 import { startCleanupScheduler } from './utils/cleanup.js';
 import expenseRoutes from './routes/expenseRoutes.js';
+import walkInCustomerRoutes from './routes/walkInCustomerRoutes.js';
+
 
 dotenv.config();
 
@@ -79,6 +81,8 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/subcategories', subcategoryRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/expenses', expenseRoutes);
+app.use('/api/admin/walkin-customers', walkInCustomerRoutes);
+
 
 app.use(notFound);
 app.use(errorHandler);

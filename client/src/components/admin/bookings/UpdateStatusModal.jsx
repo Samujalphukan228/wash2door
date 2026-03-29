@@ -7,14 +7,15 @@ import { X, Loader2, ChevronLeft, Check, AlertCircle } from 'lucide-react';
 import adminService from '@/services/adminService';
 import toast from 'react-hot-toast';
 
+// ✅ FIXED: Removed 'in-progress' from status flow
 const STATUS_FLOW = {
     pending: ['confirmed', 'cancelled'],
-    confirmed: ['in-progress', 'cancelled'],
-    'in-progress': ['completed', 'cancelled'],
+    confirmed: ['completed', 'cancelled'],  // ✅ Direct to completed
     completed: [],
     cancelled: [],
 };
 
+// ✅ FIXED: Removed 'in-progress' from status config
 const STATUS_CONFIG = {
     confirmed: { 
         label: 'Confirm Booking', 
@@ -23,14 +24,6 @@ const STATUS_CONFIG = {
         gradient: 'from-blue-500/20 to-blue-600/10',
         border: 'border-blue-500/20',
         text: 'text-blue-400'
-    },
-    'in-progress': { 
-        label: 'Start Service', 
-        description: 'Begin the service for this booking',
-        icon: '▶',
-        gradient: 'from-purple-500/20 to-purple-600/10',
-        border: 'border-purple-500/20',
-        text: 'text-purple-400'
     },
     completed: { 
         label: 'Mark Completed', 
@@ -171,7 +164,7 @@ export default function UpdateStatusModal({ booking, onClose, onSuccess }) {
             toast.success(
                 selectedStatus === 'completed'
                     ? 'Booking completed!'
-                    : `Booking ${selectedStatus.replace('-', ' ')}`
+                    : `Booking ${selectedStatus}`
             );
 
             onClose();
@@ -236,7 +229,7 @@ export default function UpdateStatusModal({ booking, onClose, onSuccess }) {
                             <div className="flex items-center gap-2 mt-1">
                                 <p className="text-sm text-white font-mono">{booking.bookingCode}</p>
                                 <span className="px-2 py-0.5 rounded-md bg-white/[0.05] border border-white/[0.08] text-[10px] text-white/50 capitalize">
-                                    {booking.status.replace('-', ' ')}
+                                    {booking.status}
                                 </span>
                             </div>
                         </div>

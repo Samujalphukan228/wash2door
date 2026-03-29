@@ -99,13 +99,12 @@ const bookingSchema = new mongoose.Schema({
         city: { type: String, required: [true, 'City is required'] },
     },
 
-    // ✅ ADDED: Contact phone number for this booking
+    // Contact phone number for this booking
     phone: {
-    type: String,
-    required: [true, 'Phone number is required'],
-    match: [/^\+?[\d\s\-]{7,15}$/, 'Please enter a valid phone number']
-},
-
+        type: String,
+        required: [true, 'Phone number is required'],
+        match: [/^\+?[\d\s\-]{7,15}$/, 'Please enter a valid phone number']
+    },
 
     // Status
     status: {
@@ -143,7 +142,7 @@ const bookingSchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 
-// ✅ FIXED: Auto generate booking code + slot lock key
+// Auto generate booking code + slot lock key
 bookingSchema.pre('save', function (next) {
     if (!this.bookingCode) {
         const random = crypto.randomBytes(3).toString('hex').toUpperCase();
@@ -152,9 +151,8 @@ bookingSchema.pre('save', function (next) {
         this.bookingCode = `${prefix}-${timestamp}${random}`;
     }
 
-    // ✅ FIXED: Generate unique key for cancelled bookings instead of null
+    // Generate unique key for cancelled bookings instead of null
     if (this.status === 'cancelled') {
-        // Generate a unique cancelled key that won't block future slots
         this.slotLockKey = `CANCELLED_${this._id}_${Date.now()}`;
         console.log(`🗑️ Cancelled booking locked with key: ${this.slotLockKey}`);
     } else {
@@ -171,7 +169,7 @@ bookingSchema.pre('save', function (next) {
     next();
 });
 
-// ✅ Indexes
+// Indexes
 bookingSchema.index({ customerId: 1 });
 bookingSchema.index({ status: 1 });
 bookingSchema.index({ bookingDate: 1 });
@@ -181,13 +179,13 @@ bookingSchema.index({ categoryId: 1 });
 bookingSchema.index({ subcategoryId: 1 });
 bookingSchema.index({ bookingType: 1 });
 bookingSchema.index({ createdAt: -1 });
-// ✅ FIXED: Unique index only for active slots (YYYY-MM-DD|HH:MM-HH:MM format)
+
+// Unique index only for active slots
 bookingSchema.index(
     { slotLockKey: 1 },
     { 
         unique: true, 
         sparse: true,
-        // Only enforce uniqueness for active bookings (slots with pipe character)
         partialFilterExpression: { slotLockKey: { $regex: '^\\d{4}-\\d{2}-\\d{2}\\|' } }
     }
 );
@@ -213,7 +211,6 @@ bookingSchema.virtual('canCancel').get(function () {
 // Static: get available slots
 bookingSchema.statics.getAvailableSlots = async function (date) {
     const dateStr = new Date(date).toISOString().split('T')[0];
-    // ✅ FIXED: Only check active bookings (exclude cancelled)
     const bookedSlots = await this.find({
         slotLockKey: { $regex: `^${dateStr}\\|` },
         status: { $in: ['pending', 'confirmed'] }
@@ -240,12 +237,16 @@ bookingSchema.statics.getUserStats = async function (userId) {
     ]);
 
     const result = {
-        total: 0, pending: 0, confirmed: 0,
-        inProgress: 0, completed: 0, cancelled: 0, totalSpent: 0
+        total: 0,
+        pending: 0,
+        confirmed: 0,
+        completed: 0,
+        cancelled: 0,
+        totalSpent: 0
     };
 
     stats.forEach(s => {
-        result[s._id === 'in-progress' ? 'inProgress' : s._id] = s.count;
+        result[s._id] = s.count;
         result.total += s.count;
         if (s._id === 'completed') result.totalSpent = s.totalSpent;
     });

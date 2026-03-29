@@ -4,10 +4,12 @@ import User from '../models/User.js';
 import Service from '../models/Service.js';
 import Booking from '../models/Booking.js';
 import Review from '../models/Review.js';
+import WalkInCustomer from '../models/WalkInCustomer.js';
 import { sendBookingStatusEmail } from '../utils/sendEmail.js';
 import {
     TIME_SLOTS,
     BOOKING_STATUSES,
+    CLOSED_DAY_MESSAGE,
     isValidTimeSlot,
     isClosedDay,
     convertTo24Hour
@@ -30,9 +32,10 @@ const isValidObjectId = (id) =>
     /^[0-9a-fA-F]{24}$/.test(id);
 
 const getLocalDateStr = (date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
+    const d = new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
 };
 
@@ -61,7 +64,6 @@ export const getDashboardStats = async (req, res) => {
             bookingsToday,
             pendingBookings,
             confirmedBookings,
-            inProgressBookings,
             completedBookings,
             cancelledBookings,
             bookingsThisMonth,
@@ -80,18 +82,18 @@ export const getDashboardStats = async (req, res) => {
             Booking.countDocuments({ createdAt: { $gte: today, $lte: todayEnd } }),
             Booking.countDocuments({ status: 'pending' }),
             Booking.countDocuments({ status: 'confirmed' }),
-            Booking.countDocuments({ status: 'in-progress' }),
             Booking.countDocuments({ status: 'completed' }),
             Booking.countDocuments({ status: 'cancelled' }),
             Booking.countDocuments({ createdAt: { $gte: thisMonthStart } }),
             Booking.countDocuments({ createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd } })
         ]);
 
+        // ✅ FIXED: Revenue ONLY counts 'completed' bookings
         const [revenueThisMonth, revenueLastMonth, totalRevenue, revenueToday] = await Promise.all([
             Booking.aggregate([
                 {
                     $match: {
-                        status: { $in: ['pending', 'confirmed', 'in-progress', 'completed'] },
+                        status: 'completed',
                         createdAt: { $gte: thisMonthStart }
                     }
                 },
@@ -100,7 +102,7 @@ export const getDashboardStats = async (req, res) => {
             Booking.aggregate([
                 {
                     $match: {
-                        status: { $in: ['pending', 'confirmed', 'in-progress', 'completed'] },
+                        status: 'completed',
                         createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd }
                     }
                 },
@@ -109,7 +111,7 @@ export const getDashboardStats = async (req, res) => {
             Booking.aggregate([
                 {
                     $match: {
-                        status: { $in: ['pending', 'confirmed', 'in-progress', 'completed'] }
+                        status: 'completed'
                     }
                 },
                 { $group: { _id: null, total: { $sum: '$price' } } }
@@ -117,7 +119,7 @@ export const getDashboardStats = async (req, res) => {
             Booking.aggregate([
                 {
                     $match: {
-                        status: { $in: ['pending', 'confirmed', 'in-progress', 'completed'] },
+                        status: 'completed',
                         createdAt: { $gte: today, $lte: todayEnd }
                     }
                 },
@@ -179,10 +181,11 @@ export const getDashboardStats = async (req, res) => {
             ? Math.round((netProfitTotal / revenueTotalVal) * 100)
             : 0;
 
+        // ✅ FIXED: Weekly revenue only from 'completed' bookings
         const weeklyRevenue = await Booking.aggregate([
             {
                 $match: {
-                    status: { $nin: ['cancelled'] },
+                    status: 'completed',
                     createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
                 }
             },
@@ -226,10 +229,11 @@ export const getDashboardStats = async (req, res) => {
 
         const sixMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 5, 1);
 
+        // ✅ FIXED: Monthly revenue only from 'completed' bookings
         const monthlyRevenue = await Booking.aggregate([
             {
                 $match: {
-                    status: { $nin: ['cancelled'] },
+                    status: 'completed',
                     createdAt: { $gte: sixMonthsAgo }
                 }
             },
@@ -347,7 +351,6 @@ export const getDashboardStats = async (req, res) => {
                     byStatus: {
                         pending: pendingBookings,
                         confirmed: confirmedBookings,
-                        inProgress: inProgressBookings,
                         completed: completedBookings,
                         cancelled: cancelledBookings
                     }
@@ -638,7 +641,6 @@ export const blockUser = async (req, res) => {
         user.refreshToken = undefined;
         await user.save({ validateBeforeSave: false });
 
-        // 🔥 Force logout via socket
         emitUserBlocked(userId, user.blockedReason);
 
         const userResponse = user.toObject();
@@ -941,7 +943,7 @@ export const getBookingById = async (req, res) => {
 };
 
 // ============================================
-// UPDATE BOOKING STATUS (🔥 FIXED REAL-TIME)
+// UPDATE BOOKING STATUS
 // ============================================
 
 export const updateBookingStatus = async (req, res) => {
@@ -973,11 +975,10 @@ export const updateBookingStatus = async (req, res) => {
             });
         }
 
-        // Validate status transition
+        // ✅ FIXED: Removed 'in-progress' from valid transitions
         const validTransitions = {
             'pending': ['confirmed', 'cancelled'],
-            'confirmed': ['in-progress', 'cancelled'],
-            'in-progress': ['completed', 'cancelled'],
+            'confirmed': ['completed', 'cancelled'],
             'completed': [],
             'cancelled': []
         };
@@ -989,13 +990,11 @@ export const updateBookingStatus = async (req, res) => {
             });
         }
 
-        // ✅ FIX: Save old slot info BEFORE any modifications
         const oldStatus = booking.status;
         const oldDateStr = getLocalDateStr(new Date(booking.bookingDate));
         const oldTimeSlot = booking.timeSlot;
         const oldServiceId = booking.serviceId;
 
-        // Update booking
         booking.status = status;
 
         if (status === 'completed') {
@@ -1011,21 +1010,15 @@ export const updateBookingStatus = async (req, res) => {
 
         await booking.save();
 
-        // ============================================
-        // 🔥 REAL-TIME SOCKET EMISSIONS
-        // ============================================
-
-        // 1. Always emit status update
+        // Real-time socket emissions
         emitBookingStatusUpdate(booking, booking.customerId?._id);
 
-        // 2. If cancelled → release the OLD slot
-        if (status === 'cancelled' && ['pending', 'confirmed', 'in-progress'].includes(oldStatus)) {
+        if (status === 'cancelled' && ['pending', 'confirmed'].includes(oldStatus)) {
             emitBookingCancelled(booking, 'admin');
             emitSlotAvailable(oldDateStr, oldTimeSlot, oldServiceId);
             console.log(`🔌 Real-time: Admin cancelled → OLD slot released ${oldDateStr} ${oldTimeSlot}`);
         }
 
-        // 3. Emit dashboard update for all status changes
         emitDashboardUpdate({ action: 'booking_status_changed', status });
 
         console.log(`🔌 Real-time: Status ${booking.bookingCode} → ${status}`);
@@ -1059,7 +1052,7 @@ export const updateBookingStatus = async (req, res) => {
 };
 
 // ============================================
-// CREATE ADMIN BOOKING (🔥 FIXED REAL-TIME)
+// CREATE ADMIN BOOKING
 // ============================================
 
 export const createAdminBooking = async (req, res) => {
@@ -1178,10 +1171,11 @@ export const createAdminBooking = async (req, res) => {
             });
         }
 
+        // ✅ FIXED: Using CLOSED_DAY_MESSAGE constant
         if (isClosedDay(requestedDate)) {
             return res.status(400).json({
                 success: false,
-                message: 'We are closed on Sundays'
+                message: CLOSED_DAY_MESSAGE
             });
         }
 
@@ -1197,7 +1191,7 @@ export const createAdminBooking = async (req, res) => {
 
         const slotTaken = await Booking.findOne({
             slotLockKey,
-            status: { $in: ['pending', 'confirmed', 'in-progress'] }
+            status: { $in: ['pending', 'confirmed'] }
         });
 
         if (slotTaken) {
@@ -1207,9 +1201,10 @@ export const createAdminBooking = async (req, res) => {
             });
         }
 
+        // ✅ FIXED: Default city changed to 'Duliajan'
         const bookingLocation = {
             address: location?.address || 'Walk-in / At Shop',
-            city: location?.city || 'Walk-in'
+            city: location?.city || 'Duliajan'
         };
 
         let booking;
@@ -1262,21 +1257,45 @@ export const createAdminBooking = async (req, res) => {
             $inc: { totalBookings: 1 }
         });
 
-        // ============================================
-        // 🔥 REAL-TIME SOCKET EMISSIONS
-        // ============================================
+        // ✅ NEW: Auto-save walk-in customer to database
+        if (bookingType === 'walkin' && walkInCustomer?.name && phone) {
+            try {
+                let walkinCustomerDoc = await WalkInCustomer.findOne({
+                    phone: phone.trim(),
+                    isActive: true
+                });
 
+                if (walkinCustomerDoc) {
+                    // Update name and increment booking count
+                    walkinCustomerDoc.name = walkInCustomer.name.trim();
+                    walkinCustomerDoc.totalBookings += 1;
+                    walkinCustomerDoc.lastBookingDate = new Date();
+                    await walkinCustomerDoc.save();
+                    console.log(`👤 Walk-in customer updated: ${walkinCustomerDoc.name} (bookings: ${walkinCustomerDoc.totalBookings})`);
+                } else {
+                    // Create new walk-in customer
+                    await WalkInCustomer.create({
+                        name: walkInCustomer.name.trim(),
+                        phone: phone.trim(),
+                        totalBookings: 1,
+                        lastBookingDate: new Date(),
+                        createdBy: req.user._id
+                    });
+                    console.log(`👤 New walk-in customer saved: ${walkInCustomer.name} (${phone})`);
+                }
+            } catch (walkinError) {
+                // Don't fail the booking, just log
+                console.error('Walk-in customer save error:', walkinError.message);
+            }
+        }
+
+        // Real-time socket emissions
         const customerName = bookingType === 'walkin'
             ? walkInCustomer.name
             : 'Online Customer';
 
-        // 1. Notify admins about new booking
         emitNewBooking(booking, customerName);
-
-        // 2. Broadcast slot is now booked
         emitSlotBooked(bookingDate, timeSlot, serviceId);
-
-        // 3. Dashboard update
         emitDashboardUpdate({ action: 'new_booking', bookingType });
 
         console.log(`🔌 Real-time: Admin booking created + slot booked ${bookingDate} ${timeSlot}`);

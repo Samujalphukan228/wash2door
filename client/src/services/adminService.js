@@ -4,13 +4,17 @@ import axiosInstance from '@/lib/axios';
 
 const adminService = {
 
+    // ============================================
     // Dashboard
+    // ============================================
     getDashboardStats: async () => {
         const response = await axiosInstance.get('/admin/dashboard/stats');
         return response.data;
     },
 
+    // ============================================
     // Users
+    // ============================================
     getAllUsers: async (params) => {
         const response = await axiosInstance.get('/admin/users', { params });
         return response.data;
@@ -42,7 +46,9 @@ const adminService = {
         return response.data;
     },
 
+    // ============================================
     // Bookings
+    // ============================================
     getAllBookings: async (params) => {
         const response = await axiosInstance.get('/admin/bookings', { params });
         return response.data;
@@ -66,7 +72,54 @@ const adminService = {
         return response.data;
     },
 
+    // ============================================
+    // Walk-in Customers
+    // ============================================
+    searchWalkInCustomers: async (query) => {
+        const response = await axiosInstance.get('/admin/walkin-customers/search', {
+            params: { q: query }
+        });
+        return response.data;
+    },
+
+    getRecentWalkInCustomers: async (limit = 5) => {
+        const response = await axiosInstance.get('/admin/walkin-customers/recent', {
+            params: { limit }
+        });
+        return response.data;
+    },
+
+    getAllWalkInCustomers: async (params) => {
+        const response = await axiosInstance.get('/admin/walkin-customers', { params });
+        return response.data;
+    },
+
+    getWalkInCustomerById: async (customerId) => {
+        const response = await axiosInstance.get(`/admin/walkin-customers/${customerId}`);
+        return response.data;
+    },
+
+    createWalkInCustomer: async (data) => {
+        const response = await axiosInstance.post('/admin/walkin-customers', data);
+        return response.data;
+    },
+
+    updateWalkInCustomer: async (customerId, data) => {
+        const response = await axiosInstance.put(
+            `/admin/walkin-customers/${customerId}`,
+            data
+        );
+        return response.data;
+    },
+
+    deleteWalkInCustomer: async (customerId) => {
+        const response = await axiosInstance.delete(`/admin/walkin-customers/${customerId}`);
+        return response.data;
+    },
+
+    // ============================================
     // Reviews
+    // ============================================
     getAllReviews: async (params) => {
         const response = await axiosInstance.get('/admin/reviews', { params });
         return response.data;
@@ -77,7 +130,9 @@ const adminService = {
         return response.data;
     },
 
+    // ============================================
     // Reports
+    // ============================================
     getRevenueReport: async (params) => {
         const response = await axiosInstance.get('/admin/reports/revenue', { params });
         return response.data;
@@ -87,8 +142,6 @@ const adminService = {
         const response = await axiosInstance.get('/admin/reports/bookings', { params });
         return response.data;
     }
-
-    // ❌ REMOVED: getAllServices - use serviceService.getAll() instead
 };
 
 export default adminService;
