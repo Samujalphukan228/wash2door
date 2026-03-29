@@ -1,150 +1,190 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Wallet, CalendarPlus } from 'lucide-react';
 
-const MENU_ITEMS = [
-    { icon: CalendarPlus, label: 'New Booking', key: 'booking' },
-    { icon: Wallet,       label: 'Expenses',    key: 'expenses' },
+const ITEMS = [
+    { key: 'expenses', Icon: Wallet,       label: 'Expenses'    },
+    { key: 'booking',  Icon: CalendarPlus, label: 'New Booking' },
 ];
 
-/* ─── spring presets ─── */
-const SPRING_SNAPPY = { type: 'spring', stiffness: 500, damping: 30 };
-const SPRING_SOFT   = { type: 'spring', stiffness: 300, damping: 28 };
+// Each satellite is 56px circle. FAB is 56px circle.
+// Min center-to-center = 28+16+28 = 72px. Using 80px for breathing room.
+// Angle 0 = straight up, positive = clockwise when viewed from above.
+const OFFSETS = [
+    { x: -21, y: -77 },  // nearly straight up, slight left
+    { x: -75, y: -27 },  // left diagonal
+];
+
+const SPRING_OPEN  = (i) => ({ type: 'spring', stiffness: 420, damping: 26, delay: i * 0.06 });
+const SPRING_CLOSE = (i) => ({ type: 'spring', stiffness: 380, damping: 30, delay: i * 0.04 });
+const SPRING_FAB   = { type: 'spring', stiffness: 340, damping: 24 };
 
 export default function MobileFAB({ onNewBooking, onExpenses }) {
-    const [isOpen, setIsOpen] = useState(false);
+    const [isOpen,    setIsOpen]    = useState(false);
+    const [triggered, setTriggered] = useState(null);
 
-    const handlers = { booking: onNewBooking, expenses: onExpenses };
+    const actions = { booking: onNewBooking, expenses: onExpenses };
 
     const handleAction = useCallback((key) => {
-        setIsOpen(false);
-        setTimeout(() => handlers[key]?.(), 250);
+        setTriggered(key);
+        setTimeout(() => {
+            setIsOpen(false);
+            setTriggered(null);
+            actions[key]?.();
+        }, 200);
     }, [onNewBooking, onExpenses]);
 
-    /* ─── variants ─── */
-    const backdropV = {
-        hidden:  { opacity: 0 },
-        visible: { opacity: 1,  transition: { duration: 0.25 } },
-        exit:    { opacity: 0,  transition: { duration: 0.2, delay: 0.05 } },
-    };
-
-    const listV = {
-        hidden:  {},
-        visible: { transition: { staggerChildren: 0.07, delayChildren: 0.04 } },
-        exit:    { transition: { staggerChildren: 0.04, staggerDirection: -1 } },
-    };
-
-    const rowV = {
-        hidden:  { opacity: 0, y: 16, filter: 'blur(4px)' },
-        visible: { opacity: 1, y: 0,  filter: 'blur(0px)', transition: SPRING_SNAPPY },
-        exit:    { opacity: 0, y: 8,  filter: 'blur(4px)', transition: { duration: 0.15 } },
-    };
+    useEffect(() => {
+        const onKey = (e) => { if (e.key === 'Escape') setIsOpen(false); };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, []);
 
     return (
         <>
-            {/* ── Backdrop ── */}
+            {/* Backdrop */}
             <AnimatePresence>
                 {isOpen && (
                     <motion.div
                         className="sm:hidden fixed inset-0 z-40"
-                        style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)' }}
-                        variants={backdropV}
-                        initial="hidden"
-                        animate="visible"
-                        exit="exit"
+                        style={{
+                            background: 'rgba(0,0,0,0.5)',
+                            backdropFilter: 'blur(6px)',
+                            WebkitBackdropFilter: 'blur(6px)',
+                        }}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1, transition: { duration: 0.2 } }}
+                        exit={{ opacity: 0, transition: { duration: 0.16, delay: 0.08 } }}
                         onClick={() => setIsOpen(false)}
                     />
                 )}
             </AnimatePresence>
 
-            {/* ── FAB Shell ── */}
-            <div className="sm:hidden fixed bottom-24 right-4 z-50 flex flex-col items-end gap-3">
+            {/* FAB anchor — fixed position, everything radiates from here */}
+            <div
+                className="sm:hidden fixed z-50"
+                style={{ bottom: 96, right: 16, width: 56, height: 56 }}
+            >
+                {/* Satellite buttons */}
+                {ITEMS.map(({ key, Icon, label }, i) => {
+                    const { x, y } = OFFSETS[i];
+                    const isTrig   = triggered === key;
 
-                {/* ── Menu rows ── */}
-                <AnimatePresence>
-                    {isOpen && (
-                        <motion.div
-                            className="flex flex-col items-end gap-2.5 mb-1"
-                            variants={listV}
-                            initial="hidden"
-                            animate="visible"
-                            exit="exit"
-                        >
-                            {MENU_ITEMS.map(({ icon: Icon, label, key }) => (
+                    return (
+                        <AnimatePresence key={key}>
+                            {isOpen && (
                                 <motion.button
-                                    key={key}
-                                    variants={rowV}
                                     onClick={() => handleAction(key)}
                                     aria-label={label}
-                                    className="group flex items-center gap-2.5 cursor-pointer"
-                                    style={{ outline: 'none', background: 'none', border: 'none', padding: 0 }}
-                                    whileTap={{ scale: 0.96 }}
+                                    style={{
+                                        position: 'absolute',
+                                        top: '50%',
+                                        left: '50%',
+                                        marginTop: -28,
+                                        marginLeft: -28,
+                                        width: 56,
+                                        height: 56,
+                                        borderRadius: '50%',
+                                        background: '#fff',
+                                        border: 'none',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        cursor: 'pointer',
+                                        outline: 'none',
+                                        boxShadow: '0 2px 16px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.9)',
+                                    }}
+                                    initial={{ x: 0, y: 0, opacity: 0, scale: 0.4 }}
+                                    animate={{
+                                        x,
+                                        y,
+                                        opacity: 1,
+                                        scale: isTrig ? 1.12 : 1,
+                                        transition: isTrig
+                                            ? { type: 'spring', stiffness: 600, damping: 18 }
+                                            : SPRING_OPEN(i),
+                                    }}
+                                    exit={{
+                                        x: 0, y: 0,
+                                        opacity: 0,
+                                        scale: 0.4,
+                                        transition: SPRING_CLOSE(ITEMS.length - 1 - i),
+                                    }}
+                                    whileHover={{ scale: 1.1 }}
+                                    whileTap={{ scale: 0.88 }}
                                 >
-                                    {/* Label pill */}
-                                    <motion.span
-                                        className="px-3.5 py-2 rounded-xl text-sm font-medium tracking-wide"
-                                        style={{
-                                            background: 'rgba(255,255,255,0.08)',
-                                            border: '1px solid rgba(255,255,255,0.12)',
-                                            color: '#fff',
-                                            letterSpacing: '0.01em',
-                                        }}
-                                        whileHover={{ background: 'rgba(255,255,255,0.16)' }}
-                                        transition={{ duration: 0.15 }}
-                                    >
-                                        {label}
-                                    </motion.span>
-
-                                    {/* Icon button */}
-                                    <motion.span
-                                        className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
-                                        style={{ background: '#fff' }}
-                                        whileHover={{ scale: 1.08 }}
-                                        whileTap={{ scale: 0.9 }}
-                                        transition={SPRING_SOFT}
-                                    >
-                                        <Icon className="w-[18px] h-[18px] text-black" strokeWidth={2.2} />
-                                    </motion.span>
+                                    <Icon
+                                        style={{ width: 20, height: 20, color: '#000', display: 'block' }}
+                                        strokeWidth={2.1}
+                                    />
                                 </motion.button>
-                            ))}
-                        </motion.div>
+                            )}
+                        </AnimatePresence>
+                    );
+                })}
+
+                {/* Pulse ring */}
+                <AnimatePresence>
+                    {isOpen && (
+                        <motion.span
+                            key="pulse"
+                            style={{
+                                position: 'absolute',
+                                inset: 0,
+                                borderRadius: '50%',
+                                border: '1.5px solid rgba(255,255,255,0.4)',
+                                pointerEvents: 'none',
+                                zIndex: 2,
+                            }}
+                            initial={{ scale: 1, opacity: 0.8 }}
+                            animate={{ scale: 2.6, opacity: 0 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.5, ease: 'easeOut' }}
+                        />
                     )}
                 </AnimatePresence>
 
-                {/* ── Main FAB ── */}
+                {/* Main FAB */}
                 <motion.button
                     onClick={() => setIsOpen((o) => !o)}
                     aria-label={isOpen ? 'Close menu' : 'Open actions'}
                     aria-expanded={isOpen}
-                    className="w-14 h-14 rounded-2xl flex items-center justify-center relative overflow-hidden"
                     style={{
-                        background: isOpen ? 'rgba(255,255,255,0.1)' : '#fff',
-                        border: isOpen ? '1px solid rgba(255,255,255,0.18)' : '1px solid transparent',
-                        boxShadow: isOpen ? 'none' : '0 4px 24px rgba(0,0,0,0.35)',
+                        position: 'absolute',
+                        inset: 0,
+                        borderRadius: '50%',
+                        background: isOpen ? 'rgba(255,255,255,0.13)' : '#fff',
+                        border: isOpen
+                            ? '0.5px solid rgba(255,255,255,0.22)'
+                            : '0.5px solid rgba(0,0,0,0.06)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        outline: 'none',
+                        boxShadow: isOpen
+                            ? '0 0 0 8px rgba(255,255,255,0.05)'
+                            : '0 4px 20px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.12)',
+                        transition: 'background 0.2s, border 0.2s, box-shadow 0.2s',
+                        zIndex: 3,
                     }}
-                    whileHover={{ scale: 1.06 }}
-                    whileTap={{ scale: 0.93 }}
-                    transition={SPRING_SOFT}
+                    whileHover={{ scale: 1.08 }}
+                    whileTap={{ scale: 0.91 }}
+                    animate={{ rotate: isOpen ? 225 : 0 }}
+                    transition={SPRING_FAB}
                 >
-                    {/* Subtle shimmer ring on hover when closed */}
-                    {!isOpen && (
-                        <motion.span
-                            className="absolute inset-0 rounded-2xl"
-                            style={{ border: '1px solid rgba(0,0,0,0.06)' }}
-                        />
-                    )}
-
-                    <motion.div
-                        animate={{ rotate: isOpen ? 45 : 0 }}
-                        transition={{ type: 'spring', stiffness: 350, damping: 22 }}
-                    >
-                        <Plus
-                            className={`w-6 h-6 ${isOpen ? 'text-white' : 'text-black'}`}
-                            strokeWidth={2.5}
-                        />
-                    </motion.div>
+                    <Plus
+                        style={{
+                            width: 22,
+                            height: 22,
+                            color: isOpen ? '#fff' : '#000',
+                            display: 'block',
+                            transition: 'color 0.18s',
+                        }}
+                        strokeWidth={2.4}
+                    />
                 </motion.button>
             </div>
         </>
