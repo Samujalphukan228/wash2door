@@ -8,6 +8,7 @@ import adminService from '@/services/adminService';
 import { format } from 'date-fns';
 import {
     Users,
+    User,
     RefreshCw,
     Search,
     X,
@@ -37,7 +38,7 @@ export default function UsersPage() {
         page: 1,
         limit: 10,
         search: '',
-        role: 'all',   // ✅ fetch everyone by default
+        role: 'all',
         isBlocked: ''
     });
 
@@ -135,7 +136,6 @@ export default function UsersPage() {
     };
 
     const handleRoleChange = async (userId, role) => {
-        // ✅ Prevent assigning developer role from UI
         if (role === 'developer') return;
 
         const roleLabel = role === 'user' ? 'Customer' : 'Admin';
@@ -311,7 +311,6 @@ function FilterBar({ filters, onFilterChange, showFilters, setShowFilters, activ
         { value: 'all', label: 'All Roles' },
         { value: 'user', label: 'Customer' },
         { value: 'admin', label: 'Admin' }
-        // developer intentionally excluded
     ];
 
     const statusOptions = [
@@ -601,13 +600,7 @@ function UserRow({ user, isFirst, onView, onBlock, onUnblock, onRoleChange }) {
             <div className="flex items-start gap-3">
                 <div className="relative shrink-0">
                     <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white/[0.06] overflow-hidden border border-white/[0.08] flex items-center justify-center">
-                        {user.avatar && user.avatar !== 'default-avatar.jpg' ? (
-                            <img src={user.avatar} alt={user.firstName} className="w-full h-full object-cover" />
-                        ) : (
-                            <span className="text-sm font-semibold text-white/40 uppercase">
-                                {user.firstName?.[0]}{user.lastName?.[0]}
-                            </span>
-                        )}
+                        <User className="w-5 h-5 sm:w-6 sm:h-6 text-white/40" />
                     </div>
                     <div className={`
                         absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-black
