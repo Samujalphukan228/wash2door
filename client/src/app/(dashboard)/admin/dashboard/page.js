@@ -5,6 +5,7 @@ import DashboardLayout from '@/components/admin/layout/DashboardLayout';
 import RevenueChart from '@/components/admin/charts/RevenueChart';
 import CreateBookingModal from '@/components/admin/bookings/CreateBookingModal';
 import ExpenseListPopup from '@/components/admin/Expense/ExpenseList';
+import MobileFAB from '@/components/admin/MobileFAB';
 import useDashboard from '@/hooks/useDashboard';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -72,7 +73,6 @@ export default function DashboardPage() {
         return 'Good evening';
     }, []);
 
-    // ✅ FIXED: Removed inProgress from bookingStats
     const bookingStats = useMemo(() => {
         const byStatus = stats?.bookings?.byStatus || {};
         return {
@@ -152,6 +152,7 @@ export default function DashboardPage() {
                                     })}
                                 </p>
                             </div>
+                            {/* Desktop Buttons */}
                             <button
                                 onClick={() => setShowExpenses(true)}
                                 className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.06] text-gray-400 hover:bg-white/[0.1] hover:text-white border border-white/[0.08] text-xs font-medium transition-colors"
@@ -237,23 +238,11 @@ export default function DashboardPage() {
                 </div>
             </div>
 
-            {/* Mobile FAB Buttons */}
-            <div className="lg:hidden fixed bottom-24 right-4 z-40 flex flex-col gap-3">
-                <button
-                    onClick={() => setShowExpenses(true)}
-                    className="w-12 h-12 rounded-2xl bg-white/10 text-gray-400 border border-white/20 shadow-2xl shadow-black/50 flex items-center justify-center active:scale-95 transition-all"
-                    aria-label="Open expenses"
-                >
-                    <Wallet className="w-5 h-5 text-white" />
-                </button>
-                <button
-                    onClick={() => setShowCreateModal(true)}
-                    className="w-14 h-14 bg-white text-black rounded-2xl shadow-2xl shadow-black/50 flex items-center justify-center active:scale-95 transition-transform hover:shadow-2xl hover:shadow-white/20"
-                    aria-label="Create new booking"
-                >
-                    <Plus className="w-6 h-6" strokeWidth={2.5} />
-                </button>
-            </div>
+            {/* Mobile FAB Component */}
+            <MobileFAB 
+                onNewBooking={() => setShowCreateModal(true)}
+                onExpenses={() => setShowExpenses(true)}
+            />
 
             {showCreateModal && (
                 <CreateBookingModal
@@ -405,7 +394,6 @@ function ProfitSummary({ profit, revenue, expenses }) {
 }
 
 // === BOOKING STATUS ===
-// ✅ FIXED: Removed 'inProgress' status completely
 function BookingStatus({ data }) {
     const statuses = [
         { key: 'pending', label: 'Pending', color: '#EAB308', icon: AlertCircle },
@@ -581,7 +569,7 @@ function RecentBookings({ bookings }) {
     );
 }
 
-// ✅ FIXED: Removed 'in-progress' and 'inProgress' from statusMap
+// === BOOKING ROW ===
 function BookingRow({ booking, isFirst }) {
     const statusMap = {
         pending: { bg: 'bg-yellow-500/10', text: 'text-yellow-500', label: 'Pending', dot: 'bg-yellow-500' },
