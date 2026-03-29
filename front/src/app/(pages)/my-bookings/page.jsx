@@ -518,7 +518,7 @@ const EmptyState = memo(function EmptyState({ hasFilters }) {
       {!hasFilters && (
         <motion.a
           whileTap={{ scale: 0.96 }}
-          href="/bookings"
+          href="/services"
           className="inline-flex items-center gap-2 h-11 px-6 bg-black text-white rounded-full hover:bg-gray-800 transition-colors"
         >
           <span
