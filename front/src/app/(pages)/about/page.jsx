@@ -252,7 +252,7 @@ const Hero = memo(function Hero() {
           className="flex flex-wrap items-center gap-4 mb-14"
         >
           <a
-            href="/bookings"
+            href="/services"
             className="group flex items-center justify-between gap-4 h-13 pl-7 pr-3 bg-white text-black
                        rounded-full hover:bg-gray-100 active:scale-[0.97] transition-all duration-300"
           >
@@ -616,7 +616,7 @@ const Process = memo(function Process() {
           className="flex justify-center"
         >
           <a
-            href="/bookings"
+            href="/services"
             className="group flex items-center justify-between gap-4 h-13 pl-7 pr-3 bg-white text-black
                        rounded-full hover:bg-gray-100 active:scale-[0.97] transition-all duration-300"
           >
