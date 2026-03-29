@@ -717,7 +717,7 @@ const BottomCTA = memo(function BottomCTA() {
               className="flex flex-wrap gap-3 lg:pb-1"
             >
               <a
-                href="/bookings"
+                href="/services"
                 className="group flex items-center justify-between gap-4 h-13 pl-7 pr-3
                            bg-white text-black rounded-full hover:bg-gray-100
                            active:scale-[0.97] transition-all duration-300"
