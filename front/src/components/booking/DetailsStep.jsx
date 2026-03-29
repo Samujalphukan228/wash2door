@@ -75,7 +75,7 @@ export default function DetailsStep({ data, onUpdate, onNext, onBack }) {
                                 type="text"
                                 value={data.location?.address || ""}
                                 onChange={(e) => handleChange("location.address", e.target.value)}
-                                placeholder="123 Main Street"
+                                placeholder="123 Main Street / Quarter Number"
                                 className="w-full h-12 px-4 border border-gray-200 rounded-xl text-black text-sm focus:outline-none focus:border-black"
                             />
                         </div>
@@ -87,9 +87,9 @@ export default function DetailsStep({ data, onUpdate, onNext, onBack }) {
                             </label>
                             <input
                                 type="text"
-                                value={data.location?.city || ""}
+                                value={data.location?.city || "Duliajan"}
                                 onChange={(e) => handleChange("location.city", e.target.value)}
-                                placeholder="Mumbai"
+                                placeholder="Duliajan"
                                 className="w-full h-12 px-4 border border-gray-200 rounded-xl text-black text-sm focus:outline-none focus:border-black"
                             />
                         </div>
