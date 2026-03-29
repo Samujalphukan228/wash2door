@@ -1,122 +1,56 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Wallet, CalendarPlus } from 'lucide-react';
+
+const MENU_ITEMS = [
+    { icon: CalendarPlus, label: 'New Booking', key: 'booking' },
+    { icon: Wallet,       label: 'Expenses',    key: 'expenses' },
+];
+
+/* ─── spring presets ─── */
+const SPRING_SNAPPY = { type: 'spring', stiffness: 500, damping: 30 };
+const SPRING_SOFT   = { type: 'spring', stiffness: 300, damping: 28 };
 
 export default function MobileFAB({ onNewBooking, onExpenses }) {
     const [isOpen, setIsOpen] = useState(false);
 
-    const handleAction = (action) => {
+    const handlers = { booking: onNewBooking, expenses: onExpenses };
+
+    const handleAction = useCallback((key) => {
         setIsOpen(false);
-        setTimeout(action, 300);
+        setTimeout(() => handlers[key]?.(), 250);
+    }, [onNewBooking, onExpenses]);
+
+    /* ─── variants ─── */
+    const backdropV = {
+        hidden:  { opacity: 0 },
+        visible: { opacity: 1,  transition: { duration: 0.25 } },
+        exit:    { opacity: 0,  transition: { duration: 0.2, delay: 0.05 } },
     };
 
-    const menuItems = [
-        {
-            icon: CalendarPlus,
-            label: 'New Booking',
-            onClick: onNewBooking
-        },
-        {
-            icon: Wallet,
-            label: 'Expenses',
-            onClick: onExpenses
-        }
-    ];
-
-    // Animation variants
-    const backdropVariants = {
-        hidden: { opacity: 0 },
-        visible: { 
-            opacity: 1,
-            transition: { duration: 0.3, ease: 'easeOut' }
-        },
-        exit: { 
-            opacity: 0,
-            transition: { duration: 0.2, ease: 'easeIn', delay: 0.1 }
-        }
+    const listV = {
+        hidden:  {},
+        visible: { transition: { staggerChildren: 0.07, delayChildren: 0.04 } },
+        exit:    { transition: { staggerChildren: 0.04, staggerDirection: -1 } },
     };
 
-    const menuContainerVariants = {
-        hidden: { opacity: 0 },
-        visible: {
-            opacity: 1,
-            transition: {
-                staggerChildren: 0.08,
-                delayChildren: 0.05
-            }
-        },
-        exit: {
-            opacity: 0,
-            transition: {
-                staggerChildren: 0.05,
-                staggerDirection: -1
-            }
-        }
-    };
-
-    const menuItemVariants = {
-        hidden: { 
-            opacity: 0, 
-            y: 20,
-            x: 20,
-            scale: 0.8
-        },
-        visible: { 
-            opacity: 1, 
-            y: 0,
-            x: 0,
-            scale: 1,
-            transition: {
-                type: 'spring',
-                stiffness: 400,
-                damping: 25
-            }
-        },
-        exit: { 
-            opacity: 0,
-            y: 10,
-            x: 10,
-            scale: 0.9,
-            transition: {
-                duration: 0.15
-            }
-        }
-    };
-
-    const labelVariants = {
-        hidden: { 
-            opacity: 0, 
-            x: 20,
-            scale: 0.9
-        },
-        visible: { 
-            opacity: 1, 
-            x: 0,
-            scale: 1,
-            transition: {
-                type: 'spring',
-                stiffness: 500,
-                damping: 30,
-                delay: 0.05
-            }
-        },
-        exit: { 
-            opacity: 0,
-            x: 10,
-            transition: { duration: 0.1 }
-        }
+    const rowV = {
+        hidden:  { opacity: 0, y: 16, filter: 'blur(4px)' },
+        visible: { opacity: 1, y: 0,  filter: 'blur(0px)', transition: SPRING_SNAPPY },
+        exit:    { opacity: 0, y: 8,  filter: 'blur(4px)', transition: { duration: 0.15 } },
     };
 
     return (
         <>
-            {/* Backdrop */}
+            {/* ── Backdrop ── */}
             <AnimatePresence>
                 {isOpen && (
                     <motion.div
-                        className="sm:hidden fixed inset-0 z-40 bg-black/90"
-                        variants={backdropVariants}
+                        className="sm:hidden fixed inset-0 z-40"
+                        style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)' }}
+                        variants={backdropV}
                         initial="hidden"
                         animate="visible"
                         exit="exit"
@@ -125,98 +59,88 @@ export default function MobileFAB({ onNewBooking, onExpenses }) {
                 )}
             </AnimatePresence>
 
-            {/* FAB Container */}
-            <div className="sm:hidden fixed bottom-24 right-4 z-50">
-                
-                {/* Menu Items */}
+            {/* ── FAB Shell ── */}
+            <div className="sm:hidden fixed bottom-24 right-4 z-50 flex flex-col items-end gap-3">
+
+                {/* ── Menu rows ── */}
                 <AnimatePresence>
                     {isOpen && (
-                        <motion.div 
-                            className="absolute bottom-20 right-0 flex flex-col items-end gap-3"
-                            variants={menuContainerVariants}
+                        <motion.div
+                            className="flex flex-col items-end gap-2.5 mb-1"
+                            variants={listV}
                             initial="hidden"
                             animate="visible"
                             exit="exit"
                         >
-                            {menuItems.map((item, index) => {
-                                const Icon = item.icon;
-                                
-                                return (
-                                    <motion.div 
-                                        key={item.label}
-                                        className="flex items-center gap-3"
-                                        variants={menuItemVariants}
+                            {MENU_ITEMS.map(({ icon: Icon, label, key }) => (
+                                <motion.button
+                                    key={key}
+                                    variants={rowV}
+                                    onClick={() => handleAction(key)}
+                                    aria-label={label}
+                                    className="group flex items-center gap-2.5 cursor-pointer"
+                                    style={{ outline: 'none', background: 'none', border: 'none', padding: 0 }}
+                                    whileTap={{ scale: 0.96 }}
+                                >
+                                    {/* Label pill */}
+                                    <motion.span
+                                        className="px-3.5 py-2 rounded-xl text-sm font-medium tracking-wide"
+                                        style={{
+                                            background: 'rgba(255,255,255,0.08)',
+                                            border: '1px solid rgba(255,255,255,0.12)',
+                                            color: '#fff',
+                                            letterSpacing: '0.01em',
+                                        }}
+                                        whileHover={{ background: 'rgba(255,255,255,0.16)' }}
+                                        transition={{ duration: 0.15 }}
                                     >
-                                        {/* Label */}
-                                        <motion.div 
-                                            className="px-4 py-2.5 rounded-xl bg-white/10 border border-white/10"
-                                            variants={labelVariants}
-                                            whileHover={{ 
-                                                backgroundColor: 'rgba(255,255,255,0.15)',
-                                                scale: 1.02
-                                            }}
-                                            whileTap={{ scale: 0.98 }}
-                                        >
-                                            <span className="text-sm font-medium text-white">
-                                                {item.label}
-                                            </span>
-                                        </motion.div>
-                                        
-                                        {/* Action Button */}
-                                        <motion.button
-                                            onClick={() => handleAction(item.onClick)}
-                                            className="w-12 h-12 rounded-xl bg-white flex items-center justify-center"
-                                            whileHover={{ 
-                                                scale: 1.1,
-                                                rotate: 5
-                                            }}
-                                            whileTap={{ scale: 0.9 }}
-                                            transition={{
-                                                type: 'spring',
-                                                stiffness: 500,
-                                                damping: 20
-                                            }}
-                                            aria-label={item.label}
-                                        >
-                                            <Icon className="w-5 h-5 text-black" strokeWidth={2} />
-                                        </motion.button>
-                                    </motion.div>
-                                );
-                            })}
+                                        {label}
+                                    </motion.span>
+
+                                    {/* Icon button */}
+                                    <motion.span
+                                        className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+                                        style={{ background: '#fff' }}
+                                        whileHover={{ scale: 1.08 }}
+                                        whileTap={{ scale: 0.9 }}
+                                        transition={SPRING_SOFT}
+                                    >
+                                        <Icon className="w-[18px] h-[18px] text-black" strokeWidth={2.2} />
+                                    </motion.span>
+                                </motion.button>
+                            ))}
                         </motion.div>
                     )}
                 </AnimatePresence>
 
-                {/* Main FAB Button */}
+                {/* ── Main FAB ── */}
                 <motion.button
-                    onClick={() => setIsOpen(!isOpen)}
-                    className={`
-                        relative w-14 h-14 rounded-xl flex items-center justify-center
-                        ${isOpen 
-                            ? 'bg-white/10 border border-white/20' 
-                            : 'bg-white'
-                        }
-                    `}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    transition={{
-                        type: 'spring',
-                        stiffness: 500,
-                        damping: 25
+                    onClick={() => setIsOpen((o) => !o)}
+                    aria-label={isOpen ? 'Close menu' : 'Open actions'}
+                    aria-expanded={isOpen}
+                    className="w-14 h-14 rounded-2xl flex items-center justify-center relative overflow-hidden"
+                    style={{
+                        background: isOpen ? 'rgba(255,255,255,0.1)' : '#fff',
+                        border: isOpen ? '1px solid rgba(255,255,255,0.18)' : '1px solid transparent',
+                        boxShadow: isOpen ? 'none' : '0 4px 24px rgba(0,0,0,0.35)',
                     }}
-                    aria-label={isOpen ? 'Close menu' : 'Open menu'}
+                    whileHover={{ scale: 1.06 }}
+                    whileTap={{ scale: 0.93 }}
+                    transition={SPRING_SOFT}
                 >
+                    {/* Subtle shimmer ring on hover when closed */}
+                    {!isOpen && (
+                        <motion.span
+                            className="absolute inset-0 rounded-2xl"
+                            style={{ border: '1px solid rgba(0,0,0,0.06)' }}
+                        />
+                    )}
+
                     <motion.div
-                        animate={{ 
-                            rotate: isOpen ? 45 : 0
-                        }}
-                        transition={{
-                            type: 'spring',
-                            stiffness: 300,
-                            damping: 20
-                        }}
+                        animate={{ rotate: isOpen ? 45 : 0 }}
+                        transition={{ type: 'spring', stiffness: 350, damping: 22 }}
                     >
-                        <Plus 
+                        <Plus
                             className={`w-6 h-6 ${isOpen ? 'text-white' : 'text-black'}`}
                             strokeWidth={2.5}
                         />
