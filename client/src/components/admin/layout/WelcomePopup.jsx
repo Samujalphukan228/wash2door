@@ -1,548 +1,464 @@
 'use client';
 
 import { useState, useEffect, useCallback, memo } from 'react';
-import { motion, AnimatePresence, useMotionValue, useTransform, PanInfo } from 'framer-motion';
-import { X, Lock, Shield, Key, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
+import { X, Lock, Shield, Key, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
 
-const SECURITY_GUIDES = [
+/* ─── data ─── */
+const GUIDES = [
     {
         icon: Lock,
-        title: 'Admin Account Security',
-        description: 'This account has full privileged access to the entire system and all customer data.',
-        tips: ['Never share your credentials with anyone', 'Rotate password every 90 days minimum', 'Enable MFA when available'],
-        color: 'from-blue-500/20 to-blue-600/5',
-        iconColor: 'text-blue-400',
+        tag: 'Credentials',
+        title: 'Admin Account\nSecurity',
+        description: 'This account carries full privileged access to every corner of the system and all customer data.',
+        tips: ['Never share credentials with anyone', 'Rotate your password every 90 days', 'Enable MFA wherever available'],
     },
     {
         icon: Shield,
-        title: 'Access Protection',
-        description: 'Nexxa continuously monitors all login activity and will alert you to unusual locations.',
-        tips: ['Never login on untrusted public devices', 'Always log out on shared computers', 'Review login history weekly'],
-        color: 'from-emerald-500/20 to-emerald-600/5',
-        iconColor: 'text-emerald-400',
+        tag: 'Monitoring',
+        title: 'Access\nProtection',
+        description: 'Nexxa continuously tracks all login activity and surfaces alerts for unusual locations or patterns.',
+        tips: ['Avoid logging in on public devices', 'Always log out on shared machines', 'Review login history weekly'],
     },
     {
         icon: Key,
-        title: 'System Credentials',
-        description: 'Protect all integration keys, API tokens and system configuration values.',
-        tips: ['Never commit secrets to source code', 'Rotate keys quarterly', 'Always use environment variables'],
-        color: 'from-amber-500/20 to-amber-600/5',
-        iconColor: 'text-amber-400',
+        tag: 'Tokens',
+        title: 'System\nCredentials',
+        description: 'Guard every integration key, API token and system configuration value like your most sensitive asset.',
+        tips: ['Never commit secrets to source code', 'Rotate all keys quarterly', 'Prefer environment variables always'],
     },
     {
         icon: AlertCircle,
-        title: 'System Monitoring',
-        description: 'You are responsible for reviewing all system alerts and suspicious activity.',
-        tips: ['Verify all manual booking modifications', 'Check fraud flags daily', 'Escalate issues immediately'],
-        color: 'from-red-500/20 to-red-600/5',
-        iconColor: 'text-red-400',
+        tag: 'Alerts',
+        title: 'System\nMonitoring',
+        description: 'You own the responsibility of reviewing all system alerts and flagging suspicious activity immediately.',
+        tips: ['Verify all manual booking edits', 'Check fraud flags every day', 'Escalate issues without delay'],
     },
 ];
 
-// Animation variants
-const backdropVariants = {
-    hidden: { opacity: 0 },
-    visible: { 
-        opacity: 1,
-        transition: { duration: 0.2, ease: 'easeOut' }
-    },
-    exit: { 
-        opacity: 0,
-        transition: { duration: 0.15, ease: 'easeIn' }
-    },
+/* ─── spring presets ─── */
+const SP_MODAL   = { type: 'spring', stiffness: 320, damping: 30, mass: 0.85 };
+const SP_CONTENT = { type: 'spring', stiffness: 360, damping: 32 };
+const SP_MICRO   = { type: 'spring', stiffness: 500, damping: 28 };
+
+/* ─── variants ─── */
+const backdropV = {
+    hidden:  { opacity: 0 },
+    visible: { opacity: 1, transition: { duration: 0.22 } },
+    exit:    { opacity: 0, transition: { duration: 0.16 } },
 };
 
-const modalVariants = {
-    hidden: { 
-        opacity: 0, 
-        y: 100,
-        scale: 0.95,
-    },
-    visible: { 
-        opacity: 1, 
-        y: 0,
-        scale: 1,
-        transition: {
-            type: 'spring',
-            damping: 28,
-            stiffness: 300,
-            mass: 0.9,
-        }
-    },
-    exit: { 
-        opacity: 0, 
-        y: 60,
-        scale: 0.97,
-        transition: {
-            duration: 0.2,
-            ease: [0.4, 0, 1, 1],
-        }
-    },
+const modalV = {
+    hidden:  { opacity: 0, y: 80, scale: 0.96 },
+    visible: { opacity: 1, y: 0,  scale: 1, transition: SP_MODAL },
+    exit:    { opacity: 0, y: 48, scale: 0.97, transition: { duration: 0.18, ease: [0.4,0,1,1] } },
 };
 
-const contentVariants = {
-    enter: (direction) => ({
-        x: direction > 0 ? 60 : -60,
-        opacity: 0,
-    }),
-    center: {
-        x: 0,
-        opacity: 1,
-        transition: {
-            type: 'spring',
-            damping: 26,
-            stiffness: 300,
-        }
-    },
-    exit: (direction) => ({
-        x: direction > 0 ? -60 : 60,
-        opacity: 0,
-        transition: {
-            duration: 0.15,
-            ease: 'easeIn',
-        }
-    }),
+const slideV = {
+    enter:  (d) => ({ x: d > 0 ? 56 : -56, opacity: 0, filter: 'blur(3px)' }),
+    center: { x: 0, opacity: 1, filter: 'blur(0px)', transition: SP_CONTENT },
+    exit:   (d) => ({ x: d > 0 ? -56 : 56, opacity: 0, filter: 'blur(3px)', transition: { duration: 0.14, ease: 'easeIn' } }),
 };
 
-const iconVariants = {
-    initial: { scale: 0.8, rotate: -10, opacity: 0 },
-    animate: { 
-        scale: 1, 
-        rotate: 0, 
-        opacity: 1,
-        transition: {
-            type: 'spring',
-            damping: 15,
-            stiffness: 200,
-            delay: 0.1,
-        }
-    },
-    exit: { 
-        scale: 0.8, 
-        rotate: 10, 
-        opacity: 0,
-        transition: { duration: 0.1 }
-    },
-};
+/* ─── tip row ─── */
+const TipRow = memo(({ tip, index }) => (
+    <motion.div
+        className="flex items-start gap-3"
+        initial={{ opacity: 0, x: -8 }}
+        animate={{ opacity: 1, x: 0, transition: { delay: 0.12 + index * 0.07, ...SP_MICRO } }}
+    >
+        <span style={{
+            width: 18, height: 18, borderRadius: '50%',
+            border: '0.5px solid rgba(255,255,255,0.14)',
+            background: 'rgba(255,255,255,0.05)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0, marginTop: 2,
+        }}>
+            <CheckCircle2 style={{ width: 10, height: 10, color: 'rgba(255,255,255,0.4)' }} strokeWidth={2.5} />
+        </span>
+        <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', lineHeight: 1.6 }}>{tip}</span>
+    </motion.div>
+));
+TipRow.displayName = 'TipRow';
 
-const tipVariants = {
-    hidden: { opacity: 0, x: -10 },
-    visible: (i) => ({
-        opacity: 1,
-        x: 0,
-        transition: {
-            delay: 0.15 + i * 0.08,
-            type: 'spring',
-            damping: 20,
-            stiffness: 300,
-        }
-    }),
-};
-
-const checkboxVariants = {
-    unchecked: { scale: 1 },
-    checked: { 
-        scale: [1, 1.2, 1],
-        transition: { duration: 0.2 }
-    },
-};
-
-// Memoized Tip Item
-const TipItem = memo(function TipItem({ tip, index }) {
-    return (
-        <motion.div
-            custom={index}
-            variants={tipVariants}
-            initial="hidden"
-            animate="visible"
-            className="flex items-start gap-2.5 group"
-        >
-            <div className="w-5 h-5 rounded-full bg-white/[0.06] flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-white/[0.1] transition-colors">
-                <CheckCircle2 className="w-3 h-3 text-white/50 group-hover:text-white/70 transition-colors" strokeWidth={2.5} />
-            </div>
-            <span className="text-xs sm:text-sm text-gray-400 leading-relaxed group-hover:text-gray-300 transition-colors">
-                {tip}
-            </span>
-        </motion.div>
-    );
-});
-
-TipItem.displayName = 'TipItem';
-
-// Memoized Progress Dot
-const ProgressDot = memo(function ProgressDot({ index, currentIndex, onClick }) {
-    const isActive = index === currentIndex;
-    const isCompleted = index < currentIndex;
-    
+/* ─── progress pip ─── */
+const Pip = memo(({ index, current, total, onClick }) => {
+    const isActive = index === current;
+    const isPast   = index < current;
     return (
         <motion.button
             onClick={() => onClick(index)}
-            className="relative h-1.5 flex-1 rounded-full overflow-hidden bg-white/[0.08]"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            aria-label={`Go to guide ${index + 1}`}
+            aria-label={`Guide ${index + 1} of ${total}`}
+            style={{
+                flex: 1, height: 2, borderRadius: 999,
+                background: 'rgba(255,255,255,0.08)',
+                border: 'none', cursor: 'pointer', padding: 0,
+                overflow: 'hidden', position: 'relative',
+            }}
+            whileHover={{ scaleY: 2 }}
+            transition={{ duration: 0.15 }}
         >
             <motion.div
-                className="absolute inset-0 bg-white rounded-full origin-left"
-                initial={false}
+                style={{
+                    position: 'absolute', inset: 0,
+                    background: '#fff', borderRadius: 999,
+                    transformOrigin: 'left',
+                }}
                 animate={{
-                    scaleX: isActive ? 1 : isCompleted ? 1 : 0,
-                    opacity: isActive ? 1 : isCompleted ? 0.5 : 0,
+                    scaleX: isActive || isPast ? 1 : 0,
+                    opacity: isActive ? 1 : isPast ? 0.4 : 0,
                 }}
-                transition={{
-                    duration: 0.3,
-                    ease: [0.4, 0, 0.2, 1],
-                }}
+                transition={{ duration: 0.28, ease: [0.4,0,0.2,1] }}
             />
         </motion.button>
     );
 });
+Pip.displayName = 'Pip';
 
-ProgressDot.displayName = 'ProgressDot';
-
+/* ─── main component ─── */
 export default function WelcomePopup({ user, onClose }) {
-    const [currentGuide, setCurrentGuide] = useState(0);
-    const [direction, setDirection] = useState(0);
-    const [dontShowAgain, setDontShowAgain] = useState(false);
-    
-    // For swipe gesture
-    const dragX = useMotionValue(0);
-    const dragOpacity = useTransform(dragX, [-100, 0, 100], [0.5, 1, 0.5]);
+    const [current, setCurrent]         = useState(0);
+    const [direction, setDirection]     = useState(0);
+    const [dontShow, setDontShow]       = useState(false);
 
-    const guide = SECURITY_GUIDES[currentGuide];
-    const GuideIcon = guide.icon;
-    const isFirstGuide = currentGuide === 0;
-    const isLastGuide = currentGuide === SECURITY_GUIDES.length - 1;
+    const guide    = GUIDES[current];
+    const Icon     = guide.icon;
+    const isFirst  = current === 0;
+    const isLast   = current === GUIDES.length - 1;
 
-    const goToGuide = useCallback((index) => {
-        setDirection(index > currentGuide ? 1 : -1);
-        setCurrentGuide(index);
-    }, [currentGuide]);
+    const dragX      = useMotionValue(0);
+    const dragAlpha  = useTransform(dragX, [-120, 0, 120], [0.55, 1, 0.55]);
 
-    const goNext = useCallback(() => {
-        if (!isLastGuide) {
-            setDirection(1);
-            setCurrentGuide(prev => prev + 1);
-        }
-    }, [isLastGuide]);
+    const go = useCallback((idx) => {
+        setDirection(idx > current ? 1 : -1);
+        setCurrent(idx);
+    }, [current]);
 
-    const goPrev = useCallback(() => {
-        if (!isFirstGuide) {
-            setDirection(-1);
-            setCurrentGuide(prev => prev - 1);
-        }
-    }, [isFirstGuide]);
+    const next = useCallback(() => { if (!isLast)  go(current + 1); }, [isLast, go, current]);
+    const prev = useCallback(() => { if (!isFirst) go(current - 1); }, [isFirst, go, current]);
 
-    const handleClose = useCallback(() => {
-        if (dontShowAgain) {
-            localStorage.setItem('hideWelcomePopup', 'true');
-        }
+    const close = useCallback(() => {
+        if (dontShow) localStorage.setItem('hideWelcomePopup', 'true');
         onClose();
-    }, [dontShowAgain, onClose]);
+    }, [dontShow, onClose]);
 
-    const handleDragEnd = useCallback((event, info) => {
-        const threshold = 50;
-        const velocity = info.velocity.x;
-        const offset = info.offset.x;
+    const onDragEnd = useCallback((_, info) => {
+        if (info.offset.x < -50 || info.velocity.x < -500) next();
+        else if (info.offset.x > 50 || info.velocity.x > 500) prev();
+    }, [next, prev]);
 
-        if (offset < -threshold || velocity < -500) {
-            goNext();
-        } else if (offset > threshold || velocity > 500) {
-            goPrev();
-        }
-    }, [goNext, goPrev]);
-
-    // Keyboard navigation
     useEffect(() => {
-        const handleKeyDown = (e) => {
-            if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-                goNext();
-            } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-                goPrev();
-            } else if (e.key === 'Escape') {
-                handleClose();
-            }
+        const h = (e) => {
+            if (e.key === 'ArrowRight') next();
+            else if (e.key === 'ArrowLeft') prev();
+            else if (e.key === 'Escape') close();
         };
+        window.addEventListener('keydown', h);
+        return () => window.removeEventListener('keydown', h);
+    }, [next, prev, close]);
 
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [goNext, goPrev, handleClose]);
-
-    // Prevent scroll on body
     useEffect(() => {
         document.body.style.overflow = 'hidden';
-        return () => {
-            document.body.style.overflow = '';
-        };
+        return () => { document.body.style.overflow = ''; };
     }, []);
+
+    /* icon accent per guide — pure monochrome tints */
+    const TINTS = [
+        'rgba(255,255,255,0.06)',
+        'rgba(255,255,255,0.05)',
+        'rgba(255,255,255,0.07)',
+        'rgba(255,255,255,0.05)',
+    ];
 
     return (
         <AnimatePresence>
             <motion.div
-                className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden"
-                variants={backdropVariants}
+                style={{
+                    position: 'fixed', inset: 0, zIndex: 100,
+                    display: 'flex', alignItems: 'flex-end',
+                    justifyContent: 'center',
+                }}
+                variants={backdropV}
                 initial="hidden"
                 animate="visible"
                 exit="exit"
             >
-                {/* Backdrop */}
+                {/* backdrop */}
                 <motion.div
-                    className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-                    onClick={handleClose}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.2 }}
+                    style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}
+                    onClick={close}
                 />
 
-                {/* Modal */}
+                {/* sheet */}
                 <motion.div
-                    className="relative bg-[#0A0A0A] border border-white/[0.08] rounded-t-3xl sm:rounded-2xl shadow-2xl shadow-black/80 w-full sm:max-w-md overflow-hidden"
-                    variants={modalVariants}
+                    variants={modalV}
                     initial="hidden"
                     animate="visible"
                     exit="exit"
                     onClick={(e) => e.stopPropagation()}
-                    style={{ willChange: 'transform, opacity' }}
+                    style={{
+                        position: 'relative',
+                        width: '100%',
+                        maxWidth: 440,
+                        background: '#0c0c0c',
+                        border: '0.5px solid rgba(255,255,255,0.1)',
+                        borderBottom: 'none',
+                        borderRadius: '24px 24px 0 0',
+                        overflow: 'hidden',
+                        willChange: 'transform, opacity',
+                    }}
                 >
-                    {/* Top gradient line */}
-                    <div className="h-px w-full bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+                    {/* top hairline accent */}
+                    <div style={{ height: 1, background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.18) 50%, transparent)' }} />
 
-                    {/* Header */}
-                    <div className="relative px-5 sm:px-6 pt-6 pb-5 border-b border-white/[0.06]">
-                        {/* Close button */}
-                        <motion.button
-                            onClick={handleClose}
-                            className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-xl bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] hover:border-white/[0.12] transition-all"
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            aria-label="Close"
-                        >
-                            <X className="w-4 h-4 text-gray-500" strokeWidth={2} />
-                        </motion.button>
-
-                        <div className="space-y-3 pr-10">
-                            <motion.div
-                                initial={{ opacity: 0, y: -10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.1 }}
-                            >
-                                <p className="text-[10px] font-medium text-gray-500 uppercase tracking-[0.2em] mb-1.5">
-                                    Welcome
-                                </p>
-                                <h1 className="text-xl sm:text-2xl font-bold text-white leading-tight">
-                                    Hi {user?.firstName || 'Admin'}, I'm{' '}
-                                    <span className="bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
-                                        Nexxa
-                                    </span>
-                                </h1>
-                            </motion.div>
-
-                            <motion.p
-                                className="text-sm text-gray-400 leading-relaxed"
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                transition={{ delay: 0.2 }}
-                            >
-                                A monitoring system from{' '}
-                                <a
-                                    href="https://nexxupp.com"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-white font-medium hover:text-gray-200 underline underline-offset-2 decoration-white/30 hover:decoration-white/60 transition-all"
-                                >
-                                    nexxupp
-                                </a>
-                                . I'm here to help fix all the possible issues.
-                            </motion.p>
-                        </div>
+                    {/* drag handle */}
+                    <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 0' }}>
+                        <div style={{ width: 36, height: 3, borderRadius: 999, background: 'rgba(255,255,255,0.1)' }} />
                     </div>
 
-                    {/* Content - Swipeable */}
-                    <motion.div
-                        className="relative overflow-hidden"
-                        style={{ opacity: dragOpacity }}
-                    >
+                    {/* ── HEADER ── */}
+                    <div style={{ padding: '20px 24px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)', position: 'relative' }}>
+                        {/* close */}
+                        <motion.button
+                            onClick={close}
+                            aria-label="Close"
+                            style={{
+                                position: 'absolute', top: 18, right: 20,
+                                width: 30, height: 30, borderRadius: '50%',
+                                background: 'rgba(255,255,255,0.05)',
+                                border: '0.5px solid rgba(255,255,255,0.1)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                cursor: 'pointer', outline: 'none',
+                            }}
+                            whileHover={{ background: 'rgba(255,255,255,0.1)' }}
+                            whileTap={{ scale: 0.92 }}
+                        >
+                            <X style={{ width: 13, height: 13, color: 'rgba(255,255,255,0.4)' }} strokeWidth={2} />
+                        </motion.button>
+
+                        <motion.div
+                            initial={{ opacity: 0, y: -8 }}
+                            animate={{ opacity: 1, y: 0, transition: { delay: 0.08, ...SP_MICRO } }}
+                        >
+                            <p style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: 6 }}>
+                                Welcome
+                            </p>
+                            <h1 style={{ fontSize: 22, fontWeight: 700, color: '#fff', lineHeight: 1.2, margin: 0 }}>
+                                Hi {user?.firstName || 'Admin'},{' '}
+                                <span style={{ color: 'rgba(255,255,255,0.45)', fontWeight: 400 }}>I'm Nexxa</span>
+                            </h1>
+                        </motion.div>
+
+                        <motion.p
+                            style={{ fontSize: 13, color: 'rgba(255,255,255,0.38)', lineHeight: 1.6, margin: '8px 0 0', paddingRight: 36 }}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1, transition: { delay: 0.16 } }}
+                        >
+                            A monitoring system from{' '}
+                            <a
+                                href="https://nexxupp.com"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ color: 'rgba(255,255,255,0.7)', textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,0.2)', textUnderlineOffset: 3 }}
+                            >
+                                nexxupp
+                            </a>
+                            . Here to surface and fix every possible issue.
+                        </motion.p>
+                    </div>
+
+                    {/* ── SLIDE CONTENT ── */}
+                    <motion.div style={{ overflow: 'hidden', opacity: dragAlpha }}>
                         <AnimatePresence mode="wait" custom={direction}>
                             <motion.div
-                                key={currentGuide}
+                                key={current}
                                 custom={direction}
-                                variants={contentVariants}
+                                variants={slideV}
                                 initial="enter"
                                 animate="center"
                                 exit="exit"
                                 drag="x"
                                 dragConstraints={{ left: 0, right: 0 }}
-                                dragElastic={0.2}
-                                onDragEnd={handleDragEnd}
-                                style={{ x: dragX, willChange: 'transform' }}
-                                className="px-5 sm:px-6 py-6 space-y-5 cursor-grab active:cursor-grabbing"
+                                dragElastic={0.15}
+                                onDragEnd={onDragEnd}
+                                style={{ x: dragX, padding: '24px 24px 20px', cursor: 'grab' }}
                             >
-                                {/* Icon with gradient background */}
-                                <motion.div
-                                    className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${guide.color} border border-white/[0.08] flex items-center justify-center relative overflow-hidden`}
-                                    variants={iconVariants}
-                                    initial="initial"
-                                    animate="animate"
-                                    exit="exit"
-                                >
-                                    {/* Shimmer effect */}
+                                {/* icon + tag row */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 18 }}>
                                     <motion.div
-                                        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"
-                                        animate={{
-                                            x: ['-100%', '100%'],
+                                        style={{
+                                            width: 52, height: 52, borderRadius: 16,
+                                            background: TINTS[current],
+                                            border: '0.5px solid rgba(255,255,255,0.1)',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            flexShrink: 0, overflow: 'hidden', position: 'relative',
                                         }}
-                                        transition={{
-                                            duration: 2,
-                                            repeat: Infinity,
-                                            repeatDelay: 3,
-                                            ease: 'easeInOut',
-                                        }}
-                                    />
-                                    <GuideIcon className={`w-7 h-7 ${guide.iconColor} relative z-10`} strokeWidth={1.5} />
-                                </motion.div>
+                                        initial={{ scale: 0.75, opacity: 0 }}
+                                        animate={{ scale: 1, opacity: 1, transition: { delay: 0.05, ...SP_MICRO } }}
+                                    >
+                                        {/* shimmer sweep */}
+                                        <motion.div
+                                            style={{
+                                                position: 'absolute', inset: 0,
+                                                background: 'linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.07) 50%, transparent 60%)',
+                                            }}
+                                            animate={{ x: ['-100%', '200%'] }}
+                                            transition={{ duration: 1.8, repeat: Infinity, repeatDelay: 3.5, ease: 'easeInOut' }}
+                                        />
+                                        <Icon style={{ width: 22, height: 22, color: 'rgba(255,255,255,0.7)', position: 'relative', zIndex: 1 }} strokeWidth={1.6} />
+                                    </motion.div>
 
-                                {/* Title & Description */}
-                                <div className="space-y-2">
-                                    <motion.h2
-                                        className="text-base sm:text-lg font-semibold text-white"
-                                        initial={{ opacity: 0, y: 5 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: 0.05 }}
-                                    >
-                                        {guide.title}
-                                    </motion.h2>
-                                    <motion.p
-                                        className="text-xs sm:text-sm text-gray-400 leading-relaxed"
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        transition={{ delay: 0.1 }}
-                                    >
-                                        {guide.description}
-                                    </motion.p>
+                                    <div>
+                                        <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.28)', marginBottom: 3 }}>
+                                            {guide.tag}
+                                        </p>
+                                        <h2 style={{ fontSize: 17, fontWeight: 600, color: '#fff', lineHeight: 1.25, margin: 0, whiteSpace: 'pre-line' }}>
+                                            {guide.title}
+                                        </h2>
+                                    </div>
                                 </div>
 
-                                {/* Tips */}
-                                <div className="space-y-2.5 pt-1">
+                                {/* description */}
+                                <motion.p
+                                    style={{ fontSize: 13, color: 'rgba(255,255,255,0.42)', lineHeight: 1.65, margin: '0 0 18px' }}
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1, transition: { delay: 0.08 } }}
+                                >
+                                    {guide.description}
+                                </motion.p>
+
+                                {/* divider */}
+                                <div style={{ height: '0.5px', background: 'rgba(255,255,255,0.06)', marginBottom: 16 }} />
+
+                                {/* tips */}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                                     {guide.tips.map((tip, i) => (
-                                        <TipItem key={`${currentGuide}-${i}`} tip={tip} index={i} />
+                                        <TipRow key={`${current}-${i}`} tip={tip} index={i} />
                                     ))}
                                 </div>
-
-                                {/* Swipe hint - mobile only */}
-                                <motion.p
-                                    className="sm:hidden text-[10px] text-gray-600 text-center pt-2"
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    transition={{ delay: 0.5 }}
-                                >
-                                    Swipe to navigate
-                                </motion.p>
                             </motion.div>
                         </AnimatePresence>
                     </motion.div>
 
-                    {/* Progress & Actions */}
-                    <div className="border-t border-white/[0.06] bg-white/[0.01] px-5 sm:px-6 py-5 space-y-4">
-                        {/* Progress bar */}
-                        <div className="flex gap-1.5">
-                            {SECURITY_GUIDES.map((_, i) => (
-                                <ProgressDot
-                                    key={i}
-                                    index={i}
-                                    currentIndex={currentGuide}
-                                    onClick={goToGuide}
-                                />
+                    {/* ── FOOTER ── */}
+                    <div style={{ borderTop: '0.5px solid rgba(255,255,255,0.06)', padding: '16px 24px 32px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+                        {/* progress pips */}
+                        <div style={{ display: 'flex', gap: 6 }}>
+                            {GUIDES.map((_, i) => (
+                                <Pip key={i} index={i} current={current} total={GUIDES.length} onClick={go} />
                             ))}
                         </div>
 
-                        {/* Don't Show Again - Only on last tab */}
+                        {/* don't show again — last slide only */}
                         <AnimatePresence>
-                            {isLastGuide && (
+                            {isLast && (
                                 <motion.button
-                                    onClick={() => setDontShowAgain(!dontShowAgain)}
-                                    className={`flex items-center justify-center gap-3 w-full px-4 py-3.5 rounded-xl border transition-all ${
-                                        dontShowAgain
-                                            ? 'bg-white/[0.08] border-white/20'
-                                            : 'bg-white/[0.02] border-white/[0.08] hover:bg-white/[0.05] hover:border-white/[0.12]'
-                                    }`}
-                                    initial={{ opacity: 0, y: 10, height: 0 }}
-                                    animate={{ opacity: 1, y: 0, height: 'auto' }}
-                                    exit={{ opacity: 0, y: -10, height: 0 }}
-                                    transition={{ duration: 0.2 }}
+                                    onClick={() => setDontShow((v) => !v)}
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: 'auto', transition: { duration: 0.2 } }}
+                                    exit={{ opacity: 0, height: 0, transition: { duration: 0.15 } }}
+                                    style={{
+                                        width: '100%',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                                        padding: '11px 16px',
+                                        borderRadius: 12,
+                                        background: dontShow ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.02)',
+                                        border: `0.5px solid ${dontShow ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.07)'}`,
+                                        cursor: 'pointer', outline: 'none',
+                                        transition: 'background 0.18s, border-color 0.18s',
+                                    }}
                                 >
+                                    {/* custom checkbox */}
                                     <motion.div
-                                        className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${
-                                            dontShowAgain
-                                                ? 'bg-white border-white'
-                                                : 'border-white/30 bg-transparent'
-                                        }`}
-                                        variants={checkboxVariants}
-                                        animate={dontShowAgain ? 'checked' : 'unchecked'}
+                                        style={{
+                                            width: 18, height: 18, borderRadius: 6,
+                                            border: `1.5px solid ${dontShow ? '#fff' : 'rgba(255,255,255,0.25)'}`,
+                                            background: dontShow ? '#fff' : 'transparent',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            flexShrink: 0, transition: 'all 0.15s',
+                                        }}
+                                        animate={{ scale: dontShow ? [1, 1.18, 1] : 1 }}
+                                        transition={{ duration: 0.2 }}
                                     >
                                         <AnimatePresence>
-                                            {dontShowAgain && (
+                                            {dontShow && (
                                                 <motion.div
                                                     initial={{ scale: 0 }}
-                                                    animate={{ scale: 1 }}
+                                                    animate={{ scale: 1, transition: SP_MICRO }}
                                                     exit={{ scale: 0 }}
-                                                    transition={{ type: 'spring', damping: 15, stiffness: 300 }}
                                                 >
-                                                    <CheckCircle2 className="w-3 h-3 text-black" strokeWidth={3} />
+                                                    <CheckCircle2 style={{ width: 11, height: 11, color: '#000' }} strokeWidth={3} />
                                                 </motion.div>
                                             )}
                                         </AnimatePresence>
                                     </motion.div>
-                                    <span className={`text-sm font-medium transition-colors ${
-                                        dontShowAgain ? 'text-white' : 'text-gray-400'
-                                    }`}>
-                                        Don't show this again
+                                    <span style={{ fontSize: 13, fontWeight: 500, color: dontShow ? '#fff' : 'rgba(255,255,255,0.38)', transition: 'color 0.15s' }}>
+                                        Don't show again
                                     </span>
                                 </motion.button>
                             )}
                         </AnimatePresence>
 
-                        {/* Navigation Buttons */}
-                        <div className="flex gap-2">
+                        {/* nav buttons */}
+                        <div style={{ display: 'flex', gap: 8 }}>
                             <motion.button
-                                onClick={goPrev}
-                                disabled={isFirstGuide}
-                                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-white/[0.08] text-sm font-medium text-gray-400 hover:text-white hover:bg-white/[0.04] hover:border-white/[0.12] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-white/[0.08] transition-all"
-                                whileHover={!isFirstGuide ? { scale: 1.02 } : {}}
-                                whileTap={!isFirstGuide ? { scale: 0.98 } : {}}
+                                onClick={prev}
+                                disabled={isFirst}
+                                style={{
+                                    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                                    padding: '12px 16px', borderRadius: 14,
+                                    background: 'rgba(255,255,255,0.04)',
+                                    border: '0.5px solid rgba(255,255,255,0.08)',
+                                    color: isFirst ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.5)',
+                                    fontSize: 14, fontWeight: 500,
+                                    cursor: isFirst ? 'not-allowed' : 'pointer', outline: 'none',
+                                    transition: 'color 0.15s',
+                                }}
+                                whileHover={!isFirst ? { background: 'rgba(255,255,255,0.07)' } : {}}
+                                whileTap={!isFirst ? { scale: 0.97 } : {}}
                             >
-                                <ChevronLeft className="w-4 h-4" />
+                                <ChevronLeft style={{ width: 15, height: 15 }} />
                                 Back
                             </motion.button>
 
                             <motion.button
-                                onClick={isLastGuide ? handleClose : goNext}
-                                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white text-sm font-medium text-black hover:bg-gray-100 transition-colors"
-                                whileHover={{ scale: 1.02 }}
-                                whileTap={{ scale: 0.98 }}
+                                onClick={isLast ? close : next}
+                                style={{
+                                    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                                    padding: '12px 16px', borderRadius: 14,
+                                    background: '#fff',
+                                    border: 'none',
+                                    color: '#000',
+                                    fontSize: 14, fontWeight: 600,
+                                    cursor: 'pointer', outline: 'none',
+                                    boxShadow: '0 2px 12px rgba(255,255,255,0.12)',
+                                }}
+                                whileHover={{ background: 'rgba(255,255,255,0.92)' }}
+                                whileTap={{ scale: 0.97 }}
                             >
-                                {isLastGuide ? (
+                                {isLast ? (
                                     <>
-                                        <CheckCircle2 className="w-4 h-4" />
+                                        <CheckCircle2 style={{ width: 15, height: 15 }} />
                                         Done
                                     </>
                                 ) : (
                                     <>
                                         Next
-                                        <ChevronRight className="w-4 h-4" />
+                                        <ArrowRight style={{ width: 15, height: 15 }} />
                                     </>
                                 )}
                             </motion.button>
                         </div>
 
-                        {/* Step counter */}
+                        {/* step counter */}
                         <motion.p
-                            className="text-[10px] text-gray-600 text-center font-mono"
-                            key={currentGuide}
+                            key={current}
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
+                            style={{ textAlign: 'center', fontSize: 11, color: 'rgba(255,255,255,0.2)', fontVariantNumeric: 'tabular-nums', margin: 0 }}
                         >
-                            {currentGuide + 1} / {SECURITY_GUIDES.length}
+                            {current + 1} / {GUIDES.length}
                         </motion.p>
                     </div>
                 </motion.div>
