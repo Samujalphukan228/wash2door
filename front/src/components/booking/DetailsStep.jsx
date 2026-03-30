@@ -69,7 +69,7 @@ export default function DetailsStep({ data, onUpdate, onNext, onBack }) {
                         {/* Address */}
                         <div>
                             <label className="block text-gray-400 text-xs mb-2 uppercase tracking-wide">
-                                Street Address *
+                                Address/ Quarter Number *
                             </label>
                             <input
                                 type="text"
