@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import DashboardLayout from '@/components/admin/layout/DashboardLayout';
 import RevenueChart from '@/components/admin/charts/RevenueChart';
 import CreateBookingModal from '@/components/admin/bookings/CreateBookingModal';
@@ -62,6 +62,20 @@ export default function DashboardPage() {
         profit,
         weeklyData 
     } = useDashboard();
+
+    // 🔍 DEBUG: Check weeklyData
+    useEffect(() => {
+        if (weeklyData && weeklyData.length > 0) {
+            console.log('═══════════════════════════════════════');
+            console.log('📊 WEEKLY DATA DEBUG:');
+            console.log('Total items:', weeklyData.length);
+            console.log('Sample item:', weeklyData[0]);
+            console.log('Has expenses?', weeklyData[0]?.expenses !== undefined);
+            console.log('Has profit?', weeklyData[0]?.profit !== undefined);
+            console.log('Full data:', weeklyData);
+            console.log('═══════════════════════════════════════');
+        }
+    }, [weeklyData]);
     
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showExpenses, setShowExpenses] = useState(false);

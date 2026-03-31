@@ -210,6 +210,14 @@ export const getDashboardStats = async (req, res) => {
             { $sort: { _id: 1 } }
         ]);
 
+        // 🔍 DEBUG: Check what's happening with weekly expenses
+        console.log('═══════════════════════════════════════');
+        console.log('🔍 WEEKLY EXPENSES DEBUG:');
+        console.log('Date range start:', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
+        console.log('Query result:', weeklyExpenses);
+        console.log('Number of expense records:', weeklyExpenses.length);
+        console.log('═══════════════════════════════════════');
+
         const expenseMap = {};
         weeklyExpenses.forEach(e => {
             expenseMap[e._id] = e.expenses;
@@ -986,7 +994,6 @@ export const updateBookingStatus = async (req, res) => {
         const oldTimeSlot = booking.timeSlot;
         const oldServiceId = booking.serviceId;
 
-        // ✅ If cancelling, DELETE the booking
         if (status === 'cancelled') {
             const bookingData = {
                 _id: booking._id,
@@ -1000,19 +1007,16 @@ export const updateBookingStatus = async (req, res) => {
                 cancellationReason: reason || 'Cancelled by admin'
             };
 
-            // Delete the booking
             await Booking.deleteOne({ _id: bookingId });
 
             console.log(`🗑️ Booking ${bookingData.bookingCode} DELETED (cancelled by admin)`);
 
-            // Real-time socket emissions
             emitBookingCancelled(bookingData, 'admin');
             emitSlotAvailable(oldDateStr, oldTimeSlot, oldServiceId);
             emitDashboardUpdate({ action: 'booking_cancelled' });
 
             console.log(`🔌 Real-time: Admin cancelled → Slot released ${oldDateStr} ${oldTimeSlot}`);
 
-            // Send email async
             setImmediate(async () => {
                 try {
                     if (bookingData.customerId?.email) {
@@ -1037,7 +1041,6 @@ export const updateBookingStatus = async (req, res) => {
             });
         }
 
-        // ✅ For other status changes (confirmed, completed)
         booking.status = status;
 
         if (status === 'completed') {
@@ -1047,13 +1050,11 @@ export const updateBookingStatus = async (req, res) => {
 
         await booking.save();
 
-        // Real-time socket emissions
         emitBookingStatusUpdate(booking, booking.customerId?._id);
         emitDashboardUpdate({ action: 'booking_status_changed', status });
 
         console.log(`🔌 Real-time: Status ${booking.bookingCode} → ${status}`);
 
-        // Send email async
         setImmediate(async () => {
             try {
                 if (booking.customerId?.email) {
@@ -1330,9 +1331,8 @@ export const createAdminBooking = async (req, res) => {
     }
 };
 
-// ============================================
-// REVENUE REPORT
-// ============================================
+// Rest of the file remains exactly the same...
+// (getAllReviews, toggleReviewVisibility, cleanupOldBookings, getBookingCleanupStats, getRevenueReport, getBookingReport)
 
 export const getRevenueReport = async (req, res) => {
     try {
@@ -1442,10 +1442,6 @@ export const getRevenueReport = async (req, res) => {
     }
 };
 
-// ============================================
-// BOOKING REPORT
-// ============================================
-
 export const getBookingReport = async (req, res) => {
     try {
         const { startDate, endDate } = req.query;
@@ -1539,10 +1535,6 @@ export const getBookingReport = async (req, res) => {
     }
 };
 
-// ============================================
-// GET ALL REVIEWS (ADMIN)
-// ============================================
-
 export const getAllReviews = async (req, res) => {
     try {
         const {
@@ -1611,10 +1603,6 @@ export const getAllReviews = async (req, res) => {
     }
 };
 
-// ============================================
-// TOGGLE REVIEW VISIBILITY
-// ============================================
-
 export const toggleReviewVisibility = async (req, res) => {
     try {
         const { reviewId } = req.params;
@@ -1654,20 +1642,16 @@ export const toggleReviewVisibility = async (req, res) => {
     }
 };
 
-// ============================================
-// CLEANUP OLD COMPLETED BOOKINGS
-// ============================================
-
 export const cleanupOldBookings = async (req, res) => {
     try {
-        const { 
+        const {
             olderThanDays = 90,
             status = 'completed',
             dryRun = 'false'
         } = req.query;
 
         const days = parseInt(olderThanDays);
-        
+
         if (isNaN(days) || days < 30) {
             return res.status(400).json({
                 success: false,
@@ -1714,10 +1698,6 @@ export const cleanupOldBookings = async (req, res) => {
     }
 };
 
-// ============================================
-// GET BOOKING CLEANUP STATS
-// ============================================
-
 export const getBookingCleanupStats = async (req, res) => {
     try {
         const now = new Date();
@@ -1754,7 +1734,7 @@ export const getBookingCleanupStats = async (req, res) => {
                     completedOlderThan60Days: completedOlderThan60,
                     completedOlderThan90Days: completedOlderThan90
                 },
-                recommendation: completedOlderThan90 > 100 
+                recommendation: completedOlderThan90 > 100
                     ? `Consider cleaning up ${completedOlderThan90} old completed bookings`
                     : 'No cleanup needed at this time'
             }
