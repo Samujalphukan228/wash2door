@@ -152,9 +152,10 @@ export default function ExpenseListPopup({ isOpen, onClose }) {
         }
     };
 
-    const totalSpent = categories.reduce((sum, c) => sum + (c.totalAmount || 0), 0);
-    const thisMonthExpenses = summary?.thisMonth || 0;
-    const lastMonthExpenses = summary?.lastMonth || 0;
+    // FIX: Convert totalAmount to Number
+    const totalSpent = categories.reduce((sum, c) => sum + (Number(c.totalAmount) || 0), 0);
+    const thisMonthExpenses = Number(summary?.thisMonth) || 0;
+    const lastMonthExpenses = Number(summary?.lastMonth) || 0;
     const growth = lastMonthExpenses > 0 
         ? Math.round(((thisMonthExpenses - lastMonthExpenses) / lastMonthExpenses) * 100) 
         : 0;
@@ -333,7 +334,7 @@ function StatPill({ label, value, trend, sub }) {
                     </span>
                 )}
             </div>
-            <p className="text-base font-bold text-white tabular-nums">₹{value.toLocaleString('en-IN')}</p>
+            <p className="text-base font-bold text-white tabular-nums">₹{Number(value).toLocaleString('en-IN')}</p>
             {sub && <p className="text-[9px] text-white/30 mt-0.5">{sub}</p>}
         </div>
     );
@@ -351,8 +352,8 @@ function LoadingState() {
 
 // === OVERVIEW TAB ===
 function OverviewTab({ categories, onAddExpense }) {
-    const sorted = [...categories].sort((a, b) => (b.totalAmount || 0) - (a.totalAmount || 0));
-    const total = sorted.reduce((s, c) => s + (c.totalAmount || 0), 0);
+    const sorted = [...categories].sort((a, b) => (Number(b.totalAmount) || 0) - (Number(a.totalAmount) || 0));
+    const total = sorted.reduce((s, c) => s + (Number(c.totalAmount) || 0), 0);
 
     if (categories.length === 0) {
         return <EmptyState icon={Wallet} title="No expenses" desc="Add your first category" />;
@@ -361,7 +362,8 @@ function OverviewTab({ categories, onAddExpense }) {
     return (
         <div className="px-3 py-2 space-y-1.5">
             {sorted.map((cat, i) => {
-                const pct = total > 0 ? Math.round((cat.totalAmount || 0) / total * 100) : 0;
+                const catTotal = Number(cat.totalAmount) || 0;
+                const pct = total > 0 ? Math.round(catTotal / total * 100) : 0;
                 const isTop = i === 0;
 
                 return (
@@ -382,7 +384,7 @@ function OverviewTab({ categories, onAddExpense }) {
                                     {cat.categoryName}
                                 </span>
                                 <span className={`text-xs font-semibold tabular-nums ${isTop ? 'text-black' : 'text-white'}`}>
-                                    ₹{(cat.totalAmount || 0).toLocaleString('en-IN')}
+                                    ₹{catTotal.toLocaleString('en-IN')}
                                 </span>
                             </div>
                             <div className="flex items-center gap-2">
@@ -467,7 +469,7 @@ function ExpensesTab({ expenses, categories, filters, setFilters, pagination, on
                                 <div className="flex items-center gap-2 mb-1.5 px-1">
                                     <span className="text-[9px] text-white/30 font-semibold uppercase tracking-wide">{formatDate(date)}</span>
                                     <div className="flex-1 h-px bg-white/[0.04]" />
-                                    <span className="text-[9px] text-white/20 tabular-nums">₹{items.reduce((s, e) => s + e.amount, 0).toLocaleString('en-IN')}</span>
+                                    <span className="text-[9px] text-white/20 tabular-nums">₹{items.reduce((s, e) => s + (Number(e.amount) || 0), 0).toLocaleString('en-IN')}</span>
                                 </div>
                                 <div className="space-y-1">
                                     {items.map((exp) => (
@@ -534,7 +536,7 @@ function ExpenseRow({ expense, onEdit, onDelete }) {
                 </div>
             ) : (
                 <>
-                    <span className="text-xs font-semibold text-white tabular-nums">₹{expense.amount.toLocaleString('en-IN')}</span>
+                    <span className="text-xs font-semibold text-white tabular-nums">₹{(Number(expense.amount) || 0).toLocaleString('en-IN')}</span>
                     <MoreHorizontal className="w-3.5 h-3.5 text-white/20 opacity-0 group-hover:opacity-100" />
                 </>
             )}
@@ -559,7 +561,8 @@ function CategoriesTab({ categories, totalSpent, onAddCategory, onAddExpense }) 
             ) : (
                 <div className="grid grid-cols-2 gap-2">
                     {categories.map((cat) => {
-                        const pct = totalSpent > 0 ? Math.round((cat.totalAmount || 0) / totalSpent * 100) : 0;
+                        const catTotal = Number(cat.totalAmount) || 0;
+                        const pct = totalSpent > 0 ? Math.round(catTotal / totalSpent * 100) : 0;
                         return (
                             <button
                                 key={cat._id}
@@ -570,7 +573,7 @@ function CategoriesTab({ categories, totalSpent, onAddCategory, onAddExpense }) 
                                     {cat.categoryName.charAt(0)}
                                 </div>
                                 <p className="text-[10px] text-white/40 truncate mb-0.5">{cat.categoryName}</p>
-                                <p className="text-sm font-bold text-white tabular-nums">₹{(cat.totalAmount || 0).toLocaleString('en-IN')}</p>
+                                <p className="text-sm font-bold text-white tabular-nums">₹{catTotal.toLocaleString('en-IN')}</p>
                                 <div className="flex items-center gap-1.5 mt-2">
                                     <div className="flex-1 h-1 bg-white/[0.06] rounded-full overflow-hidden">
                                         <div className="h-full bg-white/30 rounded-full" style={{ width: `${pct}%` }} />
@@ -707,7 +710,7 @@ function AddExpenseSheet({ categories, selectedCategory, onClose, onSubmit }) {
                     <div className="flex items-center justify-between p-3 rounded-lg bg-white/[0.03] border border-white/[0.04]">
                         <span className="text-[10px] text-white/40">New total in {selectedCat?.categoryName}</span>
                         <span className="text-sm font-bold text-white tabular-nums">
-                            ₹{((selectedCat?.totalAmount || 0) + (Number(formData.amount) || 0)).toLocaleString('en-IN')}
+                            ₹{((Number(selectedCat?.totalAmount) || 0) + (Number(formData.amount) || 0)).toLocaleString('en-IN')}
                         </span>
                     </div>
                 )}
@@ -930,7 +933,7 @@ function CategoryManagerSheet({ categories, onClose, onUpdate }) {
                                     <div className="w-6 h-6 rounded-md bg-white/[0.06] flex items-center justify-center text-[9px] font-bold text-white/50 shrink-0">{cat.categoryName.charAt(0)}</div>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-[11px] font-medium text-white/80 truncate">{cat.categoryName}</p>
-                                        <p className="text-[9px] text-white/30 tabular-nums">₹{(cat.totalAmount || 0).toLocaleString('en-IN')}</p>
+                                        <p className="text-[9px] text-white/30 tabular-nums">₹{(Number(cat.totalAmount) || 0).toLocaleString('en-IN')}</p>
                                     </div>
                                     <button onClick={() => { setEditingId(cat._id); setEditingName(cat.categoryName); }} className="w-6 h-6 rounded-md hover:bg-white/[0.06] flex items-center justify-center">
                                         <Edit2 className="w-3 h-3 text-white/40" />
@@ -952,7 +955,7 @@ function CategoryManagerSheet({ categories, onClose, onUpdate }) {
     );
 }
 
-// === SHEET WRAPPER ===
+// === SHEET WRAPPER =======
 function Sheet({ children, onClose }) {
     return (
         <>

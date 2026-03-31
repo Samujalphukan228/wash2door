@@ -242,6 +242,9 @@ export const addExpense = async (req, res) => {
     try {
         const { categoryId, amount, note } = req.body;
 
+        // ✅ FIX: Convert amount to number
+        const numAmount = Number(amount);
+
         if (!categoryId || !isValidObjectId(categoryId)) {
             return res.status(400).json({
                 success: false,
@@ -249,7 +252,7 @@ export const addExpense = async (req, res) => {
             });
         }
 
-        if (!amount || amount <= 0) {
+        if (!numAmount || isNaN(numAmount) || numAmount <= 0) {
             return res.status(400).json({
                 success: false,
                 message: 'Valid amount is required'
@@ -267,16 +270,16 @@ export const addExpense = async (req, res) => {
         const expense = await Expense.create({
             category: categoryId,
             categoryName: category.categoryName,
-            amount,
+            amount: numAmount,  // ✅ Use number
             note: note?.trim() || '',
             createdBy: req.user._id
         });
 
-        // Update category total
-        category.totalAmount += amount;
+        // ✅ FIX: Ensure totalAmount is a number before adding
+        category.totalAmount = (Number(category.totalAmount) || 0) + numAmount;
         await category.save();
 
-        emitDashboardUpdate({ action: 'expense_added', amount });
+        emitDashboardUpdate({ action: 'expense_added', amount: numAmount });
 
         res.status(201).json({ success: true, data: expense });
     } catch (error) {
@@ -290,10 +293,20 @@ export const updateExpense = async (req, res) => {
         const { expenseId } = req.params;
         const { categoryId, amount, note } = req.body;
 
+        // ✅ FIX: Convert amount to number if provided
+        const numAmount = amount !== undefined ? Number(amount) : undefined;
+
         if (!isValidObjectId(expenseId)) {
             return res.status(400).json({
                 success: false,
                 message: 'Invalid expense ID'
+            });
+        }
+
+        if (numAmount !== undefined && (isNaN(numAmount) || numAmount <= 0)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Valid amount is required'
             });
         }
 
@@ -305,7 +318,7 @@ export const updateExpense = async (req, res) => {
             });
         }
 
-        const oldAmount = expense.amount;
+        const oldAmount = Number(expense.amount) || 0;  // ✅ Ensure number
         const oldCategoryId = expense.category.toString();
 
         // If changing category
@@ -330,22 +343,23 @@ export const updateExpense = async (req, res) => {
                 $inc: { totalAmount: -oldAmount }
             });
 
-            // Add to new category
-            newCategory.totalAmount += (amount || oldAmount);
+            // ✅ FIX: Add to new category with proper number conversion
+            const amountToAdd = numAmount !== undefined ? numAmount : oldAmount;
+            newCategory.totalAmount = (Number(newCategory.totalAmount) || 0) + amountToAdd;
             await newCategory.save();
 
             expense.category = categoryId;
             expense.categoryName = newCategory.categoryName;
-        } else if (amount && amount !== oldAmount) {
+        } else if (numAmount !== undefined && numAmount !== oldAmount) {
             // Same category, different amount
-            const diff = amount - oldAmount;
+            const diff = numAmount - oldAmount;
             await ExpenseCategory.findByIdAndUpdate(expense.category, {
                 $inc: { totalAmount: diff }
             });
         }
 
         // Update fields
-        if (amount) expense.amount = amount;
+        if (numAmount !== undefined) expense.amount = numAmount;
         if (note !== undefined) expense.note = note.trim();
 
         await expense.save();
@@ -378,9 +392,11 @@ export const deleteExpense = async (req, res) => {
             });
         }
 
-        // Subtract from category total
+        // ✅ FIX: Ensure amount is number before subtracting
+        const amountToSubtract = Number(expense.amount) || 0;
+        
         await ExpenseCategory.findByIdAndUpdate(expense.category, {
-            $inc: { totalAmount: -expense.amount }
+            $inc: { totalAmount: -amountToSubtract }
         });
 
         await Expense.deleteOne({ _id: expenseId });
