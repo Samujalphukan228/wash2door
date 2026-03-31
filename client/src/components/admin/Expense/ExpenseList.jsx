@@ -611,7 +611,14 @@ function AddExpenseSheet({ categories, selectedCategory, onClose, onSubmit }) {
         e.preventDefault();
         if (!formData.categoryId || !formData.amount) return;
         setLoading(true);
-        try { await onSubmit(formData); } finally { setLoading(false); }
+        try { 
+            await onSubmit({
+                ...formData,
+                amount: Number(formData.amount)
+            }); 
+        } finally { 
+            setLoading(false); 
+        }
     };
 
     return (
@@ -700,7 +707,7 @@ function AddExpenseSheet({ categories, selectedCategory, onClose, onSubmit }) {
                     <div className="flex items-center justify-between p-3 rounded-lg bg-white/[0.03] border border-white/[0.04]">
                         <span className="text-[10px] text-white/40">New total in {selectedCat?.categoryName}</span>
                         <span className="text-sm font-bold text-white tabular-nums">
-                            ₹{((selectedCat?.totalAmount || 0) + (parseInt(formData.amount) || 0)).toLocaleString('en-IN')}
+                            ₹{((selectedCat?.totalAmount || 0) + (Number(formData.amount) || 0)).toLocaleString('en-IN')}
                         </span>
                     </div>
                 )}
@@ -788,7 +795,14 @@ function EditExpenseSheet({ expense, categories, onClose, onSubmit, onDelete }) 
         e.preventDefault();
         if (!formData.amount) return;
         setLoading(true);
-        try { await onSubmit(formData); } finally { setLoading(false); }
+        try { 
+            await onSubmit({
+                ...formData,
+                amount: Number(formData.amount)
+            }); 
+        } finally { 
+            setLoading(false); 
+        }
     };
 
     return (
