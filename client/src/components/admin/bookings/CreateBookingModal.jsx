@@ -18,7 +18,7 @@ const TIME_SLOTS = [
     '04:00 PM-05:30 PM',
 ];
 
-// ✅ REORDERED: Customer → Service → Schedule
+// Steps: Customer → Service → Schedule
 const STEPS = [
     { label: 'Customer', desc: 'Who?', icon: User },
     { label: 'Service', desc: 'What?', icon: Package },
@@ -326,13 +326,8 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
     const [loading, setLoading] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
 
-    // Step 1 - Customer & Location (NOW FIRST)
-    const [bookingType, setBookingType] = useState('walkin');
+    // Step 1 - Customer & Location
     const [walkInCustomer, setWalkInCustomer] = useState({ name: '', phone: '' });
-    const [customerSearch, setCustomerSearch] = useState('');
-    const [customers, setCustomers] = useState([]);
-    const [selectedCustomer, setSelectedCustomer] = useState(null);
-    const [searchLoading, setSearchLoading] = useState(false);
     const [location, setLocation] = useState({ address: 'Walk-in / At Shop', city: 'Duliajan' });
 
     // Walk-in customers from DB
@@ -344,12 +339,12 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
     const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
     const [deletingCustomerId, setDeletingCustomerId] = useState(null);
 
-    // Step 2 - Service (NOW SECOND)
+    // Step 2 - Service
     const [services, setServices] = useState([]);
     const [selectedService, setSelectedService] = useState(null);
     const [servicesLoading, setServicesLoading] = useState(false);
 
-    // Step 3 - Schedule (NOW THIRD)
+    // Step 3 - Schedule
     const [bookingDate, setBookingDate] = useState('');
     const [timeSlot, setTimeSlot] = useState('');
     const [availability, setAvailability] = useState([]);
@@ -379,21 +374,19 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
 
     // Load recent walk-in customers
     useEffect(() => {
-        if (bookingType === 'walkin') {
-            (async () => {
-                try {
-                    const res = await adminService.getRecentWalkInCustomers(5);
-                    if (res.success) setRecentWalkinCustomers(res.data || []);
-                } catch (error) {
-                    console.error('Failed to load recent customers:', error);
-                }
-            })();
-        }
-    }, [bookingType]);
+        (async () => {
+            try {
+                const res = await adminService.getRecentWalkInCustomers(5);
+                if (res.success) setRecentWalkinCustomers(res.data || []);
+            } catch (error) {
+                console.error('Failed to load recent customers:', error);
+            }
+        })();
+    }, []);
 
     // Search walk-in customers
     useEffect(() => {
-        if (bookingType !== 'walkin' || walkinSearch.length < 2) {
+        if (walkinSearch.length < 2) {
             setSavedWalkinCustomers([]);
             return;
         }
@@ -412,28 +405,7 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
         }, 400);
 
         return () => clearTimeout(t);
-    }, [walkinSearch, bookingType]);
-
-    // Search online customers
-    useEffect(() => {
-        if (bookingType !== 'online' || customerSearch.length < 2) {
-            setCustomers([]);
-            return;
-        }
-        const t = setTimeout(async () => {
-            setSearchLoading(true);
-            try {
-                const res = await adminService.getAllUsers({ search: customerSearch, limit: 5 });
-                if (res.success) setCustomers(res.data.users || []);
-                else setCustomers([]);
-            } catch {
-                setCustomers([]);
-            } finally {
-                setSearchLoading(false);
-            }
-        }, 400);
-        return () => clearTimeout(t);
-    }, [customerSearch, bookingType]);
+    }, [walkinSearch]);
 
     // Check availability
     useEffect(() => {
@@ -463,18 +435,16 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
         return found ? found.available : true;
     }, [availability]);
 
-    // ✅ UPDATED: canProceed for new step order
+    // canProceed validation
     const canProceed = useMemo(() => ({
-        // Step 1: Customer
-        1: (bookingType === 'walkin' 
-            ? (selectedWalkinCustomer !== null || (showNewCustomerForm && walkInCustomer.name.trim() && walkInCustomer.phone.trim()))
-            : selectedCustomer !== null) &&
+        // Step 1: Customer - either selected existing or new form filled
+        1: (selectedWalkinCustomer !== null || (showNewCustomerForm && walkInCustomer.name.trim() && walkInCustomer.phone.trim())) &&
             location.address.trim() && location.city.trim(),
         // Step 2: Service
         2: selectedService !== null,
         // Step 3: Schedule
         3: bookingDate && timeSlot
-    }), [bookingType, walkInCustomer, selectedCustomer, selectedWalkinCustomer, showNewCustomerForm, location, selectedService, bookingDate, timeSlot]);
+    }), [walkInCustomer, selectedWalkinCustomer, showNewCustomerForm, location, selectedService, bookingDate, timeSlot]);
 
     const goToStep = useCallback((newStep) => {
         setDirection(newStep > step ? 1 : -1);
@@ -525,21 +495,15 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
         try {
             setLoading(true);
             const payload = {
-                bookingType,
+                bookingType: 'walkin',
                 serviceId: selectedService._id,
                 bookingDate,
                 timeSlot,
                 location,
-                paymentMethod
+                paymentMethod,
+                walkInCustomer,
+                phone: walkInCustomer.phone
             };
-
-            if (bookingType === 'walkin') {
-                payload.walkInCustomer = walkInCustomer;
-                payload.phone = walkInCustomer.phone;
-            } else {
-                payload.customerId = selectedCustomer._id;
-                payload.phone = selectedCustomer?.phone || '';
-            }
 
             await adminService.createAdminBooking(payload);
             toast.success('Booking created successfully!');
@@ -549,7 +513,7 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
         } finally {
             setLoading(false);
         }
-    }, [bookingType, selectedService, bookingDate, timeSlot, location, paymentMethod, walkInCustomer, selectedCustomer, onSuccess]);
+    }, [selectedService, bookingDate, timeSlot, location, paymentMethod, walkInCustomer, onSuccess]);
 
     const handleNext = useCallback(() => {
         if (step < 3) {
@@ -653,277 +617,140 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                                 className="px-4 py-5 space-y-6 pb-28 sm:pb-6"
                             >
                                 {/* ========================================== */}
-                                {/* STEP 1 - Customer & Location (NOW FIRST) */}
+                                {/* STEP 1 - Customer & Location */}
                                 {/* ========================================== */}
                                 {step === 1 && (
                                     <>
-                                        {/* Booking Type */}
-                                        <div className="space-y-3">
-                                            <label className="flex items-center gap-2 text-[10px] text-white/30 uppercase tracking-widest font-medium">
-                                                <User className="w-3 h-3" />
-                                                Booking Type
-                                            </label>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                {[
-                                                    { value: 'walkin', label: 'Walk-in', desc: 'At shop' },
-                                                    { value: 'online', label: 'Online', desc: 'Registered' }
-                                                ].map(({ value, label, desc }) => (
-                                                    <motion.button
-                                                        key={value}
+                                        {/* Customer Section */}
+                                        <div className="space-y-4">
+                                            {/* Search */}
+                                            <div className="space-y-2">
+                                                <label className="flex items-center gap-2 text-[10px] text-white/30 uppercase tracking-widest font-medium">
+                                                    <History className="w-3 h-3" />
+                                                    {walkinSearch.length >= 2 ? 'Search Results' : 'Recent Customers'}
+                                                </label>
+                                                <div className="relative">
+                                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/25" />
+                                                    <input
+                                                        type="text"
+                                                        value={walkinSearch}
+                                                        onChange={(e) => setWalkinSearch(e.target.value)}
+                                                        placeholder="Search by name or phone..."
+                                                        className="w-full bg-white/[0.03] border border-white/[0.08] text-white/80 text-sm pl-11 pr-4 py-3 rounded-xl focus:outline-none focus:border-white/20 transition-all"
+                                                    />
+                                                    {walkinSearchLoading && (
+                                                        <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/25 animate-spin" />
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Customer List */}
+                                            {!showNewCustomerForm && displayWalkinCustomers.length > 0 && (
+                                                <div className="space-y-2 max-h-40 overflow-y-auto">
+                                                    {displayWalkinCustomers.map((customer) => (
+                                                        <WalkInCustomerCard
+                                                            key={customer._id}
+                                                            customer={customer}
+                                                            selected={selectedWalkinCustomer?._id === customer._id}
+                                                            onSelect={handleSelectWalkinCustomer}
+                                                            onDelete={handleDeleteWalkinCustomer}
+                                                            deleting={deletingCustomerId === customer._id}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            {/* No results */}
+                                            {!showNewCustomerForm && displayWalkinCustomers.length === 0 && walkinSearch.length >= 2 && !walkinSearchLoading && (
+                                                <div className="text-center py-4">
+                                                    <p className="text-xs text-white/40">No customers found</p>
+                                                </div>
+                                            )}
+
+                                            {/* Add New Button */}
+                                            {!showNewCustomerForm && (
+                                                <motion.button
+                                                    onClick={handleShowNewForm}
+                                                    className="w-full flex items-center justify-center gap-2 p-3 rounded-xl border border-dashed border-white/[0.15] bg-white/[0.02] text-white/50 hover:text-white/80 hover:border-white/[0.25] hover:bg-white/[0.04] transition-all"
+                                                    whileTap={{ scale: 0.98 }}
+                                                >
+                                                    <UserPlus className="w-4 h-4" />
+                                                    <span className="text-xs font-medium">Add New Customer</span>
+                                                </motion.button>
+                                            )}
+
+                                            {/* New Customer Form */}
+                                            {showNewCustomerForm && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, y: 10 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    className="space-y-3 p-4 rounded-xl border border-white/[0.1] bg-white/[0.02]"
+                                                >
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <span className="text-xs text-white/50 font-medium">New Customer</span>
+                                                        <button
+                                                            onClick={() => {
+                                                                setShowNewCustomerForm(false);
+                                                                setWalkInCustomer({ name: '', phone: '' });
+                                                            }}
+                                                            className="text-[10px] text-white/30 hover:text-white/60"
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                    </div>
+                                                    <InputField
+                                                        label="Customer Name"
+                                                        value={walkInCustomer.name}
+                                                        onChange={(v) => setWalkInCustomer(p => ({ ...p, name: v }))}
+                                                        placeholder="Full name"
+                                                        required
+                                                    />
+                                                    <InputField
+                                                        label="Phone"
+                                                        value={walkInCustomer.phone}
+                                                        onChange={(v) => setWalkInCustomer(p => ({ ...p, phone: v }))}
+                                                        placeholder="+91 XXXXX XXXXX"
+                                                        required
+                                                    />
+                                                    <p className="text-[10px] text-white/30 flex items-center gap-1">
+                                                        <Star className="w-3 h-3" />
+                                                        Customer will be saved for future bookings
+                                                    </p>
+                                                </motion.div>
+                                            )}
+
+                                            {/* Selected Customer Display */}
+                                            {selectedWalkinCustomer && !showNewCustomerForm && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, scale: 0.95 }}
+                                                    animate={{ opacity: 1, scale: 1 }}
+                                                    className="flex items-center justify-between px-4 py-3 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.05]"
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                                                            <Check className="w-4 h-4 text-emerald-400" />
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-sm text-white font-medium">
+                                                                {selectedWalkinCustomer.name}
+                                                            </p>
+                                                            <p className="text-[11px] text-white/40 font-mono">
+                                                                {selectedWalkinCustomer.phone}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <button
                                                         onClick={() => {
-                                                            setBookingType(value);
-                                                            setSelectedCustomer(null);
-                                                            setCustomerSearch('');
                                                             setSelectedWalkinCustomer(null);
-                                                            setWalkinSearch('');
-                                                            setShowNewCustomerForm(false);
                                                             setWalkInCustomer({ name: '', phone: '' });
                                                         }}
-                                                        className={`
-                                                            p-4 rounded-xl border text-left transition-all
-                                                            ${bookingType === value
-                                                                ? 'border-white/25 bg-white/[0.08]'
-                                                                : 'border-white/[0.07] bg-white/[0.02] hover:border-white/[0.12]'
-                                                            }
-                                                        `}
-                                                        whileTap={{ scale: 0.98 }}
+                                                        className="w-7 h-7 rounded-lg flex items-center justify-center text-white/30 hover:text-white/70 hover:bg-white/[0.08] transition-all"
                                                     >
-                                                        <div className="flex items-center justify-between mb-1">
-                                                            <span className={`text-sm font-medium ${bookingType === value ? 'text-white' : 'text-white/70'}`}>
-                                                                {label}
-                                                            </span>
-                                                            {bookingType === value && (
-                                                                <div className="w-4 h-4 rounded-full bg-white flex items-center justify-center">
-                                                                    <Check className="w-2.5 h-2.5 text-black" />
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                        <span className="text-[11px] text-white/30">{desc}</span>
-                                                    </motion.button>
-                                                ))}
-                                            </div>
+                                                        <X className="w-4 h-4" />
+                                                    </button>
+                                                </motion.div>
+                                            )}
                                         </div>
-
-                                        {/* Walk-in Customer */}
-                                        <AnimatePresence mode="wait">
-                                            {bookingType === 'walkin' && (
-                                                <motion.div
-                                                    key="walkin"
-                                                    initial={{ opacity: 0, y: 10 }}
-                                                    animate={{ opacity: 1, y: 0 }}
-                                                    exit={{ opacity: 0, y: -10 }}
-                                                    className="space-y-4"
-                                                >
-                                                    {/* Search */}
-                                                    <div className="space-y-2">
-                                                        <label className="flex items-center gap-2 text-[10px] text-white/30 uppercase tracking-widest font-medium">
-                                                            <History className="w-3 h-3" />
-                                                            {walkinSearch.length >= 2 ? 'Search Results' : 'Recent Customers'}
-                                                        </label>
-                                                        <div className="relative">
-                                                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/25" />
-                                                            <input
-                                                                type="text"
-                                                                value={walkinSearch}
-                                                                onChange={(e) => setWalkinSearch(e.target.value)}
-                                                                placeholder="Search by name or phone..."
-                                                                className="w-full bg-white/[0.03] border border-white/[0.08] text-white/80 text-sm pl-11 pr-4 py-3 rounded-xl focus:outline-none focus:border-white/20 transition-all"
-                                                            />
-                                                            {walkinSearchLoading && (
-                                                                <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/25 animate-spin" />
-                                                            )}
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Customer List */}
-                                                    {!showNewCustomerForm && displayWalkinCustomers.length > 0 && (
-                                                        <div className="space-y-2 max-h-40 overflow-y-auto">
-                                                            {displayWalkinCustomers.map((customer) => (
-                                                                <WalkInCustomerCard
-                                                                    key={customer._id}
-                                                                    customer={customer}
-                                                                    selected={selectedWalkinCustomer?._id === customer._id}
-                                                                    onSelect={handleSelectWalkinCustomer}
-                                                                    onDelete={handleDeleteWalkinCustomer}
-                                                                    deleting={deletingCustomerId === customer._id}
-                                                                />
-                                                            ))}
-                                                        </div>
-                                                    )}
-
-                                                    {/* No results */}
-                                                    {!showNewCustomerForm && displayWalkinCustomers.length === 0 && walkinSearch.length >= 2 && !walkinSearchLoading && (
-                                                        <div className="text-center py-4">
-                                                            <p className="text-xs text-white/40">No customers found</p>
-                                                        </div>
-                                                    )}
-
-                                                    {/* Add New Button */}
-                                                    {!showNewCustomerForm && (
-                                                        <motion.button
-                                                            onClick={handleShowNewForm}
-                                                            className="w-full flex items-center justify-center gap-2 p-3 rounded-xl border border-dashed border-white/[0.15] bg-white/[0.02] text-white/50 hover:text-white/80 hover:border-white/[0.25] hover:bg-white/[0.04] transition-all"
-                                                            whileTap={{ scale: 0.98 }}
-                                                        >
-                                                            <UserPlus className="w-4 h-4" />
-                                                            <span className="text-xs font-medium">Add New Customer</span>
-                                                        </motion.button>
-                                                    )}
-
-                                                    {/* New Customer Form */}
-                                                    {showNewCustomerForm && (
-                                                        <motion.div
-                                                            initial={{ opacity: 0, y: 10 }}
-                                                            animate={{ opacity: 1, y: 0 }}
-                                                            className="space-y-3 p-4 rounded-xl border border-white/[0.1] bg-white/[0.02]"
-                                                        >
-                                                            <div className="flex items-center justify-between mb-2">
-                                                                <span className="text-xs text-white/50 font-medium">New Customer</span>
-                                                                <button
-                                                                    onClick={() => {
-                                                                        setShowNewCustomerForm(false);
-                                                                        setWalkInCustomer({ name: '', phone: '' });
-                                                                    }}
-                                                                    className="text-[10px] text-white/30 hover:text-white/60"
-                                                                >
-                                                                    Cancel
-                                                                </button>
-                                                            </div>
-                                                            <InputField
-                                                                label="Customer Name"
-                                                                value={walkInCustomer.name}
-                                                                onChange={(v) => setWalkInCustomer(p => ({ ...p, name: v }))}
-                                                                placeholder="Full name"
-                                                                required
-                                                            />
-                                                            <InputField
-                                                                label="Phone"
-                                                                value={walkInCustomer.phone}
-                                                                onChange={(v) => setWalkInCustomer(p => ({ ...p, phone: v }))}
-                                                                placeholder="+91 XXXXX XXXXX"
-                                                                required
-                                                            />
-                                                            <p className="text-[10px] text-white/30 flex items-center gap-1">
-                                                                <Star className="w-3 h-3" />
-                                                                Customer will be saved for future bookings
-                                                            </p>
-                                                        </motion.div>
-                                                    )}
-
-                                                    {/* Selected Customer Display */}
-                                                    {selectedWalkinCustomer && !showNewCustomerForm && (
-                                                        <motion.div
-                                                            initial={{ opacity: 0, scale: 0.95 }}
-                                                            animate={{ opacity: 1, scale: 1 }}
-                                                            className="flex items-center justify-between px-4 py-3 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.05]"
-                                                        >
-                                                            <div className="flex items-center gap-3">
-                                                                <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-                                                                    <Check className="w-4 h-4 text-emerald-400" />
-                                                                </div>
-                                                                <div>
-                                                                    <p className="text-sm text-white font-medium">
-                                                                        {selectedWalkinCustomer.name}
-                                                                    </p>
-                                                                    <p className="text-[11px] text-white/40 font-mono">
-                                                                        {selectedWalkinCustomer.phone}
-                                                                    </p>
-                                                                </div>
-                                                            </div>
-                                                            <button
-                                                                onClick={() => {
-                                                                    setSelectedWalkinCustomer(null);
-                                                                    setWalkInCustomer({ name: '', phone: '' });
-                                                                }}
-                                                                className="w-7 h-7 rounded-lg flex items-center justify-center text-white/30 hover:text-white/70 hover:bg-white/[0.08] transition-all"
-                                                            >
-                                                                <X className="w-4 h-4" />
-                                                            </button>
-                                                        </motion.div>
-                                                    )}
-                                                </motion.div>
-                                            )}
-
-                                            {/* Online Customer Search */}
-                                            {bookingType === 'online' && (
-                                                <motion.div
-                                                    key="online"
-                                                    initial={{ opacity: 0, y: 10 }}
-                                                    animate={{ opacity: 1, y: 0 }}
-                                                    exit={{ opacity: 0, y: -10 }}
-                                                    className="space-y-3"
-                                                >
-                                                    <label className="block text-[10px] text-white/30 uppercase tracking-widest font-medium">
-                                                        Search Customer
-                                                    </label>
-                                                    <div className="relative">
-                                                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/25" />
-                                                        <input
-                                                            type="text"
-                                                            value={customerSearch}
-                                                            onChange={(e) => {
-                                                                setCustomerSearch(e.target.value);
-                                                                setSelectedCustomer(null);
-                                                            }}
-                                                            placeholder="Search by name or email…"
-                                                            className="w-full bg-white/[0.03] border border-white/[0.08] text-white/80 text-sm pl-11 pr-4 py-3 rounded-xl focus:outline-none focus:border-white/20 transition-all"
-                                                        />
-                                                        {searchLoading && (
-                                                            <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/25 animate-spin" />
-                                                        )}
-                                                    </div>
-
-                                                    <AnimatePresence>
-                                                        {customers.length > 0 && !selectedCustomer && (
-                                                            <motion.div
-                                                                initial={{ opacity: 0, y: -10 }}
-                                                                animate={{ opacity: 1, y: 0 }}
-                                                                exit={{ opacity: 0, y: -10 }}
-                                                                className="rounded-xl border border-white/[0.07] bg-white/[0.02] overflow-hidden divide-y divide-white/[0.04] max-h-48 overflow-y-auto"
-                                                            >
-                                                                {customers.map((c) => (
-                                                                    <button
-                                                                        key={c._id}
-                                                                        onClick={() => {
-                                                                            setSelectedCustomer(c);
-                                                                            setCustomerSearch(`${c.firstName} ${c.lastName}`);
-                                                                            setCustomers([]);
-                                                                        }}
-                                                                        className="w-full px-4 py-3 text-left hover:bg-white/[0.04] transition-colors"
-                                                                    >
-                                                                        <p className="text-sm text-white/80">{c.firstName} {c.lastName}</p>
-                                                                        <p className="text-[11px] text-white/30 font-mono mt-0.5">{c.email}</p>
-                                                                    </button>
-                                                                ))}
-                                                            </motion.div>
-                                                        )}
-                                                    </AnimatePresence>
-
-                                                    {selectedCustomer && (
-                                                        <motion.div
-                                                            initial={{ opacity: 0, scale: 0.95 }}
-                                                            animate={{ opacity: 1, scale: 1 }}
-                                                            className="flex items-center justify-between px-4 py-3 rounded-xl border border-white/[0.15] bg-white/[0.05]"
-                                                        >
-                                                            <div>
-                                                                <p className="text-sm text-white/90 font-medium">
-                                                                    {selectedCustomer.firstName} {selectedCustomer.lastName}
-                                                                </p>
-                                                                <p className="text-[11px] text-white/40 font-mono mt-0.5">
-                                                                    {selectedCustomer.email}
-                                                                </p>
-                                                            </div>
-                                                            <button
-                                                                onClick={() => { setSelectedCustomer(null); setCustomerSearch(''); }}
-                                                                className="w-7 h-7 rounded-lg flex items-center justify-center text-white/30 hover:text-white/70 hover:bg-white/[0.08] transition-all"
-                                                            >
-                                                                <X className="w-4 h-4" />
-                                                            </button>
-                                                        </motion.div>
-                                                    )}
-                                                </motion.div>
-                                            )}
-                                        </AnimatePresence>
 
                                         <div className="h-px bg-white/[0.05]" />
 
@@ -952,7 +779,7 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                                 )}
 
                                 {/* ========================================== */}
-                                {/* STEP 2 - Service (NOW SECOND) */}
+                                {/* STEP 2 - Service */}
                                 {/* ========================================== */}
                                 {step === 2 && (
                                     <div className="space-y-3">
@@ -989,7 +816,7 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                                 )}
 
                                 {/* ========================================== */}
-                                {/* STEP 3 - Schedule (NOW THIRD) */}
+                                {/* STEP 3 - Schedule */}
                                 {/* ========================================== */}
                                 {step === 3 && (
                                     <>
@@ -1090,10 +917,12 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                                             <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-4 space-y-2.5">
                                                 <SummaryRow
                                                     label="Customer"
-                                                    value={bookingType === 'walkin'
-                                                        ? walkInCustomer.name
-                                                        : `${selectedCustomer?.firstName || ''} ${selectedCustomer?.lastName || ''}`
-                                                    }
+                                                    value={walkInCustomer.name}
+                                                />
+                                                <SummaryRow
+                                                    label="Phone"
+                                                    value={walkInCustomer.phone}
+                                                    mono
                                                 />
                                                 <SummaryRow
                                                     label="Location"
@@ -1105,6 +934,7 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                                                 <SummaryRow label="Service" value={selectedService?.name} />
                                                 <SummaryRow label="Date" value={bookingDate} mono />
                                                 <SummaryRow label="Time" value={timeSlot} mono />
+                                                <SummaryRow label="Payment" value={paymentMethod} />
                                                 <div className="h-px bg-white/[0.05]" />
                                                 <SummaryRow
                                                     label="Total"
