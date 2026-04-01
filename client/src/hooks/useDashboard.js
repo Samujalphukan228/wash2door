@@ -4,19 +4,30 @@ import { useSocket } from '@/context/SocketContext';
 
 const useDashboard = () => {
     const [stats, setStats] = useState(null);
-    const [loading, setLoading] = useState(true); // only true on first load
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const { onDashboardUpdate } = useSocket();
     const isFirstLoad = useRef(true);
 
     const fetchStats = useCallback(async () => {
         try {
-            // ✅ Only show loading spinner on very first fetch
             if (isFirstLoad.current) {
                 setLoading(true);
             }
             setError(null);
+            
             const response = await adminService.getDashboardStats();
+            
+            // 🔍 DEBUG - Check what backend sends
+            console.log('═══════════════════════════════════════');
+            console.log('📊 RAW API RESPONSE:', response);
+            console.log('📊 response.success:', response.success);
+            console.log('📊 response.data:', response.data);
+            console.log('📊 response.data.revenue:', response.data?.revenue);
+            console.log('📊 response.data.expenses:', response.data?.expenses);
+            console.log('📊 response.data.profit:', response.data?.profit);
+            console.log('═══════════════════════════════════════');
+            
             if (response.success) {
                 setStats(response.data);
             }
@@ -25,7 +36,7 @@ const useDashboard = () => {
             setError(err.message);
         } finally {
             setLoading(false);
-            isFirstLoad.current = false; // ✅ Never show full loader again
+            isFirstLoad.current = false;
         }
     }, []);
 
@@ -33,14 +44,22 @@ const useDashboard = () => {
         fetchStats();
     }, [fetchStats]);
 
-    // 🔥 Real-time — silently refetches, no loading spinner
     useEffect(() => {
         const unsubscribe = onDashboardUpdate((data) => {
             console.log('📊 Dashboard update received:', data);
-            fetchStats(); // ✅ Won't show loader anymore
+            fetchStats();
         });
         return unsubscribe;
     }, [onDashboardUpdate, fetchStats]);
+
+    // 🔍 DEBUG - Check what's being returned
+    console.log('═══════════════════════════════════════');
+    console.log('📊 HOOK RETURN VALUES:');
+    console.log('stats:', stats);
+    console.log('revenue:', stats?.revenue);
+    console.log('expenses:', stats?.expenses);
+    console.log('profit:', stats?.profit);
+    console.log('═══════════════════════════════════════');
 
     return {
         stats,

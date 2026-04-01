@@ -1,4 +1,4 @@
-// routes/adminRoutes.js - CLEANED UP (removed duplicate service CRUD)
+// routes/adminRoutes.js - ADD THIS LINE
 
 import express from 'express';
 import {
@@ -9,6 +9,7 @@ import {
     unblockUser,
     changeUserRole,
     getAllBookings,
+    getBookingById,  // ← Already imported
     updateBookingStatus,
     createAdminBooking,
     getRevenueReport,
@@ -23,7 +24,6 @@ import { protect, isAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// All routes require admin auth
 router.use(protect, isAdmin);
 
 // ============================================
@@ -44,11 +44,12 @@ router.put('/users/:userId/role', changeUserRole);
 // BOOKINGS
 // ============================================
 router.get('/bookings', getAllBookings);
+router.get('/bookings/:bookingId', getBookingById); // ← ADD THIS
 router.post('/bookings', createAdminBooking);
 router.put('/bookings/:bookingId/status', updateBookingStatus);
 
 // ============================================
-// BOOKING CLEANUP (NEW)
+// BOOKING CLEANUP
 // ============================================
 router.get('/bookings/cleanup/stats', getBookingCleanupStats);
 router.delete('/bookings/cleanup', cleanupOldBookings);
@@ -64,7 +65,5 @@ router.put('/reviews/:reviewId/toggle', toggleReviewVisibility);
 // ============================================
 router.get('/reports/revenue', getRevenueReport);
 router.get('/reports/bookings', getBookingReport);
-
-
 
 export default router;
