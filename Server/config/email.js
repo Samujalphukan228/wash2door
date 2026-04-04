@@ -1,16 +1,12 @@
-// config/email.js - Brevo REST API
-
 import axios from 'axios';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
 if (!process.env.BREVO_API_KEY) {
-    console.error('❌ BREVO_API_KEY missing in environment variables');
     process.exit(1);
 }
 
-// Create axios instance for Brevo API
 const brevoAPI = axios.create({
     baseURL: 'https://api.brevo.com/v3',
     headers: {
@@ -25,7 +21,5 @@ export const emailConfig = {
     emailFrom: process.env.EMAIL_FROM,
     adminEmail: process.env.ADMIN_EMAIL
 };
-
-console.log('✅ Brevo API configured successfully');
 
 export default brevoAPI;

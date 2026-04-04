@@ -1,5 +1,3 @@
-// routes/adminRoutes.js - ADD THIS LINE
-
 import express from 'express';
 import {
     getDashboardStats,
@@ -9,13 +7,11 @@ import {
     unblockUser,
     changeUserRole,
     getAllBookings,
-    getBookingById,  // ← Already imported
+    getBookingById,
     updateBookingStatus,
     createAdminBooking,
     getRevenueReport,
     getBookingReport,
-    getAllReviews,
-    toggleReviewVisibility,
     cleanupOldBookings,
     getBookingCleanupStats
 } from '../controllers/adminController.js';
@@ -44,21 +40,11 @@ router.put('/users/:userId/role', changeUserRole);
 // BOOKINGS
 // ============================================
 router.get('/bookings', getAllBookings);
-router.get('/bookings/:bookingId', getBookingById); // ← ADD THIS
-router.post('/bookings', createAdminBooking);
-router.put('/bookings/:bookingId/status', updateBookingStatus);
-
-// ============================================
-// BOOKING CLEANUP
-// ============================================
 router.get('/bookings/cleanup/stats', getBookingCleanupStats);
 router.delete('/bookings/cleanup', cleanupOldBookings);
-
-// ============================================
-// REVIEWS
-// ============================================
-router.get('/reviews', getAllReviews);
-router.put('/reviews/:reviewId/toggle', toggleReviewVisibility);
+router.get('/bookings/:bookingId', getBookingById);
+router.post('/bookings', createAdminBooking);
+router.put('/bookings/:bookingId/status', updateBookingStatus);
 
 // ============================================
 // REPORTS

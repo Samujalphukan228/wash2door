@@ -1,11 +1,8 @@
-// controllers/authController.js - Link-Based Registration
-
 import crypto from 'crypto';
 import { validationResult } from 'express-validator';
 import mongoose from 'mongoose';
 import User from '../models/User.js';
 import Booking from '../models/Booking.js';
-import Review from '../models/Review.js';
 import { deleteCloudinaryImage, getPublicIdFromUrl } from '../config/cloudinary.js';
 import {
     generateTokens,
@@ -21,10 +18,6 @@ import {
     sendPasswordChangeConfirmation
 } from '../utils/sendEmail.js';
 
-// ============================================
-// REGISTER (Link-Based)
-// ============================================
-
 export const register = async (req, res) => {
     try {
         const errors = validationResult(req);
@@ -39,22 +32,17 @@ export const register = async (req, res) => {
         const { firstName, lastName, email, password } = req.body;
         const normalizedEmail = email.toLowerCase();
 
-        // 1. Check if user exists
         const registrationCheck = await User.findForRegistration(normalizedEmail);
 
-        // 2. If registration exists and is NOT completed, delete it to allow a fresh start
         if (registrationCheck.exists && registrationCheck.user.registrationStatus !== 'completed') {
             await User.deleteOne({ _id: registrationCheck.user._id });
-        } 
-        // If registration is truly completed, we block them
-        else if (registrationCheck.exists && registrationCheck.user.registrationStatus === 'completed') {
+        } else if (registrationCheck.exists && registrationCheck.user.registrationStatus === 'completed') {
             return res.status(409).json({
                 success: false,
                 message: 'User with this email already exists'
             });
         }
 
-        // 3. Create new user
         let user;
         try {
             user = await User.create({
@@ -74,16 +62,13 @@ export const register = async (req, res) => {
             throw createError;
         }
 
-        // 4. Generate verification token
         const verificationToken = user.generateEmailVerificationToken();
         user.registrationStatus = 'verification-sent';
         await user.save({ validateBeforeSave: false });
 
-        // 5. Send verification email with link
         try {
             await sendRegistrationVerificationEmail(user, verificationToken);
         } catch (emailError) {
-            console.error('Verification email failed:', emailError.message);
             user.registrationStatus = 'failed';
             await user.save({ validateBeforeSave: false });
 
@@ -105,17 +90,12 @@ export const register = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Register error:', error);
         res.status(500).json({
             success: false,
             message: 'Registration failed. Please try again.'
         });
     }
 };
-
-// ============================================
-// VERIFY REGISTRATION (Link-Based)
-// ============================================
 
 export const verifyRegistration = async (req, res) => {
     try {
@@ -143,7 +123,6 @@ export const verifyRegistration = async (req, res) => {
             });
         }
 
-        // Complete registration
         user.isEmailVerified = true;
         user.emailVerificationToken = undefined;
         user.emailVerificationExpire = undefined;
@@ -151,19 +130,15 @@ export const verifyRegistration = async (req, res) => {
         user.registrationCompletedAt = new Date();
         await user.save({ validateBeforeSave: false });
 
-        // Generate tokens and log user in
         const { accessToken, refreshToken } = generateTokens(user._id);
         user.refreshToken = refreshToken;
         await user.save({ validateBeforeSave: false });
 
         setTokenCookies(res, accessToken, refreshToken);
 
-        // Send welcome email
         try {
             await sendWelcomeEmail(user);
-        } catch (emailError) {
-            console.error('Welcome email failed:', emailError.message);
-        }
+        } catch (emailError) {}
 
         res.status(200).json({
             success: true,
@@ -182,17 +157,12 @@ export const verifyRegistration = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Verify registration error:', error);
         res.status(500).json({
             success: false,
             message: 'Verification failed. Please try again.'
         });
     }
 };
-
-// ============================================
-// RESEND REGISTRATION EMAIL
-// ============================================
 
 export const resendRegistrationEmail = async (req, res) => {
     try {
@@ -221,12 +191,10 @@ export const resendRegistrationEmail = async (req, res) => {
             });
         }
 
-        // Generate new verification token
         const verificationToken = user.generateEmailVerificationToken();
         user.registrationStatus = 'verification-sent';
         await user.save({ validateBeforeSave: false });
 
-        // Send verification email
         try {
             await sendRegistrationVerificationEmail(user, verificationToken);
         } catch (emailError) {
@@ -246,17 +214,12 @@ export const resendRegistrationEmail = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Resend registration email error:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to resend verification email.'
         });
     }
 };
-
-// ============================================
-// LOGIN
-// ============================================
 
 export const login = async (req, res) => {
     try {
@@ -352,17 +315,12 @@ export const login = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Login error:', error);
         res.status(500).json({
             success: false,
             message: 'Login failed.'
         });
     }
 };
-
-// ============================================
-// LOGOUT
-// ============================================
 
 export const logout = async (req, res) => {
     try {
@@ -378,17 +336,12 @@ export const logout = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Logout error:', error);
         res.status(500).json({
             success: false,
             message: 'Logout failed'
         });
     }
 };
-
-// ============================================
-// REFRESH TOKEN
-// ============================================
 
 export const refreshToken = async (req, res) => {
     try {
@@ -439,7 +392,6 @@ export const refreshToken = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Refresh token error:', error);
         clearTokenCookies(res);
         res.status(500).json({
             success: false,
@@ -447,10 +399,6 @@ export const refreshToken = async (req, res) => {
         });
     }
 };
-
-// ============================================
-// VERIFY EMAIL (For existing users)
-// ============================================
 
 export const verifyEmail = async (req, res) => {
     try {
@@ -489,17 +437,12 @@ export const verifyEmail = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Email verification error:', error);
         res.status(500).json({
             success: false,
             message: 'Email verification failed'
         });
     }
 };
-
-// ============================================
-// RESEND VERIFICATION EMAIL (For existing users)
-// ============================================
 
 export const resendVerificationEmail = async (req, res) => {
     try {
@@ -537,17 +480,12 @@ export const resendVerificationEmail = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Resend verification error:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to send verification email'
         });
     }
 };
-
-// ============================================
-// FORGOT PASSWORD
-// ============================================
 
 export const forgotPassword = async (req, res) => {
     try {
@@ -597,17 +535,12 @@ export const forgotPassword = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Forgot password error:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to process request'
         });
     }
 };
-
-// ============================================
-// RESET PASSWORD
-// ============================================
 
 export const resetPassword = async (req, res) => {
     try {
@@ -650,9 +583,7 @@ export const resetPassword = async (req, res) => {
 
         try {
             await sendPasswordChangeConfirmation(user);
-        } catch (emailError) {
-            console.error('Password change email failed:', emailError.message);
-        }
+        } catch (emailError) {}
 
         res.status(200).json({
             success: true,
@@ -660,17 +591,12 @@ export const resetPassword = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Reset password error:', error);
         res.status(500).json({
             success: false,
             message: 'Password reset failed'
         });
     }
 };
-
-// ============================================
-// CHANGE PASSWORD
-// ============================================
 
 export const changePassword = async (req, res) => {
     try {
@@ -714,9 +640,7 @@ export const changePassword = async (req, res) => {
 
         try {
             await sendPasswordChangeConfirmation(user);
-        } catch (emailError) {
-            console.error('Password change email failed:', emailError.message);
-        }
+        } catch (emailError) {}
 
         res.status(200).json({
             success: true,
@@ -725,17 +649,12 @@ export const changePassword = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Change password error:', error);
         res.status(500).json({
             success: false,
             message: 'Password change failed'
         });
     }
 };
-
-// ============================================
-// GET ME
-// ============================================
 
 export const getMe = async (req, res) => {
     try {
@@ -768,17 +687,12 @@ export const getMe = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Get me error:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to get user data'
         });
     }
 };
-
-// ============================================
-// UPDATE PROFILE
-// ============================================
 
 export const updateProfile = async (req, res) => {
     try {
@@ -826,17 +740,12 @@ export const updateProfile = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Update profile error:', error);
         res.status(500).json({
             success: false,
             message: 'Profile update failed'
         });
     }
 };
-
-// ============================================
-// UPDATE AVATAR
-// ============================================
 
 export const updateAvatar = async (req, res) => {
     try {
@@ -859,12 +768,11 @@ export const updateAvatar = async (req, res) => {
             });
         }
 
-        // Delete old avatar if exists
         if (user.avatar && !user.avatar.includes('default')) {
-            const publicId = user.avatar.startsWith('http') 
+            const publicId = user.avatar.startsWith('http')
                 ? getPublicIdFromUrl(user.avatar)
                 : user.avatar;
-            
+
             if (publicId) {
                 await deleteCloudinaryImage(publicId);
             }
@@ -879,29 +787,23 @@ export const updateAvatar = async (req, res) => {
         res.status(200).json({
             success: true,
             message: 'Avatar updated successfully',
-            data: { 
+            data: {
                 avatar: updatedUser.avatar,
                 avatarPublicId: req.file.filename
             }
         });
 
     } catch (error) {
-        console.error('Update avatar error:', error);
-        
         if (req.file?.filename) {
             await deleteCloudinaryImage(req.file.filename);
         }
-        
+
         res.status(500).json({
             success: false,
             message: 'Failed to update avatar'
         });
     }
 };
-
-// ============================================
-// DEACTIVATE ACCOUNT
-// ============================================
 
 export const deactivateAccount = async (req, res) => {
     try {
@@ -943,17 +845,12 @@ export const deactivateAccount = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Deactivate error:', error);
         res.status(500).json({
             success: false,
             message: 'Account deactivation failed'
         });
     }
 };
-
-// ============================================
-// GET USER STATS
-// ============================================
 
 export const getUserStats = async (req, res) => {
     try {
@@ -965,16 +862,14 @@ export const getUserStats = async (req, res) => {
             confirmedBookings,
             inProgressBookings,
             completedBookings,
-            cancelledBookings,
-            totalReviews
+            cancelledBookings
         ] = await Promise.all([
             Booking.countDocuments({ customerId: userId }),
             Booking.countDocuments({ customerId: userId, status: 'pending' }),
             Booking.countDocuments({ customerId: userId, status: 'confirmed' }),
             Booking.countDocuments({ customerId: userId, status: 'in-progress' }),
             Booking.countDocuments({ customerId: userId, status: 'completed' }),
-            Booking.countDocuments({ customerId: userId, status: 'cancelled' }),
-            Review.countDocuments({ customerId: userId })
+            Booking.countDocuments({ customerId: userId, status: 'cancelled' })
         ]);
 
         const totalSpentData = await Booking.aggregate([
@@ -1029,7 +924,6 @@ export const getUserStats = async (req, res) => {
                     cancelled: cancelledBookings
                 },
                 totalSpent: totalSpentData[0]?.total || 0,
-                totalReviews,
                 mostUsedService: mostUsedService[0] || null,
                 recentBookings,
                 activeBookings
@@ -1037,7 +931,6 @@ export const getUserStats = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Get user stats error:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to fetch user stats',
@@ -1045,10 +938,6 @@ export const getUserStats = async (req, res) => {
         });
     }
 };
-
-// ============================================
-// CHECK REGISTRATION STATUS
-// ============================================
 
 export const checkRegistrationStatus = async (req, res) => {
     try {
@@ -1080,7 +969,6 @@ export const checkRegistrationStatus = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Check registration error:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to check registration status'

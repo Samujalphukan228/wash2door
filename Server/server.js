@@ -13,7 +13,6 @@ import authRoutes from './routes/authRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import publicRoutes from './routes/publicRoutes.js';
 import bookingRoutes from './routes/bookingRoutes.js';
-import reviewRoutes from './routes/reviewRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
 import subcategoryRoutes from './routes/subcategoryRoutes.js';
 import serviceRoutes from './routes/serviceRoutes.js';
@@ -22,7 +21,6 @@ import { generalLimiter } from './middleware/rateLimiter.js';
 import { startCleanupScheduler } from './utils/cleanup.js';
 import expenseRoutes from './routes/expenseRoutes.js';
 import walkInCustomerRoutes from './routes/walkInCustomerRoutes.js';
-
 
 dotenv.config();
 
@@ -76,13 +74,11 @@ app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/bookings', bookingRoutes);
-app.use('/api/reviews', reviewRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/subcategories', subcategoryRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/admin/walkin-customers', walkInCustomerRoutes);
-
 
 app.use(notFound);
 app.use(errorHandler);

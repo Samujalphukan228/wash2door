@@ -1,9 +1,6 @@
-// controllers/publicController.js - COMPLETE FIXED VERSION
-
 import Service from '../models/Service.js';
 import Category from '../models/Category.js';
 import Subcategory from '../models/Subcategory.js';
-import Review from '../models/Review.js';
 import Booking from '../models/Booking.js';
 import mongoose from 'mongoose';
 import { TIME_SLOTS } from '../utils/constants.js';
@@ -12,7 +9,6 @@ const isValidObjectId = (id) =>
     mongoose.Types.ObjectId.isValid(id) &&
     /^[0-9a-fA-F]{24}$/.test(id);
 
-// 🔥 Helper: Get consistent YYYY-MM-DD string from Date
 const getLocalDateStr = (date) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -20,9 +16,6 @@ const getLocalDateStr = (date) => {
     return `${year}-${month}-${day}`;
 };
 
-// ============================================
-// GET ALL ACTIVE SERVICES - WITH PAGINATION
-// ============================================
 export const getActiveServices = async (req, res) => {
     try {
         const {
@@ -116,7 +109,6 @@ export const getActiveServices = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Get active services error:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to fetch services',
@@ -125,9 +117,6 @@ export const getActiveServices = async (req, res) => {
     }
 };
 
-// ============================================
-// GET SINGLE SERVICE DETAILS
-// ============================================
 export const getServiceDetails = async (req, res) => {
     try {
         const { serviceId } = req.params;
@@ -153,30 +142,6 @@ export const getServiceDetails = async (req, res) => {
                 message: 'Service not found'
             });
         }
-
-        const reviews = await Review.find({
-            serviceId,
-            isVisible: true
-        })
-            .populate('customerId', 'firstName lastName avatar')
-            .sort({ createdAt: -1 })
-            .limit(10);
-
-        const ratingBreakdown = await Review.aggregate([
-            {
-                $match: {
-                    serviceId: new mongoose.Types.ObjectId(serviceId),
-                    isVisible: true
-                }
-            },
-            {
-                $group: {
-                    _id: '$rating',
-                    count: { $sum: 1 }
-                }
-            },
-            { $sort: { _id: -1 } }
-        ]);
 
         const relatedServices = await Service.find({
             category: service.category._id,
@@ -212,14 +177,11 @@ export const getServiceDetails = async (req, res) => {
                     totalBookings: service.totalBookings,
                     isFeatured: service.isFeatured
                 },
-                reviews,
-                ratingBreakdown,
                 relatedServices
             }
         });
 
     } catch (error) {
-        console.error('Get service details error:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to fetch service details',
@@ -228,9 +190,6 @@ export const getServiceDetails = async (req, res) => {
     }
 };
 
-// ============================================
-// GET CATEGORIES
-// ============================================
 export const getCategories = async (req, res) => {
     try {
         const { withServiceCount = 'true' } = req.query;
@@ -269,7 +228,6 @@ export const getCategories = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('getCategories error:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to fetch categories'
@@ -277,9 +235,6 @@ export const getCategories = async (req, res) => {
     }
 };
 
-// ============================================
-// GET SUBCATEGORIES BY CATEGORY
-// ============================================
 export const getSubcategoriesByCategory = async (req, res) => {
     try {
         const { categoryId } = req.params;
@@ -335,7 +290,6 @@ export const getSubcategoriesByCategory = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('getSubcategoriesByCategory error:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to fetch subcategories'
@@ -343,92 +297,10 @@ export const getSubcategoriesByCategory = async (req, res) => {
     }
 };
 
-// ============================================
-// GET SERVICE REVIEWS
-// ============================================
-export const getServiceReviews = async (req, res) => {
-    try {
-        const { serviceId } = req.params;
-        const { page = 1, limit = 10, rating, sort = 'newest' } = req.query;
-
-        const pageNum = parseInt(page);
-        const limitNum = parseInt(limit);
-
-        if (!isValidObjectId(serviceId)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid service ID'
-            });
-        }
-
-        const query = {
-            serviceId,
-            isVisible: true
-        };
-
-        if (rating) {
-            const ratingNum = parseInt(rating);
-            if (ratingNum >= 1 && ratingNum <= 5) {
-                query.rating = ratingNum;
-            }
-        }
-
-        let sortOption = { createdAt: -1 };
-        if (sort === 'oldest') sortOption = { createdAt: 1 };
-        if (sort === 'highest') sortOption = { rating: -1, createdAt: -1 };
-        if (sort === 'lowest') sortOption = { rating: 1, createdAt: -1 };
-
-        const total = await Review.countDocuments(query);
-
-        const reviews = await Review.find(query)
-            .populate('customerId', 'firstName lastName avatar')
-            .sort(sortOption)
-            .limit(limitNum)
-            .skip((pageNum - 1) * limitNum);
-
-        const ratingStats = await Review.aggregate([
-            { $match: { serviceId: new mongoose.Types.ObjectId(serviceId), isVisible: true } },
-            {
-                $group: {
-                    _id: null,
-                    avgRating: { $avg: '$rating' },
-                    totalReviews: { $sum: 1 },
-                    rating5: { $sum: { $cond: [{ $eq: ['$rating', 5] }, 1, 0] } },
-                    rating4: { $sum: { $cond: [{ $eq: ['$rating', 4] }, 1, 0] } },
-                    rating3: { $sum: { $cond: [{ $eq: ['$rating', 3] }, 1, 0] } },
-                    rating2: { $sum: { $cond: [{ $eq: ['$rating', 2] }, 1, 0] } },
-                    rating1: { $sum: { $cond: [{ $eq: ['$rating', 1] }, 1, 0] } }
-                }
-            }
-        ]);
-
-        res.status(200).json({
-            success: true,
-            total,
-            pages: Math.ceil(total / limitNum),
-            currentPage: pageNum,
-            stats: ratingStats[0] || null,
-            data: reviews
-        });
-
-    } catch (error) {
-        console.error('Get service reviews error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to fetch reviews',
-            error: error.message
-        });
-    }
-};
-
-// ============================================
-// 🔥 CHECK AVAILABILITY (FIXED - USES slotLockKey)
-// ============================================
 export const checkAvailability = async (req, res) => {
     try {
         const { date } = req.query;
 
-        // ✅ Validate date parameter
         if (!date) {
             return res.status(400).json({
                 success: false,
@@ -436,7 +308,6 @@ export const checkAvailability = async (req, res) => {
             });
         }
 
-        // ✅ Validate date format (YYYY-MM-DD)
         if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
             return res.status(400).json({
                 success: false,
@@ -444,7 +315,6 @@ export const checkAvailability = async (req, res) => {
             });
         }
 
-        // ✅ Parse date correctly (avoid timezone issues)
         const [year, month, day] = date.split('-').map(Number);
         const bookingDate = new Date(year, month - 1, day, 12, 0, 0, 0);
 
@@ -455,11 +325,9 @@ export const checkAvailability = async (req, res) => {
             });
         }
 
-        // ✅ Get today's date string for comparison
         const now = new Date();
         const todayStr = getLocalDateStr(now);
 
-        // ✅ Check if date is in the past
         if (date < todayStr) {
             return res.status(400).json({
                 success: false,
@@ -467,7 +335,6 @@ export const checkAvailability = async (req, res) => {
             });
         }
 
-        // ✅ Check if Sunday (closed)
         if (bookingDate.getDay() === 0) {
             return res.status(200).json({
                 success: true,
@@ -487,16 +354,11 @@ export const checkAvailability = async (req, res) => {
             });
         }
 
-        // ============================================
-        // 🔥 CRITICAL FIX: Use slotLockKey instead of date range
-        // slotLockKey format: "YYYY-MM-DD|HH:MM-HH:MM"
-        // ============================================
         const bookedSlots = await Booking.find({
             slotLockKey: { $regex: `^${date}\\|` },
             status: { $in: ['pending', 'confirmed', 'in-progress'] }
         }).select('timeSlot serviceName');
 
-        // ✅ Build booked slot map
         const bookedSlotMap = {};
         bookedSlots.forEach(booking => {
             bookedSlotMap[booking.timeSlot] = {
@@ -504,17 +366,14 @@ export const checkAvailability = async (req, res) => {
             };
         });
 
-        // ✅ Check if today for past-time filtering
         const isToday = date === todayStr;
 
-        // ✅ Build slots array with availability
         const slots = TIME_SLOTS.map(slot => {
             const [startTime] = slot.split('-');
             const [hours, minutes] = startTime.split(':').map(Number);
 
             const isBooked = bookedSlotMap[slot] !== undefined;
 
-            // Check if slot time has passed (for today only)
             let isPast = false;
             if (isToday) {
                 const slotDateTime = new Date(year, month - 1, day, hours, minutes || 0, 0, 0);
@@ -553,7 +412,6 @@ export const checkAvailability = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Check availability error:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to fetch availability',
@@ -562,9 +420,6 @@ export const checkAvailability = async (req, res) => {
     }
 };
 
-// ============================================
-// GET FEATURED SERVICES
-// ============================================
 export const getFeaturedServices = async (req, res) => {
     try {
         const { limit = 6 } = req.query;
@@ -601,7 +456,6 @@ export const getFeaturedServices = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Get featured services error:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to fetch featured services'
@@ -609,14 +463,10 @@ export const getFeaturedServices = async (req, res) => {
     }
 };
 
-// ============================================
-// 🔥 GET AVAILABLE SLOTS (FIXED - USES slotLockKey)
-// ============================================
 export const getAvailableSlots = async (req, res) => {
     try {
         const { date } = req.query;
 
-        // ✅ Validate date parameter
         if (!date) {
             return res.status(400).json({
                 success: false,
@@ -624,7 +474,6 @@ export const getAvailableSlots = async (req, res) => {
             });
         }
 
-        // ✅ Validate date format (YYYY-MM-DD)
         if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
             return res.status(400).json({
                 success: false,
@@ -632,7 +481,6 @@ export const getAvailableSlots = async (req, res) => {
             });
         }
 
-        // ✅ Parse date correctly (avoid timezone issues)
         const [year, month, day] = date.split('-').map(Number);
         const bookingDate = new Date(year, month - 1, day, 12, 0, 0, 0);
 
@@ -643,11 +491,9 @@ export const getAvailableSlots = async (req, res) => {
             });
         }
 
-        // ✅ Get today's date string for comparison
         const now = new Date();
         const todayStr = getLocalDateStr(now);
 
-        // ✅ Check if date is in the past
         if (date < todayStr) {
             return res.status(400).json({
                 success: false,
@@ -655,7 +501,6 @@ export const getAvailableSlots = async (req, res) => {
             });
         }
 
-        // ✅ Check if Sunday (closed)
         if (bookingDate.getDay() === 0) {
             return res.status(200).json({
                 success: true,
@@ -668,10 +513,6 @@ export const getAvailableSlots = async (req, res) => {
             });
         }
 
-        // ============================================
-        // 🔥 CRITICAL FIX: Use slotLockKey instead of date range
-        // slotLockKey format: "YYYY-MM-DD|HH:MM-HH:MM"
-        // ============================================
         const bookedSlots = await Booking.find({
             slotLockKey: { $regex: `^${date}\\|` },
             status: { $in: ['pending', 'confirmed', 'in-progress'] }
@@ -679,15 +520,11 @@ export const getAvailableSlots = async (req, res) => {
 
         const bookedSlotNames = bookedSlots.map(b => b.timeSlot);
 
-        // ✅ Check if today for past-time filtering
         const isToday = date === todayStr;
 
-        // ✅ Filter available slots
         const availableSlots = TIME_SLOTS.filter(slot => {
-            // Check if already booked
             if (bookedSlotNames.includes(slot)) return false;
 
-            // Check if time has passed (for today only)
             if (isToday) {
                 const [startTime] = slot.split('-');
                 const [hours, minutes] = startTime.split(':').map(Number);
@@ -711,7 +548,6 @@ export const getAvailableSlots = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Get available slots error:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to fetch available slots'
@@ -724,7 +560,6 @@ export default {
     getServiceDetails,
     getCategories,
     getSubcategoriesByCategory,
-    getServiceReviews,
     checkAvailability,
     getFeaturedServices,
     getAvailableSlots

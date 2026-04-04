@@ -1,20 +1,17 @@
-// controllers/adminController.js
-
 import User from '../models/User.js';
 import Service from '../models/Service.js';
 import Booking from '../models/Booking.js';
-import Review from '../models/Review.js';
 import WalkInCustomer from '../models/WalkInCustomer.js';
 import { sendBookingStatusEmail } from '../utils/sendEmail.js';
 import {
     TIME_SLOTS,
-    ADMIN_ONLY_SLOTS,          // ✅ ADD THIS
-    ALL_TIME_SLOTS,            // ✅ ADD THIS
+    ADMIN_ONLY_SLOTS,
+    ALL_TIME_SLOTS,
     BOOKING_STATUSES,
     CLOSED_DAY_MESSAGE,
     isValidTimeSlot,
-    isValidAnySlot,            // ✅ ADD THIS
-    isAdminOnlySlot,           // ✅ ADD THIS
+    isValidAnySlot,
+    isAdminOnlySlot,
     isClosedDay,
     convertTo24Hour
 } from '../utils/constants.js';
@@ -214,14 +211,6 @@ export const getDashboardStats = async (req, res) => {
             { $sort: { _id: 1 } }
         ]);
 
-        // 🔍 DEBUG: Check what's happening with weekly expenses
-        console.log('═══════════════════════════════════════');
-        console.log('🔍 WEEKLY EXPENSES DEBUG:');
-        console.log('Date range start:', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
-        console.log('Query result:', weeklyExpenses);
-        console.log('Number of expense records:', weeklyExpenses.length);
-        console.log('═══════════════════════════════════════');
-
         const expenseMap = {};
         weeklyExpenses.forEach(e => {
             expenseMap[e._id] = e.expenses;
@@ -403,7 +392,7 @@ export const getDashboardStats = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Dashboard error:', error);
+        console.error('Dashboard stats error:', error);
         res.status(500).json({
             success: false,
             message: 'Error fetching dashboard stats',
@@ -548,11 +537,6 @@ export const getUserById = async (req, res) => {
             .sort({ createdAt: -1 })
             .limit(10);
 
-        const reviews = await Review.find({ customerId: userId })
-            .populate('serviceId', 'name')
-            .sort({ createdAt: -1 })
-            .limit(5);
-
         const favoriteServices = await Booking.aggregate([
             {
                 $match: {
@@ -585,7 +569,6 @@ export const getUserById = async (req, res) => {
                         : 0
                 },
                 recentBookings,
-                reviews,
                 favoriteServices
             }
         });
@@ -1013,13 +996,9 @@ export const updateBookingStatus = async (req, res) => {
 
             await Booking.deleteOne({ _id: bookingId });
 
-            console.log(`🗑️ Booking ${bookingData.bookingCode} DELETED (cancelled by admin)`);
-
             emitBookingCancelled(bookingData, 'admin');
             emitSlotAvailable(oldDateStr, oldTimeSlot, oldServiceId);
             emitDashboardUpdate({ action: 'booking_cancelled' });
-
-            console.log(`🔌 Real-time: Admin cancelled → Slot released ${oldDateStr} ${oldTimeSlot}`);
 
             setImmediate(async () => {
                 try {
@@ -1028,7 +1007,6 @@ export const updateBookingStatus = async (req, res) => {
                             ...bookingData,
                             status: 'cancelled'
                         });
-                        console.log('✉️ Cancellation email sent');
                     }
                 } catch (emailError) {
                     console.error('Cancellation email failed:', emailError.message);
@@ -1057,13 +1035,10 @@ export const updateBookingStatus = async (req, res) => {
         emitBookingStatusUpdate(booking, booking.customerId?._id);
         emitDashboardUpdate({ action: 'booking_status_changed', status });
 
-        console.log(`🔌 Real-time: Status ${booking.bookingCode} → ${status}`);
-
         setImmediate(async () => {
             try {
                 if (booking.customerId?.email) {
                     await sendBookingStatusEmail(booking.customerId, booking);
-                    console.log('✉️ Status email sent');
                 }
             } catch (emailError) {
                 console.error('Status email failed:', emailError.message);
@@ -1077,7 +1052,7 @@ export const updateBookingStatus = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Update booking error:', error);
+        console.error('Update booking status error:', error);
         res.status(500).json({
             success: false,
             message: 'Error updating booking status',
@@ -1103,10 +1078,8 @@ export const createAdminBooking = async (req, res) => {
             phone,
             paymentMethod,
             paymentStatus,
-            adminNotes  // ✅ NEW: Optional admin notes
+            adminNotes
         } = req.body;
-
-        // ==================== VALIDATION ====================
 
         if (!bookingType || !['walkin', 'online'].includes(bookingType)) {
             return res.status(400).json({
@@ -1155,8 +1128,6 @@ export const createAdminBooking = async (req, res) => {
             });
         }
 
-        // ==================== SERVICE VALIDATION ====================
-
         const service = await Service.findOne({ _id: serviceId, isActive: true })
             .populate('category', 'name slug')
             .populate('subcategory', 'name slug');
@@ -1185,8 +1156,6 @@ export const createAdminBooking = async (req, res) => {
             });
         }
 
-        // ==================== DATE VALIDATION ====================
-
         const [year, month, day] = bookingDate.split('-').map(Number);
         const requestedDate = new Date(year, month - 1, day, 12, 0, 0, 0);
 
@@ -1214,9 +1183,6 @@ export const createAdminBooking = async (req, res) => {
             });
         }
 
-        // ==================== TIME SLOT VALIDATION ====================
-
-        // ✅ UPDATED: Validate against ALL_TIME_SLOTS (regular + admin)
         if (!isValidAnySlot(timeSlot)) {
             return res.status(400).json({
                 success: false,
@@ -1224,15 +1190,7 @@ export const createAdminBooking = async (req, res) => {
             });
         }
 
-        // ✅ NEW: Check if this is an admin-only slot
         const isAdminSlot = isAdminOnlySlot(timeSlot);
-
-        console.log(`📅 Admin creating booking:`);
-        console.log(`   Date: ${bookingDate}`);
-        console.log(`   Time Slot: ${timeSlot}`);
-        console.log(`   Is Admin Slot: ${isAdminSlot}`);
-
-        // ==================== SLOT AVAILABILITY CHECK ====================
 
         const slotLockKey = `${bookingDate}|${timeSlot}`;
 
@@ -1248,21 +1206,17 @@ export const createAdminBooking = async (req, res) => {
             });
         }
 
-        // ==================== PREPARE LOCATION ====================
-
         const bookingLocation = {
             address: location?.address || 'Walk-in / At Shop',
             city: location?.city || 'Duliajan'
         };
-
-        // ==================== CREATE BOOKING ====================
 
         let booking;
 
         try {
             booking = await Booking.create({
                 bookingType,
-                isAdminSlot,           // ✅ NEW: Track admin slot
+                isAdminSlot,
                 customerId: bookingType === 'online' ? customerId : null,
                 walkInCustomer: bookingType === 'walkin'
                     ? { name: walkInCustomer.name, phone: phone }
@@ -1293,7 +1247,7 @@ export const createAdminBooking = async (req, res) => {
                 createdBy: req.user._id,
                 status: 'confirmed',
                 
-                adminNotes: adminNotes || ''  // ✅ NEW: Store admin notes
+                adminNotes: adminNotes || ''
             });
         } catch (createError) {
             if (createError.code === 11000) {
@@ -1305,18 +1259,9 @@ export const createAdminBooking = async (req, res) => {
             throw createError;
         }
 
-        console.log(`✅ Admin booking created: ${booking.bookingCode}`);
-        console.log(`   Service: ${service.name}`);
-        console.log(`   Price: ₹${finalPrice}`);
-        console.log(`   Admin Slot: ${isAdminSlot}`);
-
-        // ==================== UPDATE SERVICE STATS ====================
-
         await Service.findByIdAndUpdate(serviceId, {
             $inc: { totalBookings: 1 }
         });
-
-        // ==================== SAVE WALK-IN CUSTOMER ====================
 
         if (bookingType === 'walkin' && walkInCustomer?.name && phone) {
             try {
@@ -1330,7 +1275,6 @@ export const createAdminBooking = async (req, res) => {
                     walkinCustomerDoc.totalBookings += 1;
                     walkinCustomerDoc.lastBookingDate = new Date();
                     await walkinCustomerDoc.save();
-                    console.log(`👤 Walk-in customer updated: ${walkinCustomerDoc.name} (bookings: ${walkinCustomerDoc.totalBookings})`);
                 } else {
                     await WalkInCustomer.create({
                         name: walkInCustomer.name.trim(),
@@ -1339,14 +1283,11 @@ export const createAdminBooking = async (req, res) => {
                         lastBookingDate: new Date(),
                         createdBy: req.user._id
                     });
-                    console.log(`👤 New walk-in customer saved: ${walkInCustomer.name} (${phone})`);
                 }
             } catch (walkinError) {
                 console.error('Walk-in customer save error:', walkinError.message);
             }
         }
-
-        // ==================== REAL-TIME UPDATES ====================
 
         const customerName = bookingType === 'walkin'
             ? walkInCustomer.name
@@ -1356,16 +1297,12 @@ export const createAdminBooking = async (req, res) => {
         emitSlotBooked(bookingDate, timeSlot, serviceId);
         emitDashboardUpdate({ action: 'new_booking', bookingType, isAdminSlot });
 
-        console.log(`🔌 Real-time: Admin booking created + slot booked ${bookingDate} ${timeSlot}`);
-
-        // ==================== RESPONSE ====================
-
         res.status(201).json({
             success: true,
             message: 'Booking created successfully',
             data: {
                 ...booking.toObject(),
-                isAdminSlot: booking.isAdminSlot  // ✅ Include in response
+                isAdminSlot: booking.isAdminSlot
             }
         });
 
@@ -1378,8 +1315,9 @@ export const createAdminBooking = async (req, res) => {
     }
 };
 
-// Rest of the file remains exactly the same...
-// (getAllReviews, toggleReviewVisibility, cleanupOldBookings, getBookingCleanupStats, getRevenueReport, getBookingReport)
+// ============================================
+// REVENUE REPORT
+// ============================================
 
 export const getRevenueReport = async (req, res) => {
     try {
@@ -1489,6 +1427,10 @@ export const getRevenueReport = async (req, res) => {
     }
 };
 
+// ============================================
+// BOOKING REPORT
+// ============================================
+
 export const getBookingReport = async (req, res) => {
     try {
         const { startDate, endDate } = req.query;
@@ -1582,112 +1524,9 @@ export const getBookingReport = async (req, res) => {
     }
 };
 
-export const getAllReviews = async (req, res) => {
-    try {
-        const {
-            page = 1,
-            limit = 10,
-            isVisible,
-            serviceId,
-            rating,
-            sortBy = 'createdAt',
-            sortOrder = 'desc'
-        } = req.query;
-
-        const pageNum = parseInt(page);
-        const limitNum = parseInt(limit);
-
-        const query = {};
-        if (isVisible !== undefined) query.isVisible = isVisible === 'true';
-        if (serviceId && isValidObjectId(serviceId)) query.serviceId = serviceId;
-        if (rating) query.rating = parseInt(rating);
-
-        const sortOptions = {};
-        sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
-
-        const total = await Review.countDocuments(query);
-
-        const reviews = await Review.find(query)
-            .populate('customerId', 'firstName lastName email avatar')
-            .populate('serviceId', 'name category')
-            .populate('bookingId', 'bookingCode bookingDate')
-            .sort(sortOptions)
-            .limit(limitNum)
-            .skip((pageNum - 1) * limitNum);
-
-        const ratingStats = await Review.aggregate([
-            { $match: query },
-            {
-                $group: {
-                    _id: null,
-                    avgRating: { $avg: '$rating' },
-                    totalReviews: { $sum: 1 },
-                    rating5: { $sum: { $cond: [{ $eq: ['$rating', 5] }, 1, 0] } },
-                    rating4: { $sum: { $cond: [{ $eq: ['$rating', 4] }, 1, 0] } },
-                    rating3: { $sum: { $cond: [{ $eq: ['$rating', 3] }, 1, 0] } },
-                    rating2: { $sum: { $cond: [{ $eq: ['$rating', 2] }, 1, 0] } },
-                    rating1: { $sum: { $cond: [{ $eq: ['$rating', 1] }, 1, 0] } }
-                }
-            }
-        ]);
-
-        res.status(200).json({
-            success: true,
-            total,
-            pages: Math.ceil(total / limitNum),
-            currentPage: pageNum,
-            stats: ratingStats[0] || null,
-            data: reviews
-        });
-
-    } catch (error) {
-        console.error('Get reviews error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error fetching reviews',
-            error: error.message
-        });
-    }
-};
-
-export const toggleReviewVisibility = async (req, res) => {
-    try {
-        const { reviewId } = req.params;
-
-        if (!isValidObjectId(reviewId)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid review ID'
-            });
-        }
-
-        const review = await Review.findById(reviewId);
-
-        if (!review) {
-            return res.status(404).json({
-                success: false,
-                message: 'Review not found'
-            });
-        }
-
-        review.isVisible = !review.isVisible;
-        await review.save();
-
-        res.status(200).json({
-            success: true,
-            message: `Review ${review.isVisible ? 'shown' : 'hidden'} successfully`,
-            data: review
-        });
-
-    } catch (error) {
-        console.error('Toggle review error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error toggling review visibility',
-            error: error.message
-        });
-    }
-};
+// ============================================
+// CLEANUP OLD BOOKINGS
+// ============================================
 
 export const cleanupOldBookings = async (req, res) => {
     try {
@@ -1727,8 +1566,6 @@ export const cleanupOldBookings = async (req, res) => {
 
         const result = await Booking.deleteMany(query);
 
-        console.log(`🧹 Cleanup: Deleted ${result.deletedCount} old ${status} bookings`);
-
         res.status(200).json({
             success: true,
             message: `Deleted ${result.deletedCount} ${status} bookings older than ${days} days`,
@@ -1736,7 +1573,7 @@ export const cleanupOldBookings = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Cleanup error:', error);
+        console.error('Cleanup bookings error:', error);
         res.status(500).json({
             success: false,
             message: 'Error cleaning up bookings',
@@ -1744,6 +1581,10 @@ export const cleanupOldBookings = async (req, res) => {
         });
     }
 };
+
+// ============================================
+// GET BOOKING CLEANUP STATS
+// ============================================
 
 export const getBookingCleanupStats = async (req, res) => {
     try {
@@ -1810,8 +1651,6 @@ export default {
     createAdminBooking,
     getRevenueReport,
     getBookingReport,
-    getAllReviews,
-    toggleReviewVisibility,
     cleanupOldBookings,
     getBookingCleanupStats
 };
