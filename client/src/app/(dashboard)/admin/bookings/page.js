@@ -804,7 +804,15 @@ function BookingRow({ booking, isFirst, onView, onUpdateStatus }) {
                             {name.charAt(0).toUpperCase()}
                         </span>
                     </div>
+                    {/* Status dot */}
                     <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-black ${status.dot}`} />
+                    
+                    {/* ✅ NEW: Admin slot indicator */}
+                    {booking.isAdminSlot && (
+                        <div className="absolute -top-1 -left-1 w-4 h-4 rounded-full bg-purple-500 border-2 border-black flex items-center justify-center">
+                            <span className="text-[8px] font-bold text-white">A</span>
+                        </div>
+                    )}
                 </div>
 
                 {/* Content */}
@@ -816,6 +824,12 @@ function BookingRow({ booking, isFirst, onView, onUpdateStatus }) {
                                 {isFirst && (
                                     <span className="text-[8px] px-1.5 py-0.5 rounded bg-white/[0.08] text-gray-400 font-medium shrink-0">
                                         LATEST
+                                    </span>
+                                )}
+                                {/* ✅ NEW: Admin slot badge (alternative display) */}
+                                {booking.isAdminSlot && (
+                                    <span className="text-[8px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 font-medium shrink-0">
+                                        ADMIN SLOT
                                     </span>
                                 )}
                             </div>

@@ -7,12 +7,11 @@ import { format } from 'date-fns';
 import {
     X, MapPin, Clock, CreditCard, User, Package, Tag,
     RefreshCw, History, CheckCircle, XCircle, Loader2,
-    Phone, Mail, Calendar, FileText, AlertTriangle
+    Phone, Mail, Calendar, FileText, AlertTriangle, Zap
 } from 'lucide-react';
 import adminService from '@/services/adminService';
 import toast from 'react-hot-toast';
 
-// ✅ FIXED: Removed 'in-progress' from status config
 const statusConfig = {
     pending: { bg: 'bg-amber-500/10', text: 'text-amber-400', ring: 'ring-amber-500/20', dot: 'bg-amber-400', label: 'Pending' },
     confirmed: { bg: 'bg-blue-500/10', text: 'text-blue-400', ring: 'ring-blue-500/20', dot: 'bg-blue-400', label: 'Confirmed' },
@@ -20,7 +19,6 @@ const statusConfig = {
     cancelled: { bg: 'bg-red-500/10', text: 'text-red-400', ring: 'ring-red-500/20', dot: 'bg-red-400', label: 'Cancelled' }
 };
 
-// ✅ FIXED: Removed 'in-progress' from quick actions
 const getQuickActions = (currentStatus) => {
     const actions = {
         pending: [
@@ -62,6 +60,7 @@ const Section = memo(function Section({ icon: Icon, title, children, variant }) 
     const variantStyles = {
         success: 'text-emerald-400/70',
         danger: 'text-red-400/70',
+        purple: 'text-purple-400/70',
         default: 'text-white/30'
     };
     
@@ -99,6 +98,7 @@ const Badge = memo(function Badge({ children, variant = 'default' }) {
         default: 'border-white/[0.08] bg-white/[0.03] text-white/40',
         success: 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400',
         warning: 'border-amber-500/20 bg-amber-500/10 text-amber-400',
+        purple: 'border-purple-500/20 bg-purple-500/10 text-purple-400',
     };
     
     return (
@@ -293,6 +293,13 @@ export default function BookingDetailModal({ booking, customerHistory, onClose, 
                                         {booking.serviceTier}
                                     </Badge>
                                 )}
+                                {/* ✅ NEW: Admin slot badge */}
+                                {booking.isAdminSlot && (
+                                    <Badge variant="purple">
+                                        <Zap className="w-2.5 h-2.5" />
+                                        Admin Slot
+                                    </Badge>
+                                )}
                             </div>
                         </div>
 
@@ -396,6 +403,16 @@ export default function BookingDetailModal({ booking, customerHistory, onClose, 
                         <Section icon={Calendar} title="Schedule">
                             <InfoRow label="Date" value={format(new Date(booking.bookingDate), 'EEE, dd MMM yyyy')} />
                             <InfoRow icon={Clock} label="Time" value={booking.timeSlot} mono />
+                            
+                            {/* ✅ NEW: Admin slot indicator */}
+                            {booking.isAdminSlot && (
+                                <div className="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                                    <span className="w-5 h-5 rounded-full bg-purple-500 text-white text-[10px] font-bold flex items-center justify-center">
+                                        A
+                                    </span>
+                                    <span className="text-xs text-purple-400">Admin-only time slot</span>
+                                </div>
+                            )}
                         </Section>
 
                         <div className="h-px bg-white/[0.04]" />
@@ -422,6 +439,18 @@ export default function BookingDetailModal({ booking, customerHistory, onClose, 
                                 <Section icon={FileText} title="Notes">
                                     <p className="text-xs text-white/50 bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 leading-relaxed">
                                         {booking.specialNotes}
+                                    </p>
+                                </Section>
+                            </>
+                        )}
+
+                        {/* Admin Notes */}
+                        {booking.adminNotes && (
+                            <>
+                                <div className="h-px bg-white/[0.04]" />
+                                <Section icon={FileText} title="Admin Notes" variant="purple">
+                                    <p className="text-xs text-purple-300/70 bg-purple-500/[0.05] border border-purple-500/15 rounded-xl p-4 leading-relaxed">
+                                        {booking.adminNotes}
                                     </p>
                                 </Section>
                             </>

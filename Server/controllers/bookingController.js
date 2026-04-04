@@ -5,10 +5,14 @@ import Service from '../models/Service.js';
 import mongoose from 'mongoose';
 import {
     TIME_SLOTS,
+    ADMIN_ONLY_SLOTS,
+    ALL_TIME_SLOTS,
     BOOKING_STATUSES,
     LIMITS,
     CLOSED_DAY_MESSAGE,
     isValidTimeSlot,
+    isValidAnySlot,
+    isAdminOnlySlot,
     isClosedDay,
     convertTo24Hour
 } from '../utils/constants.js';
@@ -24,6 +28,10 @@ import {
     emitSlotBooked,
     emitSlotAvailable
 } from '../utils/socketEmitter.js';
+
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
 
 const isValidObjectId = (id) =>
     mongoose.Types.ObjectId.isValid(id) &&
@@ -110,11 +118,15 @@ export const getServiceWithPricing = async (req, res) => {
 };
 
 // ============================================
-// CHECK AVAILABILITY
+// CHECK AVAILABILITY (Supports Admin Slots)
 // ============================================
 export const checkAvailability = async (req, res) => {
     try {
-        const { date } = req.query;
+        const { date, includeAdminSlots } = req.query;
+        
+        // Check if user is admin (from optional auth middleware)
+        const isAdmin = req.user?.role === 'admin';
+        const showAdminSlots = isAdmin && includeAdminSlots === 'true';
 
         if (!date) {
             return res.status(400).json({ success: false, message: 'Date is required' });
@@ -130,7 +142,8 @@ export const checkAvailability = async (req, res) => {
         console.log('🔍 ==================== AVAILABILITY CHECK ====================');
         console.log('📅 Received date:', date);
         console.log('📅 Server today:', todayStr);
-        console.log('📅 Server time:', now.toLocaleString());
+        console.log('👤 Is Admin:', isAdmin);
+        console.log('🔐 Show Admin Slots:', showAdminSlots);
 
         const [year, month, day] = date.split('-').map(Number);
         const bookingDate = new Date(year, month - 1, day, 12, 0, 0, 0);
@@ -146,6 +159,10 @@ export const checkAvailability = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Cannot check availability for past dates' });
         }
 
+        // Get the appropriate slots based on role
+        const slotsToShow = showAdminSlots ? ALL_TIME_SLOTS : TIME_SLOTS;
+
+        // Check if closed day
         if (isClosedDay(bookingDate)) {
             return res.status(200).json({
                 success: true,
@@ -155,12 +172,21 @@ export const checkAvailability = async (req, res) => {
                     isClosed: true,
                     message: CLOSED_DAY_MESSAGE,
                     availableSlots: 0,
-                    totalSlots: TIME_SLOTS.length,
-                    slots: TIME_SLOTS.map(slot => ({ slot, available: false, reason: 'Closed' }))
+                    totalSlots: slotsToShow.length,
+                    slots: slotsToShow.map(slot => ({ 
+                        slot, 
+                        available: false, 
+                        reason: 'Closed',
+                        isAdminOnly: isAdminOnlySlot(slot)
+                    })),
+                    showingAdminSlots: showAdminSlots,
+                    regularSlotCount: TIME_SLOTS.length,
+                    adminSlotCount: showAdminSlots ? ADMIN_ONLY_SLOTS.length : 0
                 }
             });
         }
 
+        // Find all booked slots for this date
         const lockedBookings = await Booking.find({
             slotLockKey: { $regex: `^${date}\\|` },
             status: { $in: ['pending', 'confirmed'] }
@@ -176,11 +202,13 @@ export const checkAvailability = async (req, res) => {
         const isToday = date === todayStr;
         const bufferMinutes = LIMITS.MIN_BOOKING_BUFFER_MINUTES || 30;
 
-        const slots = TIME_SLOTS.map(slot => {
+        // Process each slot
+        const slots = slotsToShow.map(slot => {
             const { start } = convertTo24Hour(slot);
             const [hours, minutes] = start.split(':').map(Number);
 
             const isBooked = lockedSlotMap[slot] !== undefined;
+            const isAdminSlot = isAdminOnlySlot(slot);
             let isPast = false;
             let isTooClose = false;
 
@@ -206,11 +234,21 @@ export const checkAvailability = async (req, res) => {
                 reason = 'Booked'; 
             }
 
-            return { slot, available, reason };
+            return { 
+                slot, 
+                available, 
+                reason,
+                isAdminOnly: isAdminSlot
+            };
         });
 
         const availableCount = slots.filter(s => s.available).length;
-        console.log('📊 Available:', availableCount, '/', slots.length);
+        const regularAvailable = slots.filter(s => s.available && !s.isAdminOnly).length;
+        const adminOnlyAvailable = slots.filter(s => s.available && s.isAdminOnly).length;
+
+        console.log('📊 Total Available:', availableCount, '/', slots.length);
+        console.log('📊 Regular Available:', regularAvailable);
+        console.log('📊 Admin-Only Available:', adminOnlyAvailable);
         console.log('🔍 ============================================================');
 
         res.status(200).json({
@@ -219,9 +257,17 @@ export const checkAvailability = async (req, res) => {
                 date,
                 isAvailable: slots.some(s => s.available),
                 isClosed: false,
-                availableSlots: slots.filter(s => s.available).length,
+                availableSlots: availableCount,
                 totalSlots: slots.length,
-                slots
+                slots,
+                showingAdminSlots: showAdminSlots,
+                regularSlotCount: TIME_SLOTS.length,
+                adminSlotCount: showAdminSlots ? ADMIN_ONLY_SLOTS.length : 0,
+                summary: {
+                    regularAvailable,
+                    adminOnlyAvailable,
+                    totalAvailable: availableCount
+                }
             }
         });
 
@@ -232,12 +278,14 @@ export const checkAvailability = async (req, res) => {
 };
 
 // ============================================
-// CREATE BOOKING
+// CREATE BOOKING (Supports Admin Slots)
 // ============================================
 export const createBooking = async (req, res) => {
     try {
         const { serviceId, bookingDate, timeSlot, location, phone } = req.body;
 
+        // ==================== VALIDATION ====================
+        
         if (!serviceId || !bookingDate || !timeSlot || !location) {
             return res.status(400).json({
                 success: false,
@@ -263,13 +311,31 @@ export const createBooking = async (req, res) => {
             });
         }
 
-        if (!isValidTimeSlot(timeSlot)) {
-            return res.status(400).json({
+        // ==================== ADMIN SLOT CHECK ====================
+        
+        const isAdmin = req.user?.role === 'admin';
+        const isAdminSlot = isAdminOnlySlot(timeSlot);
+
+        // Non-admins cannot book admin-only slots
+        if (isAdminSlot && !isAdmin) {
+            return res.status(403).json({
                 success: false,
-                message: `Invalid time slot. Valid slots: ${TIME_SLOTS.join(', ')}`
+                message: 'This time slot is only available for admin bookings. Please choose a regular time slot.',
+                availableSlots: TIME_SLOTS
             });
         }
 
+        // Validate against appropriate slot list
+        if (!isValidAnySlot(timeSlot)) {
+            const validSlots = isAdmin ? ALL_TIME_SLOTS : TIME_SLOTS;
+            return res.status(400).json({
+                success: false,
+                message: `Invalid time slot. Valid slots: ${validSlots.join(', ')}`
+            });
+        }
+
+        // ==================== DATE VALIDATION ====================
+        
         if (!/^\d{4}-\d{2}-\d{2}$/.test(bookingDate)) {
             return res.status(400).json({
                 success: false,
@@ -315,6 +381,8 @@ export const createBooking = async (req, res) => {
             });
         }
 
+        // ==================== TIME SLOT VALIDATION ====================
+        
         const slotCheck = isSlotInPast(bookingDate, timeSlot);
         if (slotCheck.isPast) {
             return res.status(400).json({
@@ -323,6 +391,8 @@ export const createBooking = async (req, res) => {
             });
         }
 
+        // ==================== USER BOOKING LIMIT ====================
+        
         const activeBookings = await Booking.countDocuments({
             customerId: req.user._id,
             status: { $in: ['pending', 'confirmed'] }
@@ -335,6 +405,8 @@ export const createBooking = async (req, res) => {
             });
         }
 
+        // ==================== SERVICE VALIDATION ====================
+        
         const service = await Service.findOne({ _id: serviceId, isActive: true })
             .populate('category', 'name slug')
             .populate('subcategory', 'name slug');
@@ -353,6 +425,8 @@ export const createBooking = async (req, res) => {
             });
         }
 
+        // ==================== SLOT AVAILABILITY CHECK ====================
+        
         const slotLockKey = `${bookingDate}|${timeSlot}`;
 
         const existingBooking = await Booking.findOne({
@@ -367,10 +441,15 @@ export const createBooking = async (req, res) => {
             });
         }
 
+        // ==================== CREATE BOOKING ====================
+        
         const finalPrice = service.discountPrice || service.price || 0;
         const duration = service.duration || 60;
 
-        console.log(`📦 Creating booking for ${service.name}. Price: ${finalPrice}`);
+        console.log(`📦 Creating booking for ${service.name}`);
+        console.log(`   Price: ${finalPrice}`);
+        console.log(`   Admin Slot: ${isAdminSlot}`);
+        console.log(`   User: ${req.user.email}`);
 
         let booking;
 
@@ -378,6 +457,7 @@ export const createBooking = async (req, res) => {
             booking = await Booking.create({
                 bookingType: 'online',
                 customerId: req.user._id,
+                isAdminSlot: isAdminSlot,
 
                 categoryId: service.category._id,
                 categoryName: service.category.name,
@@ -401,28 +481,32 @@ export const createBooking = async (req, res) => {
                 },
 
                 phone: phone,
-
                 paymentMethod: 'cash'
             });
         } catch (createError) {
             if (createError.code === 11000) {
                 return res.status(400).json({
                     success: false,
-                    message: `Time slot ${timeSlot} on ${bookingDate} was just booked`
+                    message: `Time slot ${timeSlot} on ${bookingDate} was just booked by someone else. Please choose another slot.`
                 });
             }
             throw createError;
         }
 
+        // ==================== POST-CREATION TASKS ====================
+        
+        // Update service booking count
         await Service.findByIdAndUpdate(serviceId, {
             $inc: { totalBookings: 1 }
         });
 
+        // Emit real-time events
         emitNewBooking(booking, `${req.user.firstName} ${req.user.lastName}`);
         emitSlotBooked(bookingDate, timeSlot, serviceId);
 
         console.log(`🔌 Real-time: Emitted new booking + slot booked for ${bookingDate} ${timeSlot}`);
 
+        // Send notifications async
         const emailData = {
             bookingCode: booking.bookingCode,
             serviceName: booking.serviceName,
@@ -433,7 +517,8 @@ export const createBooking = async (req, res) => {
             bookingDate: booking.bookingDate,
             timeSlot: booking.timeSlot,
             location: booking.location,
-            phone: booking.phone
+            phone: booking.phone,
+            isAdminSlot: booking.isAdminSlot
         };
 
         setImmediate(async () => {
@@ -452,6 +537,8 @@ export const createBooking = async (req, res) => {
             }
         });
 
+        // ==================== RESPONSE ====================
+        
         res.status(201).json({
             success: true,
             message: 'Booking created successfully!',
@@ -469,7 +556,8 @@ export const createBooking = async (req, res) => {
                 location: booking.location,
                 phone: booking.phone,
                 status: booking.status,
-                paymentMethod: booking.paymentMethod
+                paymentMethod: booking.paymentMethod,
+                isAdminSlot: booking.isAdminSlot
             }
         });
 
@@ -650,7 +738,7 @@ export const cancelBooking = async (req, res) => {
         const bookingDate = booking.bookingDate;
         const timeSlot = booking.timeSlot;
 
-        // ✅ DELETE the booking instead of soft delete
+        // DELETE the booking instead of soft delete
         await Booking.deleteOne({ _id: bookingId });
 
         console.log(`🗑️ Booking ${bookingCode} DELETED (cancelled by user)`);
@@ -705,7 +793,7 @@ export const cancelBooking = async (req, res) => {
 };
 
 // ============================================
-// RESCHEDULE BOOKING
+// RESCHEDULE BOOKING (Supports Admin Slots)
 // ============================================
 export const rescheduleBooking = async (req, res) => {
     try {
@@ -720,8 +808,27 @@ export const rescheduleBooking = async (req, res) => {
             return res.status(400).json({ success: false, message: 'New date and time slot are required' });
         }
 
-        if (!isValidTimeSlot(newTimeSlot)) {
-            return res.status(400).json({ success: false, message: 'Invalid time slot' });
+        // ==================== ADMIN SLOT CHECK ====================
+        
+        const isAdmin = req.user?.role === 'admin';
+        const isAdminSlot = isAdminOnlySlot(newTimeSlot);
+
+        // Non-admins cannot reschedule to admin-only slots
+        if (isAdminSlot && !isAdmin) {
+            return res.status(403).json({
+                success: false,
+                message: 'This time slot is only available for admin bookings. Please choose a regular time slot.',
+                availableSlots: TIME_SLOTS
+            });
+        }
+
+        // Validate against appropriate slot list
+        if (!isValidAnySlot(newTimeSlot)) {
+            const validSlots = isAdmin ? ALL_TIME_SLOTS : TIME_SLOTS;
+            return res.status(400).json({ 
+                success: false, 
+                message: `Invalid time slot. Valid slots: ${validSlots.join(', ')}` 
+            });
         }
 
         if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
@@ -807,9 +914,11 @@ export const rescheduleBooking = async (req, res) => {
         try {
             booking.bookingDate = requestedDate;
             booking.timeSlot = newTimeSlot;
+            booking.isAdminSlot = isAdminSlot;  // Update admin slot flag
             await booking.save();
 
             console.log(`📅 Booking rescheduled from ${oldDateStr} ${oldTimeSlot} to ${newDate} ${newTimeSlot}`);
+            console.log(`   Admin Slot: ${isAdminSlot}`);
 
             emitSlotAvailable(oldDateStr, oldTimeSlot, serviceId);
             emitSlotBooked(newDate, newTimeSlot, serviceId);
@@ -820,7 +929,10 @@ export const rescheduleBooking = async (req, res) => {
             res.status(200).json({
                 success: true,
                 message: 'Booking rescheduled successfully',
-                data: booking
+                data: {
+                    ...booking.toObject(),
+                    isAdminSlot: booking.isAdminSlot
+                }
             });
 
         } catch (updateError) {
@@ -840,6 +952,76 @@ export const rescheduleBooking = async (req, res) => {
     }
 };
 
+// ============================================
+// GET USER BOOKING STATS
+// ============================================
+export const getMyBookingStats = async (req, res) => {
+    try {
+        const stats = await Booking.getUserStats(req.user._id);
+
+        res.status(200).json({
+            success: true,
+            data: stats
+        });
+
+    } catch (error) {
+        console.error('getMyBookingStats error:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch stats' });
+    }
+};
+
+// ============================================
+// GET AVAILABLE SLOTS FOR DATE
+// ============================================
+export const getAvailableSlots = async (req, res) => {
+    try {
+        const { date } = req.query;
+
+        if (!date) {
+            return res.status(400).json({ success: false, message: 'Date is required' });
+        }
+
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            return res.status(400).json({ success: false, message: 'Invalid date format. Use YYYY-MM-DD' });
+        }
+
+        const [year, month, day] = date.split('-').map(Number);
+        const bookingDate = new Date(year, month - 1, day, 12, 0, 0, 0);
+
+        if (isClosedDay(bookingDate)) {
+            return res.status(200).json({
+                success: true,
+                data: {
+                    date,
+                    isClosed: true,
+                    message: CLOSED_DAY_MESSAGE,
+                    availableSlots: []
+                }
+            });
+        }
+
+        const isAdmin = req.user?.role === 'admin';
+        const availableSlots = await Booking.getAvailableSlots(date, isAdmin);
+
+        res.status(200).json({
+            success: true,
+            data: {
+                date,
+                isClosed: false,
+                availableSlots,
+                totalAvailable: availableSlots.length
+            }
+        });
+
+    } catch (error) {
+        console.error('getAvailableSlots error:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch available slots' });
+    }
+};
+
+// ============================================
+// EXPORT DEFAULT
+// ============================================
 export default {
     getServiceWithPricing,
     checkAvailability,
@@ -847,5 +1029,7 @@ export default {
     getMyBookings,
     getBookingById,
     cancelBooking,
-    rescheduleBooking
+    rescheduleBooking,
+    getMyBookingStats,
+    getAvailableSlots
 };

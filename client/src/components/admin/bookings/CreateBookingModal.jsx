@@ -9,14 +9,39 @@ import serviceService from '@/services/serviceService';
 import axiosInstance from '@/lib/axios';
 import toast from 'react-hot-toast';
 
-// Time slots in 12-hour format
-const TIME_SLOTS = [
+// ✅ UPDATED: Regular time slots (Available to all users)
+const REGULAR_TIME_SLOTS = [
     '08:30 AM-10:30 AM',
     '10:30 AM-12:00 PM',
     '12:00 PM-02:30 PM',
     '02:30 PM-04:00 PM',
     '04:00 PM-05:30 PM',
 ];
+
+// ✅ NEW: Admin-only extra slots (Up to 10 PM)
+const ADMIN_ONLY_SLOTS = [
+    '05:30 PM-07:00 PM',   // Evening slot
+    '07:00 PM-08:30 PM',   // Late evening slot
+    '08:30 PM-10:00 PM',   // Night slot (NEW)
+];
+
+// ✅ NEW: Helper to sort time slots chronologically
+const sortTimeSlots = (slots) => {
+    return [...slots].sort((a, b) => {
+        const getHour = (slot) => {
+            const time = slot.split('-')[0].trim();
+            const [hourMin, period] = time.split(' ');
+            let hour = parseInt(hourMin.split(':')[0]);
+            if (period === 'PM' && hour !== 12) hour += 12;
+            if (period === 'AM' && hour === 12) hour = 0;
+            return hour;
+        };
+        return getHour(a) - getHour(b);
+    });
+};
+
+// ✅ NEW: All slots combined and sorted
+const ALL_TIME_SLOTS = sortTimeSlots([...REGULAR_TIME_SLOTS, ...ADMIN_ONLY_SLOTS]);
 
 // Steps: Customer → Service → Schedule
 const STEPS = [
@@ -89,6 +114,11 @@ function getTodayString() {
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 }
 
+// ✅ NEW: Check if slot is admin-only
+function isAdminOnlySlot(slot) {
+    return ADMIN_ONLY_SLOTS.includes(slot);
+}
+
 // Sub-components
 const InputField = memo(function InputField({ label, value, onChange, placeholder, type = 'text', required }) {
     return (
@@ -107,7 +137,8 @@ const InputField = memo(function InputField({ label, value, onChange, placeholde
     );
 });
 
-const TimeSlotButton = memo(function TimeSlotButton({ slot, selected, disabled, passed, booked, onClick }) {
+// ✅ UPDATED: TimeSlotButton with admin slot indicator
+const TimeSlotButton = memo(function TimeSlotButton({ slot, selected, disabled, passed, booked, isAdminSlot, onClick }) {
     return (
         <motion.button
             onClick={onClick}
@@ -115,14 +146,24 @@ const TimeSlotButton = memo(function TimeSlotButton({ slot, selected, disabled, 
             className={`
                 relative p-3.5 rounded-xl border text-xs font-medium transition-all duration-150
                 ${selected
-                    ? 'border-white/30 bg-white/[0.1] text-white shadow-lg shadow-white/5'
+                    ? isAdminSlot 
+                        ? 'border-purple-500/40 bg-purple-500/[0.15] text-white shadow-lg shadow-purple-500/10'
+                        : 'border-white/30 bg-white/[0.1] text-white shadow-lg shadow-white/5'
                     : disabled
                     ? 'border-white/[0.04] bg-white/[0.01] text-white/20 cursor-not-allowed'
+                    : isAdminSlot
+                    ? 'border-purple-500/20 bg-purple-500/[0.05] text-white/60 hover:border-purple-500/30 hover:text-white/80 hover:bg-purple-500/[0.08]'
                     : 'border-white/[0.08] bg-white/[0.02] text-white/60 hover:border-white/[0.15] hover:text-white/80 hover:bg-white/[0.04]'
                 }
             `}
             whileTap={!disabled ? { scale: 0.98 } : {}}
         >
+            {/* ✅ Admin slot badge */}
+            {isAdminSlot && (
+                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-purple-500 text-white text-[8px] font-bold flex items-center justify-center shadow-lg">
+                    A
+                </span>
+            )}
             <span className="block">{slot}</span>
             {passed && (
                 <span className="block text-[10px] text-white/20 mt-1">Passed</span>
@@ -136,9 +177,9 @@ const TimeSlotButton = memo(function TimeSlotButton({ slot, selected, disabled, 
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
                         exit={{ scale: 0 }}
-                        className="absolute top-2 right-2 w-4 h-4 rounded-full bg-white flex items-center justify-center"
+                        className={`absolute top-2 left-2 w-4 h-4 rounded-full flex items-center justify-center ${isAdminSlot ? 'bg-purple-400' : 'bg-white'}`}
                     >
-                        <Check className="w-2.5 h-2.5 text-black" />
+                        <Check className={`w-2.5 h-2.5 ${isAdminSlot ? 'text-white' : 'text-black'}`} />
                     </motion.span>
                 )}
             </AnimatePresence>
@@ -351,6 +392,10 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
     const [availabilityLoading, setAvailabilityLoading] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState('cash');
 
+    // ✅ NEW: This modal is for admin, so always use all slots
+    const isAdmin = true; // Admin create booking modal
+    const TIME_SLOTS = isAdmin ? ALL_TIME_SLOTS : REGULAR_TIME_SLOTS;
+
     // Refresh time every minute
     useEffect(() => {
         const interval = setInterval(() => setCurrentTime(new Date()), 60000);
@@ -407,13 +452,18 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
         return () => clearTimeout(t);
     }, [walkinSearch]);
 
-    // Check availability
+    // ✅ UPDATED: Check availability with admin slots flag
     useEffect(() => {
         if (!bookingDate) return;
         (async () => {
             try {
                 setAvailabilityLoading(true);
-                const res = await axiosInstance.get('/bookings/availability', { params: { date: bookingDate } });
+                const res = await axiosInstance.get('/bookings/availability', { 
+                    params: { 
+                        date: bookingDate,
+                        includeAdminSlots: isAdmin ? 'true' : undefined  // ✅ Pass flag for admin
+                    } 
+                });
                 if (res.data.success) setAvailability(res.data.data.slots || []);
             } catch {
                 setAvailability([]);
@@ -421,7 +471,7 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                 setAvailabilityLoading(false);
             }
         })();
-    }, [bookingDate]);
+    }, [bookingDate, isAdmin]);
 
     // Clear passed time slot
     useEffect(() => {
@@ -536,6 +586,11 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
 
     // Customers to display (search results or recent)
     const displayWalkinCustomers = walkinSearch.length >= 2 ? savedWalkinCustomers : recentWalkinCustomers;
+
+    // ✅ NEW: Count admin slots available
+    const adminSlotsCount = useMemo(() => {
+        return TIME_SLOTS.filter(slot => isAdminOnlySlot(slot)).length;
+    }, [TIME_SLOTS]);
 
     return (
         <>
@@ -816,7 +871,7 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                                 )}
 
                                 {/* ========================================== */}
-                                {/* STEP 3 - Schedule */}
+                                {/* STEP 3 - Schedule (✅ UPDATED) */}
                                 {/* ========================================== */}
                                 {step === 3 && (
                                     <>
@@ -848,6 +903,13 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                                                             Time Slot
                                                         </label>
                                                         <div className="flex items-center gap-3">
+                                                            {/* ✅ NEW: Admin slots indicator */}
+                                                            {isAdmin && adminSlotsCount > 0 && (
+                                                                <span className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                                                                    <span className="w-3 h-3 rounded-full bg-purple-500 text-white text-[7px] font-bold flex items-center justify-center">A</span>
+                                                                    <span className="text-[10px] text-purple-400 font-medium">{adminSlotsCount} admin slots</span>
+                                                                </span>
+                                                            )}
                                                             {isToday && (
                                                                 <span className="text-[10px] text-white/25 font-mono">
                                                                     {currentTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
@@ -859,10 +921,13 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                                                         </div>
                                                     </div>
 
+                                                    {/* ✅ UPDATED: Time slots grid with admin slot indicator */}
                                                     <div className="grid grid-cols-2 gap-2">
                                                         {TIME_SLOTS.map((slot) => {
                                                             const available = isSlotAvailable(slot);
                                                             const passed = isSlotPassed(slot, bookingDate);
+                                                            const isAdminSlot = isAdminOnlySlot(slot);
+                                                            
                                                             return (
                                                                 <TimeSlotButton
                                                                     key={slot}
@@ -871,11 +936,26 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                                                                     disabled={!available || passed}
                                                                     passed={passed}
                                                                     booked={!available && !passed}
+                                                                    isAdminSlot={isAdminSlot}
                                                                     onClick={() => setTimeSlot(slot)}
                                                                 />
                                                             );
                                                         })}
                                                     </div>
+
+                                                    {/* ✅ NEW: Legend for admin slots */}
+                                                    {isAdmin && (
+                                                        <div className="flex items-center gap-4 pt-2">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <div className="w-3 h-3 rounded border border-white/[0.08] bg-white/[0.02]" />
+                                                                <span className="text-[10px] text-white/30">Regular</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-1.5">
+                                                                <div className="w-3 h-3 rounded border border-purple-500/30 bg-purple-500/10" />
+                                                                <span className="text-[10px] text-purple-400">Admin only</span>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </motion.div>
                                             )}
                                         </AnimatePresence>
@@ -933,7 +1013,18 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                                                 />
                                                 <SummaryRow label="Service" value={selectedService?.name} />
                                                 <SummaryRow label="Date" value={bookingDate} mono />
-                                                <SummaryRow label="Time" value={timeSlot} mono />
+                                                {/* ✅ UPDATED: Show admin slot indicator in summary */}
+                                                <div className="flex items-center justify-between gap-4">
+                                                    <span className="text-[11px] text-white/30 shrink-0">Time</span>
+                                                    <span className="text-xs text-right font-mono text-white/60 flex items-center gap-2">
+                                                        {timeSlot || '—'}
+                                                        {timeSlot && isAdminOnlySlot(timeSlot) && (
+                                                            <span className="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 text-[9px] font-medium">
+                                                                Admin
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                </div>
                                                 <SummaryRow label="Payment" value={paymentMethod} />
                                                 <div className="h-px bg-white/[0.05]" />
                                                 <SummaryRow
@@ -967,7 +1058,7 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                             <motion.button
                                 onClick={handleNext}
                                 disabled={loading || !canProceed[step]}
-                                className="flex-1 flex items-center justify-center gap-2 py-3 px-5 rounded-xl bg-white text-black text-sm font-medium hover:bg-white/90 active:bg-white/80 disabled:bg-white/10 disabled:text-white/25 disabled:cursor-not-allowed shadow-lg shadow-white/10 transition-all"
+                                className="flex-1 flex items-center justify-center gap-2 py-3 px-5 rounded-xl bg-white text-black text-sm font-medium hover:bg-gray-200 active:bg-gray-300 disabled:bg-white/10 disabled:text-white/25 disabled:cursor-not-allowed shadow-lg shadow-white/10 transition-all"
                                 whileTap={{ scale: 0.98 }}
                             >
                                 {loading ? (

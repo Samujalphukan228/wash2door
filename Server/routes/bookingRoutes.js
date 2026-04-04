@@ -1,4 +1,4 @@
-// routes/bookingRoutes.js - UPDATED
+// routes/bookingRoutes.js
 
 import express from 'express';
 import {
@@ -8,10 +8,12 @@ import {
     cancelBooking,
     rescheduleBooking,
     getServiceWithPricing,
-    checkAvailability
+    checkAvailability,
+    getMyBookingStats,
+    getAvailableSlots
 } from '../controllers/bookingController.js';
 
-import { protect } from '../middleware/auth.js';
+import { protect, optionalAuth } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -22,8 +24,8 @@ const router = express.Router();
 // Get service with variant pricing
 router.get('/pricing/:serviceId', getServiceWithPricing);
 
-// Check time slot availability
-router.get('/availability', checkAvailability);
+// Check time slot availability (optionalAuth to detect admin)
+router.get('/availability', optionalAuth, checkAvailability);
 
 // ============================================
 // PROTECTED ROUTES - Auth required
@@ -35,6 +37,12 @@ router.post('/', createBooking);
 
 // Get my bookings
 router.get('/my-bookings', getMyBookings);
+
+// Get my booking stats
+router.get('/my-stats', getMyBookingStats);
+
+// Get available slots (simple list)
+router.get('/available-slots', getAvailableSlots);
 
 // Get single booking
 router.get('/:bookingId', getBookingById);

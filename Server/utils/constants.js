@@ -1,7 +1,31 @@
 // utils/constants.js
 
 // ============================================
-// TIME SLOTS - 12 HOUR FORMAT
+// HELPER: Convert 12-hour format to 24-hour for calculations
+// ============================================
+// ⭐ MOVE THESE FUNCTIONS TO THE TOP
+export const convertTimeTo24 = (time12) => {
+    const [time, period] = time12.split(' ');
+    let [hours, minutes] = time.split(':').map(Number);
+
+    if (period === 'PM' && hours !== 12) {
+        hours += 12;
+    } else if (period === 'AM' && hours === 12) {
+        hours = 0;
+    }
+
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+};
+
+export const convertTo24Hour = (slot12) => {
+    const [startPart, endPart] = slot12.split('-');
+    const start = convertTimeTo24(startPart.trim());
+    const end = convertTimeTo24(endPart.trim());
+    return { start, end };
+};
+
+// ============================================
+// TIME SLOTS - REGULAR (Available to all users)
 // ============================================
 export const TIME_SLOTS = [
     '08:30 AM-10:30 AM',
@@ -10,6 +34,24 @@ export const TIME_SLOTS = [
     '02:30 PM-04:00 PM',
     '04:00 PM-05:30 PM',
 ];
+
+// ============================================
+// ADMIN-ONLY EXTRA SLOTS (Up to 10 PM)
+// ============================================
+export const ADMIN_ONLY_SLOTS = [  
+    '05:30 PM-07:00 PM',   // Evening slot
+    '07:00 PM-08:30 PM',   // Late evening slot
+    '08:30 PM-10:00 PM',   // Night slot
+];
+
+// ============================================
+// ALL SLOTS (Regular + Admin-only)
+// ============================================
+export const ALL_TIME_SLOTS = [...TIME_SLOTS, ...ADMIN_ONLY_SLOTS].sort((a, b) => {
+    const timeA = convertTimeTo24(a.split('-')[0].trim());
+    const timeB = convertTimeTo24(b.split('-')[0].trim());
+    return timeA.localeCompare(timeB);
+});
 
 // ============================================
 // BOOKING STATUSES
@@ -61,36 +103,18 @@ export const REGISTRATION_STATUSES = [
 // VALIDATION HELPERS
 // ============================================
 export const isValidTimeSlot = (slot) => TIME_SLOTS.includes(slot);
+export const isValidAdminSlot = (slot) => ADMIN_ONLY_SLOTS.includes(slot);
+export const isValidAnySlot = (slot) => ALL_TIME_SLOTS.includes(slot);
+export const isAdminOnlySlot = (slot) => ADMIN_ONLY_SLOTS.includes(slot);
 export const isValidBookingStatus = (status) => BOOKING_STATUSES.includes(status);
 export const isValidServiceTier = (tier) => SERVICE_TIERS.includes(tier);
 export const isValidRole = (role) => USER_ROLES.includes(role);
 
 // ============================================
-// HELPER: Convert 12-hour format to 24-hour for calculations
+// GET SLOTS BASED ON USER ROLE
 // ============================================
-export const convertTo24Hour = (slot12) => {
-    // Input: "08:00 AM-09:00 AM" or "01:00 PM-02:00 PM"
-    // Output: { start: "08:00", end: "09:00" }
-    const [startPart, endPart] = slot12.split('-');
-    const start = convertTimeTo24(startPart.trim());
-    const end = convertTimeTo24(endPart.trim());
-    return { start, end };
-};
-
-// Helper to convert single time
-export const convertTimeTo24 = (time12) => {
-    // Input: "08:00 AM" or "01:00 PM"
-    // Output: "08:00" or "13:00"
-    const [time, period] = time12.split(' ');
-    let [hours, minutes] = time.split(':').map(Number);
-
-    if (period === 'PM' && hours !== 12) {
-        hours += 12;
-    } else if (period === 'AM' && hours === 12) {
-        hours = 0;
-    }
-
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+export const getSlotsForRole = (isAdmin = false) => {
+    return isAdmin ? ALL_TIME_SLOTS : TIME_SLOTS;
 };
 
 // ============================================
@@ -100,7 +124,7 @@ export const LIMITS = {
     MAX_ACTIVE_BOOKINGS_PER_USER: 3,
     MAX_BOOKING_ADVANCE_DAYS: 90,
     MIN_CANCEL_HOURS_BEFORE: 2,
-    MIN_BOOKING_BUFFER_MINUTES: 30, // ✅ ADDED: Buffer time for same-day bookings
+    MIN_BOOKING_BUFFER_MINUTES: 30,
     MAX_SERVICE_IMAGES: 3,
     MAX_IMAGE_SIZE_MB: 5,
     MAX_AVATAR_SIZE_MB: 2,
@@ -115,11 +139,8 @@ export const LIMITS = {
 // ============================================
 // CLOSED DAYS
 // ============================================
-// ✅ FIXED: Updated comment to be accurate
-// Day numbers: 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday
-export const CLOSED_DAYS = [1]; // 1 = Monday (We are closed on Mondays)
+export const CLOSED_DAYS = [1]; // 1 = Monday
 
-// ✅ ADDED: Closed day message constant for consistency
 export const CLOSED_DAY_MESSAGE = 'We are closed on Mondays';
 
 export const isClosedDay = (date) => {
@@ -127,7 +148,6 @@ export const isClosedDay = (date) => {
     return CLOSED_DAYS.includes(day);
 };
 
-// ✅ ADDED: Get closed day name(s) dynamically
 export const getClosedDayNames = () => {
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     return CLOSED_DAYS.map(day => dayNames[day]);
@@ -135,6 +155,8 @@ export const getClosedDayNames = () => {
 
 export default {
     TIME_SLOTS,
+    ADMIN_ONLY_SLOTS,
+    ALL_TIME_SLOTS,
     BOOKING_STATUSES,
     USER_ROLES,
     SERVICE_TIERS,
@@ -146,11 +168,15 @@ export default {
     CLOSED_DAYS,
     CLOSED_DAY_MESSAGE,
     isValidTimeSlot,
+    isValidAdminSlot,
+    isValidAnySlot,
+    isAdminOnlySlot,
     isValidBookingStatus,
     isValidServiceTier,
     isValidRole,
     isClosedDay,
     getClosedDayNames,
+    getSlotsForRole,
     convertTo24Hour,
     convertTimeTo24
 };

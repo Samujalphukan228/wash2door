@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import crypto from 'crypto';
 import {
-    TIME_SLOTS,
+    ALL_TIME_SLOTS,  // ✅ Changed to ALL_TIME_SLOTS
     BOOKING_STATUSES,
     BOOKING_TYPES,
     PAYMENT_METHODS,
@@ -17,6 +17,12 @@ const bookingSchema = new mongoose.Schema({
         type: String,
         enum: BOOKING_TYPES,
         default: 'online'
+    },
+
+    // ✅ NEW: Track if this booking uses an admin-only slot
+    isAdminSlot: {
+        type: Boolean,
+        default: false
     },
 
     // Customer
@@ -83,7 +89,7 @@ const bookingSchema = new mongoose.Schema({
     timeSlot: {
         type: String,
         required: [true, 'Time slot is required'],
-        enum: TIME_SLOTS
+        enum: ALL_TIME_SLOTS  // ✅ Allow all slots in schema
     },
 
     // Slot lock
@@ -99,7 +105,7 @@ const bookingSchema = new mongoose.Schema({
         city: { type: String, required: [true, 'City is required'] },
     },
 
-    // Contact phone number for this booking
+    // Contact phone number
     phone: {
         type: String,
         required: [true, 'Phone number is required'],
@@ -139,6 +145,12 @@ const bookingSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         default: null
+    },
+    
+    // ✅ NEW: Notes field for admin bookings
+    adminNotes: {
+        type: String,
+        default: ''
     }
 }, { timestamps: true });
 
@@ -147,23 +159,30 @@ bookingSchema.pre('save', function (next) {
     if (!this.bookingCode) {
         const random = crypto.randomBytes(3).toString('hex').toUpperCase();
         const timestamp = Date.now().toString(36).toUpperCase().slice(-3);
-        const prefix = this.bookingType === 'walkin' ? 'WI' : 'BK';
+        
+        // ✅ Different prefix for admin slot bookings
+        let prefix;
+        if (this.bookingType === 'walkin') {
+            prefix = 'WI';
+        } else if (this.isAdminSlot) {
+            prefix = 'AS'; // Admin Slot
+        } else {
+            prefix = 'BK';
+        }
+        
         this.bookingCode = `${prefix}-${timestamp}${random}`;
     }
 
-    // Generate unique key for cancelled bookings instead of null
+    // Generate slot lock key
     if (this.status === 'cancelled') {
         this.slotLockKey = `CANCELLED_${this._id}_${Date.now()}`;
-        console.log(`🗑️ Cancelled booking locked with key: ${this.slotLockKey}`);
     } else {
-        // Generate active slot lock key
         const d = new Date(this.bookingDate);
         const year = d.getFullYear();
         const month = String(d.getMonth() + 1).padStart(2, '0');
         const day = String(d.getDate()).padStart(2, '0');
         const dateStr = `${year}-${month}-${day}`;
         this.slotLockKey = `${dateStr}|${this.timeSlot}`;
-        console.log(`📍 Booking slot locked with key: ${this.slotLockKey}`);
     }
 
     next();
@@ -178,9 +197,10 @@ bookingSchema.index({ serviceId: 1 });
 bookingSchema.index({ categoryId: 1 });
 bookingSchema.index({ subcategoryId: 1 });
 bookingSchema.index({ bookingType: 1 });
+bookingSchema.index({ isAdminSlot: 1 });  // ✅ New index
 bookingSchema.index({ createdAt: -1 });
 
-// Unique index only for active slots
+// Unique slot lock index
 bookingSchema.index(
     { slotLockKey: 1 },
     { 
@@ -208,15 +228,20 @@ bookingSchema.virtual('canCancel').get(function () {
     return new Date() < cancelDeadline;
 });
 
-// Static: get available slots
-bookingSchema.statics.getAvailableSlots = async function (date) {
+// ✅ UPDATED: Get available slots (supports admin slots)
+bookingSchema.statics.getAvailableSlots = async function (date, includeAdminSlots = false) {
+    const { TIME_SLOTS, ALL_TIME_SLOTS } = await import('../utils/constants.js');
+    
     const dateStr = new Date(date).toISOString().split('T')[0];
+    const slotsToCheck = includeAdminSlots ? ALL_TIME_SLOTS : TIME_SLOTS;
+    
     const bookedSlots = await this.find({
         slotLockKey: { $regex: `^${dateStr}\\|` },
         status: { $in: ['pending', 'confirmed'] }
     }).select('timeSlot');
+    
     const bookedSlotNames = bookedSlots.map(b => b.timeSlot);
-    return TIME_SLOTS.filter(slot => !bookedSlotNames.includes(slot));
+    return slotsToCheck.filter(slot => !bookedSlotNames.includes(slot));
 };
 
 // Static: get user stats

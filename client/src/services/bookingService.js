@@ -1,3 +1,5 @@
+// services/bookingService.js
+
 import axiosInstance from '@/lib/axios';
 
 const bookingService = {
@@ -7,15 +9,18 @@ const bookingService = {
         return response.data;
     },
 
-    // ✅ Check availability (returns 12-hour format slots)
-    checkAvailability: async (date) => {
+    // ✅ UPDATED: Check availability with optional admin slots
+    checkAvailability: async (date, includeAdminSlots = false) => {
         const response = await axiosInstance.get('/bookings/availability', {
-            params: { date }
+            params: { 
+                date,
+                includeAdminSlots: includeAdminSlots ? 'true' : undefined
+            }
         });
         return response.data;
     },
 
-    // Create booking (NO VARIANTS - sends 12-hour format)
+    // Create booking
     create: async (bookingData) => {
         const response = await axiosInstance.post('/bookings', bookingData);
         return response.data;
@@ -42,11 +47,11 @@ const bookingService = {
         return response.data;
     },
 
-    // Reschedule booking (timeSlot already in 12-hour format)
+    // Reschedule booking
     reschedule: async (bookingId, newDate, newTimeSlot) => {
         const response = await axiosInstance.put(
             `/bookings/${bookingId}/reschedule`,
-            { newDate, newTimeSlot }  // ✅ Already in 12-hour format
+            { newDate, newTimeSlot }
         );
         return response.data;
     }
