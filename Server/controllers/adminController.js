@@ -1083,7 +1083,7 @@ export const updateBookingStatus = async (req, res) => {
 };
 
 // ============================================
-// CREATE ADMIN BOOKING
+// CREATE ADMIN BOOKING (WITH ADMIN SLOTS SUPPORT)
 // ============================================
 
 export const createAdminBooking = async (req, res) => {
@@ -1098,8 +1098,11 @@ export const createAdminBooking = async (req, res) => {
             location,
             phone,
             paymentMethod,
-            paymentStatus
+            paymentStatus,
+            adminNotes  // ✅ NEW: Optional admin notes
         } = req.body;
+
+        // ==================== VALIDATION ====================
 
         if (!bookingType || !['walkin', 'online'].includes(bookingType)) {
             return res.status(400).json({
@@ -1148,6 +1151,8 @@ export const createAdminBooking = async (req, res) => {
             });
         }
 
+        // ==================== SERVICE VALIDATION ====================
+
         const service = await Service.findOne({ _id: serviceId, isActive: true })
             .populate('category', 'name slug')
             .populate('subcategory', 'name slug');
@@ -1176,13 +1181,15 @@ export const createAdminBooking = async (req, res) => {
             });
         }
 
+        // ==================== DATE VALIDATION ====================
+
         const [year, month, day] = bookingDate.split('-').map(Number);
         const requestedDate = new Date(year, month - 1, day, 12, 0, 0, 0);
 
         if (isNaN(requestedDate.getTime())) {
             return res.status(400).json({
                 success: false,
-                message: 'Invalid date format'
+                message: 'Invalid date format. Use YYYY-MM-DD'
             });
         }
 
@@ -1203,12 +1210,25 @@ export const createAdminBooking = async (req, res) => {
             });
         }
 
-        if (!isValidTimeSlot(timeSlot)) {
+        // ==================== TIME SLOT VALIDATION ====================
+
+        // ✅ UPDATED: Validate against ALL_TIME_SLOTS (regular + admin)
+        if (!isValidAnySlot(timeSlot)) {
             return res.status(400).json({
                 success: false,
-                message: 'Invalid time slot'
+                message: `Invalid time slot. Valid slots: ${ALL_TIME_SLOTS.join(', ')}`
             });
         }
+
+        // ✅ NEW: Check if this is an admin-only slot
+        const isAdminSlot = isAdminOnlySlot(timeSlot);
+
+        console.log(`📅 Admin creating booking:`);
+        console.log(`   Date: ${bookingDate}`);
+        console.log(`   Time Slot: ${timeSlot}`);
+        console.log(`   Is Admin Slot: ${isAdminSlot}`);
+
+        // ==================== SLOT AVAILABILITY CHECK ====================
 
         const slotLockKey = `${bookingDate}|${timeSlot}`;
 
@@ -1220,20 +1240,25 @@ export const createAdminBooking = async (req, res) => {
         if (slotTaken) {
             return res.status(400).json({
                 success: false,
-                message: 'Time slot already booked'
+                message: `Time slot ${timeSlot} on ${bookingDate} is already booked`
             });
         }
+
+        // ==================== PREPARE LOCATION ====================
 
         const bookingLocation = {
             address: location?.address || 'Walk-in / At Shop',
             city: location?.city || 'Duliajan'
         };
 
+        // ==================== CREATE BOOKING ====================
+
         let booking;
 
         try {
             booking = await Booking.create({
                 bookingType,
+                isAdminSlot,           // ✅ NEW: Track admin slot
                 customerId: bookingType === 'online' ? customerId : null,
                 walkInCustomer: bookingType === 'walkin'
                     ? { name: walkInCustomer.name, phone: phone }
@@ -1262,21 +1287,32 @@ export const createAdminBooking = async (req, res) => {
                 paymentStatus: paymentStatus || 'pending',
 
                 createdBy: req.user._id,
-                status: 'confirmed'
+                status: 'confirmed',
+                
+                adminNotes: adminNotes || ''  // ✅ NEW: Store admin notes
             });
         } catch (createError) {
             if (createError.code === 11000) {
                 return res.status(400).json({
                     success: false,
-                    message: `Time slot ${timeSlot} on ${bookingDate} was just booked`
+                    message: `Time slot ${timeSlot} on ${bookingDate} was just booked by someone else`
                 });
             }
             throw createError;
         }
 
+        console.log(`✅ Admin booking created: ${booking.bookingCode}`);
+        console.log(`   Service: ${service.name}`);
+        console.log(`   Price: ₹${finalPrice}`);
+        console.log(`   Admin Slot: ${isAdminSlot}`);
+
+        // ==================== UPDATE SERVICE STATS ====================
+
         await Service.findByIdAndUpdate(serviceId, {
             $inc: { totalBookings: 1 }
         });
+
+        // ==================== SAVE WALK-IN CUSTOMER ====================
 
         if (bookingType === 'walkin' && walkInCustomer?.name && phone) {
             try {
@@ -1306,20 +1342,27 @@ export const createAdminBooking = async (req, res) => {
             }
         }
 
+        // ==================== REAL-TIME UPDATES ====================
+
         const customerName = bookingType === 'walkin'
             ? walkInCustomer.name
             : 'Online Customer';
 
         emitNewBooking(booking, customerName);
         emitSlotBooked(bookingDate, timeSlot, serviceId);
-        emitDashboardUpdate({ action: 'new_booking', bookingType });
+        emitDashboardUpdate({ action: 'new_booking', bookingType, isAdminSlot });
 
         console.log(`🔌 Real-time: Admin booking created + slot booked ${bookingDate} ${timeSlot}`);
+
+        // ==================== RESPONSE ====================
 
         res.status(201).json({
             success: true,
             message: 'Booking created successfully',
-            data: booking
+            data: {
+                ...booking.toObject(),
+                isAdminSlot: booking.isAdminSlot  // ✅ Include in response
+            }
         });
 
     } catch (error) {
