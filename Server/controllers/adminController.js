@@ -8,9 +8,13 @@ import WalkInCustomer from '../models/WalkInCustomer.js';
 import { sendBookingStatusEmail } from '../utils/sendEmail.js';
 import {
     TIME_SLOTS,
+    ADMIN_ONLY_SLOTS,          // ✅ ADD THIS
+    ALL_TIME_SLOTS,            // ✅ ADD THIS
     BOOKING_STATUSES,
     CLOSED_DAY_MESSAGE,
     isValidTimeSlot,
+    isValidAnySlot,            // ✅ ADD THIS
+    isAdminOnlySlot,           // ✅ ADD THIS
     isClosedDay,
     convertTo24Hour
 } from '../utils/constants.js';
