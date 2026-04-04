@@ -107,7 +107,21 @@ export const sendVerificationEmail = async (user, verificationToken) => {
 
 // Password Reset
 export const sendPasswordResetEmail = async (user, resetToken) => {
+    // ✅ DEBUG LOGS - ADD THESE
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🔍 PASSWORD RESET EMAIL DEBUG');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('📧 User:', user.email);
+    console.log('🔑 Reset token received:', resetToken);
+    console.log('📏 Token length:', resetToken.length);
+    console.log('📦 Token type:', typeof resetToken);
+    console.log('🌐 FRONTEND_URL:', process.env.FRONTEND_URL);
+    
     const resetLink = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
+    
+    console.log('🔗 Generated reset link:', resetLink);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
     return await sendEmail({
         email: user.email,
         name: `${user.firstName} ${user.lastName}`,

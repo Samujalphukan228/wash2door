@@ -75,7 +75,7 @@ export const forgotPasswordValidator = [
         .normalizeEmail()
 ];
 
-// Reset password validation
+// Reset password validation - FIXED ✅
 export const resetPasswordValidator = [
     param('token')
         .notEmpty()
@@ -87,17 +87,7 @@ export const resetPasswordValidator = [
         .isLength({ min: 8 })
         .withMessage('Password must be at least 8 characters')
         .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
-        .withMessage('Password must contain uppercase, lowercase, number, and special character'),
-    
-    body('confirmPassword')
-        .notEmpty()
-        .withMessage('Please confirm your password')
-        .custom((value, { req }) => {
-            if (value !== req.body.password) {
-                throw new Error('Passwords do not match');
-            }
-            return true;
-        })
+        .withMessage('Password must contain uppercase, lowercase, number, and special character')
 ];
 
 // Change password validation
