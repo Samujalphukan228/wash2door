@@ -71,8 +71,6 @@ export function AuthProvider({ children }) {
   const logout = useCallback(async () => {
     try {
       await logoutAPI()
-    } catch (error) {
-      console.error('Logout error:', error)
     } finally {
       localStorage.removeItem('accessToken')
       setUser(null)

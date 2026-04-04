@@ -1,12 +1,7 @@
 import api from './api'
 
-/**
- * Create a new booking (NO VARIANTS)
- */
 export async function createBooking(bookingData) {
   try {
-    console.log('📦 Creating booking with data:', JSON.stringify(bookingData, null, 2))
-
     const response = await api.post('/bookings', {
       serviceId: bookingData.serviceId,
       bookingDate: bookingData.bookingDate,
@@ -14,8 +9,6 @@ export async function createBooking(bookingData) {
       location: bookingData.location,
       phone: bookingData.phone
     })
-    
-    console.log('📦 Response:', response.data)
 
     if (response.data?.success) {
       return response.data.data
@@ -23,11 +16,6 @@ export async function createBooking(bookingData) {
     
     throw new Error(response.data?.message || 'Failed to create booking')
   } catch (error) {
-    console.log('❌ Full error:', error)
-    console.log('❌ Error response:', error.response)
-    console.log('❌ Error data:', error.response?.data)
-    console.log('❌ Validation errors:', error.response?.data?.errors)
-    
     throw new Error(
       error.response?.data?.errors?.join(', ') || 
       error.response?.data?.message || 
@@ -37,9 +25,6 @@ export async function createBooking(bookingData) {
   }
 }
 
-/**
- * Get all bookings for the current user
- */
 export async function getUserBookings(statusFilter = "", page = 1, limit = 10) {
   try {
     const params = new URLSearchParams()
@@ -61,9 +46,6 @@ export async function getUserBookings(statusFilter = "", page = 1, limit = 10) {
   }
 }
 
-/**
- * Get a single booking by ID
- */
 export async function getBookingById(bookingId) {
   try {
     const response = await api.get(`/bookings/${bookingId}`)
@@ -80,9 +62,6 @@ export async function getBookingById(bookingId) {
   }
 }
 
-/**
- * Cancel a booking
- */
 export async function cancelBooking(bookingId, reason = "") {
   try {
     const response = await api.put(`/bookings/${bookingId}/cancel`, { reason })
@@ -99,14 +78,11 @@ export async function cancelBooking(bookingId, reason = "") {
   }
 }
 
-/**
- * Reschedule a booking
- */
 export async function rescheduleBooking(bookingId, newDate, newTimeSlot) {
   try {
     const response = await api.put(`/bookings/${bookingId}/reschedule`, {
       newDate,
-      newTimeSlot  // ✅ Already in 12-hour format
+      newTimeSlot
     })
     
     if (response.data?.success) {
@@ -121,9 +97,6 @@ export async function rescheduleBooking(bookingId, newDate, newTimeSlot) {
   }
 }
 
-/**
- * Check availability for a date (GLOBAL) - ✅ FIXED URL
- */
 export async function checkAvailability(date) {
   try {
     const response = await api.get('/bookings/availability', {
@@ -142,9 +115,6 @@ export async function checkAvailability(date) {
   }
 }
 
-/**
- * Get service pricing (returns single price, not variants)
- */
 export async function getServicePricing(serviceId) {
   try {
     const response = await api.get(`/bookings/pricing/${serviceId}`)

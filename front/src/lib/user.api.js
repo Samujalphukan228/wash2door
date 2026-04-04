@@ -1,6 +1,5 @@
 import api from './api'
 
-// Get user profile (uses /auth/me)
 export const getUserProfile = async () => {
   try {
     const res = await api.get('/auth/me')
@@ -18,7 +17,6 @@ export const getUserProfile = async () => {
   }
 }
 
-// Update user profile
 export const updateUserProfile = async (data) => {
   try {
     const res = await api.put('/auth/update-profile', {
@@ -39,17 +37,15 @@ export const updateUserProfile = async (data) => {
   }
 }
 
-// Change password
 export const changePassword = async (currentPassword, newPassword, confirmNewPassword) => {
   try {
     const res = await api.put('/auth/change-password', {
       currentPassword,
       newPassword,
-      confirmNewPassword // ✅ Backend expects confirmNewPassword, not confirmPassword
+      confirmNewPassword
     })
     
     if (res.data?.success) {
-      // ✅ Store new token if returned
       if (res.data.data?.accessToken) {
         localStorage.setItem('accessToken', res.data.data.accessToken)
       }
@@ -65,7 +61,6 @@ export const changePassword = async (currentPassword, newPassword, confirmNewPas
   }
 }
 
-// Get user bookings
 export const getUserBookings = async (status = '', page = 1, limit = 10) => {
   try {
     const params = new URLSearchParams()
@@ -76,7 +71,7 @@ export const getUserBookings = async (status = '', page = 1, limit = 10) => {
     const res = await api.get(`/bookings/my-bookings?${params.toString()}`)
     
     if (res.data?.success) {
-      return res.data.data // { bookings, total, pages, currentPage }
+      return res.data.data
     }
     
     throw new Error(res.data?.message || 'Failed to fetch bookings')
@@ -88,7 +83,6 @@ export const getUserBookings = async (status = '', page = 1, limit = 10) => {
   }
 }
 
-// Get user stats
 export const getUserStats = async () => {
   try {
     const res = await api.get('/auth/me/stats')
@@ -106,7 +100,6 @@ export const getUserStats = async () => {
   }
 }
 
-// Deactivate account (not delete - your backend uses deactivate)
 export const deactivateAccount = async (password) => {
   try {
     const res = await api.delete('/auth/deactivate', {
@@ -127,7 +120,6 @@ export const deactivateAccount = async (password) => {
   }
 }
 
-// Update avatar
 export const updateAvatar = async (file) => {
   try {
     const formData = new FormData()

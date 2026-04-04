@@ -1,13 +1,8 @@
-// src/lib/services.api.js
 import api from './api'
 
-/**
- * Get all categories (PUBLIC - no auth needed)
- */
 export async function getCategories() {
   try {
     const response = await api.get('/public/categories')
-
     return response.data?.data || response.data?.categories || response.data || []
   } catch (error) {
     throw new Error(
@@ -16,9 +11,6 @@ export async function getCategories() {
   }
 }
 
-/**
- * Get public services (optionally filtered)
- */
 export async function getPublicServices(filters = {}) {
   try {
     const params = {}
@@ -34,7 +26,6 @@ export async function getPublicServices(filters = {}) {
     }
 
     const response = await api.get('/public/services', { params })
-
     return response.data?.data || response.data?.services || response.data || []
   } catch (error) {
     throw new Error(
@@ -43,14 +34,10 @@ export async function getPublicServices(filters = {}) {
   }
 }
 
-/**
- * Get single service by ID (NO VARIANTS - single price structure)
- */
 export async function getServiceById(serviceId) {
   try {
     const response = await api.get(`/bookings/service/${serviceId}/pricing`)
 
-    // ✅ Service structure: { price, discountPrice, duration, finalPrice }
     if (response.data?.success) {
       return response.data.data
     }
@@ -63,9 +50,6 @@ export async function getServiceById(serviceId) {
   }
 }
 
-/**
- * Get user bookings
- */
 export async function getUserBookings() {
   try {
     const response = await api.get('/bookings/my-bookings')
@@ -82,13 +66,9 @@ export async function getUserBookings() {
   }
 }
 
-/**
- * Get subcategories by category ID
- */
 export async function getSubcategoriesByCategoryId(categoryId) {
   try {
     const response = await api.get(`/public/categories/${categoryId}/subcategories`)
-
     return response.data?.data || response.data?.subcategories || response.data || []
   } catch (error) {
     throw new Error(
@@ -97,15 +77,11 @@ export async function getSubcategoriesByCategoryId(categoryId) {
   }
 }
 
-/**
- * Get services by subcategory ID
- */
 export async function getServicesBySubcategoryId(subcategoryId) {
   try {
     const response = await api.get('/public/services', {
       params: { subcategory: subcategoryId }
     })
-
     return response.data?.data || response.data?.services || response.data || []
   } catch (error) {
     throw new Error(
@@ -114,15 +90,11 @@ export async function getServicesBySubcategoryId(subcategoryId) {
   }
 }
 
-/**
- * Search services
- */
 export async function searchServices(query) {
   try {
     const response = await api.get('/public/services', {
       params: { search: query }
     })
-
     return response.data?.data || response.data?.services || response.data || []
   } catch (error) {
     throw new Error(
