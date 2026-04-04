@@ -57,7 +57,6 @@ export const AuthProvider = ({ children }) => {
         loadUser();
     }, [loadUser]);
 
-    // ✅ NEW: Refresh user data from backend
     const refreshUser = useCallback(async () => {
         try {
             const response = await axiosInstance.get('/auth/me');
@@ -68,11 +67,10 @@ export const AuthProvider = ({ children }) => {
                 localStorage.setItem('user', JSON.stringify(userData));
             }
         } catch (error) {
-            console.error('Refresh user error:', error);
+            // Silent fail
         }
     }, []);
 
-    // ✅ NEW: Update user state directly (for instant UI update)
     const updateUser = useCallback((updates) => {
         setUser(prev => {
             const updated = { ...prev, ...updates };
@@ -143,8 +141,6 @@ export const AuthProvider = ({ children }) => {
     const logout = async () => {
         try {
             await axiosInstance.post('/auth/logout');
-        } catch (error) {
-            console.error('Logout error:', error);
         } finally {
             localStorage.removeItem('accessToken');
             localStorage.removeItem('user');

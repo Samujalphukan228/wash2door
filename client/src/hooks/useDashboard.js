@@ -18,21 +18,10 @@ const useDashboard = () => {
             
             const response = await adminService.getDashboardStats();
             
-            // 🔍 DEBUG - Check what backend sends
-            console.log('═══════════════════════════════════════');
-            console.log('📊 RAW API RESPONSE:', response);
-            console.log('📊 response.success:', response.success);
-            console.log('📊 response.data:', response.data);
-            console.log('📊 response.data.revenue:', response.data?.revenue);
-            console.log('📊 response.data.expenses:', response.data?.expenses);
-            console.log('📊 response.data.profit:', response.data?.profit);
-            console.log('═══════════════════════════════════════');
-            
             if (response.success) {
                 setStats(response.data);
             }
         } catch (err) {
-            console.error('Dashboard fetch error:', err);
             setError(err.message);
         } finally {
             setLoading(false);
@@ -46,20 +35,10 @@ const useDashboard = () => {
 
     useEffect(() => {
         const unsubscribe = onDashboardUpdate((data) => {
-            console.log('📊 Dashboard update received:', data);
             fetchStats();
         });
         return unsubscribe;
     }, [onDashboardUpdate, fetchStats]);
-
-    // 🔍 DEBUG - Check what's being returned
-    console.log('═══════════════════════════════════════');
-    console.log('📊 HOOK RETURN VALUES:');
-    console.log('stats:', stats);
-    console.log('revenue:', stats?.revenue);
-    console.log('expenses:', stats?.expenses);
-    console.log('profit:', stats?.profit);
-    console.log('═══════════════════════════════════════');
 
     return {
         stats,

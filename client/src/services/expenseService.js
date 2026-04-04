@@ -1,9 +1,6 @@
 import axiosInstance from '@/lib/axios';
 
 const expenseService = {
-    // ============================================
-    // CATEGORIES
-    // ============================================
     getCategories: async () => {
         const response = await axiosInstance.get('/expenses/categories');
         return response.data;
@@ -24,9 +21,6 @@ const expenseService = {
         return response.data;
     },
 
-    // ============================================
-    // EXPENSES
-    // ============================================
     getAll: async (params) => {
         const response = await axiosInstance.get('/expenses', { params });
         return response.data;

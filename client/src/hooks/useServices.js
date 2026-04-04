@@ -1,5 +1,3 @@
-// src/hooks/useServices.js - FIXED WITH REAL-TIME
-
 import { useState, useCallback, useEffect } from 'react';
 import serviceService from '@/services/serviceService';
 import { useSocket } from '@/context/SocketContext';
@@ -16,7 +14,6 @@ const useServices = () => {
     });
     const { onServiceEvent } = useSocket();
 
-    // Fetch all services
     const fetchAll = useCallback(async (params = {}) => {
         try {
             setLoading(true);
@@ -41,21 +38,15 @@ const useServices = () => {
         }
     }, []);
 
-    // 🔥 ADDED: Real-time service updates
     useEffect(() => {
         const unsubscribe = onServiceEvent((event) => {
-            console.log('🛠️ Service event:', event.type, event.data);
-
             if (event.type === 'created') {
-                // Add new service to list
                 setServices(prev => [event.data, ...prev]);
             } else if (event.type === 'updated') {
-                // Update existing service
                 setServices(prev => prev.map(s => 
                     s._id === event.data._id ? event.data : s
                 ));
             } else if (event.type === 'deleted') {
-                // Remove deleted service
                 setServices(prev => prev.filter(s => s._id !== event.data.serviceId));
             }
         });
@@ -63,7 +54,6 @@ const useServices = () => {
         return unsubscribe;
     }, [onServiceEvent]);
 
-    // Fetch single
     const fetchOne = useCallback(async (serviceId) => {
         try {
             setLoading(true);
@@ -78,14 +68,12 @@ const useServices = () => {
         }
     }, []);
 
-    // Create
     const create = useCallback(async (formData) => {
         try {
             setLoading(true);
             const response = await serviceService.create(formData);
             
             if (response.success) {
-                // Don't manually add - socket will handle it
                 toast.success('Service created successfully');
             }
             return response;
@@ -98,14 +86,12 @@ const useServices = () => {
         }
     }, []);
 
-    // Update
     const update = useCallback(async (serviceId, formData) => {
         try {
             setLoading(true);
             const response = await serviceService.update(serviceId, formData);
             
             if (response.success) {
-                // Don't manually update - socket will handle it
                 toast.success('Service updated successfully');
             }
             return response;
@@ -118,14 +104,12 @@ const useServices = () => {
         }
     }, []);
 
-    // Delete
     const remove = useCallback(async (serviceId) => {
         try {
             setLoading(true);
             const response = await serviceService.delete(serviceId);
             
             if (response.success) {
-                // Don't manually remove - socket will handle it
                 toast.success('Service deleted successfully');
             }
             return response;
@@ -138,13 +122,11 @@ const useServices = () => {
         }
     }, []);
 
-    // Toggle featured
     const toggleFeatured = useCallback(async (serviceId) => {
         try {
             const response = await serviceService.toggleFeatured(serviceId);
             
             if (response.success) {
-                // Don't manually update - socket will handle it
                 toast.success('Featured status updated');
             }
             return response;
@@ -154,13 +136,11 @@ const useServices = () => {
         }
     }, []);
 
-    // Toggle active
     const toggleActive = useCallback(async (serviceId) => {
         try {
             const response = await serviceService.toggleActive(serviceId);
             
             if (response.success) {
-                // Don't manually update - socket will handle it
                 toast.success('Active status updated');
             }
             return response;
@@ -170,7 +150,6 @@ const useServices = () => {
         }
     }, []);
 
-    // Reorder
     const reorder = useCallback(async (orderedIds) => {
         try {
             const response = await serviceService.reorder(orderedIds);
@@ -185,13 +164,11 @@ const useServices = () => {
         }
     }, []);
 
-    // Delete image
     const deleteImage = useCallback(async (serviceId, imageId) => {
         try {
             const response = await serviceService.deleteImage(serviceId, imageId);
             
             if (response.success) {
-                // Socket will update
                 toast.success('Image deleted');
             }
             return response;
@@ -201,13 +178,11 @@ const useServices = () => {
         }
     }, []);
 
-    // Set primary image
     const setPrimaryImage = useCallback(async (serviceId, imageId) => {
         try {
             const response = await serviceService.setPrimaryImage(serviceId, imageId);
             
             if (response.success) {
-                // Socket will update
                 toast.success('Primary image updated');
             }
             return response;
@@ -217,13 +192,11 @@ const useServices = () => {
         }
     }, []);
 
-    // Add variant
     const addVariant = useCallback(async (serviceId, formData) => {
         try {
             const response = await serviceService.addVariant(serviceId, formData);
             
             if (response.success) {
-                // Socket will update
                 toast.success('Variant added successfully');
             }
             return response;
@@ -233,13 +206,11 @@ const useServices = () => {
         }
     }, []);
 
-    // Update variant
     const updateVariant = useCallback(async (serviceId, variantId, formData) => {
         try {
             const response = await serviceService.updateVariant(serviceId, variantId, formData);
             
             if (response.success) {
-                // Socket will update
                 toast.success('Variant updated successfully');
             }
             return response;
@@ -249,13 +220,11 @@ const useServices = () => {
         }
     }, []);
 
-    // Delete variant
     const deleteVariant = useCallback(async (serviceId, variantId) => {
         try {
             const response = await serviceService.deleteVariant(serviceId, variantId);
             
             if (response.success) {
-                // Socket will update
                 toast.success('Variant deleted successfully');
             }
             return response;

@@ -1,20 +1,11 @@
-// src/services/adminService.js
-
 import axiosInstance from '@/lib/axios';
 
 const adminService = {
-
-    // ============================================
-    // Dashboard
-    // ============================================
     getDashboardStats: async () => {
         const response = await axiosInstance.get('/admin/dashboard/stats');
         return response.data;
     },
 
-    // ============================================
-    // Users
-    // ============================================
     getAllUsers: async (params) => {
         const response = await axiosInstance.get('/admin/users', { params });
         return response.data;
@@ -46,9 +37,6 @@ const adminService = {
         return response.data;
     },
 
-    // ============================================
-    // Bookings
-    // ============================================
     getAllBookings: async (params) => {
         const response = await axiosInstance.get('/admin/bookings', { params });
         return response.data;
@@ -72,9 +60,6 @@ const adminService = {
         return response.data;
     },
 
-    // ============================================
-    // Booking Cleanup
-    // ============================================
     getBookingCleanupStats: async () => {
         const response = await axiosInstance.get('/admin/bookings/cleanup/stats');
         return response.data;
@@ -91,9 +76,6 @@ const adminService = {
         return response.data;
     },
 
-    // ============================================
-    // Walk-in Customers
-    // ============================================
     searchWalkInCustomers: async (query) => {
         const response = await axiosInstance.get('/admin/walkin-customers/search', {
             params: { q: query }
@@ -136,9 +118,6 @@ const adminService = {
         return response.data;
     },
 
-    // ============================================
-    // Reviews
-    // ============================================
     getAllReviews: async (params) => {
         const response = await axiosInstance.get('/admin/reviews', { params });
         return response.data;
@@ -149,9 +128,6 @@ const adminService = {
         return response.data;
     },
 
-    // ============================================
-    // Reports
-    // ============================================
     getRevenueReport: async (params) => {
         const response = await axiosInstance.get('/admin/reports/revenue', { params });
         return response.data;

@@ -2,16 +2,12 @@ import { useEffect, useCallback } from 'react';
 import { useSocket } from '@/context/SocketContext';
 import toast from 'react-hot-toast';
 
-// ============================================
-// BOOKING SOCKET HOOK
-// ============================================
 export const useBookingSocket = (callbacks = {}) => {
     const { socket, isConnected } = useSocket();
 
     useEffect(() => {
         if (!socket || !isConnected) return;
 
-        // New booking created
         socket.on('booking:new', (data) => {
             toast.success(`New booking: ${data.bookingCode}`, {
                 icon: '📅',
@@ -20,7 +16,6 @@ export const useBookingSocket = (callbacks = {}) => {
             callbacks.onNewBooking?.(data);
         });
 
-        // Booking status updated
         socket.on('booking:statusUpdated', (data) => {
             const statusEmojis = {
                 confirmed: '✅',
@@ -35,7 +30,6 @@ export const useBookingSocket = (callbacks = {}) => {
             callbacks.onStatusUpdate?.(data);
         });
 
-        // Booking cancelled
         socket.on('booking:cancelled', (data) => {
             toast(`Booking ${data.bookingCode} cancelled`, {
                 icon: '❌',
@@ -44,7 +38,6 @@ export const useBookingSocket = (callbacks = {}) => {
             callbacks.onCancelled?.(data);
         });
 
-        // Slot freed up (from cancellation/reschedule)
         socket.on('booking:slotAvailable', (data) => {
             callbacks.onSlotAvailable?.(data);
         });
@@ -60,16 +53,12 @@ export const useBookingSocket = (callbacks = {}) => {
     return { isConnected };
 };
 
-// ============================================
-// CATEGORY SOCKET HOOK
-// ============================================
 export const useCategorySocket = (callbacks = {}) => {
     const { socket, isConnected } = useSocket();
 
     useEffect(() => {
         if (!socket || !isConnected) return;
 
-        // Category created
         socket.on('category:created', (data) => {
             toast.success(`New category: ${data.name}`, {
                 icon: '📁',
@@ -78,12 +67,10 @@ export const useCategorySocket = (callbacks = {}) => {
             callbacks.onCreated?.(data);
         });
 
-        // Category updated
         socket.on('category:updated', (data) => {
             callbacks.onUpdated?.(data);
         });
 
-        // Category deleted
         socket.on('category:deleted', (data) => {
             toast(`Category deleted: ${data.name}`, {
                 icon: '🗑️',
@@ -102,16 +89,12 @@ export const useCategorySocket = (callbacks = {}) => {
     return { isConnected };
 };
 
-// ============================================
-// SUBCATEGORY SOCKET HOOK - ADDED
-// ============================================
 export const useSubcategorySocket = (callbacks = {}) => {
     const { socket, isConnected } = useSocket();
 
     useEffect(() => {
         if (!socket || !isConnected) return;
 
-        // Subcategory created
         socket.on('subcategory:created', (data) => {
             toast.success(`New subcategory: ${data.name}`, {
                 icon: '📂',
@@ -120,12 +103,10 @@ export const useSubcategorySocket = (callbacks = {}) => {
             callbacks.onCreated?.(data);
         });
 
-        // Subcategory updated
         socket.on('subcategory:updated', (data) => {
             callbacks.onUpdated?.(data);
         });
 
-        // Subcategory deleted
         socket.on('subcategory:deleted', (data) => {
             toast(`Subcategory deleted: ${data.name}`, {
                 icon: '🗑️',
@@ -144,16 +125,12 @@ export const useSubcategorySocket = (callbacks = {}) => {
     return { isConnected };
 };
 
-// ============================================
-// SERVICE SOCKET HOOK
-// ============================================
 export const useServiceSocket = (callbacks = {}) => {
     const { socket, isConnected } = useSocket();
 
     useEffect(() => {
         if (!socket || !isConnected) return;
 
-        // Service created
         socket.on('service:created', (data) => {
             toast.success(`New service: ${data.name}`, {
                 icon: '🆕',
@@ -162,12 +139,10 @@ export const useServiceSocket = (callbacks = {}) => {
             callbacks.onCreated?.(data);
         });
 
-        // Service updated
         socket.on('service:updated', (data) => {
             callbacks.onUpdated?.(data);
         });
 
-        // Service deleted
         socket.on('service:deleted', (data) => {
             toast(`Service deleted: ${data.name}`, {
                 icon: '🗑️',
@@ -186,16 +161,12 @@ export const useServiceSocket = (callbacks = {}) => {
     return { isConnected };
 };
 
-// ============================================
-// REVIEW SOCKET HOOK
-// ============================================
 export const useReviewSocket = (callbacks = {}) => {
     const { socket, isConnected } = useSocket();
 
     useEffect(() => {
         if (!socket || !isConnected) return;
 
-        // New review
         socket.on('review:new', (data) => {
             const stars = '⭐'.repeat(data.rating);
             toast(`New review: ${stars}`, {
@@ -213,16 +184,12 @@ export const useReviewSocket = (callbacks = {}) => {
     return { isConnected };
 };
 
-// ============================================
-// USER SOCKET HOOK (for blocked status)
-// ============================================
 export const useUserSocket = (callbacks = {}) => {
     const { socket, isConnected } = useSocket();
 
     useEffect(() => {
         if (!socket || !isConnected) return;
 
-        // User blocked - force logout
         socket.on('user:blocked', (data) => {
             toast.error(`Account blocked: ${data.reason}`, {
                 duration: 10000
@@ -230,7 +197,6 @@ export const useUserSocket = (callbacks = {}) => {
             callbacks.onBlocked?.(data);
         });
 
-        // User role changed
         socket.on('user:roleChanged', (data) => {
             callbacks.onRoleChanged?.(data);
         });
@@ -244,16 +210,12 @@ export const useUserSocket = (callbacks = {}) => {
     return { isConnected };
 };
 
-// ============================================
-// ADMIN NOTIFICATIONS HOOK (all events)
-// ============================================
 export const useAdminNotifications = (callbacks = {}) => {
     const { socket, isConnected } = useSocket();
 
     useEffect(() => {
         if (!socket || !isConnected) return;
 
-        // Listen to all admin-relevant events
         socket.on('booking:new', (data) => {
             toast(`New booking from ${data.customerName}`, {
                 icon: '📅',

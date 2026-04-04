@@ -21,20 +21,16 @@ export const SocketProvider = ({ children }) => {
     const { user, isAuthenticated, logout } = useAuth();
     const router = useRouter();
 
-    // ✅ Event listeners registry
     const listenersRef = useRef({
         booking: new Set(),
         slot: new Set(),
         service: new Set(),
-        category: new Set(),        // 🔥 ADDED
-        subcategory: new Set(),     // 🔥 ADDED
+        category: new Set(),
+        subcategory: new Set(),
         dashboard: new Set(),
         user: new Set()
     });
 
-    // ============================================
-    // SOCKET CONNECTION
-    // ============================================
     useEffect(() => {
         if (!isAuthenticated || !user) {
             if (socket) {
@@ -46,8 +42,6 @@ export const SocketProvider = ({ children }) => {
         }
 
         const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:5000';
-
-        console.log('🔌 Connecting to socket:', socketUrl);
 
         const socketInstance = io(socketUrl, {
             withCredentials: true,
@@ -61,14 +55,9 @@ export const SocketProvider = ({ children }) => {
             }
         });
 
-        // ============================================
-        // CONNECTION EVENTS
-        // ============================================
         socketInstance.on('connect', () => {
-            console.log('✅ Socket connected:', socketInstance.id);
             setIsConnected(true);
 
-            // Join admin room
             socketInstance.emit('join', {
                 userId: user._id,
                 role: user.role
@@ -81,7 +70,6 @@ export const SocketProvider = ({ children }) => {
         });
 
         socketInstance.on('disconnect', (reason) => {
-            console.log('❌ Socket disconnected:', reason);
             setIsConnected(false);
 
             if (reason === 'io server disconnect') {
@@ -89,25 +77,18 @@ export const SocketProvider = ({ children }) => {
             }
         });
 
-        socketInstance.on('connect_error', (error) => {
-            console.error('⚠️ Socket connection error:', error.message);
+        socketInstance.on('connect_error', () => {
             setIsConnected(false);
         });
 
         socketInstance.on('reconnect', (attemptNumber) => {
-            console.log('🔄 Socket reconnected after', attemptNumber, 'attempts');
             toast.success('Reconnected to server', {
                 duration: 2000,
                 icon: '🔌'
             });
         });
 
-        // ============================================
-        // 🔥 USER EVENTS (CRITICAL)
-        // ============================================
         socketInstance.on('user:blocked', (data) => {
-            console.log('🚫 User blocked:', data);
-
             toast.error(`Your account has been blocked: ${data.reason}`, {
                 duration: 10000
             });
@@ -119,8 +100,6 @@ export const SocketProvider = ({ children }) => {
         });
 
         socketInstance.on('user:roleChanged', (data) => {
-            console.log('👤 Role changed:', data);
-
             if (data.newRole !== 'admin') {
                 toast.error('Your admin access has been revoked', {
                     duration: 10000
@@ -135,12 +114,7 @@ export const SocketProvider = ({ children }) => {
             }
         });
 
-        // ============================================
-        // 🔥 BOOKING EVENTS
-        // ============================================
         socketInstance.on('booking:new', (data) => {
-            console.log('📋 New booking:', data);
-
             toast.success(
                 `New booking: ${data.serviceName} - ${data.bookingCode}`,
                 { duration: 5000, icon: '🎉' }
@@ -152,8 +126,6 @@ export const SocketProvider = ({ children }) => {
         });
 
         socketInstance.on('booking:statusUpdated', (data) => {
-            console.log('📋 Booking status updated:', data);
-
             toast.info(
                 `Booking ${data.bookingCode} → ${data.status}`,
                 { duration: 4000 }
@@ -165,8 +137,6 @@ export const SocketProvider = ({ children }) => {
         });
 
         socketInstance.on('booking:cancelled', (data) => {
-            console.log('❌ Booking cancelled:', data);
-
             toast.error(
                 `Booking ${data.bookingCode} cancelled`,
                 { duration: 4000 }
@@ -177,31 +147,19 @@ export const SocketProvider = ({ children }) => {
             });
         });
 
-        // ============================================
-        // 🔥 SLOT AVAILABILITY EVENTS
-        // ============================================
         socketInstance.on('slot:booked', (data) => {
-            console.log('📅 Slot booked:', data);
-
             listenersRef.current.slot.forEach(callback => {
                 callback({ type: 'booked', data });
             });
         });
 
         socketInstance.on('slot:available', (data) => {
-            console.log('📅 Slot available:', data);
-
             listenersRef.current.slot.forEach(callback => {
                 callback({ type: 'available', data });
             });
         });
 
-        // ============================================
-        // 🔥 SERVICE EVENTS
-        // ============================================
         socketInstance.on('service:created', (data) => {
-            console.log('🛠️ Service created:', data);
-
             toast.success(`New service: ${data.name}`, {
                 duration: 4000,
                 icon: '✨'
@@ -213,16 +171,12 @@ export const SocketProvider = ({ children }) => {
         });
 
         socketInstance.on('service:updated', (data) => {
-            console.log('🛠️ Service updated:', data);
-
             listenersRef.current.service.forEach(callback => {
                 callback({ type: 'updated', data });
             });
         });
 
         socketInstance.on('service:deleted', (data) => {
-            console.log('🛠️ Service deleted:', data);
-
             toast.info(`Service deleted: ${data.name}`, {
                 duration: 4000
             });
@@ -232,12 +186,7 @@ export const SocketProvider = ({ children }) => {
             });
         });
 
-        // ============================================
-        // 🔥 CATEGORY EVENTS - ADDED
-        // ============================================
         socketInstance.on('category:created', (data) => {
-            console.log('📁 Category created:', data);
-
             toast.success(`New category: ${data.name}`, {
                 duration: 4000,
                 icon: '📁'
@@ -249,16 +198,12 @@ export const SocketProvider = ({ children }) => {
         });
 
         socketInstance.on('category:updated', (data) => {
-            console.log('📁 Category updated:', data);
-
             listenersRef.current.category.forEach(callback => {
                 callback({ type: 'updated', data });
             });
         });
 
         socketInstance.on('category:deleted', (data) => {
-            console.log('📁 Category deleted:', data);
-
             toast.info(`Category deleted: ${data.name}`, {
                 duration: 4000
             });
@@ -268,12 +213,7 @@ export const SocketProvider = ({ children }) => {
             });
         });
 
-        // ============================================
-        // 🔥 SUBCATEGORY EVENTS - ADDED
-        // ============================================
         socketInstance.on('subcategory:created', (data) => {
-            console.log('📂 Subcategory created:', data);
-
             toast.success(`New subcategory: ${data.name}`, {
                 duration: 4000,
                 icon: '📂'
@@ -285,16 +225,12 @@ export const SocketProvider = ({ children }) => {
         });
 
         socketInstance.on('subcategory:updated', (data) => {
-            console.log('📂 Subcategory updated:', data);
-
             listenersRef.current.subcategory.forEach(callback => {
                 callback({ type: 'updated', data });
             });
         });
 
         socketInstance.on('subcategory:deleted', (data) => {
-            console.log('📂 Subcategory deleted:', data);
-
             toast.info(`Subcategory deleted: ${data.name}`, {
                 duration: 4000
             });
@@ -304,12 +240,7 @@ export const SocketProvider = ({ children }) => {
             });
         });
 
-        // ============================================
-        // 🔥 DASHBOARD EVENTS
-        // ============================================
         socketInstance.on('dashboard:updated', (data) => {
-            console.log('📊 Dashboard updated:', data);
-
             listenersRef.current.dashboard.forEach(callback => {
                 callback(data);
             });
@@ -318,7 +249,6 @@ export const SocketProvider = ({ children }) => {
         setSocket(socketInstance);
 
         return () => {
-            console.log('🔌 Disconnecting socket...');
             socketInstance.emit('leave', { userId: user._id });
             socketInstance.disconnect();
             setSocket(null);
@@ -326,9 +256,6 @@ export const SocketProvider = ({ children }) => {
         };
     }, [isAuthenticated, user, logout, router]);
 
-    // ============================================
-    // 🔥 SUBSCRIBE TO BOOKING EVENTS
-    // ============================================
     const onBookingEvent = useCallback((callback) => {
         listenersRef.current.booking.add(callback);
 
@@ -337,9 +264,6 @@ export const SocketProvider = ({ children }) => {
         };
     }, []);
 
-    // ============================================
-    // 🔥 SUBSCRIBE TO SLOT EVENTS
-    // ============================================
     const onSlotEvent = useCallback((callback) => {
         listenersRef.current.slot.add(callback);
 
@@ -348,9 +272,6 @@ export const SocketProvider = ({ children }) => {
         };
     }, []);
 
-    // ============================================
-    // 🔥 SUBSCRIBE TO SERVICE EVENTS
-    // ============================================
     const onServiceEvent = useCallback((callback) => {
         listenersRef.current.service.add(callback);
 
@@ -359,9 +280,6 @@ export const SocketProvider = ({ children }) => {
         };
     }, []);
 
-    // ============================================
-    // 🔥 SUBSCRIBE TO CATEGORY EVENTS - ADDED
-    // ============================================
     const onCategoryEvent = useCallback((callback) => {
         listenersRef.current.category.add(callback);
 
@@ -370,9 +288,6 @@ export const SocketProvider = ({ children }) => {
         };
     }, []);
 
-    // ============================================
-    // 🔥 SUBSCRIBE TO SUBCATEGORY EVENTS - ADDED
-    // ============================================
     const onSubcategoryEvent = useCallback((callback) => {
         listenersRef.current.subcategory.add(callback);
 
@@ -381,9 +296,6 @@ export const SocketProvider = ({ children }) => {
         };
     }, []);
 
-    // ============================================
-    // 🔥 SUBSCRIBE TO DASHBOARD EVENTS
-    // ============================================
     const onDashboardUpdate = useCallback((callback) => {
         listenersRef.current.dashboard.add(callback);
 
@@ -392,14 +304,9 @@ export const SocketProvider = ({ children }) => {
         };
     }, []);
 
-    // ============================================
-    // GENERIC EMIT/ON/OFF
-    // ============================================
     const emit = useCallback((event, data) => {
         if (socket && isConnected) {
             socket.emit(event, data);
-        } else {
-            console.warn('⚠️ Socket not connected, cannot emit:', event);
         }
     }, [socket, isConnected]);
 
@@ -424,12 +331,11 @@ export const SocketProvider = ({ children }) => {
             emit,
             on,
             off,
-            // 🔥 High-level event subscriptions
             onBookingEvent,
             onSlotEvent,
             onServiceEvent,
-            onCategoryEvent,        // 🔥 ADDED
-            onSubcategoryEvent,     // 🔥 ADDED
+            onCategoryEvent,
+            onSubcategoryEvent,
             onDashboardUpdate
         }}>
             {children}

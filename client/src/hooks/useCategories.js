@@ -14,27 +14,19 @@ const useCategories = () => {
     });
     const { onCategoryEvent } = useSocket();
 
-    // ============================================
-    // 🔥 REAL-TIME CATEGORY UPDATES
-    // ============================================
     useEffect(() => {
         const unsubscribe = onCategoryEvent((event) => {
-            console.log('📁 Category event:', event.type, event.data);
-
             if (event.type === 'created') {
-                // Add new category to list
                 setCategories(prev => [event.data, ...prev]);
                 setPagination(prev => ({
                     ...prev,
                     total: prev.total + 1
                 }));
             } else if (event.type === 'updated') {
-                // Update existing category
                 setCategories(prev => prev.map(c => 
                     c._id === event.data._id ? event.data : c
                 ));
             } else if (event.type === 'deleted') {
-                // Remove deleted category
                 setCategories(prev => prev.filter(c => c._id !== event.data._id));
                 setPagination(prev => ({
                     ...prev,
@@ -46,7 +38,6 @@ const useCategories = () => {
         return unsubscribe;
     }, [onCategoryEvent]);
 
-    // Fetch all categories
     const fetchAll = useCallback(async (params = {}) => {
         try {
             setLoading(true);
@@ -71,7 +62,6 @@ const useCategories = () => {
         }
     }, []);
 
-    // Fetch single
     const fetchOne = useCallback(async (categoryId) => {
         try {
             setLoading(true);
@@ -86,14 +76,12 @@ const useCategories = () => {
         }
     }, []);
 
-    // Create
     const create = useCallback(async (formData) => {
         try {
             setLoading(true);
             const response = await categoryService.create(formData);
             
             if (response.success) {
-                // Don't manually add - socket will handle it
                 toast.success('Category created successfully');
             }
             return response;
@@ -106,14 +94,12 @@ const useCategories = () => {
         }
     }, []);
 
-    // Update
     const update = useCallback(async (categoryId, formData) => {
         try {
             setLoading(true);
             const response = await categoryService.update(categoryId, formData);
             
             if (response.success) {
-                // Don't manually update - socket will handle it
                 toast.success('Category updated successfully');
             }
             return response;
@@ -126,14 +112,12 @@ const useCategories = () => {
         }
     }, []);
 
-    // Delete
     const remove = useCallback(async (categoryId) => {
         try {
             setLoading(true);
             const response = await categoryService.delete(categoryId);
             
             if (response.success) {
-                // Don't manually remove - socket will handle it
                 toast.success('Category deleted successfully');
             }
             return response;
@@ -146,13 +130,11 @@ const useCategories = () => {
         }
     }, []);
 
-    // Toggle status
     const toggleStatus = useCallback(async (categoryId) => {
         try {
             const response = await categoryService.toggleStatus(categoryId);
             
             if (response.success) {
-                // Don't manually update - socket will handle it
                 toast.success('Status updated');
             }
             return response;
@@ -162,7 +144,6 @@ const useCategories = () => {
         }
     }, []);
 
-    // Reorder
     const reorder = useCallback(async (orderedIds) => {
         try {
             const response = await categoryService.reorder(orderedIds);

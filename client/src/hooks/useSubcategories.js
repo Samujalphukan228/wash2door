@@ -9,23 +9,15 @@ const useSubcategories = () => {
     const [error, setError] = useState(null);
     const { onSubcategoryEvent } = useSocket();
 
-    // ============================================
-    // 🔥 REAL-TIME SUBCATEGORY UPDATES
-    // ============================================
     useEffect(() => {
         const unsubscribe = onSubcategoryEvent((event) => {
-            console.log('📂 Subcategory event:', event.type, event.data);
-
             if (event.type === 'created') {
-                // Add new subcategory to list
                 setSubcategories(prev => [event.data, ...prev]);
             } else if (event.type === 'updated') {
-                // Update existing subcategory
                 setSubcategories(prev => prev.map(s => 
                     s._id === event.data._id ? event.data : s
                 ));
             } else if (event.type === 'deleted') {
-                // Remove deleted subcategory
                 setSubcategories(prev => prev.filter(s => s._id !== event.data._id));
             }
         });
@@ -33,7 +25,6 @@ const useSubcategories = () => {
         return unsubscribe;
     }, [onSubcategoryEvent]);
 
-    // Fetch all subcategories
     const fetchAll = useCallback(async (params = {}) => {
         try {
             setLoading(true);
@@ -53,7 +44,6 @@ const useSubcategories = () => {
         }
     }, []);
 
-    // Fetch by category
     const fetchByCategory = useCallback(async (categoryId) => {
         try {
             setLoading(true);
@@ -72,7 +62,6 @@ const useSubcategories = () => {
         }
     }, []);
 
-    // Fetch single
     const fetchOne = useCallback(async (subcategoryId) => {
         try {
             setLoading(true);
@@ -87,14 +76,12 @@ const useSubcategories = () => {
         }
     }, []);
 
-    // Create
     const create = useCallback(async (formData) => {
         try {
             setLoading(true);
             const response = await subcategoryService.create(formData);
             
             if (response.success) {
-                // Don't manually add - socket will handle it
                 toast.success('Subcategory created successfully');
             }
             return response;
@@ -107,14 +94,12 @@ const useSubcategories = () => {
         }
     }, []);
 
-    // Update
     const update = useCallback(async (subcategoryId, formData) => {
         try {
             setLoading(true);
             const response = await subcategoryService.update(subcategoryId, formData);
             
             if (response.success) {
-                // Don't manually update - socket will handle it
                 toast.success('Subcategory updated successfully');
             }
             return response;
@@ -127,14 +112,12 @@ const useSubcategories = () => {
         }
     }, []);
 
-    // Delete
     const remove = useCallback(async (subcategoryId) => {
         try {
             setLoading(true);
             const response = await subcategoryService.delete(subcategoryId);
             
             if (response.success) {
-                // Don't manually remove - socket will handle it
                 toast.success('Subcategory deleted successfully');
             }
             return response;
@@ -147,13 +130,11 @@ const useSubcategories = () => {
         }
     }, []);
 
-    // Toggle status
     const toggleStatus = useCallback(async (subcategoryId) => {
         try {
             const response = await subcategoryService.toggleStatus(subcategoryId);
             
             if (response.success) {
-                // Don't manually update - socket will handle it
                 toast.success('Status updated');
             }
             return response;
@@ -163,7 +144,6 @@ const useSubcategories = () => {
         }
     }, []);
 
-    // Reorder
     const reorder = useCallback(async (orderedIds) => {
         try {
             const response = await subcategoryService.reorder(orderedIds);
