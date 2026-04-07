@@ -200,24 +200,36 @@ export const checkAvailability = async (req, res) => {
         });
 
         const isToday = date === todayStr;
-        const bufferMinutes = LIMITS.MIN_BOOKING_BUFFER_MINUTES || 30;
 
-        // Process each slot
+        // ✅ FIXED: Process each slot - check END time, not START time
         const slots = slotsToShow.map(slot => {
-            const { start } = convertTo24Hour(slot);
-            const [hours, minutes] = start.split(':').map(Number);
-
             const isBooked = lockedSlotMap[slot] !== undefined;
             const isAdminSlot = isAdminOnlySlot(slot);
+            
             let isPast = false;
-            let isTooClose = false;
 
+            // ✅ NEW: Check if slot END time has passed
             if (isToday) {
-                const slotDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
-                const minBookingTime = new Date(slotDateTime.getTime() - bufferMinutes * 60 * 1000);
+                const endTime = slot.split('-')[1].trim(); // "10:30 AM"
+                const match = endTime.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
                 
-                isPast = now.getTime() >= slotDateTime.getTime();
-                isTooClose = !isPast && now.getTime() >= minBookingTime.getTime();
+                if (match) {
+                    let endHour = parseInt(match[1], 10);
+                    const endMinutes = parseInt(match[2], 10);
+                    const period = match[3].toUpperCase();
+                    
+                    // Convert to 24-hour format
+                    if (period === 'PM' && endHour !== 12) {
+                        endHour += 12;
+                    } else if (period === 'AM' && endHour === 12) {
+                        endHour = 0;
+                    }
+                    
+                    const currentTotalMinutes = now.getHours() * 60 + now.getMinutes();
+                    const endTotalMinutes = endHour * 60 + endMinutes;
+                    
+                    isPast = currentTotalMinutes >= endTotalMinutes;
+                }
             }
 
             let available = true;
@@ -226,9 +238,6 @@ export const checkAvailability = async (req, res) => {
             if (isPast) { 
                 available = false; 
                 reason = 'Past'; 
-            } else if (isTooClose) { 
-                available = false; 
-                reason = 'Too close to start time'; 
             } else if (isBooked) { 
                 available = false; 
                 reason = 'Booked'; 

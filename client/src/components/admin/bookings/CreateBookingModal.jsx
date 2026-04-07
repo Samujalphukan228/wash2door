@@ -96,17 +96,50 @@ function convertTo24Hour(time12) {
     return hours;
 }
 
+// ✅ FIXED: Slot only passes when END time is reached
 function isSlotPassed(slot, selectedDate) {
     const now = new Date();
-    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const todayStr = `${year}-${month}-${day}`;
+    
+    // Future date = not passed
     if (selectedDate > todayStr) return false;
+    
+    // Past date = passed
     if (selectedDate < todayStr) return true;
 
-    const startHour = convertTo24Hour(slot.split('-')[0].trim());
-    const currentHour = now.getHours();
+    // Today - check against END time of slot
+    // Handle different dash types: -, –, —
+    const parts = slot.split(/[-–—]/);
+    if (parts.length < 2) return false;
     
-    return currentHour >= startHour;
+    const endTime = parts[1].trim();  // "10:30 AM"
+    
+    // Parse using regex for safety
+    const match = endTime.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+    if (!match) return false;
+    
+    let endHour = parseInt(match[1], 10);
+    const endMinutes = parseInt(match[2], 10);
+    const period = match[3].toUpperCase();
+    
+    // Convert to 24-hour format
+    if (period === 'PM' && endHour !== 12) {
+        endHour += 12;
+    } else if (period === 'AM' && endHour === 12) {
+        endHour = 0;
+    }
+    
+    const currentTotalMinutes = now.getHours() * 60 + now.getMinutes();
+    const endTotalMinutes = endHour * 60 + endMinutes;
+    
+    // 🔍 DEBUG - Remove this after testing
+    console.log(`Slot: ${slot}, End: ${endHour}:${endMinutes}, Current: ${now.getHours()}:${now.getMinutes()}, Passed: ${currentTotalMinutes >= endTotalMinutes}`);
+    
+    return currentTotalMinutes >= endTotalMinutes;
 }
 
 function getTodayString() {
