@@ -9,120 +9,160 @@ import TopBar from "./TopBar"
 import MobileDrawer from "./MobileDrawer"
 import AuthModal from "./AuthModal"
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
 const NAV_LINKS = [
-  { label: "Home", href: "/" },
-  { label: "About", href: "/about" },
-  { label: "Services", href: "/services" },
+  { label: "Home",     href: "/"           },
+  { label: "About",    href: "/about"      },
+  { label: "Services", href: "/services"   },
   { label: "Bookings", href: "/my-bookings", protected: true },
-  { label: "Contact", href: "/contact" },
+  { label: "Contact",  href: "/contact"    },
 ]
 
 const DROPDOWN_ITEMS = [
-  { label: "My Profile", href: "/profile" },
+  { label: "My Profile",  href: "/profile"     },
   { label: "My Bookings", href: "/my-bookings" },
 ]
 
-const SANS = "'Helvetica Neue', Helvetica, Arial, sans-serif"
-const SERIF = 'Georgia, "Times New Roman", serif'
+const SANS  = "'Helvetica Neue', Helvetica, Arial, sans-serif"
+const SERIF = "'Playfair Display', Georgia, 'Times New Roman', serif"
+
+// ─── Variants ─────────────────────────────────────────────────────────────────
 
 const dropdownVariants = {
-  hidden: {
-    opacity: 0,
-    y: -6,
-    scale: 0.97,
-    transition: { duration: 0.15, ease: "easeIn" },
-  },
-  visible: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: { duration: 0.2, ease: [0.16, 1, 0.3, 1] },
-  },
+  hidden:  { opacity: 0, y: -8, scale: 0.96,
+             transition: { duration: 0.15, ease: "easeIn" } },
+  visible: { opacity: 1, y: 0,  scale: 1,
+             transition: { duration: 0.22, ease: [0.16, 1, 0.3, 1] } },
 }
 
-const navbarVariants = {
-  top: { boxShadow: "0 0 0 rgba(0,0,0,0)" },
-  scrolled: {
-    boxShadow: "0 1px 0 rgba(0,0,0,0.06), 0 4px 20px rgba(0,0,0,0.05)",
-  },
-}
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function LoadingSpinner({ size = 16 }) {
+function LoadingSpinner({ size = 15 }) {
   return (
     <div
-      className="border-2 border-gray-200 border-t-black rounded-full animate-spin"
-      style={{ width: size, height: size }}
+      style={{
+        width:        size,
+        height:       size,
+        borderRadius: "50%",
+        border:       "1.5px solid rgba(0,0,0,0.08)",
+        borderTopColor: "#000",
+        animation:    "w2d-spin 0.7s linear infinite",
+      }}
       role="status"
       aria-label="Loading"
     />
   )
 }
 
-function UserAvatar({ name, size = "sm", onClick }) {
-  const dimensions = size === "sm" ? "w-8 h-8" : "w-10 h-10"
-  const fontSize = size === "sm" ? "12px" : "14px"
-  const Tag = onClick ? motion.button : "div"
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
+function UserAvatar({ name, size = 32, onClick }) {
+  const Tag = onClick ? motion.button : "div"
   return (
     <Tag
       onClick={onClick}
-      whileTap={onClick ? { scale: 0.88 } : undefined}
-      className={`${dimensions} rounded-full bg-black flex items-center justify-center shrink-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2`}
+      whileTap={onClick ? { scale: 0.9 } : undefined}
       aria-label={onClick ? "Open menu" : undefined}
+      style={{
+        width:          size,
+        height:         size,
+        borderRadius:   "50%",
+        background:     "#000",
+        display:        "flex",
+        alignItems:     "center",
+        justifyContent: "center",
+        flexShrink:     0,
+        cursor:         onClick ? "pointer" : "default",
+        border:         "none",
+        outline:        "none",
+      }}
     >
-      <span
-        className="text-white select-none"
-        style={{ fontFamily: SERIF, fontSize, fontWeight: 300 }}
-      >
-        {name?.charAt(0)?.toUpperCase() || "?"}
+      <span style={{
+        fontFamily: SERIF,
+        fontSize:   size * 0.4,
+        fontWeight: 300,
+        color:      "#fff",
+        fontStyle:  "italic",
+        userSelect: "none",
+      }}>
+        {name?.charAt(0)?.toUpperCase() ?? "?"}
       </span>
     </Tag>
   )
 }
 
-function MobileMenuButton({ onClick }) {
+function HamburgerButton({ onClick }) {
   return (
     <motion.button
       onClick={onClick}
       whileTap={{ scale: 0.88 }}
-      className="w-10 h-10 flex items-center justify-center rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2"
       aria-label="Open navigation menu"
+      style={{
+        width:          40,
+        height:         40,
+        display:        "flex",
+        flexDirection:  "column",
+        alignItems:     "flex-start",
+        justifyContent: "center",
+        gap:            5,
+        background:     "none",
+        border:         "none",
+        cursor:         "pointer",
+        padding:        "0 4px",
+      }}
     >
-      <div className="space-y-[5px]">
-        <span className="block w-5 h-[1.5px] bg-black rounded-full" />
-        <span className="block w-3.5 h-[1.5px] bg-black rounded-full" />
-      </div>
+      <span style={{ display:"block", width:20, height:1.5, background:"#000", borderRadius:2 }} />
+      <span style={{ display:"block", width:14, height:1.5, background:"#000", borderRadius:2 }} />
     </motion.button>
   )
 }
 
-function NavLink({ link, onProtectedClick }) {
-  const navigate = useNavigate()
+function NavLink({ link, currentPath, onProtectedClick }) {
+  const navigate    = useNavigate()
+  const isActive    = currentPath === link.href
 
   const handleClick = (e) => {
     e.preventDefault()
-    if (link.protected) {
-      const blocked = onProtectedClick(link)
-      if (blocked) return
-    }
+    if (link.protected && onProtectedClick(link)) return
     navigate(link.href)
   }
 
   return (
-    <a 
-      href={link.href} 
-      onClick={handleClick} 
-      className="relative px-4 xl:px-5 py-2 tracking-[0.18em] uppercase text-gray-400 hover:text-black transition-colors duration-300 no-underline group focus:outline-none focus:text-black" 
-      style={{ fontSize: "10px", fontWeight: 500 }}
+    <a
+      href={link.href}
+      onClick={handleClick}
+      style={{
+        position:      "relative",
+        display:       "inline-flex",
+        alignItems:    "center",
+        padding:       "6px 14px",
+        fontFamily:    SANS,
+        fontSize:      10,
+        fontWeight:    500,
+        letterSpacing: "0.16em",
+        textTransform: "uppercase",
+        color:         isActive ? "#000" : "rgba(0,0,0,0.38)",
+        textDecoration:"none",
+        transition:    "color 0.25s",
+        whiteSpace:    "nowrap",
+      }}
+      className="w2d-navlink"
     >
       {link.label}
-      <motion.span
-        className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-black"
-        initial={{ scale: 0 }}
-        whileHover={{ scale: 1 }}
-        transition={{ duration: 0.2 }}
-        aria-hidden="true"
-      />
+      {/* active dot */}
+      {isActive && (
+        <span style={{
+          position:     "absolute",
+          bottom:       2,
+          left:         "50%",
+          transform:    "translateX(-50%)",
+          width:        3,
+          height:       3,
+          borderRadius: "50%",
+          background:   "#000",
+        }} />
+      )}
     </a>
   )
 }
@@ -130,30 +170,40 @@ function NavLink({ link, onProtectedClick }) {
 function UserDropdown({ user, isOpen, onToggle, onClose, onLogout, dropdownRef }) {
   const navigate = useNavigate()
 
-  const handleItemClick = (href) => {
-    onClose()
-    navigate(href)
-  }
-
   return (
-    <div ref={dropdownRef} className="relative">
+    <div ref={dropdownRef} style={{ position: "relative" }}>
+      {/* Trigger */}
       <motion.button
         onClick={onToggle}
         whileTap={{ scale: 0.94 }}
-        className="flex items-center gap-2 py-1.5 px-2 hover:bg-gray-50 rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2"
         aria-expanded={isOpen}
         aria-haspopup="true"
         aria-label="Account menu"
+        style={{
+          display:        "flex",
+          alignItems:     "center",
+          gap:            6,
+          padding:        "4px 8px 4px 4px",
+          background:     "none",
+          border:         "0.5px solid",
+          borderColor:    isOpen ? "rgba(0,0,0,0.18)" : "transparent",
+          borderRadius:   999,
+          cursor:         "pointer",
+          transition:     "border-color 0.2s, background 0.2s",
+        }}
+        className="w2d-avatar-btn"
       >
-        <UserAvatar name={user.firstName} />
+        <UserAvatar name={user.firstName} size={30} />
         <motion.div
           animate={{ rotate: isOpen ? 180 : 0 }}
           transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
         >
-          <ChevronDown size={12} className="text-gray-400" />
+          <ChevronDown size={11} strokeWidth={1.5}
+            style={{ color: "rgba(0,0,0,0.35)", display:"block" }} />
         </motion.div>
       </motion.button>
 
+      {/* Dropdown panel */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
@@ -162,43 +212,108 @@ function UserDropdown({ user, isOpen, onToggle, onClose, onLogout, dropdownRef }
             initial="hidden"
             animate="visible"
             exit="hidden"
-            className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl border border-gray-100 z-50 overflow-hidden shadow-[0_10px_40px_rgba(0,0,0,0.1),0_2px_10px_rgba(0,0,0,0.05)]"
             role="menu"
+            style={{
+              position:     "absolute",
+              right:        0,
+              top:          "calc(100% + 10px)",
+              width:        220,
+              background:   "#fff",
+              borderRadius: 14,
+              border:       "0.5px solid rgba(0,0,0,0.08)",
+              boxShadow:    "0 12px 48px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)",
+              overflow:     "hidden",
+              zIndex:       100,
+            }}
           >
-            <div className="p-4 bg-black text-white">
-              <p className="truncate" style={{ fontFamily: SERIF, fontSize: "14px", fontWeight: 400, letterSpacing: "-0.01em" }}>
+            {/* Header */}
+            <div style={{
+              padding:    "14px 16px",
+              background: "#111",
+            }}>
+              <p style={{
+                fontFamily:   SERIF,
+                fontSize:     13,
+                fontWeight:   300,
+                fontStyle:    "italic",
+                color:        "#fff",
+                margin:       0,
+                overflow:     "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace:   "nowrap",
+              }}>
                 {user.firstName} {user.lastName}
               </p>
               {user.email && (
-                <p className="text-white/50 mt-0.5 truncate" style={{ fontSize: "11px" }}>
+                <p style={{
+                  fontSize:     10,
+                  color:        "rgba(255,255,255,0.38)",
+                  margin:       "3px 0 0",
+                  overflow:     "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace:   "nowrap",
+                }}>
                   {user.email}
                 </p>
               )}
             </div>
 
-            <div className="py-1" role="none">
+            {/* Nav items */}
+            <div style={{ padding: "6px 0" }} role="none">
               {DROPDOWN_ITEMS.map((item) => (
                 <button
                   key={item.label}
-                  onClick={() => handleItemClick(item.href)}
-                  className="w-full text-left flex items-center px-4 py-2.5 tracking-[0.12em] uppercase text-gray-500 hover:text-black hover:bg-gray-50 transition-all duration-200 focus:outline-none focus:bg-gray-50 focus:text-black"
-                  style={{ fontSize: "10px" }}
+                  onClick={() => { onClose(); navigate(item.href) }}
                   role="menuitem"
+                  className="w2d-dropdown-item"
+                  style={{
+                    width:         "100%",
+                    textAlign:     "left",
+                    display:       "flex",
+                    alignItems:    "center",
+                    padding:       "9px 16px",
+                    fontFamily:    SANS,
+                    fontSize:      10,
+                    fontWeight:    500,
+                    letterSpacing: "0.12em",
+                    textTransform: "uppercase",
+                    color:         "rgba(0,0,0,0.45)",
+                    background:    "none",
+                    border:        "none",
+                    cursor:        "pointer",
+                    transition:    "color 0.2s, background 0.2s",
+                  }}
                 >
                   {item.label}
                 </button>
               ))}
             </div>
 
-            <div className="h-px bg-gray-100 mx-3" aria-hidden="true" />
+            {/* Divider */}
+            <div style={{ height: "0.5px", background: "rgba(0,0,0,0.06)", margin: "0 12px" }} />
 
-            <div className="p-2">
+            {/* Sign out */}
+            <div style={{ padding: 8 }}>
               <motion.button
                 whileTap={{ scale: 0.97 }}
                 onClick={onLogout}
-                className="w-full py-2 tracking-[0.12em] uppercase text-red-500 hover:bg-red-50 transition-colors duration-200 rounded-lg focus:outline-none focus:bg-red-50"
-                style={{ fontSize: "10px" }}
                 role="menuitem"
+                className="w2d-signout-btn"
+                style={{
+                  width:          "100%",
+                  padding:        "8px 12px",
+                  fontFamily:     SANS,
+                  fontSize:       10,
+                  fontWeight:     500,
+                  letterSpacing:  "0.12em",
+                  textTransform:  "uppercase",
+                  color:          "#dc2626",
+                  background:     "none",
+                  border:         "none",
+                  borderRadius:   8,
+                  cursor:         "pointer",
+                  transition:     "background 0.18s",
+                }}
               >
                 Sign Out
               </motion.button>
@@ -210,45 +325,51 @@ function UserDropdown({ user, isOpen, onToggle, onClose, onLogout, dropdownRef }
   )
 }
 
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
 export default function Navbar() {
-  const [mobileOpen, setMobileOpen] = useState(false)
-  const [scrolled, setScrolled] = useState(false)
+  const [mobileOpen,   setMobileOpen]   = useState(false)
+  const [scrolled,     setScrolled]     = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [currentPath,  setCurrentPath]  = useState("/")
+
   const { user, loading, openModal, logout } = useAuth()
-  const navigate = useNavigate()
+  const navigate    = useNavigate()
   const dropdownRef = useRef(null)
 
+  // Track path
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 10)
+    setCurrentPath(window.location.pathname)
+  }, [])
+
+  // Scroll shadow
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8)
     window.addEventListener("scroll", onScroll, { passive: true })
     return () => window.removeEventListener("scroll", onScroll)
   }, [])
 
+  // Close dropdown on outside click
   useEffect(() => {
-    const handleClick = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+    const h = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target))
         setDropdownOpen(false)
-      }
     }
-    document.addEventListener("mousedown", handleClick)
-    return () => document.removeEventListener("mousedown", handleClick)
+    document.addEventListener("mousedown", h)
+    return () => document.removeEventListener("mousedown", h)
   }, [])
 
+  // Close dropdown on Escape
   useEffect(() => {
     if (!dropdownOpen) return
-    const handleKey = (e) => {
-      if (e.key === "Escape") setDropdownOpen(false)
-    }
-    document.addEventListener("keydown", handleKey)
-    return () => document.removeEventListener("keydown", handleKey)
+    const h = (e) => e.key === "Escape" && setDropdownOpen(false)
+    document.addEventListener("keydown", h)
+    return () => document.removeEventListener("keydown", h)
   }, [dropdownOpen])
 
   const handleProtectedClick = useCallback(
     (link) => {
-      if (link.protected && !user) {
-        openModal("login")
-        return true
-      }
+      if (link.protected && !user) { openModal("login"); return true }
       return false
     },
     [user, openModal]
@@ -260,158 +381,135 @@ export default function Navbar() {
   }, [logout])
 
   return (
-    <div style={{ fontFamily: SANS }}>
-      <TopBar />
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,300;1,300&display=swap');
 
-      <motion.nav
-        animate={scrolled ? "scrolled" : "top"}
-        variants={navbarVariants}
-        transition={{ duration: 0.3 }}
-        className="bg-white sticky top-0 z-50"
-        role="navigation"
-        aria-label="Main navigation"
-      >
-        {/* ═══════════════════════════════════════════════════════════════ */}
-        {/* MOBILE NAVBAR */}
-        {/* ═══════════════════════════════════════════════════════════════ */}
-        <div className="lg:hidden">
-          <div className="flex items-center justify-between px-4 h-14">
+        @keyframes w2d-spin {
+          to { transform: rotate(360deg); }
+        }
 
-            <div className="w-24 flex justify-start">
-              <MobileMenuButton onClick={() => setMobileOpen(true)} />
-            </div>
+        .w2d-navlink:hover {
+          color: #000 !important;
+        }
 
-            {/* ─────────────────────────────────────────────────────────── */}
-            {/* MOBILE LOGO                                                 */}
-            {/* Change fontSize below to make it bigger or smaller          */}
-            {/* Current: 18px                                               */}
-            {/* ─────────────────────────────────────────────────────────── */}
-            <a 
-              href="/" 
-              onClick={(e) => { e.preventDefault(); navigate("/") }} 
-              className="no-underline shrink-0" 
-              aria-label="Wash2Door Home"
-            >
-              <span 
-                className="text-black tracking-[0.3em]" 
-                style={{ 
-                  fontFamily: SERIF, 
-                  fontWeight: 400, 
-                  fontSize: "18px"  // ← MOBILE LOGO SIZE
-                }}
-              >
-                W2D
-              </span>
-            </a>
-            {/* ─────────────────────────────────────────────────────────── */}
+        .w2d-avatar-btn:hover {
+          background: rgba(0,0,0,0.03) !important;
+          border-color: rgba(0,0,0,0.1) !important;
+        }
 
-            <div className="w-24 flex justify-end">
-              {loading ? (
-                <div className="w-10 h-10 flex items-center justify-center">
-                  <LoadingSpinner />
-                </div>
-              ) : user ? (
-                <UserAvatar name={user.firstName} onClick={() => setMobileOpen(true)} />
-              ) : (
-                <motion.button
-                  whileTap={{ scale: 0.93 }}
-                  onClick={() => openModal("login")}
-                  className="h-8 px-4 bg-black text-white rounded-full tracking-[0.15em] uppercase focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2"
-                  style={{ fontSize: "9px", fontWeight: 500 }}
-                >
-                  Sign In
-                </motion.button>
-              )}
-            </div>
+        .w2d-dropdown-item:hover {
+          color: #000 !important;
+          background: rgba(0,0,0,0.03) !important;
+        }
 
-          </div>
-        </div>
+        .w2d-signout-btn:hover {
+          background: rgba(220,38,38,0.06) !important;
+        }
 
-        {/* ═══════════════════════════════════════════════════════════════ */}
-        {/* DESKTOP NAVBAR */}
-        {/* ═══════════════════════════════════════════════════════════════ */}
-        <div className="hidden lg:block">
-          <div className="max-w-[1400px] mx-auto">
-            <div className="flex items-center h-16 xl:h-[72px] px-8 xl:px-12">
+        .w2d-phone-link {
+          color: rgba(0,0,0,0.35);
+          text-decoration: none;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          transition: color 0.25s;
+          padding: 6px;
+          margin: -6px;
+          border-radius: 8px;
+        }
+        .w2d-phone-link:hover { color: #000; }
 
-              {/* ─────────────────────────────────────────────────────────── */}
-              {/* DESKTOP LOGO                                                */}
-              {/* Change fontSize below to make it bigger or smaller          */}
-              {/* Current: clamp(22px, 1.8vw, 26px)                           */}
-              {/* Format: clamp(min, preferred, max)                          */}
-              {/* ─────────────────────────────────────────────────────────── */}
-              <a 
-                href="/" 
-                onClick={(e) => { e.preventDefault(); navigate("/") }} 
-                className="no-underline group shrink-0" 
-                aria-label="Wash2Door Home"
-              >
-                <div className="flex items-baseline gap-2.5">
-                  <motion.span
-                    className="text-black"
-                    style={{ 
-                      fontFamily: SERIF, 
-                      fontWeight: 400, 
-                      fontSize: "clamp(22px, 1.8vw, 26px)",  // ← DESKTOP LOGO SIZE
-                      letterSpacing: "0.3em", 
-                      display: "inline-block" 
-                    }}
-                    whileHover={{ letterSpacing: "0.45em" }}
-                    transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-                  >
-                    WASH2DOOR
-                  </motion.span>
-                  <motion.span
-                    className="w-1.5 h-1.5 rounded-full bg-black/20"
-                    whileHover={{ backgroundColor: "rgba(0,0,0,1)" }}
-                    transition={{ duration: 0.2 }}
-                    aria-hidden="true"
-                  />
-                </div>
-              </a>
-              {/* ─────────────────────────────────────────────────────────── */}
+        .w2d-signin-btn {
+          transition: background 0.2s, opacity 0.2s;
+        }
+        .w2d-signin-btn:hover { opacity: 0.8; }
+      `}</style>
 
-              <div className="flex-1 flex items-center justify-center">
-                <div className="flex items-center gap-0.5 xl:gap-1">
-                  {NAV_LINKS.map((link) => (
-                    <NavLink key={link.label} link={link} onProtectedClick={handleProtectedClick} />
-                  ))}
-                </div>
+      <div style={{ fontFamily: SANS }}>
+        <TopBar />
+
+        {/* ── Nav shell ─────────────────────────────────────────────────── */}
+        <nav
+          role="navigation"
+          aria-label="Main navigation"
+          style={{
+            position:   "sticky",
+            top:        0,
+            zIndex:     50,
+            background: "#fff",
+            transition: "box-shadow 0.3s",
+            boxShadow:  scrolled
+              ? "0 1px 0 rgba(0,0,0,0.06), 0 4px 24px rgba(0,0,0,0.05)"
+              : "0 1px 0 rgba(0,0,0,0.06)",
+          }}
+        >
+
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* MOBILE                                                         */}
+          {/* ══════════════════════════════════════════════════════════════ */}
+          <div style={{ display: "flex" }} className="lg:hidden">
+            <div style={{
+              width:          "100%",
+              display:        "flex",
+              alignItems:     "center",
+              justifyContent: "space-between",
+              padding:        "0 16px",
+              height:         56,
+            }}>
+
+              {/* Left: hamburger */}
+              <div style={{ width: 80 }}>
+                <HamburgerButton onClick={() => setMobileOpen(true)} />
               </div>
 
-              <div className="flex items-center gap-3 xl:gap-4 shrink-0">
-                <a 
-                  href="tel:6900706456" 
-                  className="flex items-center gap-2 text-gray-400 hover:text-black transition-colors duration-300 no-underline p-2 -m-2 focus:outline-none focus:text-black" 
-                  aria-label="Call us"
-                >
-                  <Phone size={14} strokeWidth={1.5} />
-                  <span className="tracking-[0.15em] uppercase hidden xl:inline" style={{ fontSize: "10px" }}>
-                    Call Us
-                  </span>
-                </a>
+              {/* Center: logo */}
+              <a
+                href="/"
+                onClick={(e) => { e.preventDefault(); navigate("/") }}
+                aria-label="Wash2Door Home"
+                style={{ textDecoration: "none", flexShrink: 0 }}
+              >
+                <span style={{
+                  fontFamily:    SERIF,
+                  fontWeight:    300,
+                  fontStyle:     "italic",
+                  fontSize:      17,
+                  letterSpacing: "0.22em",
+                  color:         "#000",
+                }}>
+                  Wash2Door
+                </span>
+              </a>
 
-                <div className="w-px h-4 bg-gray-200" aria-hidden="true" />
-
+              {/* Right: auth */}
+              <div style={{ width: 80, display: "flex", justifyContent: "flex-end" }}>
                 {loading ? (
-                  <div className="w-10 h-10 flex items-center justify-center">
+                  <div style={{ width:40, height:40, display:"flex", alignItems:"center", justifyContent:"center" }}>
                     <LoadingSpinner />
                   </div>
                 ) : user ? (
-                  <UserDropdown
-                    user={user}
-                    isOpen={dropdownOpen}
-                    onToggle={() => setDropdownOpen((prev) => !prev)}
-                    onClose={() => setDropdownOpen(false)}
-                    onLogout={handleDropdownLogout}
-                    dropdownRef={dropdownRef}
-                  />
+                  <UserAvatar name={user.firstName} size={32} onClick={() => setMobileOpen(true)} />
                 ) : (
                   <motion.button
-                    whileTap={{ scale: 0.94 }}
+                    whileTap={{ scale: 0.93 }}
                     onClick={() => openModal("login")}
-                    className="h-9 px-5 bg-black text-white rounded-full tracking-[0.15em] uppercase hover:bg-gray-800 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2"
-                    style={{ fontSize: "10px", fontWeight: 500 }}
+                    className="w2d-signin-btn"
+                    style={{
+                      height:        32,
+                      padding:       "0 14px",
+                      background:    "#000",
+                      color:         "#fff",
+                      border:        "none",
+                      borderRadius:  999,
+                      fontFamily:    SANS,
+                      fontSize:      9,
+                      fontWeight:    600,
+                      letterSpacing: "0.16em",
+                      textTransform: "uppercase",
+                      cursor:        "pointer",
+                      whiteSpace:    "nowrap",
+                    }}
                   >
                     Sign In
                   </motion.button>
@@ -420,11 +518,147 @@ export default function Navbar() {
 
             </div>
           </div>
-        </div>
-      </motion.nav>
 
-      <MobileDrawer isOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
-      <AuthModal />
-    </div>
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* DESKTOP                                                        */}
+          {/* ══════════════════════════════════════════════════════════════ */}
+          <div style={{ display: "none" }} className="lg:block">
+            <div style={{ maxWidth: 1400, margin: "0 auto" }}>
+              <div style={{
+                display:        "flex",
+                alignItems:     "center",
+                height:         68,
+                padding:        "0 40px",
+              }}>
+
+                {/* Logo */}
+                <a
+                  href="/"
+                  onClick={(e) => { e.preventDefault(); navigate("/") }}
+                  aria-label="Wash2Door Home"
+                  style={{ textDecoration: "none", flexShrink: 0 }}
+                >
+                  <motion.span
+                    whileHover={{ letterSpacing: "0.38em" }}
+                    transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                    style={{
+                      fontFamily:    SERIF,
+                      fontWeight:    300,
+                      fontStyle:     "italic",
+                      fontSize:      "clamp(18px, 1.6vw, 22px)",
+                      letterSpacing: "0.28em",
+                      color:         "#000",
+                      display:       "inline-block",
+                    }}
+                  >
+                    Wash2Door
+                  </motion.span>
+                </a>
+
+                {/* Nav links — centered */}
+                <div style={{
+                  flex:           1,
+                  display:        "flex",
+                  alignItems:     "center",
+                  justifyContent: "center",
+                  gap:            2,
+                }}>
+                  {NAV_LINKS.map((link) => (
+                    <NavLink
+                      key={link.href}
+                      link={link}
+                      currentPath={currentPath}
+                      onProtectedClick={handleProtectedClick}
+                    />
+                  ))}
+                </div>
+
+                {/* Right actions */}
+                <div style={{
+                  display:    "flex",
+                  alignItems: "center",
+                  gap:        20,
+                  flexShrink: 0,
+                }}>
+
+                  {/* Phone */}
+                  <a
+                    href="tel:6900706456"
+                    className="w2d-phone-link"
+                    aria-label="Call us"
+                  >
+                    <Phone size={13} strokeWidth={1.4} />
+                    <span style={{
+                      fontFamily:    SANS,
+                      fontSize:      10,
+                      fontWeight:    500,
+                      letterSpacing: "0.14em",
+                      textTransform: "uppercase",
+                    }}>
+                      Call
+                    </span>
+                  </a>
+
+                  {/* Divider */}
+                  <div style={{
+                    width:      "0.5px",
+                    height:     16,
+                    background: "rgba(0,0,0,0.1)",
+                  }} />
+
+                  {/* Auth */}
+                  {loading ? (
+                    <div style={{ width:36, height:36, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                      <LoadingSpinner />
+                    </div>
+                  ) : user ? (
+                    <UserDropdown
+                      user={user}
+                      isOpen={dropdownOpen}
+                      onToggle={() => setDropdownOpen((p) => !p)}
+                      onClose={() => setDropdownOpen(false)}
+                      onLogout={handleDropdownLogout}
+                      dropdownRef={dropdownRef}
+                    />
+                  ) : (
+                    <motion.button
+                      whileTap={{ scale: 0.94 }}
+                      onClick={() => openModal("login")}
+                      className="w2d-signin-btn"
+                      style={{
+                        height:        36,
+                        padding:       "0 20px",
+                        background:    "#000",
+                        color:         "#fff",
+                        border:        "none",
+                        borderRadius:  999,
+                        fontFamily:    SANS,
+                        fontSize:      10,
+                        fontWeight:    600,
+                        letterSpacing: "0.16em",
+                        textTransform: "uppercase",
+                        cursor:        "pointer",
+                        whiteSpace:    "nowrap",
+                      }}
+                    >
+                      Sign In
+                    </motion.button>
+                  )}
+                </div>
+
+              </div>
+            </div>
+          </div>
+
+        </nav>
+
+        <MobileDrawer
+          isOpen={mobileOpen}
+          onClose={() => setMobileOpen(false)}
+          currentPath={currentPath}
+        />
+        <AuthModal />
+      </div>
+    </>
   )
 }

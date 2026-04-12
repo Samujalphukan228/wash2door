@@ -1,63 +1,76 @@
-'use client'
+"use client"
 
-import { useRef, useEffect, useState, memo, useMemo } from 'react'
-import { motion, useScroll, useTransform } from 'framer-motion'
-import { ArrowRight, Phone, Shield, Clock, Zap } from 'lucide-react'
+import { useEffect, useState, memo, useMemo } from "react"
+import { ArrowRight, Phone, Shield, Clock, Zap } from "lucide-react"
 
 /* ─── Constants ─── */
 const STATS = [
-  { value: '100+', label: 'Happy Clients', icon: Shield },
-  { value: '4.9★', label: 'Avg Rating', icon: Clock },
-  { value: '2min', label: 'Quick Booking', icon: Zap },
+  { value: "100+", label: "Happy Clients", icon: Shield },
+  { value: "4.9★", label: "Avg Rating", icon: Clock },
+  { value: "2min", label: "Quick Booking", icon: Zap },
 ]
 
 const SERVICES_MARQUEE = [
-  'Exterior Wash',
-  'Interior Detailing',
-  'Sofa Cleaning',
-  'Water Tank',
-  'Ceramic Coating',
+  "Exterior Wash",
+  "Interior Detailing",
+  "Foam Wash",
+  "Engine Bay",
+  "Ceramic Coating",
 ]
 
 const BG_IMAGE =
-  'https://images.unsplash.com/photo-1618843479313-40f8afb4b4d8?q=80&w=1920&auto=format&fit=crop'
+  "https://images.unsplash.com/photo-1618843479313-40f8afb4b4d8?q=80&w=1920&auto=format&fit=crop"
 
 const WHATSAPP_URL =
-  'https://wa.me/916900706456?text=Hi%2C%20I%27d%20like%20to%20book%20a%20car%20wash'
+  "https://wa.me/916900706456?text=Hi%2C%20I%27d%20like%20to%20book%20a%20car%20wash"
 
-const SERIF = 'Georgia, "Times New Roman", serif'
+const SERIF = "'Playfair Display', Georgia, 'Times New Roman', serif"
 const SANS = "'Helvetica Neue', Helvetica, Arial, sans-serif"
 
-const TAGLINE = 'The Shine That Finds You'
+/* ─── Greeting Hook ─── */
+function useGreeting() {
+  const [greeting, setGreeting] = useState("Welcome")
+  useEffect(() => {
+    const h = new Date().getHours()
+    setGreeting(h < 12 ? "Good Morning" : h < 17 ? "Good Afternoon" : "Good Evening")
+  }, [])
+  return greeting
+}
 
-/* ─── Memoized Subcomponents ─── */
-const PulsingDot = memo(function PulsingDot() {
-  return (
-    <span className="relative flex h-1.5 w-1.5 shrink-0" aria-hidden="true">
-      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-60" />
-      <span className="relative inline-flex rounded-full h-full w-full bg-white" />
-    </span>
-  )
-})
-
+/* ─── Marquee ─── */
 const ServicesMarquee = memo(function ServicesMarquee() {
   const doubled = useMemo(() => [...SERVICES_MARQUEE, ...SERVICES_MARQUEE], [])
-  
   return (
-    <div className="overflow-hidden whitespace-nowrap">
-      <div 
-        className="inline-flex gap-6 lg:gap-8 animate-marquee"
-        style={{ willChange: 'transform' }}
+    <div style={{ overflow: "hidden", whiteSpace: "nowrap" }}>
+      <div
+        style={{
+          display: "inline-flex",
+          gap: 24,
+          animation: "hero-scroll 28s linear infinite",
+        }}
       >
-        {doubled.map((service, i) => (
-          <span key={i} className="inline-flex items-center gap-3">
+        {doubled.map((s, i) => (
+          <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 12 }}>
             <span
-              className="text-white/20 tracking-[0.2em] lg:tracking-[0.25em] uppercase"
-              style={{ fontSize: 'clamp(8px, 2vw, 10px)', fontFamily: SANS }}
+              style={{
+                fontSize: 9,
+                letterSpacing: "0.22em",
+                textTransform: "uppercase",
+                color: "rgba(255,255,255,0.18)",
+                fontFamily: SANS,
+              }}
             >
-              {service}
+              {s}
             </span>
-            <span className="w-1 h-1 rounded-full bg-white/15" />
+            <span
+              style={{
+                width: 3,
+                height: 3,
+                borderRadius: "50%",
+                background: "rgba(255,255,255,0.12)",
+                flexShrink: 0,
+              }}
+            />
           </span>
         ))}
       </div>
@@ -65,711 +78,498 @@ const ServicesMarquee = memo(function ServicesMarquee() {
   )
 })
 
-const StatCard = memo(function StatCard({ stat, index, variant = 'mobile' }) {
-  const Icon = stat.icon
-  
-  if (variant === 'mobile') {
-    return (
-      <div className="p-3 rounded-lg border border-white/[0.06] bg-white/[0.02]">
-        <p
-          className="text-white leading-none mb-1"
-          style={{ fontFamily: SERIF, fontWeight: 300, fontSize: '16px' }}
-        >
-          {stat.value}
-        </p>
-        <p
-          className="text-white/25 tracking-[0.1em] uppercase"
-          style={{ fontSize: '6px', fontFamily: SANS, lineHeight: 1.2 }}
-        >
-          {stat.label.split(' ')[0]}
-        </p>
-      </div>
-    )
-  }
-  
+/* ─── Pulsing Dot ─── */
+function PulsingDot() {
   return (
-    <div className="group flex-1 px-4 lg:px-5 py-3 lg:py-4 rounded-lg border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] transition-colors duration-300">
-      <div className="flex items-center gap-2 mb-2 lg:mb-3">
-        <Icon size={12} className="text-white/25" strokeWidth={1.5} />
-        {variant === 'desktop' && <div className="w-3 h-px bg-white/10" />}
+    <span
+      style={{
+        position: "relative",
+        display: "flex",
+        width: 6,
+        height: 6,
+        flexShrink: 0,
+      }}
+    >
+      <span
+        style={{
+          position: "absolute",
+          inset: 0,
+          borderRadius: "50%",
+          background: "#fff",
+          opacity: 0.5,
+          animation: "hero-ping 2s cubic-bezier(0,0,0.2,1) infinite",
+        }}
+      />
+      <span
+        style={{
+          position: "relative",
+          width: "100%",
+          height: "100%",
+          borderRadius: "50%",
+          background: "#fff",
+        }}
+      />
+    </span>
+  )
+}
+
+/* ─── Stat Card ─── */
+function StatCard({ stat, compact }) {
+  const Icon = stat.icon
+  return (
+    <div
+      style={{
+        padding: compact ? "10px 12px" : "14px 18px",
+        borderRadius: 10,
+        border: "0.5px solid rgba(255,255,255,0.06)",
+        background: "rgba(255,255,255,0.02)",
+        flex: compact ? undefined : 1,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          color: "rgba(255,255,255,0.2)",
+          marginBottom: compact ? 6 : 8,
+        }}
+      >
+        <Icon size={12} strokeWidth={1.5} />
+        {!compact && (
+          <div style={{ width: 12, height: 0.5, background: "rgba(255,255,255,0.1)" }} />
+        )}
       </div>
       <p
-        className="text-white leading-none mb-1"
         style={{
           fontFamily: SERIF,
           fontWeight: 300,
-          fontSize: variant === 'desktop' ? 'clamp(1.1rem, 2vw, 1.4rem)' : '18px',
+          fontSize: compact ? 16 : "clamp(1rem, 1.8vw, 1.3rem)",
+          color: "#fff",
+          lineHeight: 1,
+          margin: "0 0 3px",
         }}
       >
         {stat.value}
       </p>
       <p
-        className="text-white/25 tracking-[0.12em] lg:tracking-[0.15em] uppercase"
-        style={{ fontSize: '7px', fontFamily: SANS }}
+        style={{
+          fontSize: 7,
+          letterSpacing: "0.14em",
+          textTransform: "uppercase",
+          color: "rgba(255,255,255,0.22)",
+          margin: 0,
+          fontFamily: SANS,
+        }}
       >
-        {stat.label}
+        {compact ? stat.label.split(" ")[0] : stat.label}
       </p>
     </div>
   )
-})
-
-// Logo component without water drop
-const Logo = memo(function Logo({ size = 'default' }) {
-  const sizes = {
-    small: { fontSize: '10px', tracking: '0.2em' },
-    default: { fontSize: '11px', tracking: '0.25em' },
-    large: { fontSize: '12px', tracking: '0.3em' },
-  }
-  
-  const s = sizes[size] || sizes.default
-  
-  return (
-    <span
-      className="text-white/40 tracking-[0.2em] uppercase font-medium"
-      style={{ fontSize: s.fontSize, fontFamily: SANS, letterSpacing: s.tracking }}
-    >
-      Wash<span className="text-white/60">2</span>Door
-    </span>
-  )
-})
-
-function useGreeting() {
-  const [greeting, setGreeting] = useState('Welcome')
-  
-  useEffect(() => {
-    const h = new Date().getHours()
-    setGreeting(h < 12 ? 'Good Morning' : h < 17 ? 'Good Afternoon' : 'Good Evening')
-  }, [])
-  
-  return greeting
 }
 
-const Background = memo(function Background({ scrollYProgress }) {
-  const bgOpacity = useTransform(scrollYProgress, [0, 0.5], [1, 0.6])
-  
-  return (
-    <motion.div 
-      className="absolute inset-0 will-change-opacity" 
-      style={{ opacity: bgOpacity }}
-    >
-      <img
-        src={BG_IMAGE}
-        alt=""
-        role="presentation"
-        className="absolute inset-0 w-full h-full object-cover object-center"
-        style={{ 
-          filter: 'brightness(0.3) contrast(1.1) saturate(0.7)',
-          willChange: 'auto'
-        }}
-        loading="eager"
-        fetchPriority="high"
-        decoding="async"
-      />
-    </motion.div>
-  )
-})
-
-const Overlays = memo(function Overlays() {
-  return (
-    <div className="absolute inset-0 z-[1] pointer-events-none" aria-hidden="true">
-      <div className="absolute inset-x-0 bottom-0 h-[70%] bg-gradient-to-t from-black via-black/80 to-transparent" />
-      <div className="absolute inset-y-0 left-0 w-[60%] bg-gradient-to-r from-black/70 to-transparent" />
-      <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/60 to-transparent" />
-      <div 
-        className="absolute inset-0 opacity-[0.03] bg-noise"
-        style={{ backgroundSize: '150px 150px' }}
-      />
-    </div>
-  )
-})
-
-// Animation variants
-const fadeInUp = {
-  hidden: { opacity: 0, y: 20 },
-  visible: (delay) => ({
-    opacity: 1,
-    y: 0,
-    transition: { delay, duration: 0.6, ease: [0.22, 1, 0.36, 1] }
-  })
-}
-
-const fadeInLeft = {
-  hidden: { opacity: 0, x: -10 },
-  visible: (delay) => ({
-    opacity: 1,
-    x: 0,
-    transition: { delay, duration: 0.6 }
-  })
-}
-
-const stagger = {
-  visible: {
-    transition: { staggerChildren: 0.08 }
-  }
-}
-
-/* ─── Main Component ─── */
+/* ─── Main ─── */
 export default function Hero() {
-  const sectionRef = useRef(null)
   const greeting = useGreeting()
-  const [isVisible, setIsVisible] = useState(false)
-
-  const { scrollYProgress } = useScroll({
-    target: sectionRef,
-    offset: ['start start', 'end start'],
-  })
+  const [vis, setVis] = useState(false)
 
   useEffect(() => {
-    const timer = requestAnimationFrame(() => setIsVisible(true))
-    return () => cancelAnimationFrame(timer)
+    const t = requestAnimationFrame(() => setVis(true))
+    return () => cancelAnimationFrame(t)
   }, [])
+
+  const fi = (delay) => ({
+    opacity: vis ? 1 : 0,
+    transform: vis ? "translateY(0)" : "translateY(18px)",
+    transition: `opacity 0.65s cubic-bezier(0.22,1,0.36,1) ${delay}s, transform 0.65s cubic-bezier(0.22,1,0.36,1) ${delay}s`,
+  })
 
   return (
     <section
-      ref={sectionRef}
-      className="relative w-full min-h-[100svh] overflow-hidden bg-black"
+      style={{
+        position: "relative",
+        width: "100%",
+        minHeight: "100svh",
+        overflow: "hidden",
+        background: "#000",
+        fontFamily: SANS,
+      }}
       aria-label="Hero section"
     >
-      <style jsx global>{`
-        @keyframes marquee {
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,300;1,300&display=swap');
+
+        @keyframes hero-scroll {
           from { transform: translateX(0); }
           to { transform: translateX(-50%); }
         }
-        .animate-marquee {
-          animation: marquee 25s linear infinite;
+        @keyframes hero-ping {
+          75%, 100% { transform: scale(2.2); opacity: 0; }
         }
-        .bg-noise {
-          background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+
+        .hero-btn-primary {
+          display: flex; align-items: center; justify-content: space-between;
+          height: 56px; padding: 0 20px; background: #fff; color: #000;
+          border-radius: 12px; text-decoration: none;
+          transition: box-shadow 0.3s, transform 0.15s;
         }
+        .hero-btn-primary:hover { box-shadow: 0 12px 36px rgba(255,255,255,0.1); }
+        .hero-btn-primary:active { transform: scale(0.98); }
+
+        .hero-btn-ghost {
+          display: flex; align-items: center; justify-content: center;
+          gap: 8px; height: 52px; border-radius: 12px;
+          border: 0.5px solid rgba(255,255,255,0.1);
+          background: rgba(255,255,255,0.03);
+          color: rgba(255,255,255,0.4); text-decoration: none;
+          transition: color 0.25s, border-color 0.25s, background 0.25s;
+        }
+        .hero-btn-ghost:hover {
+          color: rgba(255,255,255,0.65);
+          border-color: rgba(255,255,255,0.18);
+          background: rgba(255,255,255,0.06);
+        }
+
+        .hero-arrow-box {
+          width: 32px; height: 32px; border-radius: 8px; background: #000;
+          display: flex; align-items: center; justify-content: center;
+          transition: transform 0.3s;
+        }
+        .hero-btn-primary:hover .hero-arrow-box { transform: scale(1.1); }
+
+        .hero-qlink {
+          display: flex; flex-direction: column; align-items: center;
+          gap: 6px; text-decoration: none;
+        }
+        .hero-qlink-text {
+          font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase;
+          color: rgba(255,255,255,0.22); transition: color 0.25s;
+        }
+        .hero-qlink:hover .hero-qlink-text { color: rgba(255,255,255,0.5); }
+        .hero-qlink-bar {
+          height: 0.5px; background: rgba(255,255,255,0.25);
+          width: 0; transition: width 0.35s cubic-bezier(0.22,1,0.36,1);
+        }
+        .hero-qlink:hover .hero-qlink-bar { width: 36px; }
+
         @media (prefers-reduced-motion: reduce) {
-          .animate-marquee {
-            animation: none;
-          }
-          .animate-ping {
-            animation: none;
-          }
+          .hero-scroll { animation: none !important; }
+          .hero-ping { animation: none !important; }
         }
       `}</style>
 
-      <Background scrollYProgress={scrollYProgress} />
-      <Overlays />
+      {/* ── Background ── */}
+      <div style={{ position: "absolute", inset: 0 }}>
+        <img
+          src={BG_IMAGE}
+          alt=""
+          role="presentation"
+          loading="eager"
+          fetchPriority="high"
+          decoding="async"
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            objectPosition: "center",
+            filter: "brightness(0.3) contrast(1.1) saturate(0.7)",
+            display: "block",
+          }}
+        />
+      </div>
 
-      {/* ═══════════ MOBILE (< sm) ═══════════ */}
-      <motion.div 
-        className="relative z-10 min-h-[100svh] flex flex-col sm:hidden px-4 pt-4"
-        initial="hidden"
-        animate={isVisible ? "visible" : "hidden"}
+      {/* ── Overlays ── */}
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: "linear-gradient(to top, #000 0%, rgba(0,0,0,0.8) 30%, transparent 70%)",
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: "linear-gradient(to right, rgba(0,0,0,0.65) 0%, transparent 55%)",
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: "linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, transparent 22%)",
+          }}
+        />
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* MOBILE                                                             */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      <div
+        className="sm:hidden"
+        style={{
+          position: "relative",
+          zIndex: 10,
+          minHeight: "100svh",
+          display: "flex",
+          flexDirection: "column",
+          padding: "16px 16px 0",
+        }}
       >
         {/* Header */}
-        <motion.div 
-          className="flex items-center justify-between mb-8 shrink-0"
-          variants={fadeInLeft}
-          custom={0.1}
-        >
-          <Logo size="small" />
-
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-white/10 bg-white/[0.04]">
+        <div style={{ ...fi(0.1), display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 32, flexShrink: 0 }}>
+          <span style={{ fontSize: 10, letterSpacing: "0.2em", textTransform: "uppercase", fontWeight: 500, color: "rgba(255,255,255,0.38)" }}>
+            Wash<span style={{ color: "rgba(255,255,255,0.58)" }}>2</span>Door
+          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 7, padding: "6px 14px", borderRadius: 999, border: "0.5px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)" }}>
             <PulsingDot />
-            <span
-              className="text-white/40 tracking-[0.12em] uppercase"
-              style={{ fontSize: '7px', fontFamily: SANS }}
-            >
-              Open
-            </span>
+            <span style={{ fontSize: 7, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.38)" }}>Open</span>
           </div>
-        </motion.div>
+        </div>
 
-        <div className="flex-1" />
+        <div style={{ flex: 1 }} />
 
-        {/* Main Content */}
-        <div className="pb-20">
-          {/* Main Tagline */}
-          <motion.div
-            variants={fadeInLeft}
-            custom={0.2}
-            className="flex items-center gap-2 mb-5"
-          >
-            <div className="w-4 h-px bg-gradient-to-r from-white/30 to-transparent" />
-            <span
-              className="text-white/50 tracking-[0.25em] uppercase"
-              style={{ fontSize: '7px', fontFamily: SANS }}
-            >
+        {/* Content */}
+        <div style={{ paddingBottom: 72 }}>
+          {/* Greeting */}
+          <div style={{ ...fi(0.2), display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
+            <div style={{ width: 16, height: 0.5, background: "linear-gradient(to right, rgba(255,255,255,0.3), transparent)" }} />
+            <span style={{ fontSize: 7, letterSpacing: "0.28em", textTransform: "uppercase", color: "rgba(255,255,255,0.45)" }}>
               {greeting}
             </span>
-          </motion.div>
-
-          {/* Headline - Main Tagline */}
-          <div className="mb-5">
-            <motion.h1
-              variants={fadeInUp}
-              custom={0.3}
-              className="text-white leading-[1] mb-1"
-              style={{
-                fontFamily: SERIF,
-                fontWeight: 300,
-                fontSize: 'clamp(2.5rem, 11vw, 4rem)',
-                letterSpacing: '-0.03em',
-              }}
-            >
-              The Shine
-            </motion.h1>
-            <motion.h1
-              variants={fadeInUp}
-              custom={0.4}
-              className="text-white leading-[1] mb-1"
-              style={{
-                fontFamily: SERIF,
-                fontWeight: 300,
-                fontSize: 'clamp(2.5rem, 11vw, 4rem)',
-                letterSpacing: '-0.03em',
-              }}
-            >
-              That Finds
-            </motion.h1>
-            <motion.h1
-              variants={fadeInUp}
-              custom={0.5}
-              className="leading-[1]"
-              style={{
-                fontFamily: SERIF,
-                fontWeight: 300,
-                fontSize: 'clamp(2.2rem, 10vw, 3.5rem)',
-                letterSpacing: '-0.02em',
-                color: 'rgba(255,255,255,0.15)',
-                fontStyle: 'italic',
-              }}
-            >
-              You
-            </motion.h1>
           </div>
-
-          {/* Divider */}
-          <motion.div
-            variants={{
-              hidden: { scaleX: 0 },
-              visible: { 
-                scaleX: 1, 
-                transition: { delay: 0.6, duration: 0.5, ease: [0.22, 1, 0.36, 1] }
-              }
-            }}
-            className="flex items-center gap-2 origin-left mb-4"
-          >
-            <div className="w-6 h-px bg-gradient-to-r from-white/30 to-transparent" />
-            <div className="w-1 h-1 rounded-full bg-white/20" />
-          </motion.div>
-
-          <motion.p
-            variants={fadeInUp}
-            custom={0.7}
-            className="text-white/40 leading-[1.6] mb-6"
-            style={{
-              fontSize: '13px',
-              fontFamily: SANS,
-              letterSpacing: '0.005em',
-            }}
-          >
-            Premium doorstep car cleaning in Duliajan. Book in seconds — we bring everything.
-          </motion.p>
-
-          {/* CTAs */}
-          <motion.div
-            variants={fadeInUp}
-            custom={0.8}
-            className="flex flex-col gap-3 mb-8"
-          >
-            <a
-              href="/services"
-              className="group relative flex items-center justify-between px-5 h-14 bg-white rounded-xl overflow-hidden active:scale-[0.98] transition-transform duration-200"
-            >
-              <span
-                className="tracking-[0.15em] uppercase text-black"
-                style={{ fontSize: '9px', fontFamily: SANS, fontWeight: 600 }}
-              >
-                Book Now
-              </span>
-              <div className="w-8 h-8 rounded-lg bg-black flex items-center justify-center">
-                <ArrowRight size={14} className="text-white" />
-              </div>
-            </a>
-
-            <a
-              href={WHATSAPP_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 h-14 rounded-xl border border-white/10 bg-white/[0.04] text-white/40 active:bg-white/10 transition-colors duration-200"
-            >
-              <Phone size={16} strokeWidth={1.5} />
-              <span
-                className="tracking-[0.15em] uppercase"
-                style={{ fontSize: '9px', fontFamily: SANS, fontWeight: 500 }}
-              >
-                WhatsApp Us
-              </span>
-            </a>
-          </motion.div>
-
-          {/* Stats */}
-          <motion.div
-            variants={stagger}
-            className="grid grid-cols-3 gap-2"
-          >
-            {STATS.map((stat, i) => (
-              <motion.div key={stat.label} variants={fadeInUp} custom={0.9 + i * 0.05}>
-                <StatCard stat={stat} index={i} variant="mobile" />
-              </motion.div>
-            ))}
-          </motion.div>
-        </div>
-      </motion.div>
-
-      {/* ═══════════ TABLET (sm - lg) ═══════════ */}
-      <motion.div 
-        className="relative z-10 min-h-[100svh] hidden sm:flex lg:hidden flex-col px-6 md:px-8 pt-6"
-        initial="hidden"
-        animate={isVisible ? "visible" : "hidden"}
-      >
-        {/* Header */}
-        <motion.div 
-          className="flex items-center justify-between mb-12 shrink-0"
-          variants={fadeInLeft}
-          custom={0.1}
-        >
-          <div className="flex flex-col">
-            <Logo size="default" />
-            <span
-              className="text-white/20 tracking-[0.15em] uppercase mt-1"
-              style={{ fontSize: '6px', fontFamily: SANS }}
-            >
-              Duliajan, Assam
-            </span>
-          </div>
-
-          <div className="flex items-center gap-3 px-4 py-2 rounded-full border border-white/10 bg-white/[0.04]">
-            <PulsingDot />
-            <span
-              className="text-white/40 tracking-[0.12em] uppercase"
-              style={{ fontSize: '8px', fontFamily: SANS }}
-            >
-              Open · 9–5 PM
-            </span>
-          </div>
-        </motion.div>
-
-        <div className="flex-1" />
-
-        {/* Main Content */}
-        <div className="pb-20">
-          {/* Tagline Badge */}
-          <motion.div
-            variants={fadeInLeft}
-            custom={0.2}
-            className="flex items-center gap-3 mb-6"
-          >
-            <div className="w-6 h-px bg-gradient-to-r from-white/30 to-transparent" />
-            <span
-              className="text-white/40 tracking-[0.3em] uppercase"
-              style={{ fontSize: '8px', fontFamily: SANS }}
-            >
-              {TAGLINE}
-            </span>
-          </motion.div>
 
           {/* Headline */}
-          <div className="mb-8">
-            <motion.h1
-              variants={fadeInUp}
-              custom={0.3}
-              className="text-white leading-[1]"
-              style={{
-                fontFamily: SERIF,
-                fontWeight: 300,
-                fontSize: 'clamp(3rem, 8vw, 5.5rem)',
-                letterSpacing: '-0.03em',
-              }}
-            >
-              The Shine That
-            </motion.h1>
+          <h1 style={{ ...fi(0.3), fontFamily: SERIF, fontWeight: 300, fontSize: "clamp(2.5rem, 11vw, 4rem)", color: "#fff", lineHeight: 0.92, letterSpacing: "-0.03em", margin: "0 0 4px" }}>
+            The Shine
+          </h1>
+          <h1 style={{ ...fi(0.38), fontFamily: SERIF, fontWeight: 300, fontSize: "clamp(2.5rem, 11vw, 4rem)", color: "#fff", lineHeight: 0.92, letterSpacing: "-0.03em", margin: "0 0 4px" }}>
+            That Finds
+          </h1>
+          <h1 style={{ ...fi(0.46), fontFamily: SERIF, fontWeight: 300, fontSize: "clamp(2.2rem, 10vw, 3.5rem)", color: "rgba(255,255,255,0.1)", lineHeight: 0.92, letterSpacing: "-0.02em", fontStyle: "italic", margin: "0 0 20px" }}>
+            You
+          </h1>
 
-            <motion.h1
-              variants={fadeInUp}
-              custom={0.4}
-              className="leading-[1]"
-              style={{
-                fontFamily: SERIF,
-                fontWeight: 300,
-                fontSize: 'clamp(2.5rem, 7vw, 5rem)',
-                letterSpacing: '-0.02em',
-                color: 'rgba(255,255,255,0.12)',
-                fontStyle: 'italic',
-              }}
-            >
-              Finds You
-            </motion.h1>
+          {/* Divider */}
+          <div style={{ ...fi(0.5), display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+            <div style={{ width: 24, height: 0.5, background: "linear-gradient(to right, rgba(255,255,255,0.3), transparent)" }} />
+            <div style={{ width: 4, height: 4, borderRadius: "50%", background: "rgba(255,255,255,0.18)" }} />
           </div>
 
-          <motion.p
-            variants={fadeInUp}
-            custom={0.5}
-            className="text-white/35 leading-[1.7] mb-8 max-w-[600px]"
-            style={{ fontSize: '14px', fontFamily: SANS }}
-          >
-            Premium car cleaning that comes to you. Book in seconds — we arrive fully equipped.
-          </motion.p>
+          <p style={{ ...fi(0.56), fontSize: 13, color: "rgba(255,255,255,0.35)", lineHeight: 1.7, margin: "0 0 24px", letterSpacing: "0.005em" }}>
+            Premium doorstep car wash in Duliajan. Book in seconds — we bring everything.
+          </p>
 
           {/* CTAs */}
-          <motion.div
-            variants={fadeInUp}
-            custom={0.6}
-            className="flex gap-3 mb-12 max-w-[500px]"
-          >
-            <a
-              href="/bookings"
-              className="flex-1 flex items-center justify-between px-5 h-14 bg-white rounded-lg active:scale-[0.98] transition-transform duration-200"
-            >
-              <span
-                className="tracking-[0.15em] uppercase text-black"
-                style={{ fontSize: '9px', fontFamily: SANS, fontWeight: 600 }}
-              >
-                Book Now
-              </span>
-              <div className="w-8 h-8 rounded-lg bg-black flex items-center justify-center">
-                <ArrowRight size={14} className="text-white" />
-              </div>
+          <div style={{ ...fi(0.64), display: "flex", flexDirection: "column", gap: 10, marginBottom: 32 }}>
+            <a href="/services" className="hero-btn-primary">
+              <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase" }}>Book Now</span>
+              <div className="hero-arrow-box"><ArrowRight size={14} color="#fff" /></div>
             </a>
-
-            <a
-              href={WHATSAPP_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 px-5 h-14 rounded-lg border border-white/10 bg-white/[0.04] text-white/40 hover:text-white/60 transition-colors duration-200"
-            >
-              <Phone size={16} strokeWidth={1.5} />
-              <span
-                className="tracking-[0.15em] uppercase"
-                style={{ fontSize: '9px', fontFamily: SANS, fontWeight: 500 }}
-              >
-                WhatsApp
-              </span>
+            <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="hero-btn-ghost">
+              <Phone size={15} strokeWidth={1.5} />
+              <span style={{ fontSize: 9, fontWeight: 500, letterSpacing: "0.16em", textTransform: "uppercase" }}>WhatsApp Us</span>
             </a>
-          </motion.div>
-
-          <motion.div variants={fadeInUp} custom={0.7} className="mb-4">
-            <ServicesMarquee />
-          </motion.div>
-
-          <div className="w-full h-px bg-white/[0.06] mb-4" />
+          </div>
 
           {/* Stats */}
-          <motion.div variants={stagger} className="flex gap-3">
-            {STATS.map((stat, i) => (
-              <motion.div key={stat.label} variants={fadeInUp} custom={0.8 + i * 0.05} className="flex-1">
-                <StatCard stat={stat} index={i} variant="tablet" />
-              </motion.div>
+          <div style={{ ...fi(0.72), display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+            {STATS.map((stat) => (
+              <StatCard key={stat.label} stat={stat} compact />
             ))}
-          </motion.div>
+          </div>
         </div>
-      </motion.div>
+      </div>
 
-      {/* ═══════════ DESKTOP (>= lg) ═══════════ */}
-      <motion.div 
-        className="relative z-10 min-h-[100svh] hidden lg:flex flex-col px-12 xl:px-16 2xl:px-24 py-8"
-        initial="hidden"
-        animate={isVisible ? "visible" : "hidden"}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* TABLET                                                             */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      <div
+        className="hidden sm:flex lg:hidden"
+        style={{
+          position: "relative",
+          zIndex: 10,
+          minHeight: "100svh",
+          flexDirection: "column",
+          padding: "24px 24px 0",
+        }}
       >
-        {/* Top Bar */}
-        <motion.div 
-          className="flex items-center justify-between mb-16 shrink-0"
-          variants={fadeInLeft}
-          custom={0.1}
-        >
-          <div className="flex flex-col">
-            <Logo size="large" />
-            <span
-              className="text-white/15 tracking-[0.15em] uppercase mt-1"
-              style={{ fontSize: '7px', fontFamily: SANS }}
-            >
+        {/* Header */}
+        <div style={{ ...fi(0.1), display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 48, flexShrink: 0 }}>
+          <div>
+            <span style={{ display: "block", fontSize: 11, letterSpacing: "0.24em", textTransform: "uppercase", fontWeight: 500, color: "rgba(255,255,255,0.38)" }}>
+              Wash<span style={{ color: "rgba(255,255,255,0.58)" }}>2</span>Door
+            </span>
+            <span style={{ display: "block", fontSize: 6, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(255,255,255,0.18)", marginTop: 3 }}>
+              Duliajan, Assam
+            </span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 7, padding: "6px 14px", borderRadius: 999, border: "0.5px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)" }}>
+            <PulsingDot />
+            <span style={{ fontSize: 8, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.38)" }}>Open · 9–5 PM</span>
+          </div>
+        </div>
+
+        <div style={{ flex: 1 }} />
+
+        <div style={{ paddingBottom: 72 }}>
+          {/* Tagline */}
+          <div style={{ ...fi(0.2), display: "flex", alignItems: "center", gap: 10, marginBottom: 24 }}>
+            <div style={{ width: 24, height: 0.5, background: "linear-gradient(to right, rgba(255,255,255,0.3), transparent)" }} />
+            <span style={{ fontSize: 8, letterSpacing: "0.3em", textTransform: "uppercase", color: "rgba(255,255,255,0.38)" }}>
+              The Shine That Finds You
+            </span>
+          </div>
+
+          <h1 style={{ ...fi(0.3), fontFamily: SERIF, fontWeight: 300, fontSize: "clamp(3rem, 8vw, 5.5rem)", color: "#fff", lineHeight: 0.92, letterSpacing: "-0.03em", margin: "0 0 4px" }}>
+            The Shine That
+          </h1>
+          <h1 style={{ ...fi(0.4), fontFamily: SERIF, fontWeight: 300, fontSize: "clamp(2.5rem, 7vw, 5rem)", color: "rgba(255,255,255,0.1)", lineHeight: 0.92, letterSpacing: "-0.02em", fontStyle: "italic", margin: "0 0 32px" }}>
+            Finds You
+          </h1>
+
+          <p style={{ ...fi(0.5), fontSize: 14, color: "rgba(255,255,255,0.35)", lineHeight: 1.7, margin: "0 0 32px", maxWidth: 600 }}>
+            Premium car wash that comes to you. Book in seconds — we arrive fully equipped.
+          </p>
+
+          {/* CTAs */}
+          <div style={{ ...fi(0.58), display: "flex", gap: 12, marginBottom: 48, maxWidth: 500 }}>
+            <a href="/services" className="hero-btn-primary" style={{ flex: 1 }}>
+              <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase" }}>Book Now</span>
+              <div className="hero-arrow-box"><ArrowRight size={14} color="#fff" /></div>
+            </a>
+            <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="hero-btn-ghost" style={{ padding: "0 20px" }}>
+              <Phone size={15} strokeWidth={1.5} />
+              <span style={{ fontSize: 9, fontWeight: 500, letterSpacing: "0.16em", textTransform: "uppercase" }}>WhatsApp</span>
+            </a>
+          </div>
+
+          <div style={{ ...fi(0.64), marginBottom: 16 }}>
+            <ServicesMarquee />
+          </div>
+          <div style={{ ...fi(0.66), width: "100%", height: 0.5, background: "rgba(255,255,255,0.05)", marginBottom: 16 }} />
+
+          {/* Stats */}
+          <div style={{ ...fi(0.7), display: "flex", gap: 10 }}>
+            {STATS.map((stat) => (
+              <StatCard key={stat.label} stat={stat} />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* DESKTOP                                                            */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      <div
+        className="hidden lg:flex"
+        style={{
+          position: "relative",
+          zIndex: 10,
+          minHeight: "100svh",
+          flexDirection: "column",
+          padding: "32px 48px",
+        }}
+      >
+        {/* Header */}
+        <div style={{ ...fi(0.1), display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 64, flexShrink: 0 }}>
+          <div>
+            <span style={{ display: "block", fontSize: 12, letterSpacing: "0.28em", textTransform: "uppercase", fontWeight: 500, color: "rgba(255,255,255,0.38)" }}>
+              Wash<span style={{ color: "rgba(255,255,255,0.58)" }}>2</span>Door
+            </span>
+            <span style={{ display: "block", fontSize: 7, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(255,255,255,0.14)", marginTop: 4 }}>
               Duliajan, Assam
             </span>
           </div>
 
-          <div className="flex items-center gap-4">
-            <span
-              className="text-white/20 tracking-[0.1em]"
-              style={{ fontSize: '11px', fontFamily: SANS }}
-            >
-              {greeting}
-            </span>
-            <div className="w-px h-4 bg-white/10" />
-            <div className="flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-white/[0.03]">
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <span style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", letterSpacing: "0.1em" }}>{greeting}</span>
+            <div style={{ width: 0.5, height: 16, background: "rgba(255,255,255,0.1)" }} />
+            <div style={{ display: "flex", alignItems: "center", gap: 7, padding: "6px 14px", borderRadius: 999, border: "0.5px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)" }}>
               <PulsingDot />
-              <span
-                className="text-white/40 tracking-[0.15em] uppercase"
-                style={{ fontSize: '8px', fontFamily: SANS }}
-              >
-                Open · 9–5 PM
-              </span>
+              <span style={{ fontSize: 8, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.38)" }}>Open · 9–5 PM</span>
             </div>
           </div>
-        </motion.div>
+        </div>
 
-        <div className="flex-1 min-h-[60px]" />
+        <div style={{ flex: 1, minHeight: 60 }} />
 
-        {/* Main Content */}
-        <div className="shrink-0 pb-6">
-          {/* Tagline Badge */}
-          <motion.div
-            variants={fadeInLeft}
-            custom={0.2}
-            className="flex items-center gap-4 mb-10"
-          >
-            <div className="w-7 h-px bg-gradient-to-r from-white/30 to-transparent" />
-            <span
-              className="text-white/40 tracking-[0.3em] uppercase"
-              style={{ fontSize: '8px', fontFamily: SANS }}
-            >
-              {TAGLINE}
+        {/* Main */}
+        <div style={{ flexShrink: 0, paddingBottom: 24 }}>
+          {/* Tagline */}
+          <div style={{ ...fi(0.2), display: "flex", alignItems: "center", gap: 14, marginBottom: 40 }}>
+            <div style={{ width: 28, height: 0.5, background: "linear-gradient(to right, rgba(255,255,255,0.3), transparent)" }} />
+            <span style={{ fontSize: 8, letterSpacing: "0.32em", textTransform: "uppercase", color: "rgba(255,255,255,0.38)" }}>
+              The Shine That Finds You
             </span>
-            <div className="w-1.5 h-1.5 rounded-full bg-white/20" />
-          </motion.div>
+            <div style={{ width: 5, height: 5, borderRadius: "50%", background: "rgba(255,255,255,0.18)" }} />
+          </div>
 
-          {/* Headline + Right Column */}
-          <div className="flex items-end justify-between gap-16 mb-16">
-            <div className="shrink-0 max-w-[700px]">
-              <motion.h1
-                variants={fadeInUp}
-                custom={0.3}
-                className="text-white leading-[0.9]"
-                style={{
-                  fontFamily: SERIF,
-                  fontWeight: 300,
-                  fontSize: 'clamp(4rem, 7vw, 8rem)',
-                  letterSpacing: '-0.03em',
-                }}
-              >
+          {/* Headline + Right col */}
+          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 64, marginBottom: 64 }}>
+            <div style={{ flexShrink: 0, maxWidth: 700 }}>
+              <h1 style={{ ...fi(0.3), fontFamily: SERIF, fontWeight: 300, fontSize: "clamp(4rem, 7vw, 8rem)", color: "#fff", lineHeight: 0.92, letterSpacing: "-0.03em", margin: "0 0 4px" }}>
                 The Shine
-              </motion.h1>
-              <motion.h1
-                variants={fadeInUp}
-                custom={0.4}
-                className="text-white leading-[0.9]"
-                style={{
-                  fontFamily: SERIF,
-                  fontWeight: 300,
-                  fontSize: 'clamp(4rem, 7vw, 8rem)',
-                  letterSpacing: '-0.03em',
-                }}
-              >
+              </h1>
+              <h1 style={{ ...fi(0.38), fontFamily: SERIF, fontWeight: 300, fontSize: "clamp(4rem, 7vw, 8rem)", color: "#fff", lineHeight: 0.92, letterSpacing: "-0.03em", margin: "0 0 8px" }}>
                 That Finds
-              </motion.h1>
-
-              <motion.h1
-                variants={fadeInUp}
-                custom={0.5}
-                className="leading-[0.9] mt-2"
-                style={{
-                  fontFamily: SERIF,
-                  fontWeight: 300,
-                  fontSize: 'clamp(3rem, 6vw, 7rem)',
-                  letterSpacing: '-0.02em',
-                  color: 'rgba(255,255,255,0.1)',
-                  fontStyle: 'italic',
-                }}
-              >
+              </h1>
+              <h1 style={{ ...fi(0.46), fontFamily: SERIF, fontWeight: 300, fontSize: "clamp(3rem, 6vw, 7rem)", color: "rgba(255,255,255,0.1)", lineHeight: 0.92, letterSpacing: "-0.02em", fontStyle: "italic", margin: 0 }}>
                 You
-              </motion.h1>
+              </h1>
             </div>
 
-            {/* Right Column */}
-            <motion.div
-              variants={fadeInUp}
-              custom={0.6}
-              className="shrink-0 w-[300px] xl:w-[340px] pb-2"
-            >
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-5 h-px bg-gradient-to-r from-white/25 to-transparent" />
-                <div className="w-1.5 h-1.5 rounded-full bg-white/15" />
+            {/* Right panel */}
+            <div style={{ ...fi(0.5), flexShrink: 0, width: "clamp(280px, 24vw, 340px)", paddingBottom: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 24 }}>
+                <div style={{ width: 20, height: 0.5, background: "linear-gradient(to right, rgba(255,255,255,0.25), transparent)" }} />
+                <div style={{ width: 5, height: 5, borderRadius: "50%", background: "rgba(255,255,255,0.15)" }} />
               </div>
 
-              <p
-                className="text-white/30 leading-[1.8] mb-8"
-                style={{ fontSize: '13px', fontFamily: SANS }}
-              >
-                Premium car cleaning that comes to you. Book in seconds—we arrive fully equipped.
+              <p style={{ fontSize: 13, color: "rgba(255,255,255,0.3)", lineHeight: 1.8, margin: "0 0 32px" }}>
+                Premium car wash that comes to you. Book in seconds — we arrive fully equipped.
               </p>
 
-              <div className="flex flex-col gap-3">
-                <a
-                  href="/bookings"
-                  className="group relative flex items-center justify-between px-6 h-14 bg-white rounded-lg overflow-hidden hover:shadow-xl hover:shadow-white/10 transition-shadow duration-300"
-                >
-                  <span
-                    className="tracking-[0.18em] uppercase text-black"
-                    style={{ fontSize: '9px', fontFamily: SANS, fontWeight: 600 }}
-                  >
-                    Book Your Wash
-                  </span>
-                  <div className="w-8 h-8 rounded-lg bg-black flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                    <ArrowRight size={14} className="text-white" />
-                  </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <a href="/services" className="hero-btn-primary">
+                  <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase" }}>Book Your Wash</span>
+                  <div className="hero-arrow-box"><ArrowRight size={14} color="#fff" /></div>
                 </a>
-
-                <a
-                  href={WHATSAPP_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-3 h-12 rounded-lg border border-white/[0.08] bg-white/[0.02] text-white/35 hover:text-white/55 hover:border-white/15 transition-colors duration-300"
-                >
+                <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="hero-btn-ghost" style={{ height: 48 }}>
                   <Phone size={13} strokeWidth={1.5} />
-                  <span
-                    className="tracking-[0.18em] uppercase"
-                    style={{ fontSize: '9px', fontFamily: SANS }}
-                  >
-                    WhatsApp Us
-                  </span>
+                  <span style={{ fontSize: 9, fontWeight: 500, letterSpacing: "0.16em", textTransform: "uppercase" }}>WhatsApp Us</span>
                 </a>
               </div>
-            </motion.div>
+            </div>
           </div>
 
-          {/* Bottom Section */}
-          <motion.div variants={fadeInUp} custom={0.75}>
-            <div className="mb-5">
+          {/* Bottom */}
+          <div style={fi(0.6)}>
+            <div style={{ marginBottom: 20 }}>
               <ServicesMarquee />
             </div>
+            <div style={{ width: "100%", height: 0.5, background: "rgba(255,255,255,0.05)", marginBottom: 20 }} />
 
-            <div className="w-full h-px bg-white/[0.05] mb-5" />
-
-            <div className="flex items-end justify-between gap-12">
-              <div className="flex gap-4">
-                {STATS.map((stat, i) => (
-                  <StatCard key={stat.label} stat={stat} index={i} variant="desktop" />
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 48 }}>
+              <div style={{ display: "flex", gap: 14 }}>
+                {STATS.map((stat) => (
+                  <StatCard key={stat.label} stat={stat} />
                 ))}
               </div>
 
-              <nav className="flex gap-8" aria-label="Quick links">
-                {['Services', 'About', 'Contact'].map((link) => (
-                  <a
-                    key={link}
-                    href={`/${link.toLowerCase()}`}
-                    className="group flex flex-col items-center gap-2"
-                  >
-                    <span
-                      className="text-white/25 group-hover:text-white/50 tracking-[0.2em] uppercase transition-colors duration-300"
-                      style={{ fontSize: '8px', fontFamily: SANS }}
-                    >
-                      {link}
-                    </span>
-                    <span
-                      className="h-px bg-white/25 w-0 group-hover:w-10 transition-all duration-300"
-                      aria-hidden="true"
-                    />
+              <nav style={{ display: "flex", gap: 32 }} aria-label="Quick links">
+                {["Services", "About", "Contact"].map((link) => (
+                  <a key={link} href={`/${link.toLowerCase()}`} className="hero-qlink">
+                    <span className="hero-qlink-text">{link}</span>
+                    <span className="hero-qlink-bar" />
                   </a>
                 ))}
               </nav>
             </div>
-          </motion.div>
+          </div>
         </div>
-      </motion.div>
+      </div>
     </section>
   )
 }

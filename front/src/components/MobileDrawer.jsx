@@ -1,779 +1,686 @@
 "use client"
 
-import { useEffect, useCallback, useRef } from "react"
+import { useEffect, useCallback } from "react"
 import {
-  X,
-  Phone,
-  MapPin,
   LogOut,
   Calendar,
   ArrowUpRight,
-  ChevronRight,
   User,
+  Phone,
+  MapPin,
 } from "lucide-react"
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion"
 import { useAuth } from "@/context/AuthContext"
 import { useNavigate } from "@/hooks/useNavigate"
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
 const NAV_LINKS = [
-  { label: "Home", href: "/", desc: "Back to start" },
-  { label: "About Us", href: "/about", desc: "Our story" },
-  { label: "Services", href: "/services", desc: "What we offer" },
-  { label: "My Bookings", href: "/my-bookings", desc: "Your appointments", protected: true },
-  { label: "Contact", href: "/contact", desc: "Get in touch" },
+  { label: "Home",        href: "/",            protected: false },
+  { label: "About",       href: "/about",        protected: false },
+  { label: "Services",    href: "/services",     protected: false },
+  { label: "My Bookings", href: "/my-bookings",  protected: true  },
+  { label: "Contact",     href: "/contact",      protected: false },
 ]
 
 const CONTACT = {
-  phone: "6900706456",
-  phoneDisplay: "+91 690 070 6456",
-  location: "Duliajan, Assam",
-  hours: "9 AM – 5 PM",
+  phone:   "6900706456",
+  location:"Duliajan, Assam",
+  hours:   "9 AM – 5 PM",
 }
 
-const FONT = {
-  sans: "'Helvetica Neue', Helvetica, Arial, sans-serif",
-  serif: 'Georgia, "Times New Roman", serif',
-}
+// ─── Main Component ───────────────────────────────────────────────────────────
 
-// Smooth cubic bezier curves
-const EASE_OUT_EXPO = [0.16, 1, 0.3, 1]
-const EASE_OUT_QUINT = [0.22, 1, 0.36, 1]
-const EASE_IN_OUT = [0.65, 0, 0.35, 1]
-const EASE_OUT_BACK = [0.34, 1.56, 0.64, 1]
-
-// Spring configurations
-const SPRING_BOUNCY = { type: "spring", damping: 25, stiffness: 400 }
-
-const variants = {
-  backdrop: {
-    hidden: { 
-      opacity: 0,
-    },
-    visible: { 
-      opacity: 1, 
-      transition: { 
-        duration: 0.4,
-        ease: EASE_OUT_QUINT
-      } 
-    },
-    exit: { 
-      opacity: 0, 
-      transition: { 
-        duration: 0.3,
-        ease: EASE_IN_OUT,
-        delay: 0.05
-      } 
-    },
-  },
-  panel: {
-    hidden: { 
-      y: "100%",
-      borderRadius: "40px 40px 0 0",
-    },
-    visible: { 
-      y: 0,
-      borderRadius: "28px 28px 0 0",
-      transition: {
-        y: {
-          type: "spring",
-          damping: 32,
-          stiffness: 350,
-          mass: 0.8,
-        },
-        borderRadius: {
-          duration: 0.4,
-          delay: 0.1,
-          ease: EASE_OUT_QUINT
-        }
-      }
-    },
-    exit: { 
-      y: "100%",
-      borderRadius: "40px 40px 0 0",
-      transition: {
-        y: {
-          type: "spring",
-          damping: 35,
-          stiffness: 400,
-          mass: 0.6,
-        },
-        borderRadius: {
-          duration: 0.2,
-          ease: EASE_IN_OUT
-        }
-      }
-    },
-  },
-  handle: {
-    hidden: { opacity: 0, scaleX: 0.5 },
-    visible: { 
-      opacity: 1, 
-      scaleX: 1,
-      transition: {
-        delay: 0.2,
-        duration: 0.4,
-        ease: EASE_OUT_BACK
-      }
-    },
-    exit: {
-      opacity: 0,
-      scaleX: 0.5,
-      transition: {
-        duration: 0.15,
-        ease: EASE_IN_OUT
-      }
-    }
-  },
-  header: {
-    hidden: { opacity: 0, y: -10 },
-    visible: { 
-      opacity: 1, 
-      y: 0,
-      transition: {
-        delay: 0.18,
-        duration: 0.4,
-        ease: EASE_OUT_QUINT
-      }
-    },
-    exit: {
-      opacity: 0,
-      y: -5,
-      transition: {
-        duration: 0.12,
-        ease: EASE_IN_OUT
-      }
-    }
-  },
-  divider: {
-    hidden: { scaleX: 0, opacity: 0 },
-    visible: { 
-      scaleX: 1, 
-      opacity: 1,
-      transition: {
-        delay: 0.2,
-        duration: 0.5,
-        ease: EASE_OUT_QUINT
-      }
-    },
-    exit: {
-      scaleX: 0,
-      opacity: 0,
-      transition: {
-        duration: 0.15,
-        ease: EASE_IN_OUT
-      }
-    }
-  },
-  stagger: {
-    hidden: {},
-    visible: { 
-      transition: { 
-        staggerChildren: 0.045,
-        delayChildren: 0.25
-      } 
-    },
-    exit: {
-      transition: {
-        staggerChildren: 0.02,
-        staggerDirection: -1
-      }
-    }
-  },
-  item: {
-    hidden: { 
-      opacity: 0, 
-      x: -20,
-      filter: "blur(4px)"
-    },
-    visible: { 
-      opacity: 1, 
-      x: 0,
-      filter: "blur(0px)",
-      transition: { 
-        duration: 0.45,
-        ease: EASE_OUT_EXPO
-      } 
-    },
-    exit: {
-      opacity: 0,
-      x: -10,
-      filter: "blur(2px)",
-      transition: {
-        duration: 0.15,
-        ease: EASE_IN_OUT
-      }
-    }
-  },
-  userCard: {
-    hidden: { 
-      opacity: 0, 
-      y: 15,
-      scale: 0.96
-    },
-    visible: { 
-      opacity: 1, 
-      y: 0,
-      scale: 1,
-      transition: { 
-        delay: 0.2,
-        duration: 0.5,
-        ease: EASE_OUT_EXPO
-      } 
-    },
-    exit: {
-      opacity: 0,
-      y: 10,
-      scale: 0.98,
-      transition: {
-        duration: 0.15,
-        ease: EASE_IN_OUT
-      }
-    }
-  },
-  footer: {
-    hidden: { opacity: 0, y: 20 },
-    visible: { 
-      opacity: 1, 
-      y: 0,
-      transition: {
-        delay: 0.3,
-        duration: 0.4,
-        ease: EASE_OUT_QUINT
-      }
-    },
-    exit: {
-      opacity: 0,
-      y: 10,
-      transition: {
-        duration: 0.12,
-        ease: EASE_IN_OUT
-      }
-    }
-  },
-  quickActions: {
-    hidden: { opacity: 0, y: 15 },
-    visible: { 
-      opacity: 1, 
-      y: 0,
-      transition: {
-        delay: 0.35,
-        duration: 0.45,
-        ease: EASE_OUT_QUINT
-      }
-    },
-    exit: {
-      opacity: 0,
-      y: 10,
-      transition: {
-        duration: 0.12,
-        ease: EASE_IN_OUT
-      }
-    }
-  },
-  cta: {
-    hidden: { opacity: 0, y: 20, scale: 0.95 },
-    visible: { 
-      opacity: 1, 
-      y: 0,
-      scale: 1,
-      transition: {
-        delay: 0.4,
-        duration: 0.5,
-        ease: EASE_OUT_BACK
-      }
-    },
-    exit: {
-      opacity: 0,
-      y: 15,
-      scale: 0.97,
-      transition: {
-        duration: 0.15,
-        ease: EASE_IN_OUT
-      }
-    }
-  },
-  closeButton: {
-    hidden: { opacity: 0, scale: 0.8, rotate: -90 },
-    visible: { 
-      opacity: 1, 
-      scale: 1,
-      rotate: 0,
-      transition: {
-        delay: 0.25,
-        type: "spring",
-        damping: 20,
-        stiffness: 300
-      }
-    },
-    exit: {
-      opacity: 0,
-      scale: 0.8,
-      rotate: 90,
-      transition: {
-        duration: 0.15,
-        ease: EASE_IN_OUT
-      }
-    }
-  }
-}
-
-// Hooks
-function useLockScroll(lock) {
-  useEffect(() => {
-    if (!lock) return
-    const orig = { 
-      overflow: document.body.style.overflow, 
-      touchAction: document.body.style.touchAction,
-      position: document.body.style.position
-    }
-    document.body.style.overflow = "hidden"
-    document.body.style.touchAction = "none"
-    document.body.style.position = "fixed"
-    document.body.style.width = "100%"
-    return () => {
-      document.body.style.overflow = orig.overflow
-      document.body.style.touchAction = orig.touchAction
-      document.body.style.position = orig.position
-      document.body.style.width = ""
-    }
-  }, [lock])
-}
-
-function useEscapeKey(active, onEscape) {
-  useEffect(() => {
-    if (!active) return
-    const handler = (e) => e.key === "Escape" && onEscape()
-    document.addEventListener("keydown", handler)
-    return () => document.removeEventListener("keydown", handler)
-  }, [active, onEscape])
-}
-
-function useFocusTrap(active, ref) {
-  useEffect(() => {
-    if (!active || !ref.current) return
-    const container = ref.current
-    const focusable = container.querySelectorAll('button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])')
-    const first = focusable[0]
-    const last = focusable[focusable.length - 1]
-    
-    const timer = setTimeout(() => first?.focus(), 100)
-
-    const trap = (e) => {
-      if (e.key !== "Tab") return
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault()
-        last?.focus()
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault()
-        first?.focus()
-      }
-    }
-    container.addEventListener("keydown", trap)
-    return () => {
-      clearTimeout(timer)
-      container.removeEventListener("keydown", trap)
-    }
-  }, [active, ref])
-}
-
-// Components
-const Handle = () => (
-  <motion.div 
-    variants={variants.handle}
-    initial="hidden"
-    animate="visible"
-    exit="exit"
-    className="flex justify-center pt-3 pb-1"
-  >
-    <motion.div 
-      className="w-9 h-1 rounded-full bg-black/10"
-      whileHover={{ scaleX: 1.1, backgroundColor: "rgba(0,0,0,0.2)" }}
-      transition={{ duration: 0.2 }}
-    />
-  </motion.div>
-)
-
-const Header = ({ onHome, onClose }) => (
-  <motion.div 
-    variants={variants.header}
-    initial="hidden"
-    animate="visible"
-    exit="exit"
-    className="flex items-center justify-between px-5 py-3"
-  >
-    <motion.button 
-      onClick={onHome} 
-      className="group"
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
-    >
-      <span
-        className="tracking-[0.2em] uppercase text-black group-hover:opacity-60 transition-opacity"
-        style={{ fontFamily: FONT.serif, fontSize: "12px", fontWeight: 400 }}
-      >
-        Wash2Door
-      </span>
-    </motion.button>
-    <motion.button
-      variants={variants.closeButton}
-      initial="hidden"
-      animate="visible"
-      exit="exit"
-      whileHover={{ scale: 1.1, backgroundColor: "#000" }}
-      whileTap={{ scale: 0.9 }}
-      onClick={onClose}
-      className="w-9 h-9 rounded-full bg-black/5 hover:text-white flex items-center justify-center transition-colors duration-300"
-    >
-      <X size={16} strokeWidth={1.5} />
-    </motion.button>
-  </motion.div>
-)
-
-const Divider = () => (
-  <motion.div 
-    variants={variants.divider}
-    initial="hidden"
-    animate="visible"
-    exit="exit"
-    className="h-px bg-black/5 mx-5 origin-left"
-  />
-)
-
-const UserSection = ({ user, onProfile, onLogout }) => {
-  const initial = user?.firstName?.charAt(0)?.toUpperCase() || "U"
-  const name = `${user?.firstName || ""} ${user?.lastName || ""}`.trim()
-
-  return (
-    <motion.div
-      variants={variants.userCard}
-      initial="hidden"
-      animate="visible"
-      exit="exit"
-      className="mx-4 mb-3"
-    >
-      <motion.div 
-        className="bg-black rounded-2xl p-4 text-white overflow-hidden relative"
-        whileHover={{ scale: 1.01 }}
-        transition={{ duration: 0.2 }}
-      >
-        {/* Subtle gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-br from-white/[0.08] to-transparent pointer-events-none" />
-        
-        <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-4">
-            <motion.div 
-              className="w-11 h-11 rounded-full bg-white/15 flex items-center justify-center ring-2 ring-white/10"
-              whileHover={{ scale: 1.05 }}
-              transition={SPRING_BOUNCY}
-            >
-              <span style={{ fontFamily: FONT.serif, fontSize: "15px" }}>{initial}</span>
-            </motion.div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{name}</p>
-              <p className="text-[11px] text-white/50 truncate">{user?.email}</p>
-            </div>
-          </div>
-          
-          <div className="flex gap-2">
-            <motion.button
-              whileHover={{ scale: 1.02, backgroundColor: "rgba(255,255,255,0.95)" }}
-              whileTap={{ scale: 0.97 }}
-              onClick={onProfile}
-              className="flex-1 h-10 rounded-xl bg-white text-black text-[10px] font-medium tracking-wider uppercase flex items-center justify-center gap-2 transition-colors"
-            >
-              <User size={12} />
-              Profile
-            </motion.button>
-            <motion.button
-              whileHover={{ scale: 1.05, backgroundColor: "rgba(255,255,255,0.25)" }}
-              whileTap={{ scale: 0.95 }}
-              onClick={onLogout}
-              className="h-10 px-4 rounded-xl bg-white/10 text-white/80 text-[10px] font-medium tracking-wider uppercase flex items-center justify-center gap-2 transition-colors"
-            >
-              <LogOut size={12} />
-            </motion.button>
-          </div>
-        </div>
-      </motion.div>
-    </motion.div>
-  )
-}
-
-const NavItem = ({ link, index, locked, onClick }) => (
-  <motion.button
-    variants={variants.item}
-    whileHover={{ 
-      backgroundColor: "rgba(0,0,0,0.03)",
-      x: 4,
-      transition: { duration: 0.2 }
-    }}
-    whileTap={{ scale: 0.98 }}
-    onClick={() => onClick(link)}
-    className="group w-full flex items-center gap-4 p-3 rounded-2xl transition-colors"
-  >
-    {/* Number */}
-    <motion.div 
-      className="w-10 h-10 rounded-xl bg-black/[0.04] flex items-center justify-center shrink-0 transition-all duration-300 group-hover:bg-black group-hover:text-white"
-      whileHover={{ scale: 1.05 }}
-      transition={SPRING_BOUNCY}
-    >
-      <span style={{ fontFamily: FONT.serif, fontSize: "13px" }}>
-        {String(index + 1).padStart(2, "0")}
-      </span>
-    </motion.div>
-
-    {/* Label */}
-    <div className="flex-1 text-left min-w-0">
-      <p className="text-[15px] text-black font-medium truncate" style={{ fontFamily: FONT.serif }}>
-        {link.label}
-      </p>
-      <p className="text-[10px] text-black/40 truncate mt-0.5">{link.desc}</p>
-    </div>
-
-    {/* Badge or Arrow */}
-    {locked ? (
-      <motion.span 
-        className="text-[8px] px-2 py-1 rounded-full bg-black/5 text-black/40 uppercase tracking-wider font-medium shrink-0"
-        whileHover={{ backgroundColor: "rgba(0,0,0,0.1)" }}
-      >
-        Login
-      </motion.span>
-    ) : (
-      <motion.div
-        className="shrink-0"
-        initial={{ x: 0 }}
-        whileHover={{ x: 4 }}
-        transition={{ duration: 0.2 }}
-      >
-        <ChevronRight 
-          size={16} 
-          className="text-black/20 group-hover:text-black transition-colors duration-300" 
-        />
-      </motion.div>
-    )}
-  </motion.button>
-)
-
-const QuickActions = () => (
-  <motion.div
-    variants={variants.quickActions}
-    initial="hidden"
-    animate="visible"
-    exit="exit"
-    className="mx-4 mb-4"
-  >
-    <div className="flex gap-2">
-      <motion.a
-        href={`tel:${CONTACT.phone}`}
-        className="flex-1 flex items-center justify-center gap-2 h-12 rounded-xl bg-black/[0.03] hover:bg-black hover:text-white transition-all duration-300"
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
-      >
-        <Phone size={14} strokeWidth={1.5} />
-        <span className="text-[10px] tracking-wider uppercase font-medium">Call</span>
-      </motion.a>
-      <motion.div 
-        className="flex-1 flex items-center justify-center gap-2 h-12 rounded-xl bg-black/[0.03]"
-        whileHover={{ scale: 1.01 }}
-      >
-        <MapPin size={14} strokeWidth={1.5} className="text-black/40" />
-        <span className="text-[10px] text-black/60">{CONTACT.location}</span>
-      </motion.div>
-      <motion.div 
-        className="flex items-center gap-1.5 px-3 h-12 rounded-xl bg-emerald-500/10"
-        whileHover={{ scale: 1.02 }}
-      >
-        <motion.span 
-          className="w-1.5 h-1.5 rounded-full bg-emerald-500"
-          animate={{ 
-            scale: [1, 1.2, 1],
-            opacity: [1, 0.7, 1]
-          }}
-          transition={{
-            duration: 2,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-        />
-        <span className="text-[9px] text-emerald-600 font-medium uppercase tracking-wider">{CONTACT.hours}</span>
-      </motion.div>
-    </div>
-  </motion.div>
-)
-
-const BottomCTA = ({ user, onNavigate, onSignIn }) => {
-  if (user) {
-    return (
-      <motion.button
-        whileHover={{ scale: 1.01, backgroundColor: "rgba(0,0,0,0.85)" }}
-        whileTap={{ scale: 0.98 }}
-        onClick={() => onNavigate("/my-bookings")}
-        className="w-full h-14 bg-black text-white rounded-2xl flex items-center justify-center gap-3 transition-colors"
-      >
-        <Calendar size={16} />
-        <span className="text-[11px] tracking-[0.2em] uppercase font-medium">View My Bookings</span>
-      </motion.button>
-    )
-  }
-
-  return (
-    <div className="flex gap-2">
-      <motion.button
-        whileHover={{ scale: 1.01 }}
-        whileTap={{ scale: 0.98 }}
-        onClick={() => onNavigate("/services")}
-        className="flex-1 h-14 bg-black text-white rounded-2xl flex items-center justify-center gap-3 hover:bg-black/90 transition-colors"
-      >
-        <span className="text-[11px] tracking-[0.2em] uppercase font-medium">Book Now</span>
-        <motion.div 
-          className="w-6 h-6 rounded-full bg-white/15 flex items-center justify-center"
-          whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.25)" }}
-          transition={SPRING_BOUNCY}
-        >
-          <ArrowUpRight size={12} />
-        </motion.div>
-      </motion.button>
-      <motion.button
-        whileHover={{ 
-          scale: 1.02, 
-          backgroundColor: "#000", 
-          color: "#fff",
-          borderColor: "#000"
-        }}
-        whileTap={{ scale: 0.98 }}
-        onClick={onSignIn}
-        className="px-6 h-14 border border-black/10 rounded-2xl text-black text-[11px] tracking-[0.2em] uppercase font-medium transition-all duration-300"
-      >
-        Sign In
-      </motion.button>
-    </div>
-  )
-}
-
-// Main Component
-export default function MobileDrawer({ isOpen, onClose }) {
+export default function MobileDrawer({ isOpen, onClose, currentPath = "/" }) {
   const { user, openModal, logout } = useAuth()
   const navigate = useNavigate()
-  const panelRef = useRef(null)
 
-  useLockScroll(isOpen)
-  useEscapeKey(isOpen, onClose)
-  useFocusTrap(isOpen, panelRef)
+  // Lock scroll
+  useEffect(() => {
+    document.body.style.overflow = isOpen ? "hidden" : ""
+    return () => { document.body.style.overflow = "" }
+  }, [isOpen])
+
+  // Escape key
+  useEffect(() => {
+    if (!isOpen) return
+    const h = (e) => e.key === "Escape" && onClose()
+    document.addEventListener("keydown", h)
+    return () => document.removeEventListener("keydown", h)
+  }, [isOpen, onClose])
+
+  const go = useCallback(
+    (href) => { onClose(); setTimeout(() => navigate(href), 120) },
+    [navigate, onClose]
+  )
+
+  const handleLink = useCallback(
+    (link) => {
+      if (link.protected && !user) {
+        onClose()
+        setTimeout(() => openModal("login"), 120)
+        return
+      }
+      go(link.href)
+    },
+    [user, openModal, onClose, go]
+  )
 
   const handleLogout = useCallback(() => {
-    onClose()
-    setTimeout(logout, 150)
+    onClose(); setTimeout(logout, 140)
   }, [logout, onClose])
 
-  const handleNavigate = useCallback((href) => {
-    onClose()
-    setTimeout(() => navigate(href), 150)
-  }, [navigate, onClose])
-
-  const handleLinkClick = useCallback((link) => {
-    if (link.protected && !user) {
-      onClose()
-      setTimeout(() => openModal("login"), 150)
-      return
-    }
-    handleNavigate(link.href)
-  }, [user, openModal, onClose, handleNavigate])
-
   const handleSignIn = useCallback(() => {
-    onClose()
-    setTimeout(() => openModal("login"), 150)
+    onClose(); setTimeout(() => openModal("login"), 140)
   }, [openModal, onClose])
 
+  const initial = user?.firstName?.charAt(0)?.toUpperCase() ?? "U"
+  const name    = `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim()
+
   return (
-    <AnimatePresence mode="wait">
-      {isOpen && (
-        <motion.div 
-          className="fixed inset-0 z-[9999]" 
-          role="dialog" 
-          aria-modal="true"
-          initial="hidden"
-          animate="visible"
-          exit="exit"
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,300;1,300&display=swap');
+
+        .w2d-nav-link {
+          color: #c7c7cc;
+          transition: color 0.25s;
+          text-decoration: none;
+          display: block;
+          position: relative;
+          padding: 3px 0;
+          background: none;
+          border: none;
+          cursor: pointer;
+          text-align: left;
+          width: 100%;
+        }
+        .w2d-nav-link:hover { color: #1d1d1f; }
+        .w2d-nav-link::after {
+          content: '';
+          position: absolute;
+          bottom: 2px; left: 0;
+          height: 0.5px;
+          background: #1d1d1f;
+          width: 0;
+          transition: width 0.4s cubic-bezier(0.4,0,0.2,1);
+        }
+        .w2d-nav-link:hover::after { width: 100%; }
+
+        .w2d-nav-arrow {
+          opacity: 0;
+          transform: translateX(-6px);
+          transition: opacity 0.2s, transform 0.25s;
+          font-style: normal;
+          font-size: 20px;
+          display: inline-block;
+        }
+        .w2d-nav-link:hover .w2d-nav-arrow {
+          opacity: 1;
+          transform: translateX(0);
+        }
+
+        .w2d-close-btn { transition: background 0.2s; }
+        .w2d-close-btn:hover { background: rgba(0,0,0,0.1) !important; }
+
+        .w2d-ghost-btn {
+          transition: background 0.22s, color 0.22s, border-color 0.22s;
+        }
+        .w2d-ghost-btn:hover {
+          background: #1d1d1f !important;
+          color: #fff !important;
+          border-color: #1d1d1f !important;
+        }
+
+        .w2d-cta-btn { transition: opacity 0.22s; }
+        .w2d-cta-btn:hover { opacity: 0.82; }
+
+        .w2d-logout-btn { transition: background 0.2s, color 0.2s; }
+        .w2d-logout-btn:hover {
+          background: rgba(255,255,255,0.18) !important;
+          color: #fff !important;
+        }
+
+        .w2d-pill-btn { transition: background 0.2s, color 0.2s; }
+        .w2d-pill-btn:hover {
+          background: rgba(255,255,255,0.9) !important;
+        }
+
+        .w2d-menu-img {
+          transition: transform 0.7s ease, opacity 0.4s;
+          opacity: 0.8;
+        }
+        .w2d-sheet-open .w2d-menu-img { transform: scale(1.04); }
+
+        .w2d-call-chip { transition: background 0.22s, color 0.22s; }
+        .w2d-call-chip:hover {
+          background: #1d1d1f !important;
+          color: #fff !important;
+        }
+
+        @keyframes w2d-pulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50%       { opacity: 0.55; transform: scale(1.35); }
+        }
+        .w2d-pulse { animation: w2d-pulse 2.2s ease-in-out infinite; }
+      `}</style>
+
+      {/* ── Overlay ──────────────────────────────────────────────────────────── */}
+      <div
+        style={{
+          position:      "fixed",
+          inset:         0,
+          zIndex:        9999,
+          pointerEvents: isOpen ? "auto" : "none",
+          opacity:       isOpen ? 1 : 0,
+          transition:    "opacity 0.38s cubic-bezier(0.4,0,0.2,1)",
+        }}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Navigation menu"
+      >
+        {/* Backdrop */}
+        <div
+          onClick={onClose}
+          style={{
+            position:             "absolute",
+            inset:                0,
+            background:           "rgba(0,0,0,0.22)",
+            backdropFilter:       "blur(3px)",
+            WebkitBackdropFilter: "blur(3px)",
+          }}
+        />
+
+        {/* ── Sheet ────────────────────────────────────────────────────────── */}
+        <div
+          className={isOpen ? "w2d-sheet-open" : ""}
+          style={{
+            position:            "absolute",
+            inset:               8,
+            display:             "grid",
+            gridTemplateColumns: "1fr 1fr",
+            overflow:            "hidden",
+            borderRadius:        16,
+            background:          "#ffffff",
+            boxShadow:           "0 32px 80px rgba(0,0,0,0.2), 0 0 0 0.5px rgba(0,0,0,0.06)",
+            transform:           isOpen
+              ? "scale(1) translateY(0)"
+              : "scale(0.97) translateY(10px)",
+            transition: "transform 0.45s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s",
+          }}
         >
-          {/* Backdrop */}
-          <motion.div
-            variants={variants.backdrop}
-            onClick={onClose}
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-          />
 
-          {/* Panel */}
-          <motion.div
-            ref={panelRef}
-            variants={variants.panel}
-            className="absolute inset-x-0 bottom-0 max-h-[90vh] bg-white flex flex-col overflow-hidden"
-            style={{ 
-              fontFamily: FONT.sans,
-              boxShadow: "0 -10px 60px -10px rgba(0,0,0,0.3), 0 -2px 10px rgba(0,0,0,0.1)"
-            }}
-          >
-            <Handle />
-            <Header onHome={() => handleNavigate("/")} onClose={onClose} />
-            
-            <Divider />
+          {/* ── LEFT: Nav side ─────────────────────────────────────────────── */}
+          <div style={{
+            display:       "flex",
+            flexDirection: "column",
+            borderRight:   "0.5px solid rgba(0,0,0,0.06)",
+            fontFamily:    "'Helvetica Neue', Helvetica, Arial, sans-serif",
+            minHeight:     0,
+          }}>
 
-            {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto overscroll-contain py-3">
-              {user && (
-                <UserSection 
-                  user={user} 
-                  onProfile={() => handleNavigate("/profile")} 
-                  onLogout={handleLogout} 
-                />
-              )}
+            {/* Top bar */}
+            <div style={{
+              padding:        "20px 24px 16px",
+              borderBottom:   "0.5px solid rgba(0,0,0,0.06)",
+              display:        "flex",
+              alignItems:     "center",
+              justifyContent: "space-between",
+              flexShrink:     0,
+            }}>
+              <span style={{
+                fontSize:      10,
+                letterSpacing: "0.16em",
+                textTransform: "uppercase",
+                color:         "#aeaeb2",
+                fontWeight:    400,
+              }}>
+                Menu
+              </span>
 
-              {/* Navigation */}
-              <nav className="px-3">
-                <motion.div 
-                  variants={variants.stagger}
-                  initial="hidden"
-                  animate="visible"
-                  exit="exit"
+              <button
+                onClick={onClose}
+                className="w2d-close-btn"
+                aria-label="Close menu"
+                style={{
+                  width:          28,
+                  height:         28,
+                  borderRadius:   "50%",
+                  background:     "rgba(0,0,0,0.05)",
+                  border:         "none",
+                  cursor:         "pointer",
+                  display:        "flex",
+                  alignItems:     "center",
+                  justifyContent: "center",
+                  color:          "#6e6e73",
+                  flexShrink:     0,
+                }}
+              >
+                <svg
+                  width="11" height="11" viewBox="0 0 11 11"
+                  fill="none" stroke="currentColor"
+                  strokeWidth="1.2" strokeLinecap="round"
                 >
-                  {NAV_LINKS.map((link, i) => (
-                    <NavItem
-                      key={link.href}
-                      link={link}
-                      index={i}
-                      locked={link.protected && !user}
-                      onClick={handleLinkClick}
-                    />
-                  ))}
-                </motion.div>
-              </nav>
+                  <path d="M1 1l9 9M10 1L1 10" />
+                </svg>
+              </button>
             </div>
 
-            {/* Footer */}
-            <motion.div 
-              variants={variants.footer}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-              className="shrink-0 border-t border-black/5 bg-white pt-3"
-            >
-              <QuickActions />
-              
-              <motion.div 
-                variants={variants.cta}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-                className="px-4 pb-4"
-              >
-                <BottomCTA user={user} onNavigate={handleNavigate} onSignIn={handleSignIn} />
-              </motion.div>
+            {/* ── User card ──────────────────────────────────────────────── */}
+            {user && (
+              <div style={{
+                margin:       "14px 16px 0",
+                borderRadius: 12,
+                background:   "#111",
+                padding:      "12px 14px",
+                position:     "relative",
+                overflow:     "hidden",
+                flexShrink:   0,
+              }}>
+                <div style={{
+                  position:      "absolute",
+                  inset:         0,
+                  background:    "linear-gradient(135deg,rgba(255,255,255,0.07) 0%,transparent 60%)",
+                  pointerEvents: "none",
+                  borderRadius:  12,
+                }} />
 
-              {/* Safe area */}
-              <div className="h-[env(safe-area-inset-bottom)]" />
-            </motion.div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+                {/* Avatar + info */}
+                <div style={{
+                  display:     "flex",
+                  alignItems:  "center",
+                  gap:         10,
+                  marginBottom:10,
+                }}>
+                  <div style={{
+                    width:          36,
+                    height:         36,
+                    borderRadius:   "50%",
+                    background:     "rgba(255,255,255,0.12)",
+                    border:         "1px solid rgba(255,255,255,0.15)",
+                    display:        "flex",
+                    alignItems:     "center",
+                    justifyContent: "center",
+                    flexShrink:     0,
+                    fontFamily:     "'Playfair Display', Georgia, serif",
+                    fontSize:       14,
+                    color:          "#fff",
+                  }}>
+                    {initial}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{
+                      fontSize:     12,
+                      fontWeight:   500,
+                      color:        "#fff",
+                      margin:       0,
+                      overflow:     "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace:   "nowrap",
+                    }}>
+                      {name}
+                    </p>
+                    <p style={{
+                      fontSize:     9,
+                      color:        "rgba(255,255,255,0.4)",
+                      margin:       "2px 0 0",
+                      overflow:     "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace:   "nowrap",
+                    }}>
+                      {user?.email}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button
+                    onClick={() => go("/profile")}
+                    className="w2d-pill-btn"
+                    style={{
+                      flex:           1,
+                      height:         32,
+                      borderRadius:   8,
+                      border:         "none",
+                      background:     "#fff",
+                      color:          "#000",
+                      cursor:         "pointer",
+                      fontSize:       9,
+                      fontWeight:     600,
+                      letterSpacing:  "0.12em",
+                      textTransform:  "uppercase",
+                      display:        "flex",
+                      alignItems:     "center",
+                      justifyContent: "center",
+                      gap:            5,
+                    }}
+                  >
+                    <User size={10} />
+                    Profile
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    className="w2d-logout-btn"
+                    aria-label="Sign out"
+                    style={{
+                      width:          36,
+                      height:         32,
+                      borderRadius:   8,
+                      border:         "none",
+                      background:     "rgba(255,255,255,0.1)",
+                      color:          "rgba(255,255,255,0.65)",
+                      cursor:         "pointer",
+                      display:        "flex",
+                      alignItems:     "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <LogOut size={11} />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ── Nav links ──────────────────────────────────────────────── */}
+            <nav
+              aria-label="Main navigation"
+              style={{
+                flex:          1,
+                display:       "flex",
+                flexDirection: "column",
+                justifyContent:"center",
+                padding:       "16px 24px",
+                gap:           2,
+                minHeight:     0,
+              }}
+            >
+              {NAV_LINKS.map((link) => {
+                const locked = link.protected && !user
+                const active = currentPath === link.href
+                return (
+                  <button
+                    key={link.href}
+                    onClick={() => handleLink(link)}
+                    className="w2d-nav-link"
+                    style={{
+                      fontFamily:    "'Playfair Display', Georgia, serif",
+                      fontWeight:    300,
+                      fontSize:      "clamp(24px, 3.5vw, 34px)",
+                      lineHeight:    1.2,
+                      letterSpacing: "-0.01em",
+                      fontStyle:     active ? "italic" : "normal",
+                      color:         active ? "#1d1d1f" : undefined,
+                    }}
+                  >
+                    {link.label}
+                    {" "}
+                    {locked ? (
+                      <span style={{
+                        fontSize:      8,
+                        verticalAlign: "middle",
+                        padding:       "3px 7px",
+                        borderRadius:  999,
+                        background:    "rgba(0,0,0,0.06)",
+                        color:         "rgba(0,0,0,0.35)",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.1em",
+                        fontFamily:    "'Helvetica Neue', sans-serif",
+                        fontWeight:    500,
+                        fontStyle:     "normal",
+                      }}>
+                        Login
+                      </span>
+                    ) : (
+                      <span className="w2d-nav-arrow">↗</span>
+                    )}
+                  </button>
+                )
+              })}
+            </nav>
+
+            {/* ── Footer ─────────────────────────────────────────────────── */}
+            <div style={{
+              padding:       "14px 20px",
+              borderTop:     "0.5px solid rgba(0,0,0,0.06)",
+              display:       "flex",
+              flexDirection: "column",
+              gap:           8,
+              flexShrink:    0,
+            }}>
+              {/* Quick contact chips */}
+              <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                <a
+                  href={`tel:${CONTACT.phone}`}
+                  className="w2d-call-chip"
+                  style={{
+                    display:        "flex",
+                    alignItems:     "center",
+                    gap:            5,
+                    padding:        "6px 10px",
+                    borderRadius:   8,
+                    background:     "rgba(0,0,0,0.04)",
+                    color:          "#1d1d1f",
+                    textDecoration: "none",
+                    fontSize:       9,
+                    fontWeight:     600,
+                    letterSpacing:  "0.1em",
+                    textTransform:  "uppercase",
+                  }}
+                >
+                  <Phone size={10} strokeWidth={1.6} />
+                  Call
+                </a>
+
+                <div style={{
+                  display:      "flex",
+                  alignItems:   "center",
+                  gap:          4,
+                  padding:      "6px 10px",
+                  borderRadius: 8,
+                  background:   "rgba(0,0,0,0.04)",
+                }}>
+                  <MapPin size={10} strokeWidth={1.5} color="rgba(0,0,0,0.4)" />
+                  <span style={{
+                    fontSize:  9,
+                    color:     "rgba(0,0,0,0.5)",
+                    fontWeight:500,
+                  }}>
+                    {CONTACT.location}
+                  </span>
+                </div>
+
+                <div style={{
+                  display:      "flex",
+                  alignItems:   "center",
+                  gap:          5,
+                  padding:      "6px 10px",
+                  borderRadius: 8,
+                  background:   "rgba(16,185,129,0.07)",
+                }}>
+                  <span
+                    className="w2d-pulse"
+                    style={{
+                      display:      "block",
+                      width:        5,
+                      height:       5,
+                      borderRadius: "50%",
+                      background:   "#10b981",
+                      flexShrink:   0,
+                    }}
+                  />
+                  <span style={{
+                    fontSize:      9,
+                    fontWeight:    600,
+                    letterSpacing: "0.1em",
+                    textTransform: "uppercase",
+                    color:         "#059669",
+                    whiteSpace:    "nowrap",
+                  }}>
+                    {CONTACT.hours}
+                  </span>
+                </div>
+              </div>
+
+              {/* CTA buttons */}
+              {user ? (
+                <button
+                  onClick={() => go("/my-bookings")}
+                  className="w2d-cta-btn"
+                  style={{
+                    width:          "100%",
+                    height:         42,
+                    background:     "#1d1d1f",
+                    color:          "#fff",
+                    border:         "none",
+                    borderRadius:   10,
+                    cursor:         "pointer",
+                    fontSize:       9,
+                    fontWeight:     600,
+                    letterSpacing:  "0.2em",
+                    textTransform:  "uppercase",
+                    display:        "flex",
+                    alignItems:     "center",
+                    justifyContent: "center",
+                    gap:            7,
+                  }}
+                >
+                  <Calendar size={12} />
+                  View My Bookings
+                </button>
+              ) : (
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button
+                    onClick={() => go("/services")}
+                    className="w2d-cta-btn"
+                    style={{
+                      flex:           1,
+                      height:         42,
+                      background:     "#1d1d1f",
+                      color:          "#fff",
+                      border:         "none",
+                      borderRadius:   10,
+                      cursor:         "pointer",
+                      fontSize:       9,
+                      fontWeight:     600,
+                      letterSpacing:  "0.2em",
+                      textTransform:  "uppercase",
+                      display:        "flex",
+                      alignItems:     "center",
+                      justifyContent: "center",
+                      gap:            6,
+                    }}
+                  >
+                    Book a Wash
+                    <ArrowUpRight size={11} />
+                  </button>
+
+                  <button
+                    onClick={handleSignIn}
+                    className="w2d-ghost-btn"
+                    style={{
+                      padding:       "0 14px",
+                      height:        42,
+                      borderRadius:  10,
+                      border:        "0.5px solid rgba(0,0,0,0.14)",
+                      background:    "transparent",
+                      color:         "#1d1d1f",
+                      cursor:        "pointer",
+                      fontSize:      9,
+                      fontWeight:    600,
+                      letterSpacing: "0.2em",
+                      textTransform: "uppercase",
+                      whiteSpace:    "nowrap",
+                    }}
+                  >
+                    Sign In
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ── RIGHT: Image side ──────────────────────────────────────────── */}
+          <div style={{
+            position:   "relative",
+            background: "#1a1a1a",
+            overflow:   "hidden",
+          }}>
+            <img
+              src="https://images.unsplash.com/photo-1601362840469-51e4d8d58785?w=1200&auto=format&fit=crop&q=80"
+              alt="Professional car wash service"
+              className="w2d-menu-img"
+              style={{
+                width:     "100%",
+                height:    "100%",
+                objectFit: "cover",
+                display:   "block",
+              }}
+              loading="lazy"
+            />
+
+            {/* Gradient overlay */}
+            <div style={{
+              position:   "absolute",
+              inset:      0,
+              background: "linear-gradient(to bottom, transparent 35%, rgba(0,0,0,0.7) 100%)",
+            }} />
+
+            {/* Top label */}
+            <div style={{
+              position: "absolute",
+              top:      0,
+              left:     0,
+              right:    0,
+              padding:  "18px 20px",
+            }}>
+              <span style={{
+                fontSize:      9,
+                letterSpacing: "0.22em",
+                textTransform: "uppercase",
+                color:         "rgba(255,255,255,0.45)",
+                fontWeight:    400,
+                fontFamily:    "'Helvetica Neue', sans-serif",
+              }}>
+                Wash2Door · Duliajan
+              </span>
+            </div>
+
+            {/* Bottom copy */}
+            <div style={{
+              position: "absolute",
+              bottom:   0,
+              left:     0,
+              right:    0,
+              padding:  "24px 22px 22px",
+            }}>
+              <p style={{
+                fontSize:      9,
+                letterSpacing: "0.22em",
+                textTransform: "uppercase",
+                color:         "rgba(255,255,255,0.38)",
+                fontWeight:    400,
+                fontFamily:    "'Helvetica Neue', sans-serif",
+                margin:        "0 0 10px",
+              }}>
+                Doorstep Car Wash
+              </p>
+              <p style={{
+                fontFamily:    "'Playfair Display', Georgia, serif",
+                fontWeight:    300,
+                fontStyle:     "italic",
+                fontSize:      "clamp(15px, 2vw, 20px)",
+                lineHeight:    1.35,
+                color:         "rgba(255,255,255,0.88)",
+                letterSpacing: "0.01em",
+                margin:        0,
+              }}>
+                Spotless shine,<br />delivered to your door.
+              </p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </>
   )
 }
