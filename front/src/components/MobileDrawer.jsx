@@ -1,3 +1,4 @@
+// MobileDrawer.jsx
 "use client"
 
 import { useEffect, useCallback } from "react"
@@ -62,11 +63,11 @@ export default function MobileDrawer({ isOpen, onClose, currentPath = "/" }) {
         /* ─── shared backdrop ─── */
         .dr-back {
           position: fixed; inset: 0; z-index: 9998;
-          background: rgba(0,0,0,0.45);
-          backdrop-filter: blur(4px);
-          -webkit-backdrop-filter: blur(4px);
+          background: rgba(0,0,0,0.35);
+          backdrop-filter: blur(3px);
+          -webkit-backdrop-filter: blur(3px);
           opacity: 0; pointer-events: none;
-          transition: opacity 0.28s ease;
+          transition: opacity 0.3s ease;
         }
         .dr-back.on { opacity: 1; pointer-events: auto; }
 
@@ -79,7 +80,7 @@ export default function MobileDrawer({ isOpen, onClose, currentPath = "/" }) {
           z-index: 9999;
           background: #fff;
           border-radius: 22px 22px 0 0;
-          box-shadow: 0 -6px 40px rgba(0,0,0,0.13);
+          box-shadow: 0 -4px 32px rgba(0,0,0,0.1);
           display: flex; flex-direction: column;
           max-height: 88dvh;
           overflow: hidden;
@@ -92,26 +93,26 @@ export default function MobileDrawer({ isOpen, onClose, currentPath = "/" }) {
         /* handle */
         .dr-handle {
           width: 38px; height: 4px; border-radius: 99px;
-          background: #ddd; margin: 12px auto 0; flex-shrink: 0;
+          background: #e5e5e5; margin: 12px auto 0; flex-shrink: 0;
         }
 
         /* header */
         .dr-mob-head {
           display: flex; align-items: center; justify-content: space-between;
-          padding: 14px 20px; border-bottom: 1px solid #f0f0f0; flex-shrink: 0;
+          padding: 14px 20px; border-bottom: 1px solid #f2f2f2; flex-shrink: 0;
         }
         .dr-mob-brand {
           font-family: ${SERIF}; font-style: italic;
-          font-weight: 300; font-size: 21px; color: #111;
+          font-weight: 300; font-size: 21px; color: rgba(17,17,17,0.85);
         }
         .dr-mob-x {
           width: 36px; height: 36px; border-radius: 50%;
-          background: #f5f5f5; border: none; cursor: pointer;
+          background: #f7f7f7; border: none; cursor: pointer;
           display: flex; align-items: center; justify-content: center;
-          color: #555; flex-shrink: 0;
+          color: #888; flex-shrink: 0;
           transition: background 0.15s;
         }
-        .dr-mob-x:hover { background: #eee; }
+        .dr-mob-x:hover { background: #f0f0f0; }
 
         /* scroll body */
         .dr-mob-body {
@@ -122,31 +123,31 @@ export default function MobileDrawer({ isOpen, onClose, currentPath = "/" }) {
         /* user card */
         .dr-mob-user {
           margin: 14px 16px 0; padding: 15px; border-radius: 14px;
-          background: #111; position: relative; overflow: hidden;
+          background: #161616; position: relative; overflow: hidden;
         }
         .dr-mob-user-shine {
           position: absolute; inset: 0; border-radius: 14px;
-          background: linear-gradient(135deg,rgba(255,255,255,0.07),transparent 60%);
+          background: linear-gradient(135deg,rgba(255,255,255,0.06),transparent 60%);
           pointer-events: none;
         }
         .dr-mob-avatar {
           width: 44px; height: 44px; border-radius: 50%;
-          background: rgba(255,255,255,0.11);
-          border: 1px solid rgba(255,255,255,0.18);
+          background: rgba(255,255,255,0.09);
+          border: 1px solid rgba(255,255,255,0.14);
           display: flex; align-items: center; justify-content: center;
-          font-family: ${SERIF}; font-size: 18px; color: #fff; flex-shrink: 0;
+          font-family: ${SERIF}; font-size: 18px; color: rgba(255,255,255,0.9); flex-shrink: 0;
         }
         .dr-mob-uname {
-          font-size: 15px; font-weight: 600; color: #fff; margin: 0;
+          font-size: 15px; font-weight: 600; color: rgba(255,255,255,0.92); margin: 0;
           white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
         .dr-mob-uemail {
-          font-size: 11px; color: rgba(255,255,255,0.42); margin: 3px 0 0;
+          font-size: 11px; color: rgba(255,255,255,0.36); margin: 3px 0 0;
           white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
         .dr-mob-prof {
           flex: 1; height: 40px; border-radius: 10px; border: none;
-          background: #fff; color: #111;
+          background: #fff; color: rgba(17,17,17,0.85);
           font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
           text-transform: uppercase; cursor: pointer;
           display: flex; align-items: center; justify-content: center; gap: 5px;
@@ -154,10 +155,10 @@ export default function MobileDrawer({ isOpen, onClose, currentPath = "/" }) {
         .dr-mob-prof:active { opacity: 0.75; }
         .dr-mob-out {
           width: 46px; height: 40px; border-radius: 10px; border: none;
-          background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.6);
+          background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.5);
           cursor: pointer; display: flex; align-items: center; justify-content: center;
         }
-        .dr-mob-out:active { background: rgba(255,255,255,0.2); }
+        .dr-mob-out:active { background: rgba(255,255,255,0.16); }
 
         /* nav rows */
         .dr-mob-nav { padding: 6px 20px 0; }
@@ -165,7 +166,7 @@ export default function MobileDrawer({ isOpen, onClose, currentPath = "/" }) {
           width: 100%; display: flex; align-items: center;
           justify-content: space-between;
           padding: 17px 0; background: none; border: none;
-          border-bottom: 1px solid #f2f2f2;
+          border-bottom: 1px solid #f4f4f4;
           cursor: pointer; text-align: left;
           -webkit-tap-highlight-color: transparent;
         }
@@ -173,14 +174,14 @@ export default function MobileDrawer({ isOpen, onClose, currentPath = "/" }) {
         .dr-mob-row:active { opacity: 0.55; }
         .dr-mob-lbl {
           font-family: ${SERIF}; font-weight: 300;
-          font-size: 27px; color: #222; line-height: 1;
+          font-size: 27px; color: rgba(34,34,34,0.85); line-height: 1;
           letter-spacing: -0.01em;
         }
-        .dr-mob-lbl.active { font-style: italic; color: #111; }
-        .dr-mob-lbl.dim    { color: #ccc; }
+        .dr-mob-lbl.active { font-style: italic; color: rgba(17,17,17,0.9); }
+        .dr-mob-lbl.dim    { color: #d4d4d4; }
         .dr-mob-badge {
           font-size: 9px; padding: 4px 9px; border-radius: 99px;
-          background: #f2f2f2; color: #aaa;
+          background: #f4f4f4; color: #b5b5b5;
           text-transform: uppercase; letter-spacing: 0.1em;
           font-family: ${SANS}; font-weight: 600; flex-shrink: 0;
         }
@@ -190,44 +191,44 @@ export default function MobileDrawer({ isOpen, onClose, currentPath = "/" }) {
         .dr-mob-tel {
           display: flex; align-items: center; gap: 12px;
           padding: 13px 15px; border-radius: 12px;
-          background: #f7f7f7; text-decoration: none;
+          background: #f8f8f8; text-decoration: none;
         }
-        .dr-mob-tel:active { background: #efefef; }
+        .dr-mob-tel:active { background: #f2f2f2; }
         .dr-tel-icon {
           width: 36px; height: 36px; border-radius: 50%;
-          background: #111; display: flex; align-items: center;
+          background: #1a1a1a; display: flex; align-items: center;
           justify-content: center; flex-shrink: 0;
         }
         .dr-mob-loc {
           display: flex; align-items: center; gap: 8px;
           padding: 11px 15px; border-radius: 12px;
-          background: #f7f7f7; margin-top: 8px;
+          background: #f8f8f8; margin-top: 8px;
         }
         .dr-mob-hours {
           display: flex; align-items: center; gap: 8px;
           padding: 11px 15px; border-radius: 12px;
-          background: rgba(16,185,129,0.08); margin-top: 8px;
+          background: rgba(16,185,129,0.06); margin-top: 8px;
         }
         @keyframes dr-pulse {
           0%,100% { opacity:1; transform:scale(1); }
-          50%      { opacity:0.5; transform:scale(1.5); }
+          50%      { opacity:0.45; transform:scale(1.4); }
         }
         .dr-dot {
           width: 7px; height: 7px; border-radius: 50%;
           background: #10b981; flex-shrink: 0;
-          animation: dr-pulse 2s ease-in-out infinite; display: block;
+          animation: dr-pulse 2.2s ease-in-out infinite; display: block;
         }
 
         /* footer */
         .dr-mob-foot {
           flex-shrink: 0; padding: 14px 16px;
           padding-bottom: max(18px, env(safe-area-inset-bottom, 18px));
-          border-top: 1px solid #f0f0f0; background: #fff;
+          border-top: 1px solid #f2f2f2; background: #fff;
           display: flex; flex-direction: column; gap: 10px;
         }
         .dr-mob-cta {
           width: 100%; height: 56px; border: none; border-radius: 14px;
-          background: #111; color: #fff; font-family: ${SANS};
+          background: #1a1a1a; color: rgba(255,255,255,0.92); font-family: ${SANS};
           font-size: 12px; font-weight: 700; letter-spacing: 0.15em;
           text-transform: uppercase; cursor: pointer;
           display: flex; align-items: center; justify-content: center; gap: 8px;
@@ -236,13 +237,13 @@ export default function MobileDrawer({ isOpen, onClose, currentPath = "/" }) {
         .dr-mob-cta:active { opacity: 0.75; }
         .dr-mob-ghost {
           height: 56px; padding: 0 22px; border-radius: 14px;
-          border: 1.5px solid #e5e5e5; background: #fff; color: #111;
+          border: 1.5px solid #eaeaea; background: #fff; color: rgba(17,17,17,0.85);
           font-family: ${SANS}; font-size: 12px; font-weight: 700;
           letter-spacing: 0.15em; text-transform: uppercase;
           cursor: pointer; white-space: nowrap; flex-shrink: 0;
           -webkit-tap-highlight-color: transparent;
         }
-        .dr-mob-ghost:active { background: #f7f7f7; }
+        .dr-mob-ghost:active { background: #f9f9f9; }
 
         /* ════════════════════════════════
            DESKTOP  split panel  (≥ 640px)
@@ -251,7 +252,7 @@ export default function MobileDrawer({ isOpen, onClose, currentPath = "/" }) {
           position: fixed; inset: 10px; z-index: 9999;
           display: grid; grid-template-columns: 1fr 1fr;
           border-radius: 16px; overflow: hidden; background: #fff;
-          box-shadow: 0 32px 80px rgba(0,0,0,0.2), 0 0 0 0.5px rgba(0,0,0,0.06);
+          box-shadow: 0 28px 70px rgba(0,0,0,0.15), 0 0 0 0.5px rgba(0,0,0,0.04);
           transform: scale(0.97) translateY(10px); opacity: 0;
           pointer-events: none;
           transition: transform 0.45s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s ease;
@@ -261,17 +262,17 @@ export default function MobileDrawer({ isOpen, onClose, currentPath = "/" }) {
 
         /* desktop nav link */
         .dr-desk-link {
-          color: #c7c7cc; font-family: ${SERIF}; font-weight: 300;
+          color: #d0d0d4; font-family: ${SERIF}; font-weight: 300;
           font-size: clamp(24px,3.5vw,34px);
           line-height: 1.2; letter-spacing: -0.01em;
           background: none; border: none; cursor: pointer;
           text-align: left; width: 100%; padding: 3px 0;
           position: relative; display: block; transition: color 0.25s;
         }
-        .dr-desk-link:hover { color: #1d1d1f; }
+        .dr-desk-link:hover { color: rgba(29,29,31,0.85); }
         .dr-desk-link::after {
           content: ''; position: absolute; bottom: 0; left: 0;
-          height: 0.5px; background: #1d1d1f; width: 0;
+          height: 0.5px; background: rgba(29,29,31,0.7); width: 0;
           transition: width 0.4s cubic-bezier(0.4,0,0.2,1);
         }
         .dr-desk-link:hover::after { width: 100%; }
@@ -285,15 +286,15 @@ export default function MobileDrawer({ isOpen, onClose, currentPath = "/" }) {
         /* desktop close */
         .dr-desk-x {
           width: 28px; height: 28px; border-radius: 50%;
-          background: rgba(0,0,0,0.05); border: none; cursor: pointer;
+          background: rgba(0,0,0,0.04); border: none; cursor: pointer;
           display: flex; align-items: center; justify-content: center;
-          color: #6e6e73; transition: background 0.2s;
+          color: #8e8e93; transition: background 0.2s;
         }
-        .dr-desk-x:hover { background: rgba(0,0,0,0.1); }
+        .dr-desk-x:hover { background: rgba(0,0,0,0.08); }
 
         /* desktop chip */
         .dr-chip-call { transition: background 0.2s, color 0.2s; }
-        .dr-chip-call:hover { background: #1d1d1f !important; color: #fff !important; }
+        .dr-chip-call:hover { background: rgba(29,29,31,0.85) !important; color: #fff !important; }
 
         /* desktop cta */
         .dr-desk-cta {
@@ -302,12 +303,12 @@ export default function MobileDrawer({ isOpen, onClose, currentPath = "/" }) {
         .dr-desk-cta:hover { opacity: 0.82; }
         .dr-desk-ghost { transition: background 0.2s, color 0.2s, border-color 0.2s; }
         .dr-desk-ghost:hover {
-          background: #1d1d1f !important; color: #fff !important;
-          border-color: #1d1d1f !important;
+          background: rgba(29,29,31,0.85) !important; color: #fff !important;
+          border-color: rgba(29,29,31,0.85) !important;
         }
 
         /* image zoom */
-        .dr-img { transition: transform 0.7s ease; opacity: 0.8; }
+        .dr-img { transition: transform 0.7s ease; opacity: 0.75; }
         .dr-desk.on .dr-img { transform: scale(1.04); }
 
         /* pulse */
@@ -320,7 +321,7 @@ export default function MobileDrawer({ isOpen, onClose, currentPath = "/" }) {
         /* show/hide per breakpoint */
         @media (min-width: 640px) {
           .dr-mob  { display: none !important; }
-          .dr-back { display: none; }          /* desktop uses its own inline backdrop */
+          .dr-back { display: none; }
         }
         @media (max-width: 639px) {
           .dr-desk { display: none !important; }
@@ -387,7 +388,7 @@ export default function MobileDrawer({ isOpen, onClose, currentPath = "/" }) {
                   </span>
                   {locked
                     ? <span className="dr-mob-badge">Login</span>
-                    : <ChevronRight size={18} strokeWidth={1.5} color="#ccc" style={{ flexShrink:0 }} />
+                    : <ChevronRight size={18} strokeWidth={1.5} color="#d4d4d4" style={{ flexShrink:0 }} />
                   }
                 </button>
               )
@@ -398,17 +399,17 @@ export default function MobileDrawer({ isOpen, onClose, currentPath = "/" }) {
           <div className="dr-mob-contact">
             <a href="tel:6900706456" className="dr-mob-tel">
               <div className="dr-tel-icon">
-                <Phone size={16} color="#fff" strokeWidth={1.5} />
+                <Phone size={16} color="rgba(255,255,255,0.9)" strokeWidth={1.5} />
               </div>
               <div>
-                <p style={{ margin:0, fontSize:13, fontWeight:600, color:"#111" }}>+91 690 070 6456</p>
-                <p style={{ margin:"2px 0 0", fontSize:11, color:"#999" }}>Tap to call us</p>
+                <p style={{ margin:0, fontSize:13, fontWeight:600, color:"rgba(17,17,17,0.85)" }}>+91 690 070 6456</p>
+                <p style={{ margin:"2px 0 0", fontSize:11, color:"#aaa" }}>Tap to call us</p>
               </div>
             </a>
 
             <div className="dr-mob-loc">
-              <MapPin size={14} strokeWidth={1.5} color="#999" style={{ flexShrink:0 }} />
-              <span style={{ fontSize:13, color:"#555", fontWeight:500 }}>Duliajan, Assam</span>
+              <MapPin size={14} strokeWidth={1.5} color="#aaa" style={{ flexShrink:0 }} />
+              <span style={{ fontSize:13, color:"rgba(85,85,85,0.85)", fontWeight:500 }}>Duliajan, Assam</span>
             </div>
 
             <div className="dr-mob-hours">
@@ -443,17 +444,16 @@ export default function MobileDrawer({ isOpen, onClose, currentPath = "/" }) {
       {/* DESKTOP  backdrop + split panel        */}
       {/* ═══════════════════════════════════════ */}
 
-      {/* backdrop (inline — shown only on sm+) */}
       <div
         onClick={onClose}
         style={{
           position:"fixed", inset:0, zIndex:9998,
-          background:"rgba(0,0,0,0.4)",
-          backdropFilter:"blur(3px)", WebkitBackdropFilter:"blur(3px)",
+          background:"rgba(0,0,0,0.32)",
+          backdropFilter:"blur(2px)", WebkitBackdropFilter:"blur(2px)",
           opacity: isOpen ? 1 : 0,
           pointerEvents: isOpen ? "auto" : "none",
-          transition:"opacity 0.28s ease",
-          display:"none",  // shown via media query override below
+          transition:"opacity 0.3s ease",
+          display:"none",
         }}
         className="dr-desk-back"
       />
@@ -469,17 +469,17 @@ export default function MobileDrawer({ isOpen, onClose, currentPath = "/" }) {
         {/* ── LEFT ── */}
         <div style={{
           display:"flex", flexDirection:"column",
-          borderRight:"0.5px solid rgba(0,0,0,0.06)", minHeight:0,
+          borderRight:"0.5px solid rgba(0,0,0,0.04)", minHeight:0,
         }}>
 
           {/* top bar */}
           <div style={{
             padding:"20px 24px 16px",
-            borderBottom:"0.5px solid rgba(0,0,0,0.06)",
+            borderBottom:"0.5px solid rgba(0,0,0,0.04)",
             display:"flex", alignItems:"center", justifyContent:"space-between",
             flexShrink:0,
           }}>
-            <span style={{ fontSize:10, letterSpacing:"0.16em", textTransform:"uppercase", color:"#aeaeb2", fontWeight:400 }}>
+            <span style={{ fontSize:10, letterSpacing:"0.16em", textTransform:"uppercase", color:"#b8b8bc", fontWeight:400 }}>
               Menu
             </span>
             <button className="dr-desk-x" onClick={onClose} aria-label="Close">
@@ -494,27 +494,27 @@ export default function MobileDrawer({ isOpen, onClose, currentPath = "/" }) {
           {user && (
             <div style={{
               margin:"14px 16px 0", borderRadius:12,
-              background:"#111", padding:"12px 14px",
+              background:"#161616", padding:"12px 14px",
               position:"relative", overflow:"hidden", flexShrink:0,
             }}>
               <div style={{
                 position:"absolute", inset:0, borderRadius:12,
-                background:"linear-gradient(135deg,rgba(255,255,255,0.07),transparent 60%)",
+                background:"linear-gradient(135deg,rgba(255,255,255,0.06),transparent 60%)",
                 pointerEvents:"none",
               }}/>
               <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10 }}>
                 <div style={{
                   width:36, height:36, borderRadius:"50%",
-                  background:"rgba(255,255,255,0.12)",
-                  border:"1px solid rgba(255,255,255,0.18)",
+                  background:"rgba(255,255,255,0.1)",
+                  border:"1px solid rgba(255,255,255,0.14)",
                   display:"flex", alignItems:"center", justifyContent:"center",
-                  flexShrink:0, fontFamily:SERIF, fontSize:14, color:"#fff",
+                  flexShrink:0, fontFamily:SERIF, fontSize:14, color:"rgba(255,255,255,0.9)",
                 }}>
                   {initial}
                 </div>
                 <div style={{ flex:1, minWidth:0 }}>
-                  <p style={{ fontSize:12, fontWeight:500, color:"#fff", margin:0, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{name}</p>
-                  <p style={{ fontSize:9, color:"rgba(255,255,255,0.4)", margin:"2px 0 0", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{user?.email}</p>
+                  <p style={{ fontSize:12, fontWeight:500, color:"rgba(255,255,255,0.9)", margin:0, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{name}</p>
+                  <p style={{ fontSize:9, color:"rgba(255,255,255,0.35)", margin:"2px 0 0", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{user?.email}</p>
                 </div>
               </div>
               <div style={{ display:"flex", gap:6 }}>
@@ -522,7 +522,7 @@ export default function MobileDrawer({ isOpen, onClose, currentPath = "/" }) {
                   onClick={() => go("/profile")}
                   style={{
                     flex:1, height:32, borderRadius:8, border:"none",
-                    background:"#fff", color:"#111", cursor:"pointer",
+                    background:"#fff", color:"rgba(17,17,17,0.85)", cursor:"pointer",
                     fontSize:9, fontWeight:600, letterSpacing:"0.12em",
                     textTransform:"uppercase", display:"flex",
                     alignItems:"center", justifyContent:"center", gap:5,
@@ -535,8 +535,8 @@ export default function MobileDrawer({ isOpen, onClose, currentPath = "/" }) {
                   aria-label="Sign out"
                   style={{
                     width:36, height:32, borderRadius:8, border:"none",
-                    background:"rgba(255,255,255,0.1)",
-                    color:"rgba(255,255,255,0.65)", cursor:"pointer",
+                    background:"rgba(255,255,255,0.08)",
+                    color:"rgba(255,255,255,0.55)", cursor:"pointer",
                     display:"flex", alignItems:"center", justifyContent:"center",
                   }}
                 >
@@ -561,7 +561,7 @@ export default function MobileDrawer({ isOpen, onClose, currentPath = "/" }) {
                   onClick={() => handleLink(link)}
                   style={{
                     fontStyle: active ? "italic" : "normal",
-                    color: active ? "#1d1d1f" : undefined,
+                    color: active ? "rgba(29,29,31,0.85)" : undefined,
                   }}
                 >
                   {link.label}{" "}
@@ -569,7 +569,7 @@ export default function MobileDrawer({ isOpen, onClose, currentPath = "/" }) {
                     <span style={{
                       fontSize:8, verticalAlign:"middle",
                       padding:"3px 7px", borderRadius:99,
-                      background:"rgba(0,0,0,0.06)", color:"rgba(0,0,0,0.35)",
+                      background:"rgba(0,0,0,0.04)", color:"rgba(0,0,0,0.3)",
                       textTransform:"uppercase", letterSpacing:"0.1em",
                       fontFamily:SANS, fontWeight:500, fontStyle:"normal",
                     }}>Login</span>
@@ -584,7 +584,7 @@ export default function MobileDrawer({ isOpen, onClose, currentPath = "/" }) {
           {/* footer */}
           <div style={{
             padding:"14px 20px",
-            borderTop:"0.5px solid rgba(0,0,0,0.06)",
+            borderTop:"0.5px solid rgba(0,0,0,0.04)",
             display:"flex", flexDirection:"column", gap:8, flexShrink:0,
           }}>
             {/* chips */}
@@ -592,17 +592,17 @@ export default function MobileDrawer({ isOpen, onClose, currentPath = "/" }) {
               <a href="tel:6900706456" className="dr-chip-call" style={{
                 display:"flex", alignItems:"center", gap:5,
                 padding:"6px 10px", borderRadius:8,
-                background:"rgba(0,0,0,0.04)", color:"#1d1d1f",
+                background:"rgba(0,0,0,0.03)", color:"rgba(29,29,31,0.85)",
                 textDecoration:"none", fontSize:9, fontWeight:600,
                 letterSpacing:"0.1em", textTransform:"uppercase",
               }}>
                 <Phone size={10} strokeWidth={1.6}/> Call
               </a>
-              <div style={{ display:"flex", alignItems:"center", gap:4, padding:"6px 10px", borderRadius:8, background:"rgba(0,0,0,0.04)" }}>
-                <MapPin size={10} strokeWidth={1.5} color="rgba(0,0,0,0.4)"/>
-                <span style={{ fontSize:9, color:"rgba(0,0,0,0.5)", fontWeight:500 }}>Duliajan, Assam</span>
+              <div style={{ display:"flex", alignItems:"center", gap:4, padding:"6px 10px", borderRadius:8, background:"rgba(0,0,0,0.03)" }}>
+                <MapPin size={10} strokeWidth={1.5} color="rgba(0,0,0,0.35)"/>
+                <span style={{ fontSize:9, color:"rgba(0,0,0,0.45)", fontWeight:500 }}>Duliajan, Assam</span>
               </div>
-              <div style={{ display:"flex", alignItems:"center", gap:5, padding:"6px 10px", borderRadius:8, background:"rgba(16,185,129,0.07)" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:5, padding:"6px 10px", borderRadius:8, background:"rgba(16,185,129,0.05)" }}>
                 <span className="dr-pulse-dot"/>
                 <span style={{ fontSize:9, fontWeight:600, letterSpacing:"0.1em", textTransform:"uppercase", color:"#059669", whiteSpace:"nowrap" }}>9 AM – 5 PM</span>
               </div>
@@ -614,7 +614,7 @@ export default function MobileDrawer({ isOpen, onClose, currentPath = "/" }) {
                 onClick={() => go("/my-bookings")}
                 className="dr-desk-cta"
                 style={{
-                  width:"100%", height:42, background:"#1d1d1f", color:"#fff",
+                  width:"100%", height:42, background:"#1a1a1a", color:"rgba(255,255,255,0.92)",
                   border:"none", borderRadius:10, cursor:"pointer",
                   fontSize:9, fontWeight:600, letterSpacing:"0.2em",
                   textTransform:"uppercase", display:"flex",
@@ -629,7 +629,7 @@ export default function MobileDrawer({ isOpen, onClose, currentPath = "/" }) {
                   onClick={() => go("/services")}
                   className="dr-desk-cta"
                   style={{
-                    flex:1, height:42, background:"#1d1d1f", color:"#fff",
+                    flex:1, height:42, background:"#1a1a1a", color:"rgba(255,255,255,0.92)",
                     border:"none", borderRadius:10, cursor:"pointer",
                     fontSize:9, fontWeight:600, letterSpacing:"0.2em",
                     textTransform:"uppercase", display:"flex",
@@ -643,8 +643,8 @@ export default function MobileDrawer({ isOpen, onClose, currentPath = "/" }) {
                   className="dr-desk-ghost"
                   style={{
                     padding:"0 14px", height:42, borderRadius:10,
-                    border:"0.5px solid rgba(0,0,0,0.14)", background:"transparent",
-                    color:"#1d1d1f", cursor:"pointer", fontSize:9,
+                    border:"0.5px solid rgba(0,0,0,0.1)", background:"transparent",
+                    color:"rgba(29,29,31,0.85)", cursor:"pointer", fontSize:9,
                     fontWeight:600, letterSpacing:"0.2em",
                     textTransform:"uppercase", whiteSpace:"nowrap",
                   }}
@@ -667,18 +667,18 @@ export default function MobileDrawer({ isOpen, onClose, currentPath = "/" }) {
           />
           <div style={{
             position:"absolute", inset:0,
-            background:"linear-gradient(to bottom, transparent 30%, rgba(0,0,0,0.72) 100%)",
+            background:"linear-gradient(to bottom, transparent 30%, rgba(0,0,0,0.65) 100%)",
           }}/>
           <div style={{ position:"absolute", top:0, left:0, right:0, padding:"18px 20px" }}>
-            <span style={{ fontSize:9, letterSpacing:"0.22em", textTransform:"uppercase", color:"rgba(255,255,255,0.4)", fontFamily:SANS }}>
+            <span style={{ fontSize:9, letterSpacing:"0.22em", textTransform:"uppercase", color:"rgba(255,255,255,0.35)", fontFamily:SANS }}>
               Wash2Door · Duliajan
             </span>
           </div>
           <div style={{ position:"absolute", bottom:0, left:0, right:0, padding:"24px 22px" }}>
-            <p style={{ fontSize:9, letterSpacing:"0.2em", textTransform:"uppercase", color:"rgba(255,255,255,0.35)", fontFamily:SANS, margin:"0 0 8px" }}>
+            <p style={{ fontSize:9, letterSpacing:"0.2em", textTransform:"uppercase", color:"rgba(255,255,255,0.3)", fontFamily:SANS, margin:"0 0 8px" }}>
               Doorstep Car Wash
             </p>
-            <p style={{ fontFamily:SERIF, fontWeight:300, fontStyle:"italic", fontSize:"clamp(15px,2vw,20px)", lineHeight:1.35, color:"rgba(255,255,255,0.88)", margin:0 }}>
+            <p style={{ fontFamily:SERIF, fontWeight:300, fontStyle:"italic", fontSize:"clamp(15px,2vw,20px)", lineHeight:1.35, color:"rgba(255,255,255,0.82)", margin:0 }}>
               Spotless shine,<br/>delivered to your door.
             </p>
           </div>

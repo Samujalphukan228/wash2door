@@ -1,3 +1,4 @@
+// Navbar.jsx
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
@@ -30,10 +31,10 @@ const SERIF = "'Playfair Display', Georgia, 'Times New Roman', serif"
 // ─── Variants ─────────────────────────────────────────────────────────────────
 
 const dropdownVariants = {
-  hidden:  { opacity: 0, y: -8, scale: 0.96,
+  hidden:  { opacity: 0, y: -6, scale: 0.97,
              transition: { duration: 0.15, ease: "easeIn" } },
   visible: { opacity: 1, y: 0,  scale: 1,
-             transition: { duration: 0.22, ease: [0.16, 1, 0.3, 1] } },
+             transition: { duration: 0.24, ease: [0.16, 1, 0.3, 1] } },
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -45,8 +46,8 @@ function LoadingSpinner({ size = 15 }) {
         width:        size,
         height:       size,
         borderRadius: "50%",
-        border:       "1.5px solid rgba(0,0,0,0.08)",
-        borderTopColor: "#000",
+        border:       "1.5px solid rgba(0,0,0,0.06)",
+        borderTopColor: "rgba(0,0,0,0.7)",
         animation:    "w2d-spin 0.7s linear infinite",
       }}
       role="status"
@@ -68,7 +69,7 @@ function UserAvatar({ name, size = 32, onClick }) {
         width:          size,
         height:         size,
         borderRadius:   "50%",
-        background:     "#000",
+        background:     "#1a1a1a",
         display:        "flex",
         alignItems:     "center",
         justifyContent: "center",
@@ -82,7 +83,7 @@ function UserAvatar({ name, size = 32, onClick }) {
         fontFamily: SERIF,
         fontSize:   size * 0.4,
         fontWeight: 300,
-        color:      "#fff",
+        color:      "rgba(255,255,255,0.92)",
         fontStyle:  "italic",
         userSelect: "none",
       }}>
@@ -112,8 +113,8 @@ function HamburgerButton({ onClick }) {
         padding:        "0 4px",
       }}
     >
-      <span style={{ display:"block", width:20, height:1.5, background:"#000", borderRadius:2 }} />
-      <span style={{ display:"block", width:14, height:1.5, background:"#000", borderRadius:2 }} />
+      <span style={{ display:"block", width:20, height:1.5, background:"rgba(0,0,0,0.75)", borderRadius:2 }} />
+      <span style={{ display:"block", width:14, height:1.5, background:"rgba(0,0,0,0.75)", borderRadius:2 }} />
     </motion.button>
   )
 }
@@ -142,7 +143,7 @@ function NavLink({ link, currentPath, onProtectedClick }) {
         fontWeight:    500,
         letterSpacing: "0.16em",
         textTransform: "uppercase",
-        color:         isActive ? "#000" : "rgba(0,0,0,0.38)",
+        color:         isActive ? "rgba(0,0,0,0.85)" : "rgba(0,0,0,0.34)",
         textDecoration:"none",
         transition:    "color 0.25s",
         whiteSpace:    "nowrap",
@@ -150,7 +151,6 @@ function NavLink({ link, currentPath, onProtectedClick }) {
       className="w2d-navlink"
     >
       {link.label}
-      {/* active dot */}
       {isActive && (
         <span style={{
           position:     "absolute",
@@ -160,7 +160,7 @@ function NavLink({ link, currentPath, onProtectedClick }) {
           width:        3,
           height:       3,
           borderRadius: "50%",
-          background:   "#000",
+          background:   "rgba(0,0,0,0.7)",
         }} />
       )}
     </a>
@@ -172,7 +172,6 @@ function UserDropdown({ user, isOpen, onToggle, onClose, onLogout, dropdownRef }
 
   return (
     <div ref={dropdownRef} style={{ position: "relative" }}>
-      {/* Trigger */}
       <motion.button
         onClick={onToggle}
         whileTap={{ scale: 0.94 }}
@@ -186,7 +185,7 @@ function UserDropdown({ user, isOpen, onToggle, onClose, onLogout, dropdownRef }
           padding:        "4px 8px 4px 4px",
           background:     "none",
           border:         "0.5px solid",
-          borderColor:    isOpen ? "rgba(0,0,0,0.18)" : "transparent",
+          borderColor:    isOpen ? "rgba(0,0,0,0.12)" : "transparent",
           borderRadius:   999,
           cursor:         "pointer",
           transition:     "border-color 0.2s, background 0.2s",
@@ -199,11 +198,10 @@ function UserDropdown({ user, isOpen, onToggle, onClose, onLogout, dropdownRef }
           transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
         >
           <ChevronDown size={11} strokeWidth={1.5}
-            style={{ color: "rgba(0,0,0,0.35)", display:"block" }} />
+            style={{ color: "rgba(0,0,0,0.3)", display:"block" }} />
         </motion.div>
       </motion.button>
 
-      {/* Dropdown panel */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
@@ -220,8 +218,8 @@ function UserDropdown({ user, isOpen, onToggle, onClose, onLogout, dropdownRef }
               width:        220,
               background:   "#fff",
               borderRadius: 14,
-              border:       "0.5px solid rgba(0,0,0,0.08)",
-              boxShadow:    "0 12px 48px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)",
+              border:       "0.5px solid rgba(0,0,0,0.06)",
+              boxShadow:    "0 10px 40px rgba(0,0,0,0.09), 0 2px 6px rgba(0,0,0,0.04)",
               overflow:     "hidden",
               zIndex:       100,
             }}
@@ -229,14 +227,14 @@ function UserDropdown({ user, isOpen, onToggle, onClose, onLogout, dropdownRef }
             {/* Header */}
             <div style={{
               padding:    "14px 16px",
-              background: "#111",
+              background: "#161616",
             }}>
               <p style={{
                 fontFamily:   SERIF,
                 fontSize:     13,
                 fontWeight:   300,
                 fontStyle:    "italic",
-                color:        "#fff",
+                color:        "rgba(255,255,255,0.92)",
                 margin:       0,
                 overflow:     "hidden",
                 textOverflow: "ellipsis",
@@ -247,7 +245,7 @@ function UserDropdown({ user, isOpen, onToggle, onClose, onLogout, dropdownRef }
               {user.email && (
                 <p style={{
                   fontSize:     10,
-                  color:        "rgba(255,255,255,0.38)",
+                  color:        "rgba(255,255,255,0.34)",
                   margin:       "3px 0 0",
                   overflow:     "hidden",
                   textOverflow: "ellipsis",
@@ -277,7 +275,7 @@ function UserDropdown({ user, isOpen, onToggle, onClose, onLogout, dropdownRef }
                     fontWeight:    500,
                     letterSpacing: "0.12em",
                     textTransform: "uppercase",
-                    color:         "rgba(0,0,0,0.45)",
+                    color:         "rgba(0,0,0,0.4)",
                     background:    "none",
                     border:        "none",
                     cursor:        "pointer",
@@ -290,7 +288,7 @@ function UserDropdown({ user, isOpen, onToggle, onClose, onLogout, dropdownRef }
             </div>
 
             {/* Divider */}
-            <div style={{ height: "0.5px", background: "rgba(0,0,0,0.06)", margin: "0 12px" }} />
+            <div style={{ height: "0.5px", background: "rgba(0,0,0,0.05)", margin: "0 12px" }} />
 
             {/* Sign out */}
             <div style={{ padding: 8 }}>
@@ -307,7 +305,7 @@ function UserDropdown({ user, isOpen, onToggle, onClose, onLogout, dropdownRef }
                   fontWeight:     500,
                   letterSpacing:  "0.12em",
                   textTransform:  "uppercase",
-                  color:          "#dc2626",
+                  color:          "#e04040",
                   background:     "none",
                   border:         "none",
                   borderRadius:   8,
@@ -337,19 +335,16 @@ export default function Navbar() {
   const navigate    = useNavigate()
   const dropdownRef = useRef(null)
 
-  // Track path
   useEffect(() => {
     setCurrentPath(window.location.pathname)
   }, [])
 
-  // Scroll shadow
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8)
     window.addEventListener("scroll", onScroll, { passive: true })
     return () => window.removeEventListener("scroll", onScroll)
   }, [])
 
-  // Close dropdown on outside click
   useEffect(() => {
     const h = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target))
@@ -359,7 +354,6 @@ export default function Navbar() {
     return () => document.removeEventListener("mousedown", h)
   }, [])
 
-  // Close dropdown on Escape
   useEffect(() => {
     if (!dropdownOpen) return
     const h = (e) => e.key === "Escape" && setDropdownOpen(false)
@@ -390,25 +384,25 @@ export default function Navbar() {
         }
 
         .w2d-navlink:hover {
-          color: #000 !important;
+          color: rgba(0,0,0,0.8) !important;
         }
 
         .w2d-avatar-btn:hover {
-          background: rgba(0,0,0,0.03) !important;
-          border-color: rgba(0,0,0,0.1) !important;
+          background: rgba(0,0,0,0.02) !important;
+          border-color: rgba(0,0,0,0.08) !important;
         }
 
         .w2d-dropdown-item:hover {
-          color: #000 !important;
-          background: rgba(0,0,0,0.03) !important;
+          color: rgba(0,0,0,0.8) !important;
+          background: rgba(0,0,0,0.025) !important;
         }
 
         .w2d-signout-btn:hover {
-          background: rgba(220,38,38,0.06) !important;
+          background: rgba(224,64,64,0.05) !important;
         }
 
         .w2d-phone-link {
-          color: rgba(0,0,0,0.35);
+          color: rgba(0,0,0,0.3);
           text-decoration: none;
           display: flex;
           align-items: center;
@@ -418,18 +412,17 @@ export default function Navbar() {
           margin: -6px;
           border-radius: 8px;
         }
-        .w2d-phone-link:hover { color: #000; }
+        .w2d-phone-link:hover { color: rgba(0,0,0,0.75); }
 
         .w2d-signin-btn {
           transition: background 0.2s, opacity 0.2s;
         }
-        .w2d-signin-btn:hover { opacity: 0.8; }
+        .w2d-signin-btn:hover { opacity: 0.82; }
       `}</style>
 
       <div style={{ fontFamily: SANS }}>
         <TopBar />
 
-        {/* ── Nav shell ─────────────────────────────────────────────────── */}
         <nav
           role="navigation"
           aria-label="Main navigation"
@@ -438,16 +431,14 @@ export default function Navbar() {
             top:        0,
             zIndex:     50,
             background: "#fff",
-            transition: "box-shadow 0.3s",
+            transition: "box-shadow 0.35s",
             boxShadow:  scrolled
-              ? "0 1px 0 rgba(0,0,0,0.06), 0 4px 24px rgba(0,0,0,0.05)"
-              : "0 1px 0 rgba(0,0,0,0.06)",
+              ? "0 1px 0 rgba(0,0,0,0.04), 0 4px 20px rgba(0,0,0,0.04)"
+              : "0 1px 0 rgba(0,0,0,0.04)",
           }}
         >
 
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {/* MOBILE                                                         */}
-          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* MOBILE */}
           <div style={{ display: "flex" }} className="lg:hidden">
             <div style={{
               width:          "100%",
@@ -458,12 +449,10 @@ export default function Navbar() {
               height:         56,
             }}>
 
-              {/* Left: hamburger */}
               <div style={{ width: 80 }}>
                 <HamburgerButton onClick={() => setMobileOpen(true)} />
               </div>
 
-              {/* Center: logo */}
               <a
                 href="/"
                 onClick={(e) => { e.preventDefault(); navigate("/") }}
@@ -476,13 +465,12 @@ export default function Navbar() {
                   fontStyle:     "italic",
                   fontSize:      17,
                   letterSpacing: "0.22em",
-                  color:         "#000",
+                  color:         "rgba(0,0,0,0.85)",
                 }}>
                   Wash2Door
                 </span>
               </a>
 
-              {/* Right: auth */}
               <div style={{ width: 80, display: "flex", justifyContent: "flex-end" }}>
                 {loading ? (
                   <div style={{ width:40, height:40, display:"flex", alignItems:"center", justifyContent:"center" }}>
@@ -498,8 +486,8 @@ export default function Navbar() {
                     style={{
                       height:        32,
                       padding:       "0 14px",
-                      background:    "#000",
-                      color:         "#fff",
+                      background:    "#1a1a1a",
+                      color:         "rgba(255,255,255,0.92)",
                       border:        "none",
                       borderRadius:  999,
                       fontFamily:    SANS,
@@ -519,9 +507,7 @@ export default function Navbar() {
             </div>
           </div>
 
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {/* DESKTOP                                                        */}
-          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* DESKTOP */}
           <div style={{ display: "none" }} className="lg:block">
             <div style={{ maxWidth: 1400, margin: "0 auto" }}>
               <div style={{
@@ -531,7 +517,6 @@ export default function Navbar() {
                 padding:        "0 40px",
               }}>
 
-                {/* Logo */}
                 <a
                   href="/"
                   onClick={(e) => { e.preventDefault(); navigate("/") }}
@@ -547,7 +532,7 @@ export default function Navbar() {
                       fontStyle:     "italic",
                       fontSize:      "clamp(18px, 1.6vw, 22px)",
                       letterSpacing: "0.28em",
-                      color:         "#000",
+                      color:         "rgba(0,0,0,0.85)",
                       display:       "inline-block",
                     }}
                   >
@@ -555,7 +540,6 @@ export default function Navbar() {
                   </motion.span>
                 </a>
 
-                {/* Nav links — centered */}
                 <div style={{
                   flex:           1,
                   display:        "flex",
@@ -573,7 +557,6 @@ export default function Navbar() {
                   ))}
                 </div>
 
-                {/* Right actions */}
                 <div style={{
                   display:    "flex",
                   alignItems: "center",
@@ -581,7 +564,6 @@ export default function Navbar() {
                   flexShrink: 0,
                 }}>
 
-                  {/* Phone */}
                   <a
                     href="tel:6900706456"
                     className="w2d-phone-link"
@@ -599,14 +581,12 @@ export default function Navbar() {
                     </span>
                   </a>
 
-                  {/* Divider */}
                   <div style={{
                     width:      "0.5px",
                     height:     16,
-                    background: "rgba(0,0,0,0.1)",
+                    background: "rgba(0,0,0,0.08)",
                   }} />
 
-                  {/* Auth */}
                   {loading ? (
                     <div style={{ width:36, height:36, display:"flex", alignItems:"center", justifyContent:"center" }}>
                       <LoadingSpinner />
@@ -628,8 +608,8 @@ export default function Navbar() {
                       style={{
                         height:        36,
                         padding:       "0 20px",
-                        background:    "#000",
-                        color:         "#fff",
+                        background:    "#1a1a1a",
+                        color:         "rgba(255,255,255,0.92)",
                         border:        "none",
                         borderRadius:  999,
                         fontFamily:    SANS,
