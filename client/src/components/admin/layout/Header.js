@@ -9,18 +9,26 @@ import {
     LogOut, WifiOff, Car, Menu, ChevronDown, Settings, Shield,
 } from 'lucide-react';
 
+// ============================================
+// CONSTANTS
+// ============================================
+
 const APP_VERSION = '2.0.0';
 
 const PAGE_TITLES = {
-    '/admin/dashboard':     { title: 'Dashboard',      subtitle: 'Overview & analytics' },
-    '/admin/bookings':      { title: 'Bookings',        subtitle: 'Manage all bookings' },
-    '/admin/categories':    { title: 'Categories',      subtitle: 'Service categories' },
-    '/admin/subcategories': { title: 'Subcategories',   subtitle: 'Service subcategories' },
-    '/admin/services':      { title: 'Services',        subtitle: 'Your service catalog' },
-    '/admin/users':         { title: 'Users',           subtitle: 'Customer management' },
-    '/admin/reports':       { title: 'Reports',         subtitle: 'Analytics & insights' },
-    '/admin/settings':      { title: 'Settings',        subtitle: 'Account & preferences' },
+    '/admin/dashboard':     { title: 'Dashboard',     subtitle: 'Overview & analytics' },
+    '/admin/bookings':      { title: 'Bookings',       subtitle: 'Manage all bookings' },
+    '/admin/categories':    { title: 'Categories',     subtitle: 'Service categories' },
+    '/admin/subcategories': { title: 'Subcategories',  subtitle: 'Service subcategories' },
+    '/admin/services':      { title: 'Services',       subtitle: 'Your service catalog' },
+    '/admin/users':         { title: 'Users',          subtitle: 'Customer management' },
+    '/admin/reports':       { title: 'Reports',        subtitle: 'Analytics & insights' },
+    '/admin/settings':      { title: 'Settings',       subtitle: 'Account & preferences' },
 };
+
+// ============================================
+// UTILS
+// ============================================
 
 function getAvatarUrl(avatar) {
     if (!avatar) return null;
@@ -77,7 +85,7 @@ function Dropdown({ open, onClose, buttonRef, className = '', children }) {
             className={`
                 absolute right-0 mt-2 z-50
                 rounded-xl border border-white/[0.08]
-                bg-neutral-950/95 backdrop-blur-xl
+                bg-black/95 backdrop-blur-xl
                 shadow-2xl shadow-black/60
                 transition-all duration-200 ease-out origin-top-right
                 ${open
@@ -113,13 +121,11 @@ function VersionPill() {
 
 function ConnectionStatus({ isConnected }) {
     return (
-        <div
-            className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-medium transition-all duration-300 shrink-0 ${
-                isConnected
-                    ? 'bg-emerald-500/10 text-emerald-400'
-                    : 'bg-red-500/10 text-red-400'
-            }`}
-        >
+        <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-medium transition-all duration-300 shrink-0 ${
+            isConnected
+                ? 'bg-emerald-500/10 text-emerald-400'
+                : 'bg-red-500/10 text-red-400'
+        }`}>
             {isConnected ? (
                 <>
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -145,9 +151,7 @@ function Avatar({ avatarUrl, userName, userInitial, size = 'sm' }) {
         : 'w-7 h-7 rounded-lg text-xs';
 
     return (
-        <div
-            className={`${dim} bg-white/[0.06] flex items-center justify-center overflow-hidden shrink-0 ring-1 ring-white/[0.08]`}
-        >
+        <div className={`${dim} bg-white/[0.06] flex items-center justify-center overflow-hidden shrink-0 ring-1 ring-white/[0.08]`}>
             {avatarUrl ? (
                 <Image
                     src={avatarUrl}
@@ -173,15 +177,13 @@ export default function Header({ onLogout, onMenuClick }) {
     const { isConnected } = useSocket();
 
     const [showUser, setShowUser] = useState(false);
-    const [time, setTime] = useState('');
-    const [date, setDate] = useState('');
+    const [time, setTime]         = useState('');
+    const [date, setDate]         = useState('');
 
-    const userBtnRef = useRef(null);
-    const pageInfo = getPageInfo(pathname);
-    const avatarUrl = getAvatarUrl(user?.avatar);
-    const userName = user?.firstName
-        ? `${user.firstName} ${user.lastName ?? ''}`.trim()
-        : 'Admin';
+    const userBtnRef  = useRef(null);
+    const pageInfo    = getPageInfo(pathname);
+    const avatarUrl   = getAvatarUrl(user?.avatar);
+    const userName    = user?.firstName ? `${user.firstName} ${user.lastName ?? ''}`.trim() : 'Admin';
     const userInitial = userName.charAt(0).toUpperCase();
 
     // Clock
@@ -196,17 +198,13 @@ export default function Header({ onLogout, onMenuClick }) {
         return () => clearInterval(id);
     }, []);
 
-    // Close dropdown on route change
     useEffect(() => { setShowUser(false); }, [pathname]);
 
-    const toggleUser = useCallback(() => setShowUser((p) => !p), []);
-    const handleLogoutClick = useCallback(() => {
-        setShowUser(false);
-        onLogout?.();
-    }, [onLogout]);
+    const toggleUser       = useCallback(() => setShowUser((p) => !p), []);
+    const handleLogoutClick = useCallback(() => { setShowUser(false); onLogout?.(); }, [onLogout]);
 
     return (
-        <header className="sticky top-0 z-40 border-b border-white/[0.06] bg-neutral-950/90 backdrop-blur-xl">
+        <header className="sticky top-0 z-40 border-b border-white/[0.06] bg-black/90 backdrop-blur-xl">
             <div className="flex h-14 items-center justify-between gap-3 px-3 sm:px-4 lg:px-5">
 
                 {/* ── Left ── */}
@@ -256,7 +254,7 @@ export default function Header({ onLogout, onMenuClick }) {
                 <div className="flex items-center gap-2 shrink-0">
 
                     {/* Clock — desktop only */}
-                    <div className="hidden lg:flex items-center gap-3 mr-1">
+                    <div className="hidden lg:flex items-center mr-1">
                         <div className="flex flex-col items-end select-none">
                             <span className="text-xs font-medium text-white tabular-nums leading-tight">
                                 {time}
@@ -282,21 +280,14 @@ export default function Header({ onLogout, onMenuClick }) {
                                 showUser ? 'bg-white/[0.08]' : 'hover:bg-white/[0.04]'
                             }`}
                         >
-                            <Avatar
-                                avatarUrl={avatarUrl}
-                                userName={userName}
-                                userInitial={userInitial}
-                                size="sm"
-                            />
+                            <Avatar avatarUrl={avatarUrl} userName={userName} userInitial={userInitial} size="sm" />
                             <div className="hidden sm:flex items-center gap-1 pr-1">
                                 <span className="text-xs font-medium text-white/70 max-w-[70px] truncate">
                                     {user?.firstName || 'Admin'}
                                 </span>
-                                <ChevronDown
-                                    className={`w-3 h-3 text-white/30 transition-transform duration-200 ${
-                                        showUser ? 'rotate-180' : ''
-                                    }`}
-                                />
+                                <ChevronDown className={`w-3 h-3 text-white/30 transition-transform duration-200 ${
+                                    showUser ? 'rotate-180' : ''
+                                }`} />
                             </div>
                         </button>
 
@@ -309,16 +300,9 @@ export default function Header({ onLogout, onMenuClick }) {
                             {/* User info */}
                             <div className="p-3">
                                 <div className="flex items-center gap-3">
-                                    <Avatar
-                                        avatarUrl={avatarUrl}
-                                        userName={userName}
-                                        userInitial={userInitial}
-                                        size="lg"
-                                    />
+                                    <Avatar avatarUrl={avatarUrl} userName={userName} userInitial={userInitial} size="lg" />
                                     <div className="min-w-0 flex-1">
-                                        <p className="text-xs font-semibold text-white truncate">
-                                            {userName}
-                                        </p>
+                                        <p className="text-xs font-semibold text-white truncate">{userName}</p>
                                         <p className="text-[10px] text-white/40 truncate">
                                             {user?.email ?? 'admin@wash2door.com'}
                                         </p>
@@ -359,9 +343,7 @@ export default function Header({ onLogout, onMenuClick }) {
                             {/* Footer */}
                             <div className="px-3 py-2 border-t border-white/[0.04] bg-white/[0.02]">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-[10px] text-white/25">
-                                        Wash2Door Admin
-                                    </span>
+                                    <span className="text-[10px] text-white/25">Wash2Door Admin</span>
                                     <VersionPill />
                                 </div>
                             </div>

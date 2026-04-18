@@ -7,7 +7,7 @@ import Image from 'next/image';
 import {
     LayoutDashboard, CalendarDays, Wrench,
     Users, BarChart3, LogOut, Car,
-    Settings, Layers, User, X,
+    Settings, Layers, X,
 } from 'lucide-react';
 
 // ============================================
@@ -63,20 +63,15 @@ function NavItem({ item, isActive, onClick }) {
         <Link
             href={item.href}
             onClick={onClick}
-            className={`
-                group flex items-center gap-2.5 px-3 py-2 rounded-lg
-                text-xs font-medium transition-all duration-150 select-none
-                ${isActive
+            className={`group flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all select-none ${
+                isActive
                     ? 'bg-white text-black'
                     : 'text-white/40 hover:text-white/70 hover:bg-white/[0.04] active:bg-white/[0.06]'
-                }
-            `}
+            }`}
         >
             <Icon
-                className={`h-3.5 w-3.5 shrink-0 transition-colors duration-150 ${
-                    isActive
-                        ? 'text-black'
-                        : 'text-white/30 group-hover:text-white/60'
+                className={`h-3.5 w-3.5 shrink-0 transition-colors ${
+                    isActive ? 'text-black' : 'text-white/30 group-hover:text-white/60'
                 }`}
                 strokeWidth={isActive ? 2.5 : 2}
             />
@@ -93,36 +88,28 @@ export default function Sidebar({ onLogout, onClose, isMobile = false }) {
     const pathname = usePathname();
     const { user } = useAuth();
 
-    const avatarUrl = getAvatarUrl(user?.avatar);
-    const isActive  = (href) => pathname === href || pathname.startsWith(href + '/');
+    const avatarUrl   = getAvatarUrl(user?.avatar);
+    const isActive    = (href) => pathname === href || pathname.startsWith(href + '/');
     const handleNavClick = () => { if (isMobile && onClose) onClose(); };
-
-    const userName = user?.firstName
-        ? `${user.firstName} ${user.lastName ?? ''}`.trim()
-        : 'Admin User';
-
+    const userName    = user?.firstName ? `${user.firstName} ${user.lastName ?? ''}`.trim() : 'Admin User';
     const userInitial = userName.charAt(0).toUpperCase();
 
     return (
-        <aside className="flex flex-col w-full h-full bg-neutral-950 border-r border-white/[0.06]">
+        <aside className="flex flex-col w-full h-full bg-black border-r border-white/[0.06]">
 
             {/* ── Logo ── */}
             <div className="h-14 flex items-center justify-between px-4 border-b border-white/[0.06] shrink-0">
                 <Link
                     href="/admin/dashboard"
                     onClick={handleNavClick}
-                    className="flex items-center gap-2.5 group"
+                    className="flex items-center gap-2.5"
                 >
                     <div className="h-8 w-8 rounded-lg bg-white flex items-center justify-center shrink-0">
                         <Car className="h-4 w-4 text-black" strokeWidth={2} />
                     </div>
                     <div>
-                        <p className="text-xs font-semibold text-white leading-tight">
-                            Wash2Door
-                        </p>
-                        <p className="text-[10px] text-white/30 leading-tight mt-0.5">
-                            Admin Panel
-                        </p>
+                        <p className="text-xs font-semibold text-white leading-tight">Wash2Door</p>
+                        <p className="text-[10px] text-white/30 leading-tight mt-0.5">Admin Panel</p>
                     </div>
                 </Link>
 
@@ -161,17 +148,15 @@ export default function Sidebar({ onLogout, onClose, isMobile = false }) {
             {/* ── Footer ── */}
             <div className="p-3 border-t border-white/[0.06] shrink-0 space-y-0.5">
 
-                {/* Settings */}
                 <NavItem
                     item={{ label: 'Settings', href: '/admin/settings', icon: Settings }}
                     isActive={isActive('/admin/settings')}
                     onClick={handleNavClick}
                 />
 
-                {/* Logout */}
                 <button
                     onClick={() => { handleNavClick(); onLogout?.(); }}
-                    className="group flex w-full items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-white/40 hover:text-red-400 hover:bg-red-500/10 active:bg-red-500/[0.12] transition-all duration-150"
+                    className="group flex w-full items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-white/40 hover:text-red-400 hover:bg-red-500/10 active:bg-red-500/[0.12] transition-all"
                 >
                     <LogOut className="h-3.5 w-3.5 shrink-0 group-hover:text-red-400 transition-colors" strokeWidth={2} />
                     Logout
@@ -182,12 +167,7 @@ export default function Sidebar({ onLogout, onClose, isMobile = false }) {
                     <div className="flex items-center gap-2.5 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
                         <div className="relative w-7 h-7 rounded-lg bg-white/[0.06] border border-white/[0.08] flex items-center justify-center overflow-hidden shrink-0">
                             {avatarUrl ? (
-                                <Image
-                                    src={avatarUrl}
-                                    alt={userName}
-                                    fill
-                                    className="object-cover"
-                                />
+                                <Image src={avatarUrl} alt={userName} fill className="object-cover" />
                             ) : (
                                 <span className="text-[10px] font-semibold text-white/50">
                                     {userInitial}
@@ -205,7 +185,6 @@ export default function Sidebar({ onLogout, onClose, isMobile = false }) {
                     </div>
                 </div>
 
-                {/* Built by */}
                 <p className="text-[9px] text-white/20 text-center pt-1.5">
                     Built by{' '}
                     <a
