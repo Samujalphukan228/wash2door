@@ -1,4 +1,3 @@
-// src/components/admin/bookings/BookingDetailModal.jsx
 'use client';
 
 import { useState, useCallback, memo } from 'react';
@@ -6,43 +5,37 @@ import { format } from 'date-fns';
 import {
     X, MapPin, Clock, CreditCard, User, Package, Tag,
     RefreshCw, History, CheckCircle, XCircle, Loader2,
-    Phone, Mail, Calendar, FileText, AlertTriangle, Zap,
-    ChevronRight
+    Calendar, FileText, AlertTriangle, Zap, ChevronLeft,
 } from 'lucide-react';
 import adminService from '@/services/adminService';
 import toast from 'react-hot-toast';
 
-const statusConfig = {
-    pending: {
-        bg: 'bg-amber-500/10', text: 'text-amber-400',
-        ring: 'ring-amber-500/20', dot: 'bg-amber-400', label: 'Pending'
-    },
-    confirmed: {
-        bg: 'bg-blue-500/10', text: 'text-blue-400',
-        ring: 'ring-blue-500/20', dot: 'bg-blue-400', label: 'Confirmed'
-    },
-    completed: {
-        bg: 'bg-emerald-500/10', text: 'text-emerald-400',
-        ring: 'ring-emerald-500/20', dot: 'bg-emerald-400', label: 'Completed'
-    },
-    cancelled: {
-        bg: 'bg-red-500/10', text: 'text-red-400',
-        ring: 'ring-red-500/20', dot: 'bg-red-400', label: 'Cancelled'
-    }
+// ============================================
+// CONSTANTS
+// ============================================
+
+const STATUS_CONFIG = {
+    pending:   { bg: 'bg-amber-500/10',   text: 'text-amber-400',   ring: 'ring-amber-500/20',   dot: 'bg-amber-400',   label: 'Pending' },
+    confirmed: { bg: 'bg-blue-500/10',    text: 'text-blue-400',    ring: 'ring-blue-500/20',    dot: 'bg-blue-400',    label: 'Confirmed' },
+    completed: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', ring: 'ring-emerald-500/20', dot: 'bg-emerald-400', label: 'Completed' },
+    cancelled: { bg: 'bg-red-500/10',     text: 'text-red-400',     ring: 'ring-red-500/20',     dot: 'bg-red-400',     label: 'Cancelled' },
 };
 
-const getQuickActions = (currentStatus) => {
-    const actions = {
-        pending: [
-            { status: 'confirmed', label: 'Confirm', icon: CheckCircle, variant: 'primary' },
-            { status: 'cancelled', label: 'Cancel', icon: XCircle, variant: 'danger', needsReason: true }
-        ],
-        confirmed: [
-            { status: 'completed', label: 'Complete', icon: CheckCircle, variant: 'success' },
-            { status: 'cancelled', label: 'Cancel', icon: XCircle, variant: 'danger', needsReason: true }
-        ]
-    };
-    return actions[currentStatus] || [];
+const QUICK_ACTIONS = {
+    pending: [
+        { status: 'confirmed', label: 'Confirm',  icon: CheckCircle, variant: 'primary',  needsReason: false },
+        { status: 'cancelled', label: 'Cancel',   icon: XCircle,     variant: 'danger',   needsReason: true },
+    ],
+    confirmed: [
+        { status: 'completed', label: 'Complete', icon: CheckCircle, variant: 'success',  needsReason: false },
+        { status: 'cancelled', label: 'Cancel',   icon: XCircle,     variant: 'danger',   needsReason: true },
+    ],
+};
+
+const ACTION_VARIANTS = {
+    primary: 'bg-white text-black hover:bg-white/90',
+    success: 'bg-emerald-500 text-white hover:bg-emerald-600',
+    danger:  'bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20',
 };
 
 // ============================================
@@ -50,17 +43,19 @@ const getQuickActions = (currentStatus) => {
 // ============================================
 
 const Section = memo(function Section({ icon: Icon, title, children, variant }) {
-    const variantStyles = {
+    const variantText = {
         success: 'text-emerald-400/60',
-        danger: 'text-red-400/60',
-        purple: 'text-purple-400/60',
-        default: 'text-white/25'
+        danger:  'text-red-400/60',
+        purple:  'text-purple-400/60',
+        default: 'text-white/25',
     };
+    const cls = variantText[variant] || variantText.default;
+
     return (
         <div className="space-y-2.5">
             <div className="flex items-center gap-2">
-                <Icon className={`w-3 h-3 ${variantStyles[variant] || variantStyles.default}`} />
-                <span className={`text-[9px] font-semibold uppercase tracking-widest ${variantStyles[variant] || variantStyles.default}`}>
+                <Icon className={`w-3 h-3 ${cls}`} />
+                <span className={`text-[9px] font-semibold uppercase tracking-widest ${cls}`}>
                     {title}
                 </span>
             </div>
@@ -89,7 +84,7 @@ const InfoRow = memo(function InfoRow({ label, value, highlight, mono }) {
 const Divider = () => <div className="h-px bg-white/[0.04]" />;
 
 function HistoryItem({ booking }) {
-    const status = statusConfig[booking.status] || statusConfig.pending;
+    const s = STATUS_CONFIG[booking.status] || STATUS_CONFIG.pending;
     return (
         <div className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.04] transition-colors">
             <div className="min-w-0">
@@ -99,8 +94,8 @@ function HistoryItem({ booking }) {
                 </p>
             </div>
             <div className="text-right shrink-0 ml-3">
-                <span className={`text-[9px] px-2 py-0.5 rounded-full ${status.bg} ${status.text}`}>
-                    {status.label}
+                <span className={`text-[9px] px-2 py-0.5 rounded-full ${s.bg} ${s.text}`}>
+                    {s.label}
                 </span>
                 <p className="text-[9px] text-white/30 mt-1 font-mono">
                     ₹{booking.price?.toLocaleString('en-IN')}
@@ -114,14 +109,16 @@ function HistoryItem({ booking }) {
 // MAIN COMPONENT
 // ============================================
 
-export default function BookingDetailModal({ booking, customerHistory, onClose, onUpdateStatus, onStatusChange }) {
-    const [actionLoading, setActionLoading] = useState(null);
+export default function BookingDetailModal({
+    booking, customerHistory, onClose, onUpdateStatus, onStatusChange,
+}) {
+    const [actionLoading, setActionLoading]   = useState(null);
     const [showCancelInput, setShowCancelInput] = useState(false);
-    const [cancelReason, setCancelReason] = useState('');
+    const [cancelReason, setCancelReason]     = useState('');
 
-    const status = statusConfig[booking.status] || statusConfig.pending;
-    const canUpdate = !['completed', 'cancelled'].includes(booking.status);
-    const quickActions = getQuickActions(booking.status);
+    const status      = STATUS_CONFIG[booking.status] || STATUS_CONFIG.pending;
+    const canUpdate   = !['completed', 'cancelled'].includes(booking.status);
+    const quickActions = QUICK_ACTIONS[booking.status] || [];
 
     const customerName = booking.customerId
         ? typeof booking.customerId === 'object'
@@ -129,47 +126,36 @@ export default function BookingDetailModal({ booking, customerHistory, onClose, 
             : 'Online Customer'
         : booking.walkInCustomer?.name || 'Walk-in Customer';
 
-    const customerEmail = booking.customerId && typeof booking.customerId === 'object'
-        ? booking.customerId.email : null;
-
-    const customerPhone = booking.customerId && typeof booking.customerId === 'object'
-        ? booking.customerId.phone : booking.walkInCustomer?.phone;
+    const customerEmail = typeof booking.customerId === 'object' ? booking.customerId?.email : null;
+    const customerPhone = typeof booking.customerId === 'object'
+        ? booking.customerId?.phone
+        : booking.walkInCustomer?.phone;
 
     const handleQuickAction = useCallback(async (action) => {
-        if (action.needsReason) {
-            setShowCancelInput(true);
-            return;
-        }
+        if (action.needsReason) { setShowCancelInput(true); return; }
         try {
             setActionLoading(action.status);
             await adminService.updateBookingStatus(booking._id, action.status);
-            const messages = {
-                completed: 'Booking completed!',
-                confirmed: 'Booking confirmed!'
-            };
-            toast.success(messages[action.status] || `Booking ${action.status}`);
+            toast.success(action.status === 'confirmed' ? 'Booking confirmed!' : `Booking ${action.status}`);
             onStatusChange?.();
             onClose();
-        } catch (error) {
-            toast.error(error.response?.data?.message || 'Failed to update');
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to update');
         } finally {
             setActionLoading(null);
         }
     }, [booking._id, onStatusChange, onClose]);
 
     const handleCancel = useCallback(async () => {
-        if (!cancelReason.trim()) {
-            toast.error('Please provide a reason');
-            return;
-        }
+        if (!cancelReason.trim()) { toast.error('Please provide a reason'); return; }
         try {
             setActionLoading('cancelled');
             await adminService.updateBookingStatus(booking._id, 'cancelled', cancelReason);
             toast.success('Booking cancelled');
             onStatusChange?.();
             onClose();
-        } catch (error) {
-            toast.error(error.response?.data?.message || 'Failed to cancel');
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to cancel');
         } finally {
             setActionLoading(null);
             setShowCancelInput(false);
@@ -188,6 +174,7 @@ export default function BookingDetailModal({ booking, customerHistory, onClose, 
                 <div className="shrink-0 px-4 pt-4 pb-3">
                     <div className="flex items-start justify-between mb-3">
                         <div className="space-y-2">
+                            {/* Code + Status */}
                             <div className="flex items-center gap-2 flex-wrap">
                                 <span className="font-mono text-[11px] text-white/50 bg-white/[0.04] border border-white/[0.06] px-2.5 py-1 rounded-lg">
                                     {booking.bookingCode}
@@ -197,6 +184,7 @@ export default function BookingDetailModal({ booking, customerHistory, onClose, 
                                     {status.label}
                                 </span>
                             </div>
+                            {/* Tags */}
                             <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className="inline-flex items-center px-2 py-0.5 rounded-md border border-white/[0.06] bg-white/[0.03] text-[10px] text-white/40">
                                     {booking.bookingType === 'walkin' ? 'Walk-in' : 'Online'}
@@ -225,22 +213,17 @@ export default function BookingDetailModal({ booking, customerHistory, onClose, 
 
                     {/* Quick Actions */}
                     {canUpdate && quickActions.length > 0 && (
-                        <div className="mt-2">
+                        <div className="mt-1">
                             {!showCancelInput ? (
                                 <div className="flex gap-2">
                                     {quickActions.map((action) => {
                                         const Icon = action.icon;
-                                        const variants = {
-                                            primary: 'bg-white text-black hover:bg-white/90',
-                                            success: 'bg-emerald-500 text-white hover:bg-emerald-600',
-                                            danger: 'bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20',
-                                        };
                                         return (
                                             <button
                                                 key={action.status}
                                                 onClick={() => handleQuickAction(action)}
                                                 disabled={actionLoading !== null}
-                                                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-medium transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed ${variants[action.variant]}`}
+                                                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-medium transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed ${ACTION_VARIANTS[action.variant]}`}
                                             >
                                                 {actionLoading === action.status ? (
                                                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -290,12 +273,12 @@ export default function BookingDetailModal({ booking, customerHistory, onClose, 
                 {/* Divider */}
                 <div className="h-px bg-white/[0.06] mx-4" />
 
-                {/* Scrollable Content */}
+                {/* Content */}
                 <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-3 space-y-4">
 
                     {/* Customer */}
                     <Section icon={User} title="Customer">
-                        <InfoRow label="Name" value={customerName} />
+                        <InfoRow label="Name"  value={customerName} />
                         {customerEmail && <InfoRow label="Email" value={customerEmail} mono />}
                         {customerPhone && <InfoRow label="Phone" value={customerPhone} mono />}
                     </Section>
@@ -305,10 +288,10 @@ export default function BookingDetailModal({ booking, customerHistory, onClose, 
                     {/* Service */}
                     <Section icon={Package} title="Service">
                         <InfoRow label="Category" value={booking.categoryName} />
-                        <InfoRow label="Service" value={booking.serviceName} />
+                        <InfoRow label="Service"  value={booking.serviceName} />
                         {booking.variantName && <InfoRow label="Variant" value={booking.variantName} />}
                         <InfoRow label="Duration" value={`${booking.duration} min`} />
-                        <InfoRow label="Amount" value={`₹${booking.price?.toLocaleString('en-IN')}`} highlight />
+                        <InfoRow label="Amount"   value={`₹${booking.price?.toLocaleString('en-IN')}`} highlight />
                     </Section>
 
                     <Divider />
@@ -319,7 +302,9 @@ export default function BookingDetailModal({ booking, customerHistory, onClose, 
                         <InfoRow label="Time" value={booking.timeSlot} mono />
                         {booking.isAdminSlot && (
                             <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-purple-500/[0.08] border border-purple-500/15 mt-1">
-                                <span className="w-4 h-4 rounded-full bg-purple-500 text-white text-[8px] font-bold flex items-center justify-center shrink-0">A</span>
+                                <span className="w-4 h-4 rounded-full bg-purple-500 text-white text-[8px] font-bold flex items-center justify-center shrink-0">
+                                    A
+                                </span>
                                 <span className="text-[10px] text-purple-400">Admin-only time slot</span>
                             </div>
                         )}
@@ -329,7 +314,7 @@ export default function BookingDetailModal({ booking, customerHistory, onClose, 
 
                     {/* Location */}
                     <Section icon={MapPin} title="Location">
-                        <InfoRow label="City" value={booking.location?.city} />
+                        <InfoRow label="City"    value={booking.location?.city} />
                         <InfoRow label="Address" value={booking.location?.address} />
                         {booking.location?.landmark && (
                             <InfoRow label="Landmark" value={booking.location.landmark} />
@@ -344,7 +329,7 @@ export default function BookingDetailModal({ booking, customerHistory, onClose, 
                         <InfoRow label="Status" value={booking.paymentStatus || 'Pending'} />
                     </Section>
 
-                    {/* Special Notes */}
+                    {/* Notes */}
                     {booking.specialNotes && (
                         <>
                             <Divider />
@@ -368,7 +353,7 @@ export default function BookingDetailModal({ booking, customerHistory, onClose, 
                         </>
                     )}
 
-                    {/* Completion Info */}
+                    {/* Completion */}
                     {booking.status === 'completed' && (
                         <>
                             <Divider />
@@ -391,13 +376,13 @@ export default function BookingDetailModal({ booking, customerHistory, onClose, 
                         </>
                     )}
 
-                    {/* Cancellation Info */}
+                    {/* Cancellation */}
                     {booking.status === 'cancelled' && (
                         <>
                             <Divider />
                             <Section icon={AlertTriangle} title="Cancellation" variant="danger">
                                 <div className="bg-red-500/[0.04] border border-red-500/10 rounded-lg p-3 space-y-1.5">
-                                    <InfoRow label="By" value={booking.cancelledBy} />
+                                    <InfoRow label="By"     value={booking.cancelledBy} />
                                     <InfoRow label="Reason" value={booking.cancellationReason} />
                                     {booking.cancelledAt && (
                                         <InfoRow
@@ -411,14 +396,14 @@ export default function BookingDetailModal({ booking, customerHistory, onClose, 
                         </>
                     )}
 
-                    {/* Customer History */}
+                    {/* History */}
                     {customerHistory?.length > 0 && (
                         <>
                             <Divider />
                             <Section icon={History} title="Previous Bookings">
                                 <div className="space-y-1.5">
-                                    {customerHistory.map((hist) => (
-                                        <HistoryItem key={hist._id} booking={hist} />
+                                    {customerHistory.map((h) => (
+                                        <HistoryItem key={h._id} booking={h} />
                                     ))}
                                 </div>
                             </Section>
@@ -431,13 +416,13 @@ export default function BookingDetailModal({ booking, customerHistory, onClose, 
                 {/* Footer */}
                 <div className="shrink-0 p-3 border-t border-white/[0.06]">
                     <div className="flex items-center justify-between">
-                        <p className="text-[10px] text-white/25 font-mono">
+                        <p className="text-[10px] text-white/20 font-mono">
                             {booking.createdAt && format(new Date(booking.createdAt), 'dd MMM yyyy · hh:mm a')}
                         </p>
                         {canUpdate ? (
                             <button
                                 onClick={onUpdateStatus}
-                                className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-white/[0.06] hover:bg-white/[0.04] text-[10px] text-white/40 hover:text-white/60 transition-all"
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/[0.06] hover:bg-white/[0.04] text-[10px] text-white/40 hover:text-white/60 transition-all"
                             >
                                 <RefreshCw className="w-3 h-3" />
                                 More Options

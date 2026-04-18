@@ -8,31 +8,20 @@ import ServiceDetailModal from '@/components/admin/services/ServiceDetailModal';
 import serviceService from '@/services/serviceService';
 import categoryService from '@/services/categoryService';
 import subcategoryService from '@/services/subcategoryService';
-import { useSocket } from '@/context/SocketContext'; // ✅ ADDED
+import { useSocket } from '@/context/SocketContext';
 import Image from 'next/image';
 import {
-    Plus,
-    RefreshCw,
-    Search,
-    X,
-    ChevronRight,
-    ChevronLeft,
-    Eye,
-    Pencil,
-    Trash2,
-    ToggleLeft,
-    ToggleRight,
-    Star,
-    Clock,
-    Package,
-    Loader2,
-    IndianRupee,
-    SlidersHorizontal,
-    Check
+    Plus, RefreshCw, Search, X,
+    ChevronRight, ChevronLeft, Eye, Pencil, Trash2,
+    ToggleLeft, ToggleRight, Star, Clock, Package,
+    Loader2, IndianRupee, SlidersHorizontal, Check,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-// ─── Debounce hook ────────────────────────────────────────────────────────────
+// ============================================
+// DEBOUNCE HOOK
+// ============================================
+
 function useDebounce(value, delay = 400) {
     const [debounced, setDebounced] = useState(value);
     useEffect(() => {
@@ -42,98 +31,83 @@ function useDebounce(value, delay = 400) {
     return debounced;
 }
 
+// ============================================
+// MAIN PAGE
+// ============================================
+
 export default function ServicesPage() {
-    const [services, setServices] = useState([]);
-    const [categories, setCategories] = useState([]);
-    const [subcategories, setSubcategories] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [refreshing, setRefreshing] = useState(false);
+    const [services, setServices]             = useState([]);
+    const [categories, setCategories]         = useState([]);
+    const [subcategories, setSubcategories]   = useState([]);
+    const [loading, setLoading]               = useState(true);
+    const [refreshing, setRefreshing]         = useState(false);
     const [loadingSubcategories, setLoadingSubcategories] = useState(false);
-    const [total, setTotal] = useState(0);
-    const [pages, setPages] = useState(1);
-
-    const [searchInput, setSearchInput] = useState('');
-    const debouncedSearch = useDebounce(searchInput, 400);
-
+    const [total, setTotal]                   = useState(0);
+    const [pages, setPages]                   = useState(1);
+    const [searchInput, setSearchInput]       = useState('');
     const [showFilterDrawer, setShowFilterDrawer] = useState(false);
+    const [selectedService, setSelectedService]   = useState(null);
+    const [showCreateModal, setShowCreateModal]   = useState(false);
+    const [showEditModal, setShowEditModal]       = useState(false);
+    const [showDetailModal, setShowDetailModal]   = useState(false);
 
     const [filters, setFilters] = useState({
-        page: 1,
-        limit: 12,
-        category: '',
-        subcategory: '',
-        search: ''
+        page: 1, limit: 12, category: '', subcategory: '', search: '',
     });
 
-    const [selectedService, setSelectedService] = useState(null);
-    const [showCreateModal, setShowCreateModal] = useState(false);
-    const [showEditModal, setShowEditModal] = useState(false);
-    const [showDetailModal, setShowDetailModal] = useState(false);
-
+    const debouncedSearch = useDebounce(searchInput, 400);
     const listTopRef = useRef(null);
-
-    // ✅ ADDED: Get socket subscription method
     const { onServiceEvent } = useSocket();
 
-    // Sync debounced search → filters
+    // ── Sync search → filters ──
     useEffect(() => {
-        setFilters(prev => ({ ...prev, search: debouncedSearch, page: 1 }));
+        setFilters((prev) => ({ ...prev, search: debouncedSearch, page: 1 }));
     }, [debouncedSearch]);
 
-    // Fetch categories
+    // ── Fetch Categories ──
     useEffect(() => {
-        const fetchCategories = async () => {
+        (async () => {
             try {
-                const response = await categoryService.getAll({ isActive: true, limit: 100 });
-                if (response.success) {
-                    const cats = response.data?.categories || response.data || [];
+                const res = await categoryService.getAll({ isActive: true, limit: 100 });
+                if (res.success) {
+                    const cats = res.data?.categories || res.data || [];
                     setCategories(Array.isArray(cats) ? cats : []);
                 }
-            } catch {
-                console.error('Failed to load categories');
-            }
-        };
-        fetchCategories();
+            } catch {}
+        })();
     }, []);
 
-    // Fetch subcategories when category changes
+    // ── Fetch Subcategories ──
     useEffect(() => {
-        if (!filters.category) {
-            setSubcategories([]);
-            return;
-        }
-        const fetchSubcategories = async () => {
+        if (!filters.category) { setSubcategories([]); return; }
+        (async () => {
             try {
                 setLoadingSubcategories(true);
-                const response = await subcategoryService.getByCategory(filters.category);
-                let subs = [];
-                if (response.data?.subcategories && Array.isArray(response.data.subcategories)) {
-                    subs = response.data.subcategories;
-                } else if (Array.isArray(response.data)) {
-                    subs = response.data;
-                }
-                setSubcategories(Array.isArray(subs) ? subs : []);
+                const res = await subcategoryService.getByCategory(filters.category);
+                const subs = res.data?.subcategories && Array.isArray(res.data.subcategories)
+                    ? res.data.subcategories
+                    : Array.isArray(res.data) ? res.data : [];
+                setSubcategories(subs);
             } catch {
                 setSubcategories([]);
             } finally {
                 setLoadingSubcategories(false);
             }
-        };
-        fetchSubcategories();
+        })();
     }, [filters.category]);
 
-    // Fetch services
+    // ── Fetch Services ──
     const fetchServices = useCallback(async (isRefresh = false) => {
         try {
             isRefresh ? setRefreshing(true) : setLoading(true);
             const params = Object.fromEntries(
                 Object.entries(filters).filter(([, v]) => v !== '')
             );
-            const response = await serviceService.getAll(params);
-            if (response.success) {
-                setServices(response.data);
-                setTotal(response.total);
-                setPages(response.pages);
+            const res = await serviceService.getAll(params);
+            if (res.success) {
+                setServices(res.data);
+                setTotal(res.total);
+                setPages(res.pages);
             }
         } catch {
             toast.error('Failed to fetch services');
@@ -143,154 +117,78 @@ export default function ServicesPage() {
         }
     }, [filters]);
 
-    useEffect(() => {
-        fetchServices();
-    }, [fetchServices]);
+    useEffect(() => { fetchServices(); }, [fetchServices]);
 
-    // ============================================
-    // 🔥 ADDED: Real-time service updates
-    // ============================================
+    // ── Real-time ──
     useEffect(() => {
-        const unsubscribe = onServiceEvent((event) => {
-            console.log('🛠️ Service event received:', event.type, event.data);
-
-            if (event.type === 'created') {
-                // Add new service to list if on first page
-                if (filters.page === 1) {
-                    setServices(prev => {
-                        const exists = prev.find(s => s._id === event.data.serviceId);
-                        if (exists) return prev;
-                        
-                        // Create service object from socket data
-                        const newService = {
-                            _id: event.data.serviceId,
-                            name: event.data.name,
-                            category: event.data.category,
-                            subcategory: event.data.subcategory,
-                            isActive: event.data.isActive,
-                            isFeatured: event.data.isFeatured,
-                            price: event.data.price,
-                            duration: event.data.duration,
-                            description: event.data.description,
-                            images: event.data.images || [],
-                            tier: event.data.tier,
-                            averageRating: event.data.averageRating || 0,
-                            ...event.data
-                        };
-                        
-                        const updated = [newService, ...prev];
-                        if (updated.length > filters.limit) updated.pop();
-                        return updated;
-                    });
-                    setTotal(prev => prev + 1);
-                }
+        const unsub = onServiceEvent((event) => {
+            if (event.type === 'created' && filters.page === 1) {
+                setServices((prev) => {
+                    if (prev.find((s) => s._id === event.data.serviceId)) return prev;
+                    const ns = { _id: event.data.serviceId, images: [], averageRating: 0, ...event.data };
+                    const updated = [ns, ...prev];
+                    if (updated.length > filters.limit) updated.pop();
+                    return updated;
+                });
+                setTotal((p) => p + 1);
             } else if (event.type === 'updated') {
-                // Update existing service
-                setServices(prev => prev.map(s => 
-                    s._id === event.data.serviceId 
-                        ? { 
-                            ...s, 
-                            ...event.data, 
-                            _id: event.data.serviceId,
-                            // Preserve nested objects if not provided in update
-                            category: event.data.category || s.category,
-                            subcategory: event.data.subcategory || s.subcategory,
-                            images: event.data.images || s.images
-                        }
+                setServices((prev) => prev.map((s) =>
+                    s._id === event.data.serviceId
+                        ? { ...s, ...event.data, _id: event.data.serviceId, category: event.data.category || s.category, subcategory: event.data.subcategory || s.subcategory, images: event.data.images || s.images }
                         : s
                 ));
             } else if (event.type === 'deleted') {
-                // Remove deleted service
-                setServices(prev => prev.filter(s => 
-                    s._id !== event.data.serviceId && s._id !== event.data._id
-                ));
-                setTotal(prev => Math.max(0, prev - 1));
+                setServices((prev) => prev.filter((s) => s._id !== event.data.serviceId && s._id !== event.data._id));
+                setTotal((p) => Math.max(0, p - 1));
             }
         });
-
-        return unsubscribe;
+        return unsub;
     }, [onServiceEvent, filters.page, filters.limit]);
 
-    const hasActiveFilters = filters.category || filters.subcategory || filters.search;
+    // ── Derived ──
+    const hasActiveFilters    = filters.category || filters.subcategory || filters.search;
+    const selectedCategoryName    = filters.category    ? categories.find((c) => c._id === filters.category)?.name    : null;
+    const selectedSubcategoryName = filters.subcategory ? subcategories.find((s) => s._id === filters.subcategory)?.name : null;
 
-    const selectedCategoryName = filters.category
-        ? categories.find(c => c._id === filters.category)?.name
-        : null;
-
-    const selectedSubcategoryName = filters.subcategory
-        ? subcategories.find(s => s._id === filters.subcategory)?.name
-        : null;
-
-    // ── Handlers ──────────────────────────────────────────────────────────────
-    const handleCategoryChange = (categoryId) => {
-        setFilters(prev => ({ ...prev, category: categoryId, subcategory: '', page: 1 }));
-    };
-
-    const handleSubcategoryChange = (subcategoryId, autoClose = false) => {
-        setFilters(prev => ({ ...prev, subcategory: subcategoryId, page: 1 }));
-        if (autoClose) {
-            setShowFilterDrawer(false);
-        }
-    };
-
-    const handlePageChange = (page) => {
-        setFilters(prev => ({ ...prev, page }));
-        listTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    };
-
-    const handleView = (service) => {
-        setSelectedService(service);
-        setShowDetailModal(true);
-    };
-
-    const handleEdit = (service) => {
-        setSelectedService(service);
-        setShowEditModal(true);
-    };
+    // ── Handlers ──
+    const handleCategoryChange    = (id) => setFilters((p) => ({ ...p, category: id, subcategory: '', page: 1 }));
+    const handleSubcategoryChange = (id, autoClose = false) => { setFilters((p) => ({ ...p, subcategory: id, page: 1 })); if (autoClose) setShowFilterDrawer(false); };
+    const handlePageChange = (page) => { setFilters((p) => ({ ...p, page })); listTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+    const handleView       = (s) => { setSelectedService(s); setShowDetailModal(true); };
+    const handleEdit       = (s) => { setSelectedService(s); setShowEditModal(true); };
+    const handleRefresh    = () => { fetchServices(true); toast.success('Refreshed', { duration: 1200 }); };
+    const handleClearAll   = () => { setSearchInput(''); setFilters((p) => ({ ...p, category: '', subcategory: '', search: '', page: 1 })); };
 
     const handleDelete = async (serviceId) => {
         if (!confirm('Delete this service? This cannot be undone.')) return;
         try {
             await serviceService.delete(serviceId);
-            // ✅ Socket will handle the update
             toast.success('Service deleted');
-            // Optionally refresh for accurate counts
             fetchServices(true);
-        } catch (error) {
-            toast.error(error.response?.data?.message || 'Failed to delete');
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to delete');
         }
     };
 
     const handleToggleActive = async (service) => {
         try {
-            const formData = new FormData();
-            formData.append('isActive', !service.isActive);
-            await serviceService.update(service._id, formData);
-            // ✅ Socket will handle the update
+            const fd = new FormData();
+            fd.append('isActive', !service.isActive);
+            await serviceService.update(service._id, fd);
             toast.success(`Service ${!service.isActive ? 'activated' : 'deactivated'}`);
         } catch {
             toast.error('Failed to update');
         }
     };
 
-    const handleRefresh = () => {
-        fetchServices(true);
-        toast.success('Refreshed', { duration: 1200 });
-    };
-
-    const handleClearAll = () => {
-        setSearchInput('');
-        setFilters(prev => ({ ...prev, category: '', subcategory: '', search: '', page: 1 }));
-    };
-
-    // ── Loading skeleton ───────────────────────────────────────────────────────
+    // ── Loading ──
     if (loading && services.length === 0) {
         return (
             <DashboardLayout>
-                <div className="min-h-screen bg-black flex items-center justify-center">
-                    <div className="flex flex-col items-center gap-4">
-                        <Loader2 className="w-6 h-6 text-white animate-spin" />
-                        <p className="text-sm text-gray-500">Loading services...</p>
+                <div className="min-h-[60vh] flex items-center justify-center">
+                    <div className="flex flex-col items-center gap-3">
+                        <Loader2 className="w-5 h-5 text-white/30 animate-spin" />
+                        <p className="text-[10px] text-white/20 uppercase tracking-wide">Loading services...</p>
                     </div>
                 </div>
             </DashboardLayout>
@@ -299,169 +197,178 @@ export default function ServicesPage() {
 
     return (
         <DashboardLayout>
-            <div className="min-h-screen bg-black">
+            <div className="max-w-5xl mx-auto space-y-3 sm:space-y-4">
 
-                {/* HEADER */}
-                <header className="sticky top-0 z-30 bg-black/95 backdrop-blur-sm border-b border-white/[0.06]">
-                    <div className="px-4 pt-3 pb-2 flex items-center gap-2">
-                        <div className="flex-1 min-w-0">
-                            <h1 className="text-base font-semibold text-white leading-tight">Services</h1>
-                            <p className="text-[11px] text-gray-500">
-                                {total} total
-                                {hasActiveFilters && (
-                                    <> · <span className="text-white">{total} result{total !== 1 ? 's' : ''}</span></>
-                                )}
-                            </p>
-                        </div>
-
+                {/* ── Header ── */}
+                <div className="flex items-center justify-between">
+                    <div>
+                        <p className="text-[10px] text-white/30 uppercase tracking-wide">Catalog</p>
+                        <h1 className="text-base sm:text-lg font-semibold text-white">Services</h1>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        {refreshing && (
+                            <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white/[0.04] border border-white/[0.06]">
+                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                <span className="text-[10px] text-white/30">Syncing</span>
+                            </div>
+                        )}
                         <button
                             onClick={handleRefresh}
                             disabled={refreshing}
-                            className="w-9 h-9 rounded-xl flex items-center justify-center bg-white/[0.05] text-gray-400 hover:text-white disabled:opacity-50 transition-all shrink-0"
+                            className="w-8 h-8 rounded-lg border border-white/[0.06] bg-white/[0.02] text-white/30 hover:text-white hover:bg-white/[0.06] disabled:opacity-30 transition-all flex items-center justify-center"
                         >
-                            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+                            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
                         </button>
-
                         <button
                             onClick={() => setShowCreateModal(true)}
-                            className="flex items-center gap-1.5 h-9 px-3 sm:px-4 rounded-xl bg-white text-black text-xs font-medium hover:bg-gray-100 transition-colors shrink-0"
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white text-black text-xs font-semibold hover:bg-white/90 active:scale-[0.98] transition-all"
                         >
                             <Plus className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline">Add New</span>
+                            <span className="hidden sm:inline">Add Service</span>
                             <span className="sm:hidden">Add</span>
                         </button>
                     </div>
+                </div>
 
-                    {/* Search + Filter trigger row */}
-                    <div className="px-4 pb-3 flex gap-2">
-                        <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
-                            <input
-                                type="text"
-                                value={searchInput}
-                                onChange={(e) => setSearchInput(e.target.value)}
-                                placeholder="Search services..."
-                                className="w-full h-10 bg-white/[0.05] border-0 text-white text-sm placeholder-gray-500 pl-10 pr-8 rounded-xl focus:outline-none focus:ring-1 focus:ring-white/20 transition-all"
-                            />
-                            {searchInput && (
-                                <button
-                                    onClick={() => setSearchInput('')}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
-                                >
-                                    <X className="w-3 h-3" />
-                                </button>
-                            )}
-                        </div>
-
-                        {/* Filter button (mobile) */}
+                {/* ── Category Tabs ── */}
+                <div className="overflow-x-auto scrollbar-hide -mx-1 px-1">
+                    <div className="flex gap-1.5 min-w-max p-1 bg-white/[0.04] rounded-lg">
                         <button
-                            onClick={() => setShowFilterDrawer(true)}
-                            className={`
-                                sm:hidden w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all relative
-                                ${hasActiveFilters
-                                    ? 'bg-white text-black'
-                                    : 'bg-white/[0.05] text-gray-400'
-                                }
-                            `}
+                            onClick={() => handleCategoryChange('')}
+                            className={`px-3 py-2 text-[11px] font-medium rounded-md whitespace-nowrap transition-all ${
+                                !filters.category ? 'bg-white text-black' : 'text-white/40 hover:text-white/70'
+                            }`}
                         >
-                            <SlidersHorizontal className="w-4 h-4" />
-                            {hasActiveFilters && (
-                                <span className="absolute -top-1 -right-1 w-4 h-4 bg-white rounded-full text-black text-[9px] font-bold flex items-center justify-center border-2 border-black">
-                                    {[filters.category, filters.subcategory].filter(Boolean).length || ''}
-                                </span>
-                            )}
+                            All
                         </button>
+                        {categories.map((cat) => (
+                            <button
+                                key={cat._id}
+                                onClick={() => handleCategoryChange(cat._id)}
+                                className={`flex items-center gap-1.5 px-3 py-2 text-[11px] font-medium rounded-md whitespace-nowrap transition-all ${
+                                    filters.category === cat._id
+                                        ? 'bg-white text-black'
+                                        : 'text-white/40 hover:text-white/70'
+                                }`}
+                            >
+                                {filters.category === cat._id ? (
+                                    <Check className="w-3 h-3" />
+                                ) : cat.icon ? (
+                                    <span className="text-[11px]">{cat.icon}</span>
+                                ) : null}
+                                {cat.name}
+                            </button>
+                        ))}
                     </div>
+                </div>
 
-                    {/* Desktop: category tabs inline in header */}
-                    <div className="hidden sm:block px-4 pb-3 overflow-x-auto scrollbar-hide">
-                        <CategoryTabs
-                            categories={categories}
-                            activeCategory={filters.category}
-                            onSelect={handleCategoryChange}
-                        />
-                        {filters.category && (
-                            <div className="mt-2">
-                                <SubcategoryTabs
-                                    subcategories={subcategories}
-                                    activeSubcategory={filters.subcategory}
-                                    loading={loadingSubcategories}
-                                    categoryName={selectedCategoryName}
-                                    onSelect={(id) => handleSubcategoryChange(id, false)}
-                                />
+                {/* ── Subcategory Tabs (when category selected) ── */}
+                {filters.category && (
+                    <div className="overflow-x-auto scrollbar-hide -mx-1 px-1">
+                        {loadingSubcategories ? (
+                            <div className="flex items-center gap-2 h-8 px-1">
+                                <Loader2 className="w-3 h-3 text-white/30 animate-spin" />
+                                <span className="text-[10px] text-white/25">Loading...</span>
                             </div>
+                        ) : subcategories.length > 0 ? (
+                            <div className="flex gap-1.5 min-w-max">
+                                <button
+                                    onClick={() => handleSubcategoryChange('')}
+                                    className={`px-2.5 py-1.5 text-[10px] font-medium rounded-lg whitespace-nowrap transition-all ${
+                                        !filters.subcategory
+                                            ? 'bg-white/[0.10] text-white'
+                                            : 'bg-white/[0.03] text-white/30 hover:text-white/60'
+                                    }`}
+                                >
+                                    All {selectedCategoryName}
+                                </button>
+                                {subcategories.map((sub) => (
+                                    <button
+                                        key={sub._id}
+                                        onClick={() => handleSubcategoryChange(sub._id)}
+                                        className={`flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-medium rounded-lg whitespace-nowrap transition-all ${
+                                            filters.subcategory === sub._id
+                                                ? 'bg-white/[0.10] text-white'
+                                                : 'bg-white/[0.03] text-white/30 hover:text-white/60'
+                                        }`}
+                                    >
+                                        {sub.icon && <span>{sub.icon}</span>}
+                                        {sub.name}
+                                    </button>
+                                ))}
+                            </div>
+                        ) : null}
+                    </div>
+                )}
+
+                {/* ── Search + Filter ── */}
+                <div className="flex gap-2">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/25 pointer-events-none" />
+                        <input
+                            type="text"
+                            value={searchInput}
+                            onChange={(e) => setSearchInput(e.target.value)}
+                            placeholder="Search services..."
+                            className="w-full bg-white/[0.04] border border-white/[0.06] text-xs text-white placeholder-white/25 pl-9 pr-8 py-2.5 rounded-lg focus:outline-none focus:border-white/20 transition-colors"
+                        />
+                        {searchInput && (
+                            <button
+                                onClick={() => setSearchInput('')}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-white/25 hover:text-white/60 transition-colors"
+                            >
+                                <X className="w-3.5 h-3.5" />
+                            </button>
                         )}
                     </div>
 
-                    {/* Active filter pills (desktop) */}
-                    {hasActiveFilters && (
-                        <div className="hidden sm:flex px-4 pb-3 items-center gap-2">
-                            {selectedCategoryName && (
-                                <FilterPill
-                                    label={selectedCategoryName}
-                                    onRemove={() => handleCategoryChange('')}
-                                />
-                            )}
-                            {selectedSubcategoryName && (
-                                <FilterPill
-                                    label={selectedSubcategoryName}
-                                    onRemove={() => handleSubcategoryChange('')}
-                                />
-                            )}
-                            {filters.search && (
-                                <FilterPill
-                                    label={`"${filters.search}"`}
-                                    onRemove={() => setSearchInput('')}
-                                />
-                            )}
-                            <button
-                                onClick={handleClearAll}
-                                className="text-[11px] text-gray-500 hover:text-white transition-colors ml-auto"
-                            >
-                                Clear all
-                            </button>
-                        </div>
-                    )}
-                </header>
+                    {/* Mobile filter button */}
+                    <button
+                        onClick={() => setShowFilterDrawer(true)}
+                        className={`sm:hidden relative w-9 h-9 rounded-lg flex items-center justify-center shrink-0 transition-all ${
+                            hasActiveFilters
+                                ? 'bg-white text-black'
+                                : 'bg-white/[0.04] border border-white/[0.06] text-white/40'
+                        }`}
+                    >
+                        <SlidersHorizontal className="w-3.5 h-3.5" />
+                        {hasActiveFilters && (
+                            <span className="absolute -top-1 -right-1 w-4 h-4 bg-white rounded-full text-black text-[9px] font-bold flex items-center justify-center border-2 border-black">
+                                {[filters.category, filters.subcategory].filter(Boolean).length || ''}
+                            </span>
+                        )}
+                    </button>
+                </div>
 
-                {/* SERVICES GRID */}
-                <div ref={listTopRef} className="px-4 py-4 pb-28 sm:pb-8">
-                    {/* Mobile active filters summary */}
-                    {hasActiveFilters && (
-                        <div className="sm:hidden flex items-center gap-2 mb-3 flex-wrap">
-                            {selectedCategoryName && (
-                                <FilterPill
-                                    label={selectedCategoryName}
-                                    onRemove={() => handleCategoryChange('')}
-                                />
-                            )}
-                            {selectedSubcategoryName && (
-                                <FilterPill
-                                    label={selectedSubcategoryName}
-                                    onRemove={() => handleSubcategoryChange('')}
-                                />
-                            )}
-                            {filters.search && (
-                                <FilterPill
-                                    label={`"${filters.search}"`}
-                                    onRemove={() => setSearchInput('')}
-                                />
-                            )}
-                            <button
-                                onClick={handleClearAll}
-                                className="text-[11px] text-gray-500 hover:text-white transition-colors"
-                            >
-                                Clear all
-                            </button>
-                        </div>
-                    )}
+                {/* ── Active filter pills ── */}
+                {hasActiveFilters && (
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                        {selectedCategoryName && (
+                            <FilterPill label={selectedCategoryName} onRemove={() => handleCategoryChange('')} />
+                        )}
+                        {selectedSubcategoryName && (
+                            <FilterPill label={selectedSubcategoryName} onRemove={() => handleSubcategoryChange('')} />
+                        )}
+                        {filters.search && (
+                            <FilterPill label={`"${filters.search}"`} onRemove={() => setSearchInput('')} />
+                        )}
+                        <button
+                            onClick={handleClearAll}
+                            className="text-[10px] text-white/30 hover:text-white transition-colors ml-auto"
+                        >
+                            Clear all
+                        </button>
+                    </div>
+                )}
 
+                {/* ── Grid ── */}
+                <div ref={listTopRef}>
                     {loading ? (
                         <LoadingGrid />
                     ) : services.length === 0 ? (
                         <EmptyState onClear={handleClearAll} hasFilters={!!hasActiveFilters} />
                     ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
                             {services.map((service) => (
                                 <ServiceCard
                                     key={service._id}
@@ -490,13 +397,12 @@ export default function ServicesPage() {
                 <button
                     onClick={() => setShowCreateModal(true)}
                     className="w-14 h-14 bg-white text-black rounded-2xl shadow-2xl shadow-black/50 flex items-center justify-center active:scale-95 transition-transform"
-                    aria-label="Create new service"
                 >
                     <Plus className="w-6 h-6" strokeWidth={2.5} />
                 </button>
             </div>
 
-            {/* MOBILE FILTER DRAWER */}
+            {/* Mobile Filter Drawer */}
             {showFilterDrawer && (
                 <FilterDrawer
                     categories={categories}
@@ -518,145 +424,113 @@ export default function ServicesPage() {
             {showCreateModal && (
                 <CreateServiceModal
                     onClose={() => setShowCreateModal(false)}
-                    onSuccess={() => {
-                        setShowCreateModal(false);
-                        // ✅ Socket will add to list, but refresh for accurate data
-                        fetchServices(true);
-                        toast.success('Service created');
-                    }}
+                    onSuccess={() => { setShowCreateModal(false); fetchServices(true); toast.success('Service created'); }}
                 />
             )}
-
             {showEditModal && selectedService && (
                 <EditServiceModal
                     service={selectedService}
-                    onClose={() => {
-                        setShowEditModal(false);
-                        setSelectedService(null);
-                    }}
-                    onSuccess={() => {
-                        setShowEditModal(false);
-                        setSelectedService(null);
-                        // ✅ Socket will update, but refresh for accurate data
-                        fetchServices(true);
-                        toast.success('Service updated!');
-                    }}
+                    onClose={() => { setShowEditModal(false); setSelectedService(null); }}
+                    onSuccess={() => { setShowEditModal(false); setSelectedService(null); fetchServices(true); toast.success('Service updated!'); }}
                 />
             )}
-
             {showDetailModal && selectedService && (
                 <ServiceDetailModal
                     service={selectedService}
-                    onClose={() => {
-                        setShowDetailModal(false);
-                        setSelectedService(null);
-                    }}
-                    onEdit={() => {
-                        setShowDetailModal(false);
-                        setShowEditModal(true);
-                    }}
+                    onClose={() => { setShowDetailModal(false); setSelectedService(null); }}
+                    onEdit={() => { setShowDetailModal(false); setShowEditModal(true); }}
                 />
             )}
         </DashboardLayout>
     );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ============================================
 // FILTER DRAWER (Mobile)
-// ═══════════════════════════════════════════════════════════════════════════
+// ============================================
 
 function FilterDrawer({
     categories, subcategories, loadingSubcategories,
-    activeCategory, activeSubcategory,
-    selectedCategoryName,
-    totalResults,
-    isLoading,
-    onCategoryChange, onSubcategoryChange,
-    onClear, onClose
+    activeCategory, activeSubcategory, selectedCategoryName,
+    totalResults, isLoading,
+    onCategoryChange, onSubcategoryChange, onClear, onClose,
 }) {
-    const activeFiltersCount = [activeCategory, activeSubcategory].filter(Boolean).length;
+    const activeCount = [activeCategory, activeSubcategory].filter(Boolean).length;
 
     return (
         <>
-            {/* Backdrop */}
-            <div
-                className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
-                onClick={onClose}
-            />
-
-            {/* Sheet */}
-            <div className="fixed bottom-0 inset-x-0 z-50 bg-[#111] rounded-t-2xl border-t border-white/[0.08] max-h-[75vh] flex flex-col animate-in slide-in-from-bottom duration-300">
+            <div className="fixed inset-0 z-40 bg-black/80 backdrop-blur-sm" onClick={onClose} />
+            <div className="fixed bottom-0 inset-x-0 z-50 bg-neutral-950 rounded-t-2xl border border-white/[0.08] border-b-0 max-h-[75vh] flex flex-col">
                 {/* Handle */}
                 <div className="flex justify-center pt-3 pb-2 shrink-0">
-                    <div className="w-10 h-1 rounded-full bg-white/20" />
+                    <div className="w-9 h-[3px] rounded-full bg-white/10" />
                 </div>
 
-                {/* Header row */}
+                {/* Header */}
                 <div className="flex items-center justify-between px-4 pb-3 shrink-0">
                     <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-white">Filters</span>
-                        {activeFiltersCount > 0 && (
-                            <span className="w-5 h-5 rounded-full bg-white text-black text-[10px] font-bold flex items-center justify-center">
-                                {activeFiltersCount}
+                        <span className="text-xs font-semibold text-white">Filters</span>
+                        {activeCount > 0 && (
+                            <span className="w-5 h-5 rounded-full bg-white text-black text-[9px] font-bold flex items-center justify-center">
+                                {activeCount}
                             </span>
                         )}
                     </div>
                     <div className="flex items-center gap-3">
-                        {activeFiltersCount > 0 && (
+                        {activeCount > 0 && (
                             <button
                                 onClick={onClear}
-                                className="text-xs text-gray-400 hover:text-white transition-colors"
+                                className="text-[10px] text-white/30 hover:text-white transition-colors"
                             >
                                 Clear all
                             </button>
                         )}
                         <button
                             onClick={onClose}
-                            className="w-7 h-7 rounded-lg bg-white/[0.06] flex items-center justify-center text-gray-400"
+                            className="w-7 h-7 rounded-lg bg-white/[0.06] flex items-center justify-center text-white/40"
                         >
-                            <X className="w-4 h-4" />
+                            <X className="w-3.5 h-3.5" />
                         </button>
                     </div>
                 </div>
 
-                <div className="overflow-y-auto flex-1 px-4 pb-6">
-                    {/* Category label */}
-                    <p className="text-[11px] text-gray-500 uppercase tracking-wide mb-2">Category</p>
-                    <div className="flex flex-wrap gap-2 mb-5">
-                        <FilterChip
-                            label="All"
-                            isActive={!activeCategory}
-                            onClick={() => onCategoryChange('')}
-                        />
-                        {categories.map((cat) => (
-                            <FilterChip
-                                key={cat._id}
-                                label={cat.name}
-                                icon={cat.icon}
-                                isActive={activeCategory === cat._id}
-                                onClick={() => onCategoryChange(cat._id)}
-                            />
-                        ))}
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-4">
+                    {/* Category */}
+                    <div>
+                        <p className="text-[9px] text-white/30 font-semibold uppercase tracking-wide mb-2">Category</p>
+                        <div className="flex flex-wrap gap-1.5">
+                            <FilterChip label="All" isActive={!activeCategory} onClick={() => onCategoryChange('')} />
+                            {categories.map((cat) => (
+                                <FilterChip
+                                    key={cat._id}
+                                    label={cat.name}
+                                    icon={cat.icon}
+                                    isActive={activeCategory === cat._id}
+                                    onClick={() => onCategoryChange(cat._id)}
+                                />
+                            ))}
+                        </div>
                     </div>
 
                     {/* Subcategory */}
                     {activeCategory && (
-                        <>
-                            <p className="text-[11px] text-gray-500 uppercase tracking-wide mb-2">
+                        <div>
+                            <p className="text-[9px] text-white/30 font-semibold uppercase tracking-wide mb-2">
                                 {selectedCategoryName}
                             </p>
                             {loadingSubcategories ? (
-                                <div className="flex items-center gap-2 h-8">
-                                    <Loader2 className="w-3 h-3 text-gray-500 animate-spin" />
-                                    <span className="text-xs text-gray-500">Loading...</span>
+                                <div className="flex items-center gap-2">
+                                    <Loader2 className="w-3 h-3 text-white/30 animate-spin" />
+                                    <span className="text-[10px] text-white/25">Loading...</span>
                                 </div>
                             ) : subcategories.length > 0 ? (
-                                <div className="flex flex-wrap gap-2">
+                                <div className="flex flex-wrap gap-1.5">
                                     <FilterChip
                                         label={`All ${selectedCategoryName}`}
                                         isActive={!activeSubcategory}
                                         onClick={() => onSubcategoryChange('')}
-                                        variant="secondary"
+                                        secondary
                                     />
                                     {subcategories.map((sub) => (
                                         <FilterChip
@@ -665,30 +539,27 @@ function FilterDrawer({
                                             icon={sub.icon}
                                             isActive={activeSubcategory === sub._id}
                                             onClick={() => onSubcategoryChange(sub._id)}
-                                            variant="secondary"
+                                            secondary
                                         />
                                     ))}
                                 </div>
                             ) : (
-                                <p className="text-xs text-gray-600">No subcategories available</p>
+                                <p className="text-[10px] text-white/20">No subcategories available</p>
                             )}
-                        </>
+                        </div>
                     )}
                 </div>
 
-                {/* Results button */}
-                <div className="shrink-0 px-4 pb-8 pt-3 border-t border-white/[0.06]">
+                {/* Footer button */}
+                <div className="shrink-0 px-4 py-3 pb-8 border-t border-white/[0.06]">
                     <button
                         onClick={onClose}
-                        className="w-full h-11 bg-white text-black text-sm font-medium rounded-xl flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+                        className="w-full py-2.5 bg-white text-black text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 active:scale-[0.98] transition-all"
                     >
                         {isLoading ? (
-                            <>
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                <span>Updating...</span>
-                            </>
+                            <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Updating...</>
                         ) : (
-                            <span>Show {totalResults} result{totalResults !== 1 ? 's' : ''}</span>
+                            `Show ${totalResults} result${totalResults !== 1 ? 's' : ''}`
                         )}
                     </button>
                 </div>
@@ -697,258 +568,155 @@ function FilterDrawer({
     );
 }
 
-function FilterChip({ label, icon, isActive, onClick, variant = 'primary' }) {
-    const baseStyles = variant === 'primary'
-        ? isActive
-            ? 'bg-white text-black'
-            : 'bg-white/[0.06] text-gray-400'
-        : isActive
-            ? 'bg-white/20 text-white'
-            : 'bg-white/[0.04] text-gray-500';
-
+function FilterChip({ label, icon, isActive, onClick, secondary = false }) {
     return (
         <button
             onClick={onClick}
-            className={`
-                h-8 px-3 rounded-full text-xs font-medium whitespace-nowrap transition-all 
-                flex items-center gap-1.5 active:scale-95
-                ${baseStyles}
-            `}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-medium whitespace-nowrap transition-all active:scale-95 ${
+                secondary
+                    ? isActive
+                        ? 'bg-white/[0.10] text-white border border-white/[0.12]'
+                        : 'bg-white/[0.03] text-white/30 border border-white/[0.06] hover:text-white/60'
+                    : isActive
+                        ? 'bg-white text-black'
+                        : 'bg-white/[0.04] border border-white/[0.06] text-white/40 hover:text-white/70'
+            }`}
         >
             {isActive && <Check className="w-3 h-3" />}
-            {icon && !isActive && <span className="text-sm">{icon}</span>}
+            {icon && !isActive && <span className="text-[10px]">{icon}</span>}
             {label}
         </button>
     );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// CATEGORY & SUBCATEGORY TABS (Desktop)
-// ═══════════════════════════════════════════════════════════════════════════
-
-function CategoryTabs({ categories, activeCategory, onSelect }) {
-    return (
-        <div className="flex gap-2 min-w-max">
-            <button
-                onClick={() => onSelect('')}
-                className={`h-8 px-4 rounded-full text-xs font-medium whitespace-nowrap transition-all ${!activeCategory ? 'bg-white text-black' : 'bg-white/[0.06] text-gray-400 hover:text-white'
-                    }`}
-            >
-                All
-            </button>
-            {categories.map((cat) => (
-                <button
-                    key={cat._id}
-                    onClick={() => onSelect(cat._id)}
-                    className={`
-                        h-8 px-4 rounded-full text-xs font-medium whitespace-nowrap transition-all flex items-center gap-1.5
-                        ${activeCategory === cat._id
-                            ? 'bg-white text-black'
-                            : 'bg-white/[0.06] text-gray-400 hover:text-white'
-                        }
-                    `}
-                >
-                    {cat.icon && <span className="text-sm">{cat.icon}</span>}
-                    {cat.name}
-                </button>
-            ))}
-        </div>
-    );
-}
-
-function SubcategoryTabs({ subcategories, activeSubcategory, loading, categoryName, onSelect }) {
-    if (loading) {
-        return (
-            <div className="flex items-center gap-2 h-7">
-                <Loader2 className="w-3 h-3 text-gray-500 animate-spin" />
-                <span className="text-[11px] text-gray-500">Loading...</span>
-            </div>
-        );
-    }
-    if (!subcategories.length) return null;
-
-    return (
-        <div className="flex gap-1.5 min-w-max">
-            <button
-                onClick={() => onSelect('')}
-                className={`h-7 px-3 rounded-lg text-[11px] font-medium whitespace-nowrap transition-all ${!activeSubcategory ? 'bg-white/20 text-white' : 'bg-white/[0.04] text-gray-500 hover:text-white'
-                    }`}
-            >
-                All {categoryName}
-            </button>
-            {subcategories.map((sub) => (
-                <button
-                    key={sub._id}
-                    onClick={() => onSelect(sub._id)}
-                    className={`
-                        h-7 px-3 rounded-lg text-[11px] font-medium whitespace-nowrap transition-all flex items-center gap-1
-                        ${activeSubcategory === sub._id
-                            ? 'bg-white/20 text-white'
-                            : 'bg-white/[0.04] text-gray-500 hover:text-white'
-                        }
-                    `}
-                >
-                    {sub.icon && <span>{sub.icon}</span>}
-                    {sub.name}
-                </button>
-            ))}
-        </div>
-    );
-}
-
 function FilterPill({ label, onRemove }) {
     return (
-        <span className="inline-flex items-center gap-1 h-6 px-2 rounded-md bg-white/[0.08] text-[11px] text-gray-300">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-white/[0.06] bg-white/[0.02] text-[10px] text-white/40">
             {label}
-            <button onClick={onRemove} className="text-gray-500 hover:text-white transition-colors">
+            <button onClick={onRemove} className="text-white/25 hover:text-white/60 transition-colors">
                 <X className="w-3 h-3" />
             </button>
         </span>
     );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// SERVICE CARD (Vertical layout matching SubcategoryCard)
-// ═══════════════════════════════════════════════════════════════════════════
+// ============================================
+// SERVICE CARD
+// ============================================
 
 function ServiceCard({ service, onView, onEdit, onDelete, onToggleActive }) {
-    const primaryImage = service.images?.find(img => img.isPrimary) || service.images?.[0];
-    const categoryName = service.category?.name || '';
+    const primaryImage   = service.images?.find((img) => img.isPrimary) || service.images?.[0];
+    const categoryName   = service.category?.name || '';
     const subcategoryName = service.subcategory?.name || '';
-    const isActive = service.isActive !== undefined ? service.isActive : true;
+    const isActive       = service.isActive !== undefined ? service.isActive : true;
 
     return (
-        <div className={`
-            bg-white/[0.02] border border-white/[0.08] rounded-xl sm:rounded-2xl 
-            flex flex-col overflow-hidden transition-all hover:bg-white/[0.04]
-            ${!isActive ? 'opacity-50' : ''}
-        `}>
+        <div className={`bg-neutral-950 border border-white/[0.08] rounded-xl flex flex-col overflow-hidden transition-all hover:border-white/[0.12] ${
+            !isActive ? 'opacity-50' : ''
+        }`}>
             {/* Image */}
             <button
                 onClick={() => onView(service)}
-                className="relative h-32 sm:h-36 bg-white/[0.04] w-full focus:outline-none"
+                className="relative h-32 bg-white/[0.03] w-full focus:outline-none"
             >
                 {primaryImage ? (
-                    <Image
-                        src={primaryImage.url}
-                        alt={service.name}
-                        fill
-                        className="object-cover"
-                    />
+                    <Image src={primaryImage.url} alt={service.name} fill className="object-cover" />
                 ) : (
                     <div className="w-full h-full flex items-center justify-center">
-                        <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white/[0.04] flex items-center justify-center">
-                            <Package className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
+                        <div className="w-10 h-10 rounded-xl bg-white/[0.04] flex items-center justify-center">
+                            <Package className="w-4 h-4 text-white/20" />
                         </div>
                     </div>
                 )}
 
-                {/* Featured Badge */}
+                {/* Featured */}
                 {service.isFeatured && (
                     <div className="absolute top-2 left-2">
-                        <span className="flex items-center gap-1 text-[9px] font-medium px-1.5 py-0.5 rounded bg-yellow-500/15 text-yellow-400 border border-yellow-500/20">
-                            <Star className="w-2.5 h-2.5 fill-yellow-400" />
+                        <span className="flex items-center gap-1 text-[9px] font-medium px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/20">
+                            <Star className="w-2.5 h-2.5 fill-amber-400" />
                             Featured
                         </span>
                     </div>
                 )}
 
-                {/* Status Badge */}
+                {/* Status */}
                 <div className="absolute top-2 right-2">
-                    <span className={`
-                        text-[9px] font-medium px-1.5 py-0.5 rounded
-                        ${isActive
+                    <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-md ${
+                        isActive
                             ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
-                            : 'bg-red-500/15 text-red-400 border border-red-500/20'
-                        }
-                    `}>
+                            : 'bg-white/[0.06] text-white/30 border border-white/[0.08]'
+                    }`}>
                         {isActive ? 'Active' : 'Inactive'}
                     </span>
                 </div>
             </button>
 
             {/* Content */}
-            <div className="p-3 sm:p-4 flex-1 flex flex-col">
-                <div className="flex items-start justify-between gap-2 mb-1.5">
-                    <div className="flex-1 min-w-0">
-                        <p className="text-[10px] text-gray-600 truncate uppercase tracking-wider">
-                            {categoryName}{subcategoryName && ` · ${subcategoryName}`}
-                        </p>
-                        <button
-                            onClick={() => onView(service)}
-                            className="text-sm font-medium text-white truncate block max-w-full text-left mt-0.5 hover:underline focus:outline-none"
-                        >
-                            {service.name}
-                        </button>
-                    </div>
-                    {service.tier && service.tier !== 'basic' && (
-                        <div className="w-7 h-7 rounded-lg bg-white/[0.06] flex items-center justify-center shrink-0">
-                            <span className="text-[9px] font-medium text-gray-400 capitalize">
-                                {service.tier.charAt(0).toUpperCase()}
-                            </span>
-                        </div>
-                    )}
+            <div className="p-3 flex-1 flex flex-col gap-2">
+                {/* Name + category */}
+                <div>
+                    <p className="text-[9px] text-white/25 truncate uppercase tracking-wide">
+                        {categoryName}{subcategoryName && ` · ${subcategoryName}`}
+                    </p>
+                    <button
+                        onClick={() => onView(service)}
+                        className="text-[11px] font-semibold text-white/80 truncate block max-w-full text-left mt-0.5 hover:text-white transition-colors"
+                    >
+                        {service.name}
+                    </button>
                 </div>
 
-                {/* Price & Duration */}
-                <div className="flex items-center gap-3 mb-2">
+                {/* Price + Duration + Rating */}
+                <div className="flex items-center gap-3">
                     <div className="flex items-center gap-0.5 text-white">
                         <IndianRupee className="w-3 h-3" />
-                        <span className="text-sm font-semibold">
+                        <span className="text-xs font-bold tabular-nums">
                             {service.price?.toLocaleString('en-IN')}
                         </span>
                     </div>
-                    <div className="flex items-center gap-1 text-gray-500">
+                    <div className="flex items-center gap-1 text-white/25">
                         <Clock className="w-3 h-3" />
-                        <span className="text-[11px]">{service.duration} min</span>
+                        <span className="text-[10px]">{service.duration} min</span>
                     </div>
                     {service.averageRating > 0 && (
-                        <div className="flex items-center gap-1 text-gray-500">
+                        <div className="flex items-center gap-1 text-white/25">
                             <Star className="w-3 h-3" />
-                            <span className="text-[11px]">{service.averageRating?.toFixed(1)}</span>
+                            <span className="text-[10px]">{service.averageRating?.toFixed(1)}</span>
                         </div>
                     )}
                 </div>
 
-                {service.description && (
-                    <p className="text-[10px] sm:text-xs text-gray-500 leading-relaxed mb-3 line-clamp-2">
-                        {service.description}
-                    </p>
-                )}
-
                 {/* Actions */}
-                <div className="flex items-center gap-1.5 mt-auto pt-3 border-t border-white/[0.06]">
+                <div className="flex items-center gap-1.5 pt-2 border-t border-white/[0.06] mt-auto">
                     <button
                         onClick={() => onView(service)}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[10px] text-gray-400 hover:text-white hover:bg-white/[0.08] transition-all"
+                        className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-[10px] font-medium text-white/40 hover:text-white hover:bg-white/[0.08] transition-all"
                     >
                         <Eye className="w-3 h-3" />
                         View
                     </button>
                     <button
                         onClick={() => onEdit(service)}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[10px] text-gray-400 hover:text-white hover:bg-white/[0.08] transition-all"
+                        className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-[10px] font-medium text-white/40 hover:text-white hover:bg-white/[0.08] transition-all"
                     >
                         <Pencil className="w-3 h-3" />
                         Edit
                     </button>
                     <button
                         onClick={() => onToggleActive(service)}
-                        className={`
-                            p-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-gray-400 transition-all
-                            ${isActive
-                                ? 'hover:text-yellow-400 hover:bg-yellow-500/10 hover:border-yellow-500/20'
-                                : 'hover:text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/20'
-                            }
-                        `}
                         title={isActive ? 'Deactivate' : 'Activate'}
+                        className={`p-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-white/30 transition-all ${
+                            isActive
+                                ? 'hover:text-amber-400 hover:bg-amber-500/10 hover:border-amber-500/20'
+                                : 'hover:text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/20'
+                        }`}
                     >
                         {isActive ? <ToggleRight className="w-3 h-3" /> : <ToggleLeft className="w-3 h-3" />}
                     </button>
                     <button
                         onClick={() => onDelete(service._id)}
-                        className="p-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-gray-400 hover:text-red-400 hover:bg-red-500/10 hover:border-red-500/20 transition-all"
                         title="Delete"
+                        className="p-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-white/30 hover:text-red-400 hover:bg-red-500/10 hover:border-red-500/20 transition-all"
                     >
                         <Trash2 className="w-3 h-3" />
                     </button>
@@ -958,23 +726,20 @@ function ServiceCard({ service, onView, onEdit, onDelete, onToggleActive }) {
     );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ============================================
 // LOADING GRID
-// ═══════════════════════════════════════════════════════════════════════════
+// ============================================
 
 function LoadingGrid() {
     return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-            {[...Array(8)].map((_, i) => (
-                <div
-                    key={i}
-                    className="bg-white/[0.02] border border-white/[0.08] rounded-xl sm:rounded-2xl overflow-hidden"
-                >
-                    <div className="h-32 sm:h-36 bg-white/[0.04] animate-pulse" />
-                    <div className="p-3 sm:p-4 space-y-3">
-                        <div className="h-3 w-16 bg-white/[0.06] rounded animate-pulse" />
-                        <div className="h-4 w-3/4 bg-white/[0.06] rounded animate-pulse" />
-                        <div className="h-3 w-1/2 bg-white/[0.04] rounded animate-pulse" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
+            {[...Array(6)].map((_, i) => (
+                <div key={i} className="bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden">
+                    <div className="h-32 bg-white/[0.04] animate-pulse" />
+                    <div className="p-3 space-y-2">
+                        <div className="h-2.5 w-1/3 bg-white/[0.06] rounded animate-pulse" />
+                        <div className="h-3 w-2/3 bg-white/[0.06] rounded animate-pulse" />
+                        <div className="h-2.5 w-1/2 bg-white/[0.04] rounded animate-pulse" />
                     </div>
                 </div>
             ))}
@@ -982,27 +747,24 @@ function LoadingGrid() {
     );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ============================================
 // EMPTY STATE
-// ═══════════════════════════════════════════════════════════════════════════
+// ============================================
 
 function EmptyState({ onClear, hasFilters }) {
     return (
         <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-white/[0.04] flex items-center justify-center mb-4">
-                <Package className="w-7 h-7 text-gray-600" />
+            <div className="w-10 h-10 rounded-xl bg-white/[0.04] flex items-center justify-center mb-3">
+                <Package className="w-4 h-4 text-white/20" />
             </div>
-            <p className="text-sm text-gray-400 mb-1">No services found</p>
-            <p className="text-xs text-gray-600 max-w-[180px]">
-                {hasFilters
-                    ? 'Try adjusting your filters'
-                    : 'Add your first service to get started'
-                }
+            <p className="text-[11px] text-white/40 mb-0.5">No services found</p>
+            <p className="text-[10px] text-white/20 max-w-[180px]">
+                {hasFilters ? 'Try adjusting your filters' : 'Add your first service to get started'}
             </p>
             {hasFilters && (
                 <button
                     onClick={onClear}
-                    className="mt-4 text-xs text-white/60 hover:text-white underline underline-offset-2 transition-colors"
+                    className="mt-4 text-[10px] text-white/40 hover:text-white underline underline-offset-2 transition-colors"
                 >
                     Clear filters
                 </button>
@@ -1011,61 +773,50 @@ function EmptyState({ onClear, hasFilters }) {
     );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ============================================
 // PAGINATION
-// ═══════════════════════════════════════════════════════════════════════════
+// ============================================
 
 function Pagination({ currentPage, totalPages, onPageChange }) {
     const pageNumbers = useMemo(() => {
         const count = Math.min(5, totalPages);
-        let start;
-        if (totalPages <= 5) {
-            start = 1;
-        } else if (currentPage <= 3) {
-            start = 1;
-        } else if (currentPage >= totalPages - 2) {
-            start = totalPages - 4;
-        } else {
-            start = currentPage - 2;
-        }
+        let start =
+            totalPages <= 5 ? 1 :
+            currentPage <= 3 ? 1 :
+            currentPage >= totalPages - 2 ? totalPages - 4 :
+            currentPage - 2;
         return Array.from({ length: count }, (_, i) => start + i);
     }, [currentPage, totalPages]);
 
     return (
-        <div className="flex items-center justify-center gap-1 pt-6">
+        <div className="flex items-center justify-center gap-1 pt-5">
             <button
                 onClick={() => onPageChange(currentPage - 1)}
                 disabled={currentPage === 1}
-                className="w-9 h-9 rounded-xl flex items-center justify-center bg-white/[0.05] text-gray-400 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                aria-label="Previous page"
+                className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/[0.04] border border-white/[0.06] text-white/30 disabled:opacity-20 disabled:cursor-not-allowed transition-all"
             >
-                <ChevronLeft className="w-4 h-4" />
+                <ChevronLeft className="w-3.5 h-3.5" />
             </button>
-
             {pageNumbers.map((page) => (
                 <button
                     key={page}
                     onClick={() => onPageChange(page)}
                     aria-current={currentPage === page ? 'page' : undefined}
-                    className={`
-                        w-9 h-9 rounded-xl text-xs font-medium transition-all
-                        ${currentPage === page
+                    className={`w-8 h-8 rounded-lg text-[10px] font-medium transition-all ${
+                        currentPage === page
                             ? 'bg-white text-black'
-                            : 'text-gray-500 hover:bg-white/[0.05]'
-                        }
-                    `}
+                            : 'text-white/30 hover:text-white hover:bg-white/[0.04]'
+                    }`}
                 >
                     {page}
                 </button>
             ))}
-
             <button
                 onClick={() => onPageChange(currentPage + 1)}
                 disabled={currentPage === totalPages}
-                className="w-9 h-9 rounded-xl flex items-center justify-center bg-white/[0.05] text-gray-400 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                aria-label="Next page"
+                className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/[0.04] border border-white/[0.06] text-white/30 disabled:opacity-20 disabled:cursor-not-allowed transition-all"
             >
-                <ChevronRight className="w-4 h-4" />
+                <ChevronRight className="w-3.5 h-3.5" />
             </button>
         </div>
     );
