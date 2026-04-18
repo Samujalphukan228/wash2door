@@ -4,48 +4,57 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import axiosInstance from '@/lib/axios';
-import {
-    Eye,
-    EyeOff,
-    ArrowLeft,
-    AlertCircle,
-    Loader2,
-    Check,
-    X
-} from 'lucide-react';
+import { Eye, EyeOff, ArrowLeft, AlertCircle, Loader2, Check, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-const checkPasswordStrength = (password) => {
-    const checks = {
-        length: password.length >= 8,
-        uppercase: /[A-Z]/.test(password),
-        lowercase: /[a-z]/.test(password),
-        number: /\d/.test(password),
-        special: /[^a-zA-Z0-9]/.test(password)
-    };
+// ============================================
+// PASSWORD STRENGTH
+// ============================================
+
+const CHECKS_CONFIG = [
+    { key: 'length',    label: '8+ chars',  test: (p) => p.length >= 8 },
+    { key: 'uppercase', label: 'Uppercase', test: (p) => /[A-Z]/.test(p) },
+    { key: 'lowercase', label: 'Lowercase', test: (p) => /[a-z]/.test(p) },
+    { key: 'number',    label: 'Number',    test: (p) => /\d/.test(p) },
+    { key: 'special',   label: 'Special',   test: (p) => /[^a-zA-Z0-9]/.test(p) },
+];
+
+const REQUIREMENTS = [
+    'Minimum 8 characters',
+    'One uppercase letter (A–Z)',
+    'One lowercase letter (a–z)',
+    'One number (0–9)',
+    'One special character',
+];
+
+function checkPasswordStrength(password) {
+    const checks = Object.fromEntries(
+        CHECKS_CONFIG.map(({ key, test }) => [key, test(password)])
+    );
     const score = Object.values(checks).filter(Boolean).length;
     const strength =
         score <= 2 ? 'Weak' :
         score <= 3 ? 'Fair' :
         score <= 4 ? 'Good' : 'Strong';
     return { checks, strength, score };
-};
+}
+
+// ============================================
+// MAIN PAGE
+// ============================================
 
 export default function ResetPasswordPage() {
     const router = useRouter();
     const params = useParams();
-    const token = params.token;
+    const token  = params.token;
 
-    const [formData, setFormData] = useState({
-        password: '',
-        confirmPassword: ''
-    });
+    const [formData, setFormData]         = useState({ password: '', confirmPassword: '' });
     const [showPassword, setShowPassword] = useState(false);
-    const [showConfirm, setShowConfirm] = useState(false);
-    const [errors, setErrors] = useState({});
-    const [loading, setLoading] = useState(false);
-    const [success, setSuccess] = useState(false);
-    const [strength, setStrength] = useState(null);
+    const [showConfirm, setShowConfirm]   = useState(false);
+    const [errors, setErrors]             = useState({});
+    const [loading, setLoading]           = useState(false);
+    const [success, setSuccess]           = useState(false);
+    const [strength, setStrength]         = useState(null);
 
     useEffect(() => {
         if (!token) router.push('/admin/forgot-password');
@@ -53,62 +62,41 @@ export default function ResetPasswordPage() {
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
-        if (name === 'password') {
-            setStrength(value ? checkPasswordStrength(value) : null);
-        }
-        if (errors[name] || errors.general) {
-            setErrors(prev => ({ ...prev, [name]: '', general: '' }));
-        }
+        setFormData((prev) => ({ ...prev, [name]: value }));
+        if (name === 'password') setStrength(value ? checkPasswordStrength(value) : null);
+        if (errors[name] || errors.general) setErrors((prev) => ({ ...prev, [name]: '', general: '' }));
     };
 
     const validate = () => {
-        const newErrors = {};
-        if (!formData.password) {
-            newErrors.password = 'Password is required';
-        } else if (formData.password.length < 8) {
-            newErrors.password = 'At least 8 characters required';
-        }
-        if (!formData.confirmPassword) {
-            newErrors.confirmPassword = 'Please confirm your password';
-        } else if (formData.password !== formData.confirmPassword) {
-            newErrors.confirmPassword = 'Passwords do not match';
-        }
-        return newErrors;
+        const errs = {};
+        if (!formData.password) errs.password = 'Password is required';
+        else if (formData.password.length < 8) errs.password = 'At least 8 characters required';
+        if (!formData.confirmPassword) errs.confirmPassword = 'Please confirm your password';
+        else if (formData.password !== formData.confirmPassword) errs.confirmPassword = 'Passwords do not match';
+        return errs;
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         const validationErrors = validate();
-        if (Object.keys(validationErrors).length > 0) {
-            setErrors(validationErrors);
-            return;
-        }
+        if (Object.keys(validationErrors).length > 0) { setErrors(validationErrors); return; }
+
         try {
             setLoading(true);
             setErrors({});
-
-            // ✅ FIXED: Now sending both password and confirmPassword
-            const response = await axiosInstance.post(
-                `/auth/reset-password/${token}`,
-                { 
-                    password: formData.password,
-                    confirmPassword: formData.confirmPassword 
-                }
-            );
-
-            if (response.data.success) {
+            const res = await axiosInstance.post(`/auth/reset-password/${token}`, {
+                password: formData.password,
+                confirmPassword: formData.confirmPassword,
+            });
+            if (res.data.success) {
                 setSuccess(true);
                 toast.success('Password reset successfully!');
             }
-        } catch (error) {
-            const data = error.response?.data;
-            let message = data?.message || 'Reset link expired or invalid. Please request a new one.';
-
-            if (data?.errors && Array.isArray(data.errors)) {
-                message = data.errors.map(e => e.msg || e.message).join('. ') || message;
-            }
-
+        } catch (err) {
+            const data = err.response?.data;
+            const message = Array.isArray(data?.errors)
+                ? data.errors.map((e) => e.msg || e.message).join('. ')
+                : data?.message || 'Reset link expired or invalid. Please request a new one.';
             setErrors({ general: message });
             toast.error(message);
         } finally {
@@ -116,59 +104,41 @@ export default function ResetPasswordPage() {
         }
     };
 
-    const strengthBarWidth = strength
-        ? `${(strength.score / 5) * 100}%`
-        : '0%';
-
-    const strengthColor =
-        strength?.strength === 'Weak' ? 'bg-black' :
-        strength?.strength === 'Fair' ? 'bg-neutral-600' :
-        strength?.strength === 'Good' ? 'bg-neutral-400' :
-        'bg-black';
+    const strengthPct   = strength ? `${(strength.score / 5) * 100}%` : '0%';
+    const passwordsMatch = formData.confirmPassword && formData.password === formData.confirmPassword;
 
     return (
         <div className="min-h-screen bg-white flex">
 
-            {/* Left Side */}
+            {/* ── Left: Branding ── */}
             <div className="hidden lg:flex lg:w-1/2 bg-black flex-col justify-between p-16">
-                <div>
-                    <p className="text-white text-xs tracking-[0.3em] uppercase font-medium">
-                        Wash2Door
-                    </p>
-                </div>
+                <p className="text-white text-xs tracking-[0.3em] uppercase font-medium">
+                    Wash2Door
+                </p>
+
                 <div>
                     <h1
                         className="text-white text-6xl font-light leading-tight mb-8"
                         style={{ fontFamily: 'Playfair Display, serif' }}
                     >
-                        New<br />
-                        <em>password.</em>
+                        New<br /><em>password.</em>
                     </h1>
+
                     <div className="bg-neutral-900 border border-neutral-800 p-6 max-w-xs">
-                        <p className="text-neutral-400 text-xs tracking-widest uppercase mb-4">
+                        <p className="text-neutral-500 text-xs tracking-widest uppercase mb-4">
                             Requirements
                         </p>
                         <div className="space-y-2">
-                            {[
-                                'Minimum 8 characters',
-                                'One uppercase letter (A–Z)',
-                                'One lowercase letter (a–z)',
-                                'One number (0–9)',
-                                'One special character'
-                            ].map((req, i) => (
-                                <div
-                                    key={i}
-                                    className="flex items-center gap-3"
-                                >
-                                    <div className="w-1 h-1 bg-neutral-500 rounded-full" />
-                                    <p className="text-neutral-400 text-sm">
-                                        {req}
-                                    </p>
+                            {REQUIREMENTS.map((req, i) => (
+                                <div key={i} className="flex items-center gap-3">
+                                    <div className="w-1 h-1 bg-neutral-600 rounded-full shrink-0" />
+                                    <p className="text-neutral-400 text-sm">{req}</p>
                                 </div>
                             ))}
                         </div>
                     </div>
                 </div>
+
                 <div className="border-t border-neutral-800 pt-8">
                     <p className="text-neutral-600 text-xs">
                         © {new Date().getFullYear()} Wash2Door
@@ -176,7 +146,7 @@ export default function ResetPasswordPage() {
                 </div>
             </div>
 
-            {/* Right Side */}
+            {/* ── Right: Form ── */}
             <div className="w-full lg:w-1/2 flex items-center justify-center p-8 lg:p-16">
                 <div className="w-full max-w-sm">
 
@@ -185,9 +155,7 @@ export default function ResetPasswordPage() {
                         className="inline-flex items-center gap-2 text-neutral-400 hover:text-black transition-colors mb-12 group"
                     >
                         <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                        <span className="text-xs tracking-widest uppercase">
-                            Back to login
-                        </span>
+                        <span className="text-xs tracking-widest uppercase">Back to login</span>
                     </Link>
 
                     {!success ? (
@@ -207,19 +175,15 @@ export default function ResetPasswordPage() {
                             {errors.general && (
                                 <div className="mb-6 flex items-start gap-3 border border-neutral-200 bg-neutral-50 p-4">
                                     <AlertCircle className="w-4 h-4 text-black mt-0.5 shrink-0" />
-                                    <p className="text-black text-sm">
-                                        {errors.general}
-                                    </p>
+                                    <p className="text-black text-sm">{errors.general}</p>
                                 </div>
                             )}
 
-                            <form
-                                onSubmit={handleSubmit}
-                                className="space-y-6"
-                            >
+                            <form onSubmit={handleSubmit} className="space-y-7">
+
                                 {/* New Password */}
                                 <div>
-                                    <label className="block text-xs tracking-[0.15em] uppercase text-neutral-500 mb-2">
+                                    <label className="block text-xs tracking-[0.15em] uppercase text-neutral-500 mb-3">
                                         New Password
                                     </label>
                                     <div className="relative">
@@ -240,52 +204,35 @@ export default function ResetPasswordPage() {
                                             onClick={() => setShowPassword(!showPassword)}
                                             className="absolute right-0 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-black transition-colors"
                                         >
-                                            {showPassword
-                                                ? <EyeOff className="w-4 h-4" />
-                                                : <Eye className="w-4 h-4" />
-                                            }
+                                            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                         </button>
                                     </div>
 
+                                    {/* Strength meter */}
                                     {formData.password && strength && (
-                                        <div className="mt-3">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <span className="text-xs text-neutral-400">
-                                                    Strength
-                                                </span>
-                                                <span className="text-xs text-black font-medium">
-                                                    {strength.strength}
-                                                </span>
+                                        <div className="mt-3 space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs text-neutral-400">Strength</span>
+                                                <span className="text-xs text-black font-medium">{strength.strength}</span>
                                             </div>
                                             <div className="h-px bg-neutral-100 w-full">
                                                 <div
-                                                    className={`h-px ${strengthColor} transition-all duration-300`}
-                                                    style={{ width: strengthBarWidth }}
+                                                    className="h-px bg-black transition-all duration-300"
+                                                    style={{ width: strengthPct }}
                                                 />
                                             </div>
-                                            <div className="grid grid-cols-2 gap-1.5 mt-3">
-                                                {[
-                                                    { key: 'length', label: '8+ chars' },
-                                                    { key: 'uppercase', label: 'Uppercase' },
-                                                    { key: 'lowercase', label: 'Lowercase' },
-                                                    { key: 'number', label: 'Number' },
-                                                    { key: 'special', label: 'Special' }
-                                                ].map((check) => (
-                                                    <div
-                                                        key={check.key}
-                                                        className="flex items-center gap-1.5"
-                                                    >
-                                                        {strength.checks[check.key] ? (
+                                            <div className="grid grid-cols-2 gap-1.5 pt-1">
+                                                {CHECKS_CONFIG.map(({ key, label }) => (
+                                                    <div key={key} className="flex items-center gap-1.5">
+                                                        {strength.checks[key] ? (
                                                             <Check className="w-3 h-3 text-black shrink-0" />
                                                         ) : (
                                                             <X className="w-3 h-3 text-neutral-300 shrink-0" />
                                                         )}
                                                         <span className={`text-xs ${
-                                                            strength.checks[check.key]
-                                                                ? 'text-black'
-                                                                : 'text-neutral-300'
+                                                            strength.checks[key] ? 'text-black' : 'text-neutral-300'
                                                         }`}>
-                                                            {check.label}
+                                                            {label}
                                                         </span>
                                                     </div>
                                                 ))}
@@ -294,15 +241,13 @@ export default function ResetPasswordPage() {
                                     )}
 
                                     {errors.password && (
-                                        <p className="text-black text-xs mt-2">
-                                            {errors.password}
-                                        </p>
+                                        <p className="text-black text-xs mt-2">{errors.password}</p>
                                     )}
                                 </div>
 
                                 {/* Confirm Password */}
                                 <div>
-                                    <label className="block text-xs tracking-[0.15em] uppercase text-neutral-500 mb-2">
+                                    <label className="block text-xs tracking-[0.15em] uppercase text-neutral-500 mb-3">
                                         Confirm Password
                                     </label>
                                     <div className="relative">
@@ -313,11 +258,9 @@ export default function ResetPasswordPage() {
                                             onChange={handleChange}
                                             placeholder="••••••••"
                                             className={`w-full bg-transparent text-black placeholder-neutral-300 border-b py-3 text-sm focus:outline-none transition-colors pr-10 ${
-                                                errors.confirmPassword
-                                                    ? 'border-black'
-                                                    : formData.confirmPassword && formData.password === formData.confirmPassword
-                                                    ? 'border-black'
-                                                    : 'border-neutral-200 focus:border-black'
+                                                errors.confirmPassword ? 'border-black' :
+                                                passwordsMatch ? 'border-black' :
+                                                'border-neutral-200 focus:border-black'
                                             }`}
                                         />
                                         <button
@@ -325,58 +268,42 @@ export default function ResetPasswordPage() {
                                             onClick={() => setShowConfirm(!showConfirm)}
                                             className="absolute right-0 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-black transition-colors"
                                         >
-                                            {showConfirm
-                                                ? <EyeOff className="w-4 h-4" />
-                                                : <Eye className="w-4 h-4" />
-                                            }
+                                            {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                         </button>
                                     </div>
+
                                     {formData.confirmPassword && (
                                         <p className={`text-xs mt-2 flex items-center gap-1 ${
-                                            formData.password === formData.confirmPassword
-                                                ? 'text-black'
-                                                : 'text-neutral-400'
+                                            passwordsMatch ? 'text-black' : 'text-neutral-400'
                                         }`}>
-                                            {formData.password === formData.confirmPassword ? (
-                                                <>
-                                                    <Check className="w-3 h-3" />
-                                                    Passwords match
-                                                </>
+                                            {passwordsMatch ? (
+                                                <><Check className="w-3 h-3 shrink-0" /> Passwords match</>
                                             ) : (
-                                                <>
-                                                    <X className="w-3 h-3" />
-                                                    Passwords do not match
-                                                </>
+                                                <><X className="w-3 h-3 shrink-0" /> Passwords do not match</>
                                             )}
                                         </p>
                                     )}
+
                                     {errors.confirmPassword && (
-                                        <p className="text-black text-xs mt-2">
-                                            {errors.confirmPassword}
-                                        </p>
+                                        <p className="text-black text-xs mt-2">{errors.confirmPassword}</p>
                                     )}
                                 </div>
 
-                                <div className="pt-2">
+                                <div className="pt-1">
                                     <button
                                         type="submit"
                                         disabled={loading}
-                                        className="w-full bg-black hover:bg-neutral-800 disabled:bg-neutral-300 disabled:cursor-not-allowed text-white text-sm tracking-[0.15em] uppercase py-4 transition-colors flex items-center justify-center gap-3"
+                                        className="w-full bg-black hover:bg-neutral-800 disabled:bg-neutral-200 disabled:text-neutral-400 disabled:cursor-not-allowed text-white text-sm tracking-[0.15em] uppercase py-4 transition-colors flex items-center justify-center gap-3"
                                     >
                                         {loading ? (
-                                            <>
-                                                <Loader2 className="w-4 h-4 animate-spin" />
-                                                <span>Resetting</span>
-                                            </>
-                                        ) : (
-                                            'Reset Password'
-                                        )}
+                                            <><Loader2 className="w-4 h-4 animate-spin" /> Resetting...</>
+                                        ) : 'Reset Password'}
                                     </button>
                                 </div>
                             </form>
                         </>
                     ) : (
-                        /* Success */
+                        /* ── Success ── */
                         <div>
                             <div className="mb-10">
                                 <div className="w-12 h-12 bg-black rounded-full flex items-center justify-center mb-6">
