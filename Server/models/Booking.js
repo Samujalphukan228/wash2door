@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import crypto from 'crypto';
 import {
-    ALL_TIME_SLOTS,  // ✅ Changed to ALL_TIME_SLOTS
+    ALL_TIME_SLOTS,
     BOOKING_STATUSES,
     BOOKING_TYPES,
     PAYMENT_METHODS,
@@ -19,7 +19,7 @@ const bookingSchema = new mongoose.Schema({
         default: 'online'
     },
 
-    // ✅ NEW: Track if this booking uses an admin-only slot
+    // Track if this booking uses an admin-only slot
     isAdminSlot: {
         type: Boolean,
         default: false
@@ -89,7 +89,7 @@ const bookingSchema = new mongoose.Schema({
     timeSlot: {
         type: String,
         required: [true, 'Time slot is required'],
-        enum: ALL_TIME_SLOTS  // ✅ Allow all slots in schema
+        enum: ALL_TIME_SLOTS
     },
 
     // Slot lock
@@ -99,10 +99,22 @@ const bookingSchema = new mongoose.Schema({
         sparse: true
     },
 
-    // Location
+    // ✅ FIXED: Location with defaults so validation never fails
     location: {
-        address: { type: String, required: [true, 'Address is required'] },
-        city: { type: String, required: [true, 'City is required'] },
+        address: {
+            type: String,
+            required: [true, 'Address is required'],
+            default: 'Walk-in / At Shop'
+        },
+        city: {
+            type: String,
+            required: [true, 'City is required'],
+            default: 'Duliajan'         // ✅ THIS FIXES "City is required" ERROR
+        },
+        landmark: {
+            type: String,
+            default: ''
+        }
     },
 
     // Contact phone number
@@ -118,8 +130,14 @@ const bookingSchema = new mongoose.Schema({
         enum: BOOKING_STATUSES,
         default: 'pending'
     },
-    completedAt: Date,
-    cancelledAt: Date,
+    completedAt: {
+        type: Date,
+        default: null
+    },
+    cancelledAt: {
+        type: Date,
+        default: null
+    },
     cancelledBy: {
         type: String,
         enum: ['user', 'admin', null],
@@ -130,7 +148,11 @@ const bookingSchema = new mongoose.Schema({
         default: ''
     },
 
-    isReviewed: { type: Boolean, default: false },
+    isReviewed: {
+        type: Boolean,
+        default: false
+    },
+
     paymentMethod: {
         type: String,
         enum: PAYMENT_METHODS,
@@ -141,35 +163,46 @@ const bookingSchema = new mongoose.Schema({
         enum: PAYMENT_STATUSES,
         default: 'pending'
     },
+
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         default: null
     },
-    
-    // ✅ NEW: Notes field for admin bookings
+
+    // Special notes from customer
+    specialNotes: {
+        type: String,
+        default: ''
+    },
+
+    // Notes from admin
     adminNotes: {
         type: String,
         default: ''
     }
+
 }, { timestamps: true });
 
-// Auto generate booking code + slot lock key
+// ============================================
+// PRE SAVE - Auto generate booking code + slot lock key
+// ============================================
 bookingSchema.pre('save', function (next) {
+
+    // Generate booking code
     if (!this.bookingCode) {
         const random = crypto.randomBytes(3).toString('hex').toUpperCase();
         const timestamp = Date.now().toString(36).toUpperCase().slice(-3);
-        
-        // ✅ Different prefix for admin slot bookings
+
         let prefix;
         if (this.bookingType === 'walkin') {
             prefix = 'WI';
         } else if (this.isAdminSlot) {
-            prefix = 'AS'; // Admin Slot
+            prefix = 'AS';
         } else {
             prefix = 'BK';
         }
-        
+
         this.bookingCode = `${prefix}-${timestamp}${random}`;
     }
 
@@ -185,10 +218,31 @@ bookingSchema.pre('save', function (next) {
         this.slotLockKey = `${dateStr}|${this.timeSlot}`;
     }
 
+    // ✅ SAFETY NET: Ensure location always has values
+    if (!this.location) {
+        this.location = {
+            address: 'Walk-in / At Shop',
+            city: 'Duliajan',
+            landmark: ''
+        };
+    } else {
+        if (!this.location.address || this.location.address.trim() === '') {
+            this.location.address = 'Walk-in / At Shop';
+        }
+        if (!this.location.city || this.location.city.trim() === '') {
+            this.location.city = 'Duliajan';
+        }
+        if (!this.location.landmark) {
+            this.location.landmark = '';
+        }
+    }
+
     next();
 });
 
-// Indexes
+// ============================================
+// INDEXES
+// ============================================
 bookingSchema.index({ customerId: 1 });
 bookingSchema.index({ status: 1 });
 bookingSchema.index({ bookingDate: 1 });
@@ -197,20 +251,24 @@ bookingSchema.index({ serviceId: 1 });
 bookingSchema.index({ categoryId: 1 });
 bookingSchema.index({ subcategoryId: 1 });
 bookingSchema.index({ bookingType: 1 });
-bookingSchema.index({ isAdminSlot: 1 });  // ✅ New index
+bookingSchema.index({ isAdminSlot: 1 });
 bookingSchema.index({ createdAt: -1 });
 
 // Unique slot lock index
 bookingSchema.index(
     { slotLockKey: 1 },
-    { 
-        unique: true, 
+    {
+        unique: true,
         sparse: true,
-        partialFilterExpression: { slotLockKey: { $regex: '^\\d{4}-\\d{2}-\\d{2}\\|' } }
+        partialFilterExpression: {
+            slotLockKey: { $regex: '^\\d{4}-\\d{2}-\\d{2}\\|' }
+        }
     }
 );
 
-// Virtuals
+// ============================================
+// VIRTUALS
+// ============================================
 bookingSchema.virtual('isUpcoming').get(function () {
     if (['cancelled', 'completed'].includes(this.status)) return false;
     const bookingDateTime = new Date(this.bookingDate);
@@ -228,23 +286,27 @@ bookingSchema.virtual('canCancel').get(function () {
     return new Date() < cancelDeadline;
 });
 
-// ✅ UPDATED: Get available slots (supports admin slots)
+// ============================================
+// STATICS
+// ============================================
+
+// Get available slots (supports admin slots)
 bookingSchema.statics.getAvailableSlots = async function (date, includeAdminSlots = false) {
     const { TIME_SLOTS, ALL_TIME_SLOTS } = await import('../utils/constants.js');
-    
+
     const dateStr = new Date(date).toISOString().split('T')[0];
     const slotsToCheck = includeAdminSlots ? ALL_TIME_SLOTS : TIME_SLOTS;
-    
+
     const bookedSlots = await this.find({
         slotLockKey: { $regex: `^${dateStr}\\|` },
         status: { $in: ['pending', 'confirmed'] }
     }).select('timeSlot');
-    
+
     const bookedSlotNames = bookedSlots.map(b => b.timeSlot);
     return slotsToCheck.filter(slot => !bookedSlotNames.includes(slot));
 };
 
-// Static: get user stats
+// Get user booking stats
 bookingSchema.statics.getUserStats = async function (userId) {
     const stats = await this.aggregate([
         { $match: { customerId: new mongoose.Types.ObjectId(userId) } },

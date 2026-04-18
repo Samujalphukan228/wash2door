@@ -1,9 +1,23 @@
 "use client"
 
+import { useEffect } from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { motion } from "framer-motion"
 
 export default function DetailsStep({ data, onUpdate, onNext, onBack }) {
+
+    // ✅ FIX: Set default city on mount if not already set
+    useEffect(() => {
+        if (!data.location?.city || data.location.city.trim() === '') {
+            onUpdate({
+                location: {
+                    address: data.location?.address || '',
+                    city: 'Duliajan'
+                }
+            })
+        }
+    }, [])
+
     const handleChange = (field, value) => {
         if (field.includes(".")) {
             const [parent, child] = field.split(".")
@@ -49,8 +63,8 @@ export default function DetailsStep({ data, onUpdate, onNext, onBack }) {
                 <span className="uppercase">Back</span>
             </motion.button>
 
-            <motion.h2 
-                className="text-black mb-10" 
+            <motion.h2
+                className="text-black mb-10"
                 style={{ fontFamily: 'Georgia, serif', fontWeight: 300, fontSize: "clamp(24px, 4vw, 32px)" }}
             >
                 Service Location
@@ -58,7 +72,6 @@ export default function DetailsStep({ data, onUpdate, onNext, onBack }) {
 
             <div className="max-w-2xl">
 
-                {/* Address Section */}
                 <div className="border border-gray-200 p-6 rounded-2xl mb-6">
                     <h3 className="text-black mb-6" style={{ fontFamily: 'Georgia, serif', fontSize: "14px" }}>
                         Address Details
@@ -69,7 +82,7 @@ export default function DetailsStep({ data, onUpdate, onNext, onBack }) {
                         {/* Address */}
                         <div>
                             <label className="block text-gray-400 text-xs mb-2 uppercase tracking-wide">
-                                Address/ Quarter Number *
+                                Address / Quarter Number *
                             </label>
                             <input
                                 type="text"
@@ -80,7 +93,7 @@ export default function DetailsStep({ data, onUpdate, onNext, onBack }) {
                             />
                         </div>
 
-                        {/* City */}
+                        {/* City - ✅ FIXED: value now reads from state not hardcoded */}
                         <div>
                             <label className="block text-gray-400 text-xs mb-2 uppercase tracking-wide">
                                 City *

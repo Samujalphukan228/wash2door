@@ -2,7 +2,6 @@ import User from '../models/User.js';
 import Service from '../models/Service.js';
 import Booking from '../models/Booking.js';
 import WalkInCustomer from '../models/WalkInCustomer.js';
-import { sendBookingStatusEmail } from '../utils/sendEmail.js';
 import {
     TIME_SLOTS,
     ADMIN_ONLY_SLOTS,
@@ -24,6 +23,11 @@ import {
     emitUserBlocked,
     emitDashboardUpdate
 } from '../utils/socketEmitter.js';
+import {
+    sendAdminBookingTelegram,
+    sendBookingCancelledTelegram,
+    sendBookingStatusTelegram
+} from '../utils/telegram.js';
 import ExpenseCategory from '../models/ExpenseCategory.js';
 import Expense from '../models/Expense.js';
 import mongoose from 'mongoose';
@@ -89,38 +93,19 @@ export const getDashboardStats = async (req, res) => {
 
         const [revenueThisMonth, revenueLastMonth, totalRevenue, revenueToday] = await Promise.all([
             Booking.aggregate([
-                {
-                    $match: {
-                        status: 'completed',
-                        createdAt: { $gte: thisMonthStart }
-                    }
-                },
+                { $match: { status: 'completed', createdAt: { $gte: thisMonthStart } } },
                 { $group: { _id: null, total: { $sum: '$price' } } }
             ]),
             Booking.aggregate([
-                {
-                    $match: {
-                        status: 'completed',
-                        createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd }
-                    }
-                },
+                { $match: { status: 'completed', createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd } } },
                 { $group: { _id: null, total: { $sum: '$price' } } }
             ]),
             Booking.aggregate([
-                {
-                    $match: {
-                        status: 'completed'
-                    }
-                },
+                { $match: { status: 'completed' } },
                 { $group: { _id: null, total: { $sum: '$price' } } }
             ]),
             Booking.aggregate([
-                {
-                    $match: {
-                        status: 'completed',
-                        createdAt: { $gte: today, $lte: todayEnd }
-                    }
-                },
+                { $match: { status: 'completed', createdAt: { $gte: today, $lte: todayEnd } } },
                 { $group: { _id: null, total: { $sum: '$price' } } }
             ])
         ]);
@@ -212,9 +197,7 @@ export const getDashboardStats = async (req, res) => {
         ]);
 
         const expenseMap = {};
-        weeklyExpenses.forEach(e => {
-            expenseMap[e._id] = e.expenses;
-        });
+        weeklyExpenses.forEach(e => { expenseMap[e._id] = e.expenses; });
 
         const weeklyData = weeklyRevenue.map(day => ({
             day: day._id,
@@ -245,9 +228,7 @@ export const getDashboardStats = async (req, res) => {
 
         const monthlyExpenses = await Expense.aggregate([
             {
-                $match: {
-                    createdAt: { $gte: sixMonthsAgo }
-                }
+                $match: { createdAt: { $gte: sixMonthsAgo } }
             },
             {
                 $group: {
@@ -259,9 +240,7 @@ export const getDashboardStats = async (req, res) => {
         ]);
 
         const monthlyExpenseMap = {};
-        monthlyExpenses.forEach(e => {
-            monthlyExpenseMap[e._id] = e.expenses;
-        });
+        monthlyExpenses.forEach(e => { monthlyExpenseMap[e._id] = e.expenses; });
 
         const monthlyData = monthlyRevenue.map(month => ({
             month: month._id,
@@ -593,33 +572,21 @@ export const blockUser = async (req, res) => {
         const { reason } = req.body;
 
         if (!isValidObjectId(userId)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid user ID'
-            });
+            return res.status(400).json({ success: false, message: 'Invalid user ID' });
         }
 
         const user = await User.findById(userId);
 
         if (!user) {
-            return res.status(404).json({
-                success: false,
-                message: 'User not found'
-            });
+            return res.status(404).json({ success: false, message: 'User not found' });
         }
 
         if (user.role === 'admin') {
-            return res.status(403).json({
-                success: false,
-                message: 'Cannot block admin users'
-            });
+            return res.status(403).json({ success: false, message: 'Cannot block admin users' });
         }
 
         if (user.isBlocked) {
-            return res.status(400).json({
-                success: false,
-                message: 'User is already blocked'
-            });
+            return res.status(400).json({ success: false, message: 'User is already blocked' });
         }
 
         user.isBlocked = true;
@@ -643,11 +610,7 @@ export const blockUser = async (req, res) => {
 
     } catch (error) {
         console.error('Block user error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error blocking user',
-            error: error.message
-        });
+        res.status(500).json({ success: false, message: 'Error blocking user', error: error.message });
     }
 };
 
@@ -660,26 +623,17 @@ export const unblockUser = async (req, res) => {
         const { userId } = req.params;
 
         if (!isValidObjectId(userId)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid user ID'
-            });
+            return res.status(400).json({ success: false, message: 'Invalid user ID' });
         }
 
         const user = await User.findById(userId);
 
         if (!user) {
-            return res.status(404).json({
-                success: false,
-                message: 'User not found'
-            });
+            return res.status(404).json({ success: false, message: 'User not found' });
         }
 
         if (!user.isBlocked) {
-            return res.status(400).json({
-                success: false,
-                message: 'User is not blocked'
-            });
+            return res.status(400).json({ success: false, message: 'User is not blocked' });
         }
 
         user.isBlocked = false;
@@ -700,11 +654,7 @@ export const unblockUser = async (req, res) => {
 
     } catch (error) {
         console.error('Unblock user error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error unblocking user',
-            error: error.message
-        });
+        res.status(500).json({ success: false, message: 'Error unblocking user', error: error.message });
     }
 };
 
@@ -718,40 +668,25 @@ export const changeUserRole = async (req, res) => {
         const { role } = req.body;
 
         if (!isValidObjectId(userId)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid user ID'
-            });
+            return res.status(400).json({ success: false, message: 'Invalid user ID' });
         }
 
         if (!['user', 'admin'].includes(role)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid role. Must be "user" or "admin"'
-            });
+            return res.status(400).json({ success: false, message: 'Invalid role' });
         }
 
         if (userId === req.user._id.toString()) {
-            return res.status(400).json({
-                success: false,
-                message: 'Cannot change your own role'
-            });
+            return res.status(400).json({ success: false, message: 'Cannot change your own role' });
         }
 
         const user = await User.findById(userId);
 
         if (!user) {
-            return res.status(404).json({
-                success: false,
-                message: 'User not found'
-            });
+            return res.status(404).json({ success: false, message: 'User not found' });
         }
 
         if (user.role === role) {
-            return res.status(400).json({
-                success: false,
-                message: `User is already a ${role}`
-            });
+            return res.status(400).json({ success: false, message: `User is already a ${role}` });
         }
 
         user.role = role;
@@ -770,11 +705,7 @@ export const changeUserRole = async (req, res) => {
 
     } catch (error) {
         console.error('Change role error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error changing role',
-            error: error.message
-        });
+        res.status(500).json({ success: false, message: 'Error changing role', error: error.message });
     }
 };
 
@@ -866,11 +797,7 @@ export const getAllBookings = async (req, res) => {
 
     } catch (error) {
         console.error('Get bookings error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error fetching bookings',
-            error: error.message
-        });
+        res.status(500).json({ success: false, message: 'Error fetching bookings', error: error.message });
     }
 };
 
@@ -883,10 +810,7 @@ export const getBookingById = async (req, res) => {
         const { bookingId } = req.params;
 
         if (!isValidObjectId(bookingId)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid booking ID'
-            });
+            return res.status(400).json({ success: false, message: 'Invalid booking ID' });
         }
 
         const booking = await Booking.findById(bookingId)
@@ -894,10 +818,7 @@ export const getBookingById = async (req, res) => {
             .populate('createdBy', 'firstName lastName');
 
         if (!booking) {
-            return res.status(404).json({
-                success: false,
-                message: 'Booking not found'
-            });
+            return res.status(404).json({ success: false, message: 'Booking not found' });
         }
 
         let customerHistory = null;
@@ -913,19 +834,12 @@ export const getBookingById = async (req, res) => {
 
         res.status(200).json({
             success: true,
-            data: {
-                booking,
-                customerHistory
-            }
+            data: { booking, customerHistory }
         });
 
     } catch (error) {
         console.error('Get booking error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error fetching booking',
-            error: error.message
-        });
+        res.status(500).json({ success: false, message: 'Error fetching booking', error: error.message });
     }
 };
 
@@ -939,10 +853,7 @@ export const updateBookingStatus = async (req, res) => {
         const { status, reason } = req.body;
 
         if (!isValidObjectId(bookingId)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid booking ID'
-            });
+            return res.status(400).json({ success: false, message: 'Invalid booking ID' });
         }
 
         if (!BOOKING_STATUSES.includes(status)) {
@@ -956,10 +867,7 @@ export const updateBookingStatus = async (req, res) => {
             .populate('customerId', 'firstName lastName email');
 
         if (!booking) {
-            return res.status(404).json({
-                success: false,
-                message: 'Booking not found'
-            });
+            return res.status(404).json({ success: false, message: 'Booking not found' });
         }
 
         const validTransitions = {
@@ -976,11 +884,13 @@ export const updateBookingStatus = async (req, res) => {
             });
         }
 
-        const oldStatus = booking.status;
         const oldDateStr = getLocalDateStr(new Date(booking.bookingDate));
         const oldTimeSlot = booking.timeSlot;
         const oldServiceId = booking.serviceId;
 
+        // ============================================
+        // CANCELLED - DELETE FROM DB
+        // ============================================
         if (status === 'cancelled') {
             const bookingData = {
                 _id: booking._id,
@@ -989,6 +899,8 @@ export const updateBookingStatus = async (req, res) => {
                 bookingDate: booking.bookingDate,
                 timeSlot: booking.timeSlot,
                 price: booking.price,
+                phone: booking.phone,
+                walkInCustomer: booking.walkInCustomer,
                 customerId: booking.customerId,
                 cancelledBy: 'admin',
                 cancellationReason: reason || 'Cancelled by admin'
@@ -1000,29 +912,26 @@ export const updateBookingStatus = async (req, res) => {
             emitSlotAvailable(oldDateStr, oldTimeSlot, oldServiceId);
             emitDashboardUpdate({ action: 'booking_cancelled' });
 
+            // ✅ Telegram only - no email
             setImmediate(async () => {
                 try {
-                    if (bookingData.customerId?.email) {
-                        await sendBookingStatusEmail(bookingData.customerId, {
-                            ...bookingData,
-                            status: 'cancelled'
-                        });
-                    }
-                } catch (emailError) {
-                    console.error('Cancellation email failed:', emailError.message);
+                    await sendBookingCancelledTelegram(bookingData, 'admin');
+                    console.log('📱 Telegram: Admin cancellation notification sent');
+                } catch (e) {
+                    console.error('Telegram cancellation notification failed:', e.message);
                 }
             });
 
             return res.status(200).json({
                 success: true,
                 message: 'Booking cancelled and deleted successfully',
-                data: {
-                    ...bookingData,
-                    status: 'deleted'
-                }
+                data: { ...bookingData, status: 'deleted' }
             });
         }
 
+        // ============================================
+        // CONFIRMED / COMPLETED
+        // ============================================
         booking.status = status;
 
         if (status === 'completed') {
@@ -1035,13 +944,17 @@ export const updateBookingStatus = async (req, res) => {
         emitBookingStatusUpdate(booking, booking.customerId?._id);
         emitDashboardUpdate({ action: 'booking_status_changed', status });
 
+        // ✅ Telegram only - no email
         setImmediate(async () => {
             try {
-                if (booking.customerId?.email) {
-                    await sendBookingStatusEmail(booking.customerId, booking);
-                }
-            } catch (emailError) {
-                console.error('Status email failed:', emailError.message);
+                await sendBookingStatusTelegram(
+                    booking,
+                    status,
+                    `Admin (${req.user.firstName} ${req.user.lastName})`
+                );
+                console.log('📱 Telegram: Status update notification sent');
+            } catch (e) {
+                console.error('Telegram status notification failed:', e.message);
             }
         });
 
@@ -1053,16 +966,12 @@ export const updateBookingStatus = async (req, res) => {
 
     } catch (error) {
         console.error('Update booking status error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error updating booking status',
-            error: error.message
-        });
+        res.status(500).json({ success: false, message: 'Error updating booking status', error: error.message });
     }
 };
 
 // ============================================
-// CREATE ADMIN BOOKING (WITH ADMIN SLOTS SUPPORT)
+// CREATE ADMIN BOOKING ✅ FIXED + TELEGRAM
 // ============================================
 
 export const createAdminBooking = async (req, res) => {
@@ -1081,6 +990,12 @@ export const createAdminBooking = async (req, res) => {
             adminNotes
         } = req.body;
 
+        // ✅ FIX: Validate location early with defaults
+        const bookingLocation = {
+            address: location?.address?.trim() || 'Walk-in / At Shop',
+            city: location?.city?.trim() || 'Duliajan'
+        };
+
         if (!bookingType || !['walkin', 'online'].includes(bookingType)) {
             return res.status(400).json({
                 success: false,
@@ -1089,7 +1004,7 @@ export const createAdminBooking = async (req, res) => {
         }
 
         if (bookingType === 'walkin') {
-            if (!walkInCustomer?.name) {
+            if (!walkInCustomer?.name?.trim()) {
                 return res.status(400).json({
                     success: false,
                     message: 'Walk-in customer name is required'
@@ -1156,13 +1071,20 @@ export const createAdminBooking = async (req, res) => {
             });
         }
 
+        if (!bookingDate || !/^\d{4}-\d{2}-\d{2}$/.test(bookingDate)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid date format. Use YYYY-MM-DD'
+            });
+        }
+
         const [year, month, day] = bookingDate.split('-').map(Number);
         const requestedDate = new Date(year, month - 1, day, 12, 0, 0, 0);
 
         if (isNaN(requestedDate.getTime())) {
             return res.status(400).json({
                 success: false,
-                message: 'Invalid date format. Use YYYY-MM-DD'
+                message: 'Invalid date'
             });
         }
 
@@ -1183,7 +1105,7 @@ export const createAdminBooking = async (req, res) => {
             });
         }
 
-        if (!isValidAnySlot(timeSlot)) {
+        if (!timeSlot || !isValidAnySlot(timeSlot)) {
             return res.status(400).json({
                 success: false,
                 message: `Invalid time slot. Valid slots: ${ALL_TIME_SLOTS.join(', ')}`
@@ -1191,7 +1113,6 @@ export const createAdminBooking = async (req, res) => {
         }
 
         const isAdminSlot = isAdminOnlySlot(timeSlot);
-
         const slotLockKey = `${bookingDate}|${timeSlot}`;
 
         const slotTaken = await Booking.findOne({
@@ -1206,11 +1127,6 @@ export const createAdminBooking = async (req, res) => {
             });
         }
 
-        const bookingLocation = {
-            address: location?.address || 'Walk-in / At Shop',
-            city: location?.city || 'Duliajan'
-        };
-
         let booking;
 
         try {
@@ -1219,7 +1135,7 @@ export const createAdminBooking = async (req, res) => {
                 isAdminSlot,
                 customerId: bookingType === 'online' ? customerId : null,
                 walkInCustomer: bookingType === 'walkin'
-                    ? { name: walkInCustomer.name, phone: phone }
+                    ? { name: walkInCustomer.name.trim(), phone: phone }
                     : { name: '', phone: '' },
 
                 categoryId: service.category._id,
@@ -1238,6 +1154,7 @@ export const createAdminBooking = async (req, res) => {
                 bookingDate: requestedDate,
                 timeSlot,
 
+                // ✅ FIXED: Use validated bookingLocation with defaults
                 location: bookingLocation,
                 phone,
 
@@ -1246,7 +1163,7 @@ export const createAdminBooking = async (req, res) => {
 
                 createdBy: req.user._id,
                 status: 'confirmed',
-                
+
                 adminNotes: adminNotes || ''
             });
         } catch (createError) {
@@ -1259,10 +1176,9 @@ export const createAdminBooking = async (req, res) => {
             throw createError;
         }
 
-        await Service.findByIdAndUpdate(serviceId, {
-            $inc: { totalBookings: 1 }
-        });
+        await Service.findByIdAndUpdate(serviceId, { $inc: { totalBookings: 1 } });
 
+        // Save walk-in customer to DB
         if (bookingType === 'walkin' && walkInCustomer?.name && phone) {
             try {
                 let walkinCustomerDoc = await WalkInCustomer.findOne({
@@ -1296,6 +1212,16 @@ export const createAdminBooking = async (req, res) => {
         emitNewBooking(booking, customerName);
         emitSlotBooked(bookingDate, timeSlot, serviceId);
         emitDashboardUpdate({ action: 'new_booking', bookingType, isAdminSlot });
+
+        // ✅ Telegram only - no email for admin bookings
+        setImmediate(async () => {
+            try {
+                await sendAdminBookingTelegram(booking);
+                console.log('📱 Telegram: Admin booking notification sent');
+            } catch (e) {
+                console.error('Telegram admin booking notification failed:', e.message);
+            }
+        });
 
         res.status(201).json({
             success: true,
@@ -1419,11 +1345,7 @@ export const getRevenueReport = async (req, res) => {
 
     } catch (error) {
         console.error('Revenue report error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error fetching revenue report',
-            error: error.message
-        });
+        res.status(500).json({ success: false, message: 'Error fetching revenue report', error: error.message });
     }
 };
 
@@ -1516,11 +1438,7 @@ export const getBookingReport = async (req, res) => {
 
     } catch (error) {
         console.error('Booking report error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error fetching booking report',
-            error: error.message
-        });
+        res.status(500).json({ success: false, message: 'Error fetching booking report', error: error.message });
     }
 };
 
@@ -1530,12 +1448,7 @@ export const getBookingReport = async (req, res) => {
 
 export const cleanupOldBookings = async (req, res) => {
     try {
-        const {
-            olderThanDays = 90,
-            status = 'completed',
-            dryRun = 'false'
-        } = req.query;
-
+        const { olderThanDays = 90, status = 'completed', dryRun = 'false' } = req.query;
         const days = parseInt(olderThanDays);
 
         if (isNaN(days) || days < 30) {
@@ -1548,11 +1461,7 @@ export const cleanupOldBookings = async (req, res) => {
         const cutoffDate = new Date();
         cutoffDate.setDate(cutoffDate.getDate() - days);
 
-        const query = {
-            status: status,
-            createdAt: { $lt: cutoffDate }
-        };
-
+        const query = { status, createdAt: { $lt: cutoffDate } };
         const count = await Booking.countDocuments(query);
 
         if (dryRun === 'true') {
@@ -1574,11 +1483,7 @@ export const cleanupOldBookings = async (req, res) => {
 
     } catch (error) {
         console.error('Cleanup bookings error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error cleaning up bookings',
-            error: error.message
-        });
+        res.status(500).json({ success: false, message: 'Error cleaning up bookings', error: error.message });
     }
 };
 
@@ -1630,11 +1535,7 @@ export const getBookingCleanupStats = async (req, res) => {
 
     } catch (error) {
         console.error('Cleanup stats error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error fetching cleanup stats',
-            error: error.message
-        });
+        res.status(500).json({ success: false, message: 'Error fetching cleanup stats', error: error.message });
     }
 };
 

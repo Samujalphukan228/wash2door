@@ -17,17 +17,19 @@ import {
     convertTo24Hour
 } from '../utils/constants.js';
 import {
-    sendBookingConfirmationEmail,
-    sendBookingCancellationEmail
-} from '../utils/sendEmail.js';
-import { sendNewBookingTelegram } from '../utils/telegram.js';
-import {
     emitNewBooking,
     emitBookingCancelled,
     emitBookingStatusUpdate,
     emitSlotBooked,
     emitSlotAvailable
 } from '../utils/socketEmitter.js';
+import {
+    sendNewBookingTelegram,
+    sendAdminBookingTelegram,
+    sendBookingCancelledTelegram,
+    sendBookingStatusTelegram,
+    sendBookingRescheduledTelegram
+} from '../utils/telegram.js';
 
 // ============================================
 // HELPER FUNCTIONS
@@ -48,29 +50,29 @@ const getLocalDateStr = (date) => {
 const isSlotInPast = (dateStr, timeSlot, bufferMinutes = LIMITS.MIN_BOOKING_BUFFER_MINUTES || 30) => {
     const now = new Date();
     const todayStr = getLocalDateStr(now);
-    
+
     if (dateStr !== todayStr) {
         return { isPast: false, reason: null };
     }
-    
+
     const { start } = convertTo24Hour(timeSlot);
     const [hours, minutes] = start.split(':').map(Number);
     const [year, month, day] = dateStr.split('-').map(Number);
-    
+
     const slotDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
     const minBookingTime = new Date(slotDateTime.getTime() - bufferMinutes * 60 * 1000);
-    
+
     if (now >= slotDateTime) {
         return { isPast: true, reason: 'This time slot has already passed' };
     }
-    
+
     if (now >= minBookingTime) {
-        return { 
-            isPast: true, 
-            reason: `Please book at least ${bufferMinutes} minutes before the slot starts` 
+        return {
+            isPast: true,
+            reason: `Please book at least ${bufferMinutes} minutes before the slot starts`
         };
     }
-    
+
     return { isPast: false, reason: null };
 };
 
@@ -118,13 +120,12 @@ export const getServiceWithPricing = async (req, res) => {
 };
 
 // ============================================
-// CHECK AVAILABILITY (Supports Admin Slots)
+// CHECK AVAILABILITY
 // ============================================
 export const checkAvailability = async (req, res) => {
     try {
         const { date, includeAdminSlots } = req.query;
-        
-        // Check if user is admin (from optional auth middleware)
+
         const isAdmin = req.user?.role === 'admin';
         const showAdminSlots = isAdmin && includeAdminSlots === 'true';
 
@@ -139,17 +140,8 @@ export const checkAvailability = async (req, res) => {
         const now = new Date();
         const todayStr = getLocalDateStr(now);
 
-        console.log('🔍 ==================== AVAILABILITY CHECK ====================');
-        console.log('📅 Received date:', date);
-        console.log('📅 Server today:', todayStr);
-        console.log('👤 Is Admin:', isAdmin);
-        console.log('🔐 Show Admin Slots:', showAdminSlots);
-
         const [year, month, day] = date.split('-').map(Number);
         const bookingDate = new Date(year, month - 1, day, 12, 0, 0, 0);
-
-        console.log('📅 Parsed booking date:', bookingDate.toLocaleDateString());
-        console.log('📅 Day of week:', bookingDate.getDay(), '(0=Sun, 1=Mon)');
 
         if (isNaN(bookingDate.getTime())) {
             return res.status(400).json({ success: false, message: 'Invalid date' });
@@ -159,10 +151,8 @@ export const checkAvailability = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Cannot check availability for past dates' });
         }
 
-        // Get the appropriate slots based on role
         const slotsToShow = showAdminSlots ? ALL_TIME_SLOTS : TIME_SLOTS;
 
-        // Check if closed day
         if (isClosedDay(bookingDate)) {
             return res.status(200).json({
                 success: true,
@@ -173,9 +163,9 @@ export const checkAvailability = async (req, res) => {
                     message: CLOSED_DAY_MESSAGE,
                     availableSlots: 0,
                     totalSlots: slotsToShow.length,
-                    slots: slotsToShow.map(slot => ({ 
-                        slot, 
-                        available: false, 
+                    slots: slotsToShow.map(slot => ({
+                        slot,
+                        available: false,
                         reason: 'Closed',
                         isAdminOnly: isAdminOnlySlot(slot)
                     })),
@@ -186,13 +176,10 @@ export const checkAvailability = async (req, res) => {
             });
         }
 
-        // Find all booked slots for this date
         const lockedBookings = await Booking.find({
             slotLockKey: { $regex: `^${date}\\|` },
             status: { $in: ['pending', 'confirmed'] }
         }).select('timeSlot serviceName status');
-
-        console.log('📋 Active bookings found:', lockedBookings.length);
 
         const lockedSlotMap = {};
         lockedBookings.forEach(b => {
@@ -201,33 +188,27 @@ export const checkAvailability = async (req, res) => {
 
         const isToday = date === todayStr;
 
-        // ✅ FIXED: Process each slot - check END time, not START time
         const slots = slotsToShow.map(slot => {
             const isBooked = lockedSlotMap[slot] !== undefined;
             const isAdminSlot = isAdminOnlySlot(slot);
-            
+
             let isPast = false;
 
-            // ✅ NEW: Check if slot END time has passed
             if (isToday) {
-                const endTime = slot.split('-')[1].trim(); // "10:30 AM"
+                const endTime = slot.split('-')[1].trim();
                 const match = endTime.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
-                
+
                 if (match) {
                     let endHour = parseInt(match[1], 10);
                     const endMinutes = parseInt(match[2], 10);
                     const period = match[3].toUpperCase();
-                    
-                    // Convert to 24-hour format
-                    if (period === 'PM' && endHour !== 12) {
-                        endHour += 12;
-                    } else if (period === 'AM' && endHour === 12) {
-                        endHour = 0;
-                    }
-                    
+
+                    if (period === 'PM' && endHour !== 12) endHour += 12;
+                    else if (period === 'AM' && endHour === 12) endHour = 0;
+
                     const currentTotalMinutes = now.getHours() * 60 + now.getMinutes();
                     const endTotalMinutes = endHour * 60 + endMinutes;
-                    
+
                     isPast = currentTotalMinutes >= endTotalMinutes;
                 }
             }
@@ -235,30 +216,15 @@ export const checkAvailability = async (req, res) => {
             let available = true;
             let reason = null;
 
-            if (isPast) { 
-                available = false; 
-                reason = 'Past'; 
-            } else if (isBooked) { 
-                available = false; 
-                reason = 'Booked'; 
-            }
+            if (isPast) { available = false; reason = 'Past'; }
+            else if (isBooked) { available = false; reason = 'Booked'; }
 
-            return { 
-                slot, 
-                available, 
-                reason,
-                isAdminOnly: isAdminSlot
-            };
+            return { slot, available, reason, isAdminOnly: isAdminSlot };
         });
 
         const availableCount = slots.filter(s => s.available).length;
         const regularAvailable = slots.filter(s => s.available && !s.isAdminOnly).length;
         const adminOnlyAvailable = slots.filter(s => s.available && s.isAdminOnly).length;
-
-        console.log('📊 Total Available:', availableCount, '/', slots.length);
-        console.log('📊 Regular Available:', regularAvailable);
-        console.log('📊 Admin-Only Available:', adminOnlyAvailable);
-        console.log('🔍 ============================================================');
 
         res.status(200).json({
             success: true,
@@ -287,14 +253,12 @@ export const checkAvailability = async (req, res) => {
 };
 
 // ============================================
-// CREATE BOOKING (Supports Admin Slots)
+// CREATE BOOKING (Online)
 // ============================================
 export const createBooking = async (req, res) => {
     try {
         const { serviceId, bookingDate, timeSlot, location, phone } = req.body;
 
-        // ==================== VALIDATION ====================
-        
         if (!serviceId || !bookingDate || !timeSlot || !location) {
             return res.status(400).json({
                 success: false,
@@ -320,21 +284,17 @@ export const createBooking = async (req, res) => {
             });
         }
 
-        // ==================== ADMIN SLOT CHECK ====================
-        
         const isAdmin = req.user?.role === 'admin';
         const isAdminSlot = isAdminOnlySlot(timeSlot);
 
-        // Non-admins cannot book admin-only slots
         if (isAdminSlot && !isAdmin) {
             return res.status(403).json({
                 success: false,
-                message: 'This time slot is only available for admin bookings. Please choose a regular time slot.',
+                message: 'This time slot is only available for admin bookings.',
                 availableSlots: TIME_SLOTS
             });
         }
 
-        // Validate against appropriate slot list
         if (!isValidAnySlot(timeSlot)) {
             const validSlots = isAdmin ? ALL_TIME_SLOTS : TIME_SLOTS;
             return res.status(400).json({
@@ -343,8 +303,6 @@ export const createBooking = async (req, res) => {
             });
         }
 
-        // ==================== DATE VALIDATION ====================
-        
         if (!/^\d{4}-\d{2}-\d{2}$/.test(bookingDate)) {
             return res.status(400).json({
                 success: false,
@@ -356,10 +314,7 @@ export const createBooking = async (req, res) => {
         const requestedDate = new Date(year, month - 1, day, 12, 0, 0, 0);
 
         if (isNaN(requestedDate.getTime())) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid date format. Use YYYY-MM-DD'
-            });
+            return res.status(400).json({ success: false, message: 'Invalid date' });
         }
 
         const now = new Date();
@@ -390,8 +345,6 @@ export const createBooking = async (req, res) => {
             });
         }
 
-        // ==================== TIME SLOT VALIDATION ====================
-        
         const slotCheck = isSlotInPast(bookingDate, timeSlot);
         if (slotCheck.isPast) {
             return res.status(400).json({
@@ -400,8 +353,6 @@ export const createBooking = async (req, res) => {
             });
         }
 
-        // ==================== USER BOOKING LIMIT ====================
-        
         const activeBookings = await Booking.countDocuments({
             customerId: req.user._id,
             status: { $in: ['pending', 'confirmed'] }
@@ -414,8 +365,6 @@ export const createBooking = async (req, res) => {
             });
         }
 
-        // ==================== SERVICE VALIDATION ====================
-        
         const service = await Service.findOne({ _id: serviceId, isActive: true })
             .populate('category', 'name slug')
             .populate('subcategory', 'name slug');
@@ -434,8 +383,6 @@ export const createBooking = async (req, res) => {
             });
         }
 
-        // ==================== SLOT AVAILABILITY CHECK ====================
-        
         const slotLockKey = `${bookingDate}|${timeSlot}`;
 
         const existingBooking = await Booking.findOne({
@@ -450,15 +397,8 @@ export const createBooking = async (req, res) => {
             });
         }
 
-        // ==================== CREATE BOOKING ====================
-        
         const finalPrice = service.discountPrice || service.price || 0;
         const duration = service.duration || 60;
-
-        console.log(`📦 Creating booking for ${service.name}`);
-        console.log(`   Price: ${finalPrice}`);
-        console.log(`   Admin Slot: ${isAdminSlot}`);
-        console.log(`   User: ${req.user.email}`);
 
         let booking;
 
@@ -466,88 +406,50 @@ export const createBooking = async (req, res) => {
             booking = await Booking.create({
                 bookingType: 'online',
                 customerId: req.user._id,
-                isAdminSlot: isAdminSlot,
-
+                isAdminSlot,
                 categoryId: service.category._id,
                 categoryName: service.category.name,
-
                 subcategoryId: service.subcategory._id,
                 subcategoryName: service.subcategory.name,
-
                 serviceId: service._id,
                 serviceName: service.name,
                 serviceTier: service.tier || 'basic',
-
                 price: finalPrice,
-                duration: duration,
-
+                duration,
                 bookingDate: requestedDate,
                 timeSlot,
-
                 location: {
                     address: location.address,
                     city: location.city
                 },
-
-                phone: phone,
+                phone,
                 paymentMethod: 'cash'
             });
         } catch (createError) {
             if (createError.code === 11000) {
                 return res.status(400).json({
                     success: false,
-                    message: `Time slot ${timeSlot} on ${bookingDate} was just booked by someone else. Please choose another slot.`
+                    message: `Time slot ${timeSlot} on ${bookingDate} was just booked by someone else.`
                 });
             }
             throw createError;
         }
 
-        // ==================== POST-CREATION TASKS ====================
-        
-        // Update service booking count
-        await Service.findByIdAndUpdate(serviceId, {
-            $inc: { totalBookings: 1 }
-        });
+        await Service.findByIdAndUpdate(serviceId, { $inc: { totalBookings: 1 } });
 
-        // Emit real-time events
         emitNewBooking(booking, `${req.user.firstName} ${req.user.lastName}`);
         emitSlotBooked(bookingDate, timeSlot, serviceId);
 
-        console.log(`🔌 Real-time: Emitted new booking + slot booked for ${bookingDate} ${timeSlot}`);
-
-        // Send notifications async
-        const emailData = {
-            bookingCode: booking.bookingCode,
-            serviceName: booking.serviceName,
-            serviceCategory: booking.categoryName,
-            subcategoryName: booking.subcategoryName,
-            price: booking.price,
-            duration: booking.duration,
-            bookingDate: booking.bookingDate,
-            timeSlot: booking.timeSlot,
-            location: booking.location,
-            phone: booking.phone,
-            isAdminSlot: booking.isAdminSlot
-        };
-
+        // Send Telegram notification async
         setImmediate(async () => {
             try {
-                await sendBookingConfirmationEmail(req.user, emailData);
-                console.log('✉️ Booking confirmation email sent');
-            } catch (e) {
-                console.error('Customer email failed:', e.message);
-            }
-
-            try {
                 await sendNewBookingTelegram(booking, req.user);
-                console.log('📱 Telegram notification sent');
+                console.log('📱 Telegram: New booking notification sent');
             } catch (e) {
                 console.error('Telegram notification failed:', e.message);
             }
         });
 
-        // ==================== RESPONSE ====================
-        
         res.status(201).json({
             success: true,
             message: 'Booking created successfully!',
@@ -582,10 +484,7 @@ export const createBooking = async (req, res) => {
             });
         }
 
-        res.status(500).json({
-            success: false,
-            message: 'Failed to create booking'
-        });
+        res.status(500).json({ success: false, message: 'Failed to create booking' });
     }
 };
 
@@ -620,7 +519,7 @@ export const getMyBookings = async (req, res) => {
         const bookingsWithMeta = bookings.map(booking => {
             const bookingObj = booking.toObject();
             const bookingDateTime = new Date(booking.bookingDate);
-            
+
             const { start } = convertTo24Hour(booking.timeSlot);
             const [startHour] = start.split(':').map(Number);
             bookingDateTime.setHours(parseInt(startHour), 0, 0, 0);
@@ -672,7 +571,7 @@ export const getBookingById = async (req, res) => {
 
         const bookingObj = booking.toObject();
         const bookingDateTime = new Date(booking.bookingDate);
-        
+
         const { start } = convertTo24Hour(booking.timeSlot);
         const [startHour] = start.split(':').map(Number);
         bookingDateTime.setHours(parseInt(startHour), 0, 0, 0);
@@ -697,7 +596,7 @@ export const getBookingById = async (req, res) => {
 };
 
 // ============================================
-// CANCEL BOOKING (DELETES FROM DB)
+// CANCEL BOOKING
 // ============================================
 export const cancelBooking = async (req, res) => {
     try {
@@ -722,7 +621,6 @@ export const cancelBooking = async (req, res) => {
         }
 
         const bookingDateTime = new Date(booking.bookingDate);
-        
         const { start } = convertTo24Hour(booking.timeSlot);
         const [startHour] = start.split(':').map(Number);
         bookingDateTime.setHours(parseInt(startHour), 0, 0, 0);
@@ -738,7 +636,6 @@ export const cancelBooking = async (req, res) => {
             });
         }
 
-        // Save info BEFORE deleting
         const oldDateStr = getLocalDateStr(booking.bookingDate);
         const oldSlot = booking.timeSlot;
         const oldServiceId = booking.serviceId;
@@ -746,16 +643,16 @@ export const cancelBooking = async (req, res) => {
         const serviceName = booking.serviceName;
         const bookingDate = booking.bookingDate;
         const timeSlot = booking.timeSlot;
+        const price = booking.price;
+        const phone = booking.phone;
+        const walkInCustomer = booking.walkInCustomer;
+        const customerId = booking.customerId;
 
-        // DELETE the booking instead of soft delete
         await Booking.deleteOne({ _id: bookingId });
 
         console.log(`🗑️ Booking ${bookingCode} DELETED (cancelled by user)`);
-        console.log(`🔓 Slot freed: ${oldDateStr} | ${oldSlot}`);
 
-        // Real-time socket emissions
         emitSlotAvailable(oldDateStr, oldSlot, oldServiceId);
-
         emitBookingCancelled({
             _id: bookingId,
             bookingCode,
@@ -765,27 +662,29 @@ export const cancelBooking = async (req, res) => {
             customerId: req.user._id
         }, 'user');
 
-        console.log(`🔌 Real-time: Emitted cancellation + slot available for ${oldDateStr} ${oldSlot}`);
-
-        // Send cancellation email async
+        // Send Telegram notification async
         setImmediate(async () => {
             try {
-                await sendBookingCancellationEmail(req.user, {
+                await sendBookingCancelledTelegram({
                     bookingCode,
                     serviceName,
                     bookingDate,
                     timeSlot,
+                    price,
+                    phone,
+                    walkInCustomer,
+                    customerId,
                     cancellationReason: reason || 'Cancelled by customer'
-                });
-                console.log('✉️ Cancellation email sent');
+                }, 'user');
+                console.log('📱 Telegram: Cancellation notification sent');
             } catch (e) {
-                console.error('Cancellation email failed:', e.message);
+                console.error('Telegram cancellation notification failed:', e.message);
             }
         });
 
         res.status(200).json({
             success: true,
-            message: 'Booking cancelled and removed successfully. The slot is now available for others.',
+            message: 'Booking cancelled successfully. The slot is now available.',
             data: {
                 bookingCode,
                 serviceName,
@@ -802,7 +701,7 @@ export const cancelBooking = async (req, res) => {
 };
 
 // ============================================
-// RESCHEDULE BOOKING (Supports Admin Slots)
+// RESCHEDULE BOOKING
 // ============================================
 export const rescheduleBooking = async (req, res) => {
     try {
@@ -817,26 +716,22 @@ export const rescheduleBooking = async (req, res) => {
             return res.status(400).json({ success: false, message: 'New date and time slot are required' });
         }
 
-        // ==================== ADMIN SLOT CHECK ====================
-        
         const isAdmin = req.user?.role === 'admin';
         const isAdminSlot = isAdminOnlySlot(newTimeSlot);
 
-        // Non-admins cannot reschedule to admin-only slots
         if (isAdminSlot && !isAdmin) {
             return res.status(403).json({
                 success: false,
-                message: 'This time slot is only available for admin bookings. Please choose a regular time slot.',
+                message: 'This time slot is only available for admin bookings.',
                 availableSlots: TIME_SLOTS
             });
         }
 
-        // Validate against appropriate slot list
         if (!isValidAnySlot(newTimeSlot)) {
             const validSlots = isAdmin ? ALL_TIME_SLOTS : TIME_SLOTS;
-            return res.status(400).json({ 
-                success: false, 
-                message: `Invalid time slot. Valid slots: ${validSlots.join(', ')}` 
+            return res.status(400).json({
+                success: false,
+                message: `Invalid time slot. Valid slots: ${validSlots.join(', ')}`
             });
         }
 
@@ -875,10 +770,7 @@ export const rescheduleBooking = async (req, res) => {
         }
 
         if (isClosedDay(requestedDate)) {
-            return res.status(400).json({ 
-                success: false, 
-                message: CLOSED_DAY_MESSAGE 
-            });
+            return res.status(400).json({ success: false, message: CLOSED_DAY_MESSAGE });
         }
 
         const maxDate = new Date();
@@ -894,10 +786,7 @@ export const rescheduleBooking = async (req, res) => {
 
         const slotCheck = isSlotInPast(newDate, newTimeSlot);
         if (slotCheck.isPast) {
-            return res.status(400).json({ 
-                success: false, 
-                message: slotCheck.reason 
-            });
+            return res.status(400).json({ success: false, message: slotCheck.reason });
         }
 
         const newSlotLockKey = `${newDate}|${newTimeSlot}`;
@@ -911,29 +800,41 @@ export const rescheduleBooking = async (req, res) => {
         if (slotTaken) {
             return res.status(400).json({
                 success: false,
-                message: `Time slot ${newTimeSlot} on ${newDate} is already booked. Please choose another slot.`
+                message: `Time slot ${newTimeSlot} on ${newDate} is already booked.`
             });
         }
 
         // Save old slot info BEFORE updating
         const oldDateStr = getLocalDateStr(booking.bookingDate);
         const oldTimeSlot = booking.timeSlot;
+        const oldDate = booking.bookingDate;
         const serviceId = booking.serviceId;
 
         try {
             booking.bookingDate = requestedDate;
             booking.timeSlot = newTimeSlot;
-            booking.isAdminSlot = isAdminSlot;  // Update admin slot flag
+            booking.isAdminSlot = isAdminSlot;
             await booking.save();
-
-            console.log(`📅 Booking rescheduled from ${oldDateStr} ${oldTimeSlot} to ${newDate} ${newTimeSlot}`);
-            console.log(`   Admin Slot: ${isAdminSlot}`);
 
             emitSlotAvailable(oldDateStr, oldTimeSlot, serviceId);
             emitSlotBooked(newDate, newTimeSlot, serviceId);
             emitBookingStatusUpdate(booking, req.user._id);
 
-            console.log(`🔌 Real-time: Rescheduled ${oldDateStr} ${oldTimeSlot} -> ${newDate} ${newTimeSlot}`);
+            // Send Telegram notification async
+            setImmediate(async () => {
+                try {
+                    await sendBookingRescheduledTelegram(
+                        booking,
+                        oldDate,
+                        oldTimeSlot,
+                        requestedDate,
+                        newTimeSlot
+                    );
+                    console.log('📱 Telegram: Reschedule notification sent');
+                } catch (e) {
+                    console.error('Telegram reschedule notification failed:', e.message);
+                }
+            });
 
             res.status(200).json({
                 success: true,
@@ -946,10 +847,9 @@ export const rescheduleBooking = async (req, res) => {
 
         } catch (updateError) {
             if (updateError.code === 11000) {
-                console.warn(`⚠️ Duplicate booking attempt for slot: ${newSlotLockKey}`);
                 return res.status(400).json({
                     success: false,
-                    message: `Time slot ${newTimeSlot} on ${newDate} was just booked by someone else. Please choose another slot.`
+                    message: `Time slot ${newTimeSlot} on ${newDate} was just booked by someone else.`
                 });
             }
             throw updateError;
@@ -967,12 +867,7 @@ export const rescheduleBooking = async (req, res) => {
 export const getMyBookingStats = async (req, res) => {
     try {
         const stats = await Booking.getUserStats(req.user._id);
-
-        res.status(200).json({
-            success: true,
-            data: stats
-        });
-
+        res.status(200).json({ success: true, data: stats });
     } catch (error) {
         console.error('getMyBookingStats error:', error);
         res.status(500).json({ success: false, message: 'Failed to fetch stats' });
@@ -980,7 +875,7 @@ export const getMyBookingStats = async (req, res) => {
 };
 
 // ============================================
-// GET AVAILABLE SLOTS FOR DATE
+// GET AVAILABLE SLOTS
 // ============================================
 export const getAvailableSlots = async (req, res) => {
     try {
@@ -1028,9 +923,6 @@ export const getAvailableSlots = async (req, res) => {
     }
 };
 
-// ============================================
-// EXPORT DEFAULT
-// ============================================
 export default {
     getServiceWithPricing,
     checkAvailability,

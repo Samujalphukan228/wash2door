@@ -123,7 +123,7 @@ export const getSlotsForRole = (isAdmin = false) => {
 export const LIMITS = {
     MAX_ACTIVE_BOOKINGS_PER_USER: 3,
     MAX_BOOKING_ADVANCE_DAYS: 90,
-    MIN_CANCEL_HOURS_BEFORE: 2,
+    MIN_CANCEL_HOURS_BEFORE: 0.5,
     MIN_BOOKING_BUFFER_MINUTES: 30,
     MAX_SERVICE_IMAGES: 3,
     MAX_IMAGE_SIZE_MB: 5,
