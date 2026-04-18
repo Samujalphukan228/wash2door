@@ -1,3 +1,5 @@
+// routes/adminRoutes.js
+
 import express from 'express';
 import {
     getDashboardStats,
@@ -13,7 +15,14 @@ import {
     getRevenueReport,
     getBookingReport,
     cleanupOldBookings,
-    getBookingCleanupStats
+    getBookingCleanupStats,
+    // ✅ NEW: Walk-in customer routes
+    getWalkInCustomers,
+    getRecentWalkInCustomers,
+    searchWalkInCustomers,
+    updateWalkInCustomer,
+    deleteWalkInCustomer,
+    bulkUpdateWalkInCustomers
 } from '../controllers/adminController.js';
 
 import { protect, isAdmin } from '../middleware/auth.js';
@@ -45,6 +54,16 @@ router.delete('/bookings/cleanup', cleanupOldBookings);
 router.get('/bookings/:bookingId', getBookingById);
 router.post('/bookings', createAdminBooking);
 router.put('/bookings/:bookingId/status', updateBookingStatus);
+
+// ============================================
+// WALK-IN CUSTOMERS ✅ NEW
+// ============================================
+router.get('/walkin-customers', getWalkInCustomers);
+router.get('/walkin-customers/recent', getRecentWalkInCustomers);
+router.get('/walkin-customers/search', searchWalkInCustomers);
+router.put('/walkin-customers/bulk-update', bulkUpdateWalkInCustomers); // ✅ Update all missing address/city
+router.put('/walkin-customers/:customerId', updateWalkInCustomer);
+router.delete('/walkin-customers/:customerId', deleteWalkInCustomer);
 
 // ============================================
 // REPORTS

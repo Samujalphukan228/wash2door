@@ -1,31 +1,30 @@
-// src/components/admin/bookings/CreateBookingModal.jsx
 'use client';
 
-import { useState, useEffect, useCallback, useMemo, memo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X, Loader2, Search, ChevronLeft, ChevronRight, Check, Calendar, Clock, CreditCard, User, MapPin, Package, UserPlus, History, Star, Trash2 } from 'lucide-react';
+import { useState, useEffect, useCallback, memo } from 'react';
+import {
+    X, Loader2, Search, ChevronLeft, ChevronRight, Check,
+    Calendar, Clock, CreditCard, User, MapPin, Package,
+    UserPlus, History, Star, Trash2, Pencil, Save,
+    Settings, Plus, Filter, MoreHorizontal, Edit2,
+} from 'lucide-react';
 import adminService from '@/services/adminService';
 import serviceService from '@/services/serviceService';
 import axiosInstance from '@/lib/axios';
 import toast from 'react-hot-toast';
 
-// ✅ UPDATED: Regular time slots (Available to all users)
+// ============================================
+// CONSTANTS & UTILS
+// ============================================
+
 const REGULAR_TIME_SLOTS = [
-    '08:30 AM-10:30 AM',
-    '10:30 AM-12:00 PM',
-    '12:00 PM-02:30 PM',
-    '02:30 PM-04:00 PM',
-    '04:00 PM-05:30 PM',
+    '08:30 AM-10:30 AM', '10:30 AM-12:00 PM', '12:00 PM-02:30 PM',
+    '02:30 PM-04:00 PM', '04:00 PM-05:30 PM',
 ];
 
-// ✅ NEW: Admin-only extra slots (Up to 10 PM)
 const ADMIN_ONLY_SLOTS = [
-    '05:30 PM-07:00 PM',   // Evening slot
-    '07:00 PM-08:30 PM',   // Late evening slot
-    '08:30 PM-10:00 PM',   // Night slot (NEW)
+    '05:30 PM-07:00 PM', '07:00 PM-08:30 PM', '08:30 PM-10:00 PM',
 ];
 
-// ✅ NEW: Helper to sort time slots chronologically
 const sortTimeSlots = (slots) => {
     return [...slots].sort((a, b) => {
         const getHour = (slot) => {
@@ -40,371 +39,50 @@ const sortTimeSlots = (slots) => {
     });
 };
 
-// ✅ NEW: All slots combined and sorted
 const ALL_TIME_SLOTS = sortTimeSlots([...REGULAR_TIME_SLOTS, ...ADMIN_ONLY_SLOTS]);
 
-// Steps: Customer → Service → Schedule
 const STEPS = [
-    { label: 'Customer', desc: 'Who?', icon: User },
-    { label: 'Service', desc: 'What?', icon: Package },
-    { label: 'Schedule', desc: 'When?', icon: Calendar }
+    { key: 'customer', label: 'Customer', icon: User },
+    { key: 'service', label: 'Service', icon: Package },
+    { key: 'schedule', label: 'Schedule', icon: Calendar },
 ];
 
-// Animation variants
-const backdropVariants = {
-    hidden: { opacity: 0 },
-    visible: { opacity: 1 },
-};
-
-const modalVariants = {
-    hidden: { opacity: 0, y: '100%' },
-    visible: { 
-        opacity: 1, 
-        y: 0,
-        transition: { type: 'spring', damping: 30, stiffness: 300 }
-    },
-    exit: { 
-        opacity: 0, 
-        y: '100%',
-        transition: { duration: 0.25 }
-    }
-};
-
-const stepVariants = {
-    enter: (direction) => ({
-        x: direction > 0 ? 50 : -50,
-        opacity: 0,
-    }),
-    center: {
-        x: 0,
-        opacity: 1,
-        transition: { type: 'spring', stiffness: 300, damping: 30 }
-    },
-    exit: (direction) => ({
-        x: direction > 0 ? -50 : 50,
-        opacity: 0,
-        transition: { duration: 0.2 }
-    })
-};
-
-// Utility functions
-function convertTo24Hour(time12) {
-    const [time, period] = time12.split(' ');
-    let [hours] = time.split(':').map(Number);
-    if (period === 'PM' && hours !== 12) hours += 12;
-    else if (period === 'AM' && hours === 12) hours = 0;
-    return hours;
-}
-
-// ✅ FIXED: Slot only passes when END time is reached
 function isSlotPassed(slot, selectedDate) {
     const now = new Date();
-    
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const todayStr = `${year}-${month}-${day}`;
-    
-    // Future date = not passed
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     if (selectedDate > todayStr) return false;
-    
-    // Past date = passed
     if (selectedDate < todayStr) return true;
-
-    // Today - check against END time of slot
-    // Handle different dash types: -, –, —
     const parts = slot.split(/[-–—]/);
     if (parts.length < 2) return false;
-    
-    const endTime = parts[1].trim();  // "10:30 AM"
-    
-    // Parse using regex for safety
-    const match = endTime.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+    const match = parts[1].trim().match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
     if (!match) return false;
-    
     let endHour = parseInt(match[1], 10);
     const endMinutes = parseInt(match[2], 10);
     const period = match[3].toUpperCase();
-    
-    // Convert to 24-hour format
-    if (period === 'PM' && endHour !== 12) {
-        endHour += 12;
-    } else if (period === 'AM' && endHour === 12) {
-        endHour = 0;
-    }
-    
-    const currentTotalMinutes = now.getHours() * 60 + now.getMinutes();
-    const endTotalMinutes = endHour * 60 + endMinutes;
-    
-    // 🔍 DEBUG - Remove this after testing
-    console.log(`Slot: ${slot}, End: ${endHour}:${endMinutes}, Current: ${now.getHours()}:${now.getMinutes()}, Passed: ${currentTotalMinutes >= endTotalMinutes}`);
-    
-    return currentTotalMinutes >= endTotalMinutes;
+    if (period === 'PM' && endHour !== 12) endHour += 12;
+    else if (period === 'AM' && endHour === 12) endHour = 0;
+    return (now.getHours() * 60 + now.getMinutes()) >= (endHour * 60 + endMinutes);
 }
 
 function getTodayString() {
-    const today = new Date();
-    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const t = new Date();
+    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
 }
 
-// ✅ NEW: Check if slot is admin-only
-function isAdminOnlySlot(slot) {
-    return ADMIN_ONLY_SLOTS.includes(slot);
-}
+const isAdminOnlySlot = (slot) => ADMIN_ONLY_SLOTS.includes(slot);
 
-// Sub-components
-const InputField = memo(function InputField({ label, value, onChange, placeholder, type = 'text', required }) {
-    return (
-        <div className="space-y-2">
-            <label className="block text-[10px] text-white/30 uppercase tracking-widest font-medium">
-                {label} {required && <span className="text-white/50">*</span>}
-            </label>
-            <input
-                type={type}
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                placeholder={placeholder}
-                className="w-full bg-white/[0.03] border border-white/[0.08] text-white/80 text-sm placeholder-white/20 px-4 py-3 rounded-xl focus:outline-none focus:border-white/20 focus:bg-white/[0.05] transition-all duration-150"
-            />
-        </div>
-    );
-});
-
-// ✅ UPDATED: TimeSlotButton with admin slot indicator
-const TimeSlotButton = memo(function TimeSlotButton({ slot, selected, disabled, passed, booked, isAdminSlot, onClick }) {
-    return (
-        <motion.button
-            onClick={onClick}
-            disabled={disabled}
-            className={`
-                relative p-3.5 rounded-xl border text-xs font-medium transition-all duration-150
-                ${selected
-                    ? isAdminSlot 
-                        ? 'border-purple-500/40 bg-purple-500/[0.15] text-white shadow-lg shadow-purple-500/10'
-                        : 'border-white/30 bg-white/[0.1] text-white shadow-lg shadow-white/5'
-                    : disabled
-                    ? 'border-white/[0.04] bg-white/[0.01] text-white/20 cursor-not-allowed'
-                    : isAdminSlot
-                    ? 'border-purple-500/20 bg-purple-500/[0.05] text-white/60 hover:border-purple-500/30 hover:text-white/80 hover:bg-purple-500/[0.08]'
-                    : 'border-white/[0.08] bg-white/[0.02] text-white/60 hover:border-white/[0.15] hover:text-white/80 hover:bg-white/[0.04]'
-                }
-            `}
-            whileTap={!disabled ? { scale: 0.98 } : {}}
-        >
-            {/* ✅ Admin slot badge */}
-            {isAdminSlot && (
-                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-purple-500 text-white text-[8px] font-bold flex items-center justify-center shadow-lg">
-                    A
-                </span>
-            )}
-            <span className="block">{slot}</span>
-            {passed && (
-                <span className="block text-[10px] text-white/20 mt-1">Passed</span>
-            )}
-            {!passed && booked && (
-                <span className="block text-[10px] text-white/20 mt-1">Booked</span>
-            )}
-            <AnimatePresence>
-                {selected && (
-                    <motion.span
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        exit={{ scale: 0 }}
-                        className={`absolute top-2 left-2 w-4 h-4 rounded-full flex items-center justify-center ${isAdminSlot ? 'bg-purple-400' : 'bg-white'}`}
-                    >
-                        <Check className={`w-2.5 h-2.5 ${isAdminSlot ? 'text-white' : 'text-black'}`} />
-                    </motion.span>
-                )}
-            </AnimatePresence>
-        </motion.button>
-    );
-});
-
-const ServiceCard = memo(function ServiceCard({ service, selected, onClick }) {
-    return (
-        <motion.button
-            onClick={onClick}
-            className={`
-                w-full flex items-center justify-between p-4 rounded-xl border text-left transition-all duration-150
-                ${selected
-                    ? 'border-white/25 bg-white/[0.08] shadow-lg'
-                    : 'border-white/[0.07] bg-white/[0.02] hover:border-white/[0.12] hover:bg-white/[0.04]'
-                }
-            `}
-            whileTap={{ scale: 0.99 }}
-        >
-            <div className="flex-1 min-w-0">
-                <p className={`text-sm font-medium ${selected ? 'text-white' : 'text-white/80'}`}>
-                    {service.name}
-                </p>
-                <div className="flex items-center gap-2 mt-1">
-                    <span className="text-[11px] text-white/30">{service.category?.name || service.tier}</span>
-                    <span className="text-white/10">·</span>
-                    <span className="text-[11px] text-white/50 font-medium">
-                        ₹{(service.discountPrice || service.price || 0).toLocaleString('en-IN')}
-                    </span>
-                </div>
-            </div>
-            <AnimatePresence>
-                {selected && (
-                    <motion.div
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        exit={{ scale: 0 }}
-                        className="w-6 h-6 rounded-full bg-white flex items-center justify-center shrink-0 ml-3"
-                    >
-                        <Check className="w-3.5 h-3.5 text-black" />
-                    </motion.div>
-                )}
-            </AnimatePresence>
-        </motion.button>
-    );
-});
-
-// Walk-in Customer Card
-const WalkInCustomerCard = memo(function WalkInCustomerCard({ customer, selected, onSelect, onDelete, deleting }) {
-    return (
-        <motion.div
-            initial={{ opacity: 0, y: 5 }}
-            animate={{ opacity: 1, y: 0 }}
-            className={`
-                flex items-center justify-between p-3 rounded-xl border transition-all
-                ${selected
-                    ? 'border-emerald-500/30 bg-emerald-500/[0.08]'
-                    : 'border-white/[0.07] bg-white/[0.02] hover:border-white/[0.12]'
-                }
-            `}
-        >
-            <button
-                onClick={() => onSelect(customer)}
-                className="flex-1 flex items-center gap-3 text-left"
-            >
-                <div className="w-9 h-9 rounded-lg bg-white/[0.06] flex items-center justify-center shrink-0">
-                    <span className="text-sm font-semibold text-white/60">
-                        {customer.name?.charAt(0)?.toUpperCase() || '?'}
-                    </span>
-                </div>
-                <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                        <p className={`text-sm font-medium truncate ${selected ? 'text-white' : 'text-white/80'}`}>
-                            {customer.name}
-                        </p>
-                        {customer.totalBookings > 0 && (
-                            <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-emerald-500/15 text-[9px] text-emerald-400 font-medium">
-                                <Star className="w-2.5 h-2.5" />
-                                {customer.totalBookings}
-                            </span>
-                        )}
-                    </div>
-                    <p className="text-[11px] text-white/40 font-mono truncate">
-                        {customer.phone}
-                    </p>
-                </div>
-                {selected && (
-                    <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center shrink-0">
-                        <Check className="w-3 h-3 text-white" />
-                    </div>
-                )}
-            </button>
-            <button
-                onClick={(e) => {
-                    e.stopPropagation();
-                    onDelete(customer._id);
-                }}
-                disabled={deleting}
-                className="ml-2 w-7 h-7 rounded-lg flex items-center justify-center text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-50"
-            >
-                {deleting ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                    <Trash2 className="w-3.5 h-3.5" />
-                )}
-            </button>
-        </motion.div>
-    );
-});
-
-const SummaryRow = memo(function SummaryRow({ label, value, highlight, mono }) {
-    return (
-        <div className="flex items-center justify-between gap-4">
-            <span className="text-[11px] text-white/30 shrink-0">{label}</span>
-            <span className={`text-xs text-right truncate ${
-                highlight ? 'text-white font-semibold text-sm'
-                : mono ? 'font-mono text-white/60'
-                : 'text-white/60'
-            }`}>
-                {value || '—'}
-            </span>
-        </div>
-    );
-});
-
-const StepIndicator = memo(function StepIndicator({ steps, currentStep }) {
-    return (
-        <div className="px-4 pb-4 space-y-3">
-            <div className="relative flex items-center gap-1">
-                {steps.map((_, i) => (
-                    <motion.div
-                        key={i}
-                        className="h-1 flex-1 rounded-full overflow-hidden bg-white/[0.06]"
-                    >
-                        <motion.div
-                            className="h-full bg-white/60 rounded-full"
-                            initial={{ width: 0 }}
-                            animate={{ width: i + 1 <= currentStep ? '100%' : '0%' }}
-                            transition={{ duration: 0.3, ease: 'easeOut' }}
-                        />
-                    </motion.div>
-                ))}
-            </div>
-
-            <div className="flex items-center justify-between">
-                {steps.map((step, i) => {
-                    const Icon = step.icon;
-                    const isActive = currentStep === i + 1;
-                    const isCompleted = currentStep > i + 1;
-                    
-                    return (
-                        <div key={step.label} className="flex items-center gap-2">
-                            <motion.div
-                                className={`
-                                    w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold
-                                    ${isActive
-                                        ? 'bg-white text-black shadow-lg shadow-white/20'
-                                        : isCompleted
-                                        ? 'bg-white/20 text-white/70'
-                                        : 'bg-white/[0.06] text-white/25'
-                                    }
-                                `}
-                                animate={{ scale: isActive ? 1.1 : 1 }}
-                                transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-                            >
-                                {isCompleted ? <Check className="w-3 h-3" /> : <Icon className="w-3 h-3" />}
-                            </motion.div>
-                            <span className={`text-[10px] transition-colors ${
-                                isActive ? 'text-white/70' : 'text-white/25'
-                            }`}>
-                                {step.label}
-                            </span>
-                        </div>
-                    );
-                })}
-            </div>
-        </div>
-    );
-});
+// ============================================
+// MAIN COMPONENT
+// ============================================
 
 export default function CreateBookingModal({ onClose, onSuccess }) {
     const [step, setStep] = useState(1);
-    const [direction, setDirection] = useState(0);
     const [loading, setLoading] = useState(false);
-    const [currentTime, setCurrentTime] = useState(new Date());
 
-    // Step 1 - Customer & Location
-    const [walkInCustomer, setWalkInCustomer] = useState({ name: '', phone: '' });
+    // Customer state
+    const [walkInCustomer, setWalkInCustomer] = useState({ name: '', phone: '', address: '', city: 'Duliajan' });
     const [location, setLocation] = useState({ address: 'Walk-in / At Shop', city: 'Duliajan' });
-
-    // Walk-in customers from DB
+    const [saveToDb, setSaveToDb] = useState(true);
     const [walkinSearch, setWalkinSearch] = useState('');
     const [savedWalkinCustomers, setSavedWalkinCustomers] = useState([]);
     const [recentWalkinCustomers, setRecentWalkinCustomers] = useState([]);
@@ -412,30 +90,27 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
     const [selectedWalkinCustomer, setSelectedWalkinCustomer] = useState(null);
     const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
     const [deletingCustomerId, setDeletingCustomerId] = useState(null);
+    const [editingCustomer, setEditingCustomer] = useState(null);
+    const [editForm, setEditForm] = useState({ name: '', phone: '', address: '', city: '' });
+    const [editLoading, setEditLoading] = useState(false);
 
-    // Step 2 - Service
+    // Service state
     const [services, setServices] = useState([]);
     const [selectedService, setSelectedService] = useState(null);
     const [servicesLoading, setServicesLoading] = useState(false);
+    const [serviceSearch, setServiceSearch] = useState('');
 
-    // Step 3 - Schedule
+    // Schedule state
     const [bookingDate, setBookingDate] = useState('');
     const [timeSlot, setTimeSlot] = useState('');
     const [availability, setAvailability] = useState([]);
     const [availabilityLoading, setAvailabilityLoading] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState('cash');
 
-    // ✅ NEW: This modal is for admin, so always use all slots
-    const isAdmin = true; // Admin create booking modal
-    const TIME_SLOTS = isAdmin ? ALL_TIME_SLOTS : REGULAR_TIME_SLOTS;
+    // ============================================
+    // EFFECTS
+    // ============================================
 
-    // Refresh time every minute
-    useEffect(() => {
-        const interval = setInterval(() => setCurrentTime(new Date()), 60000);
-        return () => clearInterval(interval);
-    }, []);
-
-    // Load services
     useEffect(() => {
         (async () => {
             try {
@@ -450,52 +125,43 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
         })();
     }, []);
 
-    // Load recent walk-in customers
     useEffect(() => {
         (async () => {
             try {
                 const res = await adminService.getRecentWalkInCustomers(5);
                 if (res.success) setRecentWalkinCustomers(res.data || []);
             } catch (error) {
-                console.error('Failed to load recent customers:', error);
+                console.error(error);
             }
         })();
     }, []);
 
-    // Search walk-in customers
     useEffect(() => {
         if (walkinSearch.length < 2) {
             setSavedWalkinCustomers([]);
             return;
         }
-
         const t = setTimeout(async () => {
             setWalkinSearchLoading(true);
             try {
                 const res = await adminService.searchWalkInCustomers(walkinSearch);
-                if (res.success) setSavedWalkinCustomers(res.data || []);
-                else setSavedWalkinCustomers([]);
+                setSavedWalkinCustomers(res.success ? (res.data || []) : []);
             } catch {
                 setSavedWalkinCustomers([]);
             } finally {
                 setWalkinSearchLoading(false);
             }
         }, 400);
-
         return () => clearTimeout(t);
     }, [walkinSearch]);
 
-    // ✅ UPDATED: Check availability with admin slots flag
     useEffect(() => {
         if (!bookingDate) return;
         (async () => {
             try {
                 setAvailabilityLoading(true);
-                const res = await axiosInstance.get('/bookings/availability', { 
-                    params: { 
-                        date: bookingDate,
-                        includeAdminSlots: isAdmin ? 'true' : undefined  // ✅ Pass flag for admin
-                    } 
+                const res = await axiosInstance.get('/bookings/availability', {
+                    params: { date: bookingDate, includeAdminSlots: 'true' },
                 });
                 if (res.data.success) setAvailability(res.data.data.slots || []);
             } catch {
@@ -504,75 +170,69 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                 setAvailabilityLoading(false);
             }
         })();
-    }, [bookingDate, isAdmin]);
+    }, [bookingDate]);
 
-    // Clear passed time slot
-    useEffect(() => {
-        if (timeSlot && bookingDate && isSlotPassed(timeSlot, bookingDate)) {
-            setTimeSlot('');
-        }
-    }, [currentTime, timeSlot, bookingDate]);
+    // ============================================
+    // HANDLERS
+    // ============================================
 
-    const isSlotAvailable = useCallback((slot) => {
-        const found = availability.find(a => a.slot === slot);
-        return found ? found.available : true;
-    }, [availability]);
-
-    // canProceed validation
-    const canProceed = useMemo(() => ({
-        // Step 1: Customer - either selected existing or new form filled
-        1: (selectedWalkinCustomer !== null || (showNewCustomerForm && walkInCustomer.name.trim() && walkInCustomer.phone.trim())) &&
-            location.address.trim() && location.city.trim(),
-        // Step 2: Service
-        2: selectedService !== null,
-        // Step 3: Schedule
-        3: bookingDate && timeSlot
-    }), [walkInCustomer, selectedWalkinCustomer, showNewCustomerForm, location, selectedService, bookingDate, timeSlot]);
-
-    const goToStep = useCallback((newStep) => {
-        setDirection(newStep > step ? 1 : -1);
-        setStep(newStep);
-    }, [step]);
-
-    // Handle select walk-in customer
     const handleSelectWalkinCustomer = useCallback((customer) => {
         setSelectedWalkinCustomer(customer);
-        setWalkInCustomer({ name: customer.name, phone: customer.phone });
+        setWalkInCustomer({
+            name: customer.name,
+            phone: customer.phone,
+            address: customer.address || '',
+            city: customer.city || 'Duliajan',
+        });
+        setLocation({
+            address: customer.address || 'Walk-in / At Shop',
+            city: customer.city || 'Duliajan',
+        });
         setShowNewCustomerForm(false);
         setWalkinSearch('');
-        setSavedWalkinCustomers([]);
     }, []);
 
-    // Handle delete walk-in customer
-    const handleDeleteWalkinCustomer = useCallback(async (customerId) => {
+    const handleClearCustomer = useCallback(() => {
+        setSelectedWalkinCustomer(null);
+        setWalkInCustomer({ name: '', phone: '', address: '', city: 'Duliajan' });
+        setLocation({ address: 'Walk-in / At Shop', city: 'Duliajan' });
+    }, []);
+
+    const handleDeleteWalkinCustomer = useCallback(async (id) => {
         try {
-            setDeletingCustomerId(customerId);
-            await adminService.deleteWalkInCustomer(customerId);
-            
-            // Remove from lists
-            setSavedWalkinCustomers(prev => prev.filter(c => c._id !== customerId));
-            setRecentWalkinCustomers(prev => prev.filter(c => c._id !== customerId));
-            
-            // Clear selection if deleted
-            if (selectedWalkinCustomer?._id === customerId) {
-                setSelectedWalkinCustomer(null);
-                setWalkInCustomer({ name: '', phone: '' });
-            }
-            
+            setDeletingCustomerId(id);
+            await adminService.deleteWalkInCustomer(id);
+            setSavedWalkinCustomers((prev) => prev.filter((c) => c._id !== id));
+            setRecentWalkinCustomers((prev) => prev.filter((c) => c._id !== id));
+            if (selectedWalkinCustomer?._id === id) handleClearCustomer();
             toast.success('Customer deleted');
-        } catch (error) {
-            toast.error('Failed to delete customer');
+        } catch {
+            toast.error('Failed to delete');
         } finally {
             setDeletingCustomerId(null);
         }
-    }, [selectedWalkinCustomer]);
+    }, [selectedWalkinCustomer, handleClearCustomer]);
 
-    // Show new customer form
-    const handleShowNewForm = useCallback(() => {
-        setShowNewCustomerForm(true);
-        setSelectedWalkinCustomer(null);
-        setWalkInCustomer({ name: '', phone: '' });
-    }, []);
+    const handleSaveEdit = useCallback(async () => {
+        try {
+            setEditLoading(true);
+            const res = await adminService.updateWalkInCustomer(editingCustomer._id, editForm);
+            if (res.success) {
+                const updated = res.data;
+                setRecentWalkinCustomers((prev) =>
+                    prev.map((c) => (c._id === updated._id ? updated : c))
+                );
+                if (selectedWalkinCustomer?._id === updated._id)
+                    handleSelectWalkinCustomer(updated);
+                toast.success('Updated!');
+                setEditingCustomer(null);
+            }
+        } catch {
+            toast.error('Failed to update');
+        } finally {
+            setEditLoading(false);
+        }
+    }, [editingCustomer, editForm, selectedWalkinCustomer, handleSelectWalkinCustomer]);
 
     const handleSubmit = useCallback(async () => {
         try {
@@ -584,537 +244,871 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                 timeSlot,
                 location,
                 paymentMethod,
-                walkInCustomer,
-                phone: walkInCustomer.phone
+                walkInCustomer: {
+                    name: walkInCustomer.name,
+                    phone: walkInCustomer.phone,
+                },
+                phone: walkInCustomer.phone,
+                saveCustomer: selectedWalkinCustomer ? false : saveToDb,
             };
-
             await adminService.createAdminBooking(payload);
-            toast.success('Booking created successfully!');
+            toast.success('Booking created!');
             onSuccess();
         } catch (err) {
-            toast.error(err.response?.data?.message || 'Failed to create booking');
+            toast.error(err.response?.data?.message || 'Error');
         } finally {
             setLoading(false);
         }
-    }, [selectedService, bookingDate, timeSlot, location, paymentMethod, walkInCustomer, onSuccess]);
+    }, [selectedService, bookingDate, timeSlot, location, paymentMethod, walkInCustomer, selectedWalkinCustomer, saveToDb, onSuccess]);
 
-    const handleNext = useCallback(() => {
-        if (step < 3) {
-            goToStep(step + 1);
-        } else {
-            handleSubmit();
-        }
-    }, [step, goToStep, handleSubmit]);
+    const goToStep = (s) => setStep(s);
 
-    const handleBack = useCallback(() => {
-        if (step > 1) {
-            goToStep(step - 1);
-        } else {
-            onClose();
-        }
-    }, [step, goToStep, onClose]);
+    const canProceed = {
+        1: (selectedWalkinCustomer || (showNewCustomerForm && walkInCustomer.name && walkInCustomer.phone)) && location.address,
+        2: !!selectedService,
+        3: !!bookingDate && !!timeSlot,
+    };
 
-    const todayString = useMemo(() => getTodayString(), []);
-    const isToday = bookingDate === todayString;
+    const filteredServices = serviceSearch
+        ? services.filter((s) =>
+              s.name.toLowerCase().includes(serviceSearch.toLowerCase()) ||
+              s.category?.name?.toLowerCase().includes(serviceSearch.toLowerCase())
+          )
+        : services;
 
-    // Customers to display (search results or recent)
-    const displayWalkinCustomers = walkinSearch.length >= 2 ? savedWalkinCustomers : recentWalkinCustomers;
-
-    // ✅ NEW: Count admin slots available
-    const adminSlotsCount = useMemo(() => {
-        return TIME_SLOTS.filter(slot => isAdminOnlySlot(slot)).length;
-    }, [TIME_SLOTS]);
+    const customersList = walkinSearch.length >= 2 ? savedWalkinCustomers : recentWalkinCustomers;
 
     return (
         <>
             {/* Backdrop */}
-            <motion.div
-                className="fixed inset-0 bg-black/80 z-50"
-                variants={backdropVariants}
-                initial="hidden"
-                animate="visible"
-                exit="hidden"
-                onClick={onClose}
-            />
+            <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50" onClick={onClose} />
 
             {/* Modal */}
-            <motion.div
-                className="fixed inset-0 z-50 flex items-end sm:items-center justify-center pointer-events-none"
-                variants={backdropVariants}
-                initial="hidden"
-                animate="visible"
-                exit="hidden"
-            >
-                <motion.div
-                    className="pointer-events-auto w-full h-[100dvh] sm:h-auto sm:max-w-lg sm:max-h-[92vh] flex flex-col bg-[#0a0a0a] sm:rounded-2xl border-0 sm:border sm:border-white/[0.08] shadow-2xl overflow-hidden"
-                    variants={modalVariants}
-                    initial="hidden"
-                    animate="visible"
-                    exit="exit"
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    {/* Top gradient */}
-                    <div className="h-px w-full bg-gradient-to-r from-transparent via-white/15 to-transparent shrink-0" />
+            <div className="fixed inset-2 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[460px] sm:max-h-[85vh] bg-neutral-950 rounded-2xl overflow-hidden z-50 flex flex-col border border-white/[0.08]">
 
-                    {/* Header */}
-                    <div className="shrink-0 flex items-center gap-3 px-4 py-4">
-                        <motion.button
-                            onClick={handleBack}
-                            className="w-9 h-9 rounded-xl flex items-center justify-center border border-white/[0.08] bg-white/[0.03] text-white/40 hover:text-white/80 hover:bg-white/[0.06] transition-all"
-                            whileTap={{ scale: 0.95 }}
-                        >
-                            <ChevronLeft className="w-4 h-4" />
-                        </motion.button>
-
-                        <div className="flex-1 min-w-0">
-                            <p className="text-[10px] text-white/30 uppercase tracking-widest font-medium">
-                                Step {step} of 3
-                            </p>
-                            <p className="text-sm font-medium text-white/90 mt-0.5 flex items-center gap-2">
-                                {STEPS[step - 1].label}
-                                <span className="text-white/30 font-normal text-xs">
-                                    {STEPS[step - 1].desc}
-                                </span>
-                            </p>
+                {/* Header */}
+                <div className="shrink-0 px-4 pt-4 pb-3">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2.5">
+                            {step > 1 ? (
+                                <button
+                                    onClick={() => goToStep(step - 1)}
+                                    className="w-8 h-8 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] flex items-center justify-center transition-colors"
+                                >
+                                    <ChevronLeft className="w-4 h-4 text-white/60" />
+                                </button>
+                            ) : (
+                                <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
+                                    <Calendar className="w-4 h-4 text-white/80" />
+                                </div>
+                            )}
+                            <div>
+                                <h2 className="text-sm font-semibold text-white">New Booking</h2>
+                                <p className="text-[10px] text-white/40">
+                                    Step {step} of 3 · {STEPS[step - 1].label}
+                                </p>
+                            </div>
                         </div>
-
-                        <motion.button
+                        <button
                             onClick={onClose}
-                            className="w-9 h-9 rounded-xl flex items-center justify-center border border-white/[0.08] bg-white/[0.03] text-white/30 hover:text-white/70 transition-all"
-                            whileTap={{ scale: 0.95 }}
+                            className="w-8 h-8 rounded-lg hover:bg-white/[0.06] flex items-center justify-center transition-colors"
                         >
-                            <X className="w-4 h-4" />
-                        </motion.button>
+                            <X className="w-3.5 h-3.5 text-white/40" />
+                        </button>
                     </div>
 
                     {/* Step Indicator */}
-                    <StepIndicator steps={STEPS} currentStep={step} />
-
-                    <div className="h-px bg-white/[0.05] shrink-0" />
-
-                    {/* Content */}
-                    <div className="flex-1 overflow-y-auto relative">
-                        <AnimatePresence mode="wait" custom={direction}>
-                            <motion.div
-                                key={step}
-                                custom={direction}
-                                variants={stepVariants}
-                                initial="enter"
-                                animate="center"
-                                exit="exit"
-                                className="px-4 py-5 space-y-6 pb-28 sm:pb-6"
+                    <div className="flex gap-1 p-1 bg-white/[0.04] rounded-lg">
+                        {STEPS.map((s, i) => (
+                            <button
+                                key={s.key}
+                                onClick={() => {
+                                    if (i + 1 < step) goToStep(i + 1);
+                                }}
+                                disabled={i + 1 > step}
+                                className={`
+                                    flex-1 flex items-center justify-center gap-1.5 py-2 text-[11px] font-medium rounded-md transition-all
+                                    ${step === i + 1
+                                        ? 'bg-white/10 text-white'
+                                        : i + 1 < step
+                                            ? 'text-white/50 hover:text-white/70 cursor-pointer'
+                                            : 'text-white/20 cursor-not-allowed'
+                                    }
+                                `}
                             >
-                                {/* ========================================== */}
-                                {/* STEP 1 - Customer & Location */}
-                                {/* ========================================== */}
-                                {step === 1 && (
-                                    <>
-                                        {/* Customer Section */}
-                                        <div className="space-y-4">
-                                            {/* Search */}
-                                            <div className="space-y-2">
-                                                <label className="flex items-center gap-2 text-[10px] text-white/30 uppercase tracking-widest font-medium">
-                                                    <History className="w-3 h-3" />
-                                                    {walkinSearch.length >= 2 ? 'Search Results' : 'Recent Customers'}
-                                                </label>
-                                                <div className="relative">
-                                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/25" />
-                                                    <input
-                                                        type="text"
-                                                        value={walkinSearch}
-                                                        onChange={(e) => setWalkinSearch(e.target.value)}
-                                                        placeholder="Search by name or phone..."
-                                                        className="w-full bg-white/[0.03] border border-white/[0.08] text-white/80 text-sm pl-11 pr-4 py-3 rounded-xl focus:outline-none focus:border-white/20 transition-all"
-                                                    />
-                                                    {walkinSearchLoading && (
-                                                        <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/25 animate-spin" />
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            {/* Customer List */}
-                                            {!showNewCustomerForm && displayWalkinCustomers.length > 0 && (
-                                                <div className="space-y-2 max-h-40 overflow-y-auto">
-                                                    {displayWalkinCustomers.map((customer) => (
-                                                        <WalkInCustomerCard
-                                                            key={customer._id}
-                                                            customer={customer}
-                                                            selected={selectedWalkinCustomer?._id === customer._id}
-                                                            onSelect={handleSelectWalkinCustomer}
-                                                            onDelete={handleDeleteWalkinCustomer}
-                                                            deleting={deletingCustomerId === customer._id}
-                                                        />
-                                                    ))}
-                                                </div>
-                                            )}
-
-                                            {/* No results */}
-                                            {!showNewCustomerForm && displayWalkinCustomers.length === 0 && walkinSearch.length >= 2 && !walkinSearchLoading && (
-                                                <div className="text-center py-4">
-                                                    <p className="text-xs text-white/40">No customers found</p>
-                                                </div>
-                                            )}
-
-                                            {/* Add New Button */}
-                                            {!showNewCustomerForm && (
-                                                <motion.button
-                                                    onClick={handleShowNewForm}
-                                                    className="w-full flex items-center justify-center gap-2 p-3 rounded-xl border border-dashed border-white/[0.15] bg-white/[0.02] text-white/50 hover:text-white/80 hover:border-white/[0.25] hover:bg-white/[0.04] transition-all"
-                                                    whileTap={{ scale: 0.98 }}
-                                                >
-                                                    <UserPlus className="w-4 h-4" />
-                                                    <span className="text-xs font-medium">Add New Customer</span>
-                                                </motion.button>
-                                            )}
-
-                                            {/* New Customer Form */}
-                                            {showNewCustomerForm && (
-                                                <motion.div
-                                                    initial={{ opacity: 0, y: 10 }}
-                                                    animate={{ opacity: 1, y: 0 }}
-                                                    className="space-y-3 p-4 rounded-xl border border-white/[0.1] bg-white/[0.02]"
-                                                >
-                                                    <div className="flex items-center justify-between mb-2">
-                                                        <span className="text-xs text-white/50 font-medium">New Customer</span>
-                                                        <button
-                                                            onClick={() => {
-                                                                setShowNewCustomerForm(false);
-                                                                setWalkInCustomer({ name: '', phone: '' });
-                                                            }}
-                                                            className="text-[10px] text-white/30 hover:text-white/60"
-                                                        >
-                                                            Cancel
-                                                        </button>
-                                                    </div>
-                                                    <InputField
-                                                        label="Customer Name"
-                                                        value={walkInCustomer.name}
-                                                        onChange={(v) => setWalkInCustomer(p => ({ ...p, name: v }))}
-                                                        placeholder="Full name"
-                                                        required
-                                                    />
-                                                    <InputField
-                                                        label="Phone"
-                                                        value={walkInCustomer.phone}
-                                                        onChange={(v) => setWalkInCustomer(p => ({ ...p, phone: v }))}
-                                                        placeholder="+91 XXXXX XXXXX"
-                                                        required
-                                                    />
-                                                    <p className="text-[10px] text-white/30 flex items-center gap-1">
-                                                        <Star className="w-3 h-3" />
-                                                        Customer will be saved for future bookings
-                                                    </p>
-                                                </motion.div>
-                                            )}
-
-                                            {/* Selected Customer Display */}
-                                            {selectedWalkinCustomer && !showNewCustomerForm && (
-                                                <motion.div
-                                                    initial={{ opacity: 0, scale: 0.95 }}
-                                                    animate={{ opacity: 1, scale: 1 }}
-                                                    className="flex items-center justify-between px-4 py-3 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.05]"
-                                                >
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-                                                            <Check className="w-4 h-4 text-emerald-400" />
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-sm text-white font-medium">
-                                                                {selectedWalkinCustomer.name}
-                                                            </p>
-                                                            <p className="text-[11px] text-white/40 font-mono">
-                                                                {selectedWalkinCustomer.phone}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                    <button
-                                                        onClick={() => {
-                                                            setSelectedWalkinCustomer(null);
-                                                            setWalkInCustomer({ name: '', phone: '' });
-                                                        }}
-                                                        className="w-7 h-7 rounded-lg flex items-center justify-center text-white/30 hover:text-white/70 hover:bg-white/[0.08] transition-all"
-                                                    >
-                                                        <X className="w-4 h-4" />
-                                                    </button>
-                                                </motion.div>
-                                            )}
-                                        </div>
-
-                                        <div className="h-px bg-white/[0.05]" />
-
-                                        {/* Location */}
-                                        <div className="space-y-3">
-                                            <label className="flex items-center gap-2 text-[10px] text-white/30 uppercase tracking-widest font-medium">
-                                                <MapPin className="w-3 h-3" />
-                                                Service Location
-                                            </label>
-                                            <InputField
-                                                label="Address"
-                                                value={location.address}
-                                                onChange={(v) => setLocation(p => ({ ...p, address: v }))}
-                                                placeholder="Street address or 'Walk-in / At Shop'"
-                                                required
-                                            />
-                                            <InputField
-                                                label="City"
-                                                value={location.city}
-                                                onChange={(v) => setLocation(p => ({ ...p, city: v }))}
-                                                placeholder="City"
-                                                required
-                                            />
-                                        </div>
-                                    </>
-                                )}
-
-                                {/* ========================================== */}
-                                {/* STEP 2 - Service */}
-                                {/* ========================================== */}
-                                {step === 2 && (
-                                    <div className="space-y-3">
-                                        <label className="flex items-center gap-2 text-[10px] text-white/30 uppercase tracking-widest font-medium">
-                                            <Package className="w-3 h-3" />
-                                            Select Service
-                                        </label>
-
-                                        {servicesLoading ? (
-                                            <div className="space-y-2">
-                                                {[...Array(4)].map((_, i) => (
-                                                    <div key={i} className="h-[72px] rounded-xl bg-white/[0.03] animate-pulse" />
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
-                                                {services.map((s, i) => (
-                                                    <motion.div
-                                                        key={s._id}
-                                                        initial={{ opacity: 0, y: 10 }}
-                                                        animate={{ opacity: 1, y: 0 }}
-                                                        transition={{ delay: i * 0.03 }}
-                                                    >
-                                                        <ServiceCard
-                                                            service={s}
-                                                            selected={selectedService?._id === s._id}
-                                                            onClick={() => setSelectedService(s)}
-                                                        />
-                                                    </motion.div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-
-                                {/* ========================================== */}
-                                {/* STEP 3 - Schedule (✅ UPDATED) */}
-                                {/* ========================================== */}
-                                {step === 3 && (
-                                    <>
-                                        <div className="space-y-2">
-                                            <label className="flex items-center gap-2 text-[10px] text-white/30 uppercase tracking-widest font-medium">
-                                                <Calendar className="w-3 h-3" />
-                                                Booking Date
-                                            </label>
-                                            <input
-                                                type="date"
-                                                value={bookingDate}
-                                                min={todayString}
-                                                onChange={(e) => { setBookingDate(e.target.value); setTimeSlot(''); }}
-                                                className="w-full bg-white/[0.03] border border-white/[0.08] text-white/80 text-sm px-4 py-3 rounded-xl focus:outline-none focus:border-white/20 transition-all [color-scheme:dark]"
-                                            />
-                                        </div>
-
-                                        <AnimatePresence>
-                                            {bookingDate && (
-                                                <motion.div
-                                                    initial={{ opacity: 0, height: 0 }}
-                                                    animate={{ opacity: 1, height: 'auto' }}
-                                                    exit={{ opacity: 0, height: 0 }}
-                                                    className="space-y-3"
-                                                >
-                                                    <div className="flex items-center justify-between">
-                                                        <label className="flex items-center gap-2 text-[10px] text-white/30 uppercase tracking-widest font-medium">
-                                                            <Clock className="w-3 h-3" />
-                                                            Time Slot
-                                                        </label>
-                                                        <div className="flex items-center gap-3">
-                                                            {/* ✅ NEW: Admin slots indicator */}
-                                                            {isAdmin && adminSlotsCount > 0 && (
-                                                                <span className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-purple-500/10 border border-purple-500/20">
-                                                                    <span className="w-3 h-3 rounded-full bg-purple-500 text-white text-[7px] font-bold flex items-center justify-center">A</span>
-                                                                    <span className="text-[10px] text-purple-400 font-medium">{adminSlotsCount} admin slots</span>
-                                                                </span>
-                                                            )}
-                                                            {isToday && (
-                                                                <span className="text-[10px] text-white/25 font-mono">
-                                                                    {currentTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
-                                                                </span>
-                                                            )}
-                                                            {availabilityLoading && (
-                                                                <Loader2 className="w-3 h-3 text-white/25 animate-spin" />
-                                                            )}
-                                                        </div>
-                                                    </div>
-
-                                                    {/* ✅ UPDATED: Time slots grid with admin slot indicator */}
-                                                    <div className="grid grid-cols-2 gap-2">
-                                                        {TIME_SLOTS.map((slot) => {
-                                                            const available = isSlotAvailable(slot);
-                                                            const passed = isSlotPassed(slot, bookingDate);
-                                                            const isAdminSlot = isAdminOnlySlot(slot);
-                                                            
-                                                            return (
-                                                                <TimeSlotButton
-                                                                    key={slot}
-                                                                    slot={slot}
-                                                                    selected={timeSlot === slot}
-                                                                    disabled={!available || passed}
-                                                                    passed={passed}
-                                                                    booked={!available && !passed}
-                                                                    isAdminSlot={isAdminSlot}
-                                                                    onClick={() => setTimeSlot(slot)}
-                                                                />
-                                                            );
-                                                        })}
-                                                    </div>
-
-                                                    {/* ✅ NEW: Legend for admin slots */}
-                                                    {isAdmin && (
-                                                        <div className="flex items-center gap-4 pt-2">
-                                                            <div className="flex items-center gap-1.5">
-                                                                <div className="w-3 h-3 rounded border border-white/[0.08] bg-white/[0.02]" />
-                                                                <span className="text-[10px] text-white/30">Regular</span>
-                                                            </div>
-                                                            <div className="flex items-center gap-1.5">
-                                                                <div className="w-3 h-3 rounded border border-purple-500/30 bg-purple-500/10" />
-                                                                <span className="text-[10px] text-purple-400">Admin only</span>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </motion.div>
-                                            )}
-                                        </AnimatePresence>
-
-                                        <div className="h-px bg-white/[0.05]" />
-
-                                        <div className="space-y-3">
-                                            <label className="flex items-center gap-2 text-[10px] text-white/30 uppercase tracking-widest font-medium">
-                                                <CreditCard className="w-3 h-3" />
-                                                Payment Method
-                                            </label>
-                                            <div className="grid grid-cols-3 gap-2">
-                                                {['cash', 'card', 'online'].map((m) => (
-                                                    <motion.button
-                                                        key={m}
-                                                        onClick={() => setPaymentMethod(m)}
-                                                        className={`
-                                                            p-3 rounded-xl border text-xs font-medium capitalize transition-all
-                                                            ${paymentMethod === m
-                                                                ? 'border-white/25 bg-white/[0.08] text-white/90'
-                                                                : 'border-white/[0.07] bg-white/[0.02] text-white/40 hover:border-white/[0.12]'
-                                                            }
-                                                        `}
-                                                        whileTap={{ scale: 0.98 }}
-                                                    >
-                                                        {m}
-                                                    </motion.button>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        <div className="h-px bg-white/[0.05]" />
-
-                                        {/* Summary */}
-                                        <div className="space-y-3">
-                                            <label className="text-[10px] text-white/30 uppercase tracking-widest font-medium">
-                                                Summary
-                                            </label>
-                                            <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-4 space-y-2.5">
-                                                <SummaryRow
-                                                    label="Customer"
-                                                    value={walkInCustomer.name}
-                                                />
-                                                <SummaryRow
-                                                    label="Phone"
-                                                    value={walkInCustomer.phone}
-                                                    mono
-                                                />
-                                                <SummaryRow
-                                                    label="Location"
-                                                    value={location.address !== 'Walk-in / At Shop'
-                                                        ? `${location.address}, ${location.city}`
-                                                        : location.address
-                                                    }
-                                                />
-                                                <SummaryRow label="Service" value={selectedService?.name} />
-                                                <SummaryRow label="Date" value={bookingDate} mono />
-                                                {/* ✅ UPDATED: Show admin slot indicator in summary */}
-                                                <div className="flex items-center justify-between gap-4">
-                                                    <span className="text-[11px] text-white/30 shrink-0">Time</span>
-                                                    <span className="text-xs text-right font-mono text-white/60 flex items-center gap-2">
-                                                        {timeSlot || '—'}
-                                                        {timeSlot && isAdminOnlySlot(timeSlot) && (
-                                                            <span className="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 text-[9px] font-medium">
-                                                                Admin
-                                                            </span>
-                                                        )}
-                                                    </span>
-                                                </div>
-                                                <SummaryRow label="Payment" value={paymentMethod} />
-                                                <div className="h-px bg-white/[0.05]" />
-                                                <SummaryRow
-                                                    label="Total"
-                                                    value={`₹${(selectedService?.discountPrice || selectedService?.price || 0).toLocaleString('en-IN')}`}
-                                                    highlight
-                                                />
-                                            </div>
-                                        </div>
-                                    </>
-                                )}
-                            </motion.div>
-                        </AnimatePresence>
-                    </div>
-
-                    {/* Footer */}
-                    <div className="shrink-0 border-t border-white/[0.05] bg-[#0a0a0a]/95 backdrop-blur-sm">
-                        <div className="px-4 py-4 flex gap-2">
-                            {step > 1 && (
-                                <motion.button
-                                    onClick={() => goToStep(step - 1)}
-                                    disabled={loading}
-                                    className="hidden sm:flex items-center gap-2 px-5 py-3 rounded-xl border border-white/[0.08] bg-white/[0.03] text-sm text-white/50 hover:text-white/80 hover:border-white/[0.15] transition-all disabled:opacity-50"
-                                    whileTap={{ scale: 0.98 }}
-                                >
-                                    <ChevronLeft className="w-4 h-4" />
-                                    Back
-                                </motion.button>
-                            )}
-
-                            <motion.button
-                                onClick={handleNext}
-                                disabled={loading || !canProceed[step]}
-                                className="flex-1 flex items-center justify-center gap-2 py-3 px-5 rounded-xl bg-white text-black text-sm font-medium hover:bg-gray-200 active:bg-gray-300 disabled:bg-white/10 disabled:text-white/25 disabled:cursor-not-allowed shadow-lg shadow-white/10 transition-all"
-                                whileTap={{ scale: 0.98 }}
-                            >
-                                {loading ? (
-                                    <>
-                                        <Loader2 className="w-4 h-4 animate-spin" />
-                                        <span>Creating…</span>
-                                    </>
-                                ) : step < 3 ? (
-                                    <>
-                                        <span>Continue</span>
-                                        <ChevronRight className="w-4 h-4" />
-                                    </>
+                                {i + 1 < step ? (
+                                    <Check className="w-3 h-3 text-emerald-400" />
                                 ) : (
-                                    <>
-                                        <Check className="w-4 h-4" />
-                                        <span>Create Booking</span>
-                                    </>
+                                    <s.icon className="w-3 h-3" />
                                 )}
-                            </motion.button>
+                                {s.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto overscroll-contain">
+                    {step === 1 && (
+                        <CustomerStep
+                            walkinSearch={walkinSearch}
+                            setWalkinSearch={setWalkinSearch}
+                            walkinSearchLoading={walkinSearchLoading}
+                            customersList={customersList}
+                            selectedWalkinCustomer={selectedWalkinCustomer}
+                            onSelectCustomer={handleSelectWalkinCustomer}
+                            onDeleteCustomer={handleDeleteWalkinCustomer}
+                            deletingCustomerId={deletingCustomerId}
+                            showNewCustomerForm={showNewCustomerForm}
+                            setShowNewCustomerForm={setShowNewCustomerForm}
+                            walkInCustomer={walkInCustomer}
+                            setWalkInCustomer={setWalkInCustomer}
+                            saveToDb={saveToDb}
+                            setSaveToDb={setSaveToDb}
+                            onClearCustomer={handleClearCustomer}
+                            location={location}
+                            setLocation={setLocation}
+                            editingCustomer={editingCustomer}
+                            setEditingCustomer={setEditingCustomer}
+                            editForm={editForm}
+                            setEditForm={setEditForm}
+                            editLoading={editLoading}
+                            onSaveEdit={handleSaveEdit}
+                        />
+                    )}
+                    {step === 2 && (
+                        <ServiceStep
+                            services={filteredServices}
+                            servicesLoading={servicesLoading}
+                            selectedService={selectedService}
+                            setSelectedService={setSelectedService}
+                            serviceSearch={serviceSearch}
+                            setServiceSearch={setServiceSearch}
+                        />
+                    )}
+                    {step === 3 && (
+                        <ScheduleStep
+                            bookingDate={bookingDate}
+                            setBookingDate={setBookingDate}
+                            timeSlot={timeSlot}
+                            setTimeSlot={setTimeSlot}
+                            availability={availability}
+                            availabilityLoading={availabilityLoading}
+                            paymentMethod={paymentMethod}
+                            setPaymentMethod={setPaymentMethod}
+                            walkInCustomer={walkInCustomer}
+                            selectedService={selectedService}
+                        />
+                    )}
+                </div>
+
+                {/* Footer */}
+                <div className="shrink-0 p-3 border-t border-white/[0.06]">
+                    <button
+                        onClick={step < 3 ? () => goToStep(step + 1) : handleSubmit}
+                        disabled={loading || !canProceed[step]}
+                        className="w-full py-2.5 rounded-lg bg-white hover:bg-white/90 text-black text-xs font-semibold flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] disabled:opacity-20 disabled:cursor-not-allowed"
+                    >
+                        {loading ? (
+                            <>
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                Processing...
+                            </>
+                        ) : step < 3 ? (
+                            <>
+                                Continue
+                                <ChevronRight className="w-3.5 h-3.5" />
+                            </>
+                        ) : (
+                            'Create Booking'
+                        )}
+                    </button>
+                </div>
+            </div>
+        </>
+    );
+}
+
+// ============================================
+// STEP 1: CUSTOMER
+// ============================================
+
+function CustomerStep({
+    walkinSearch, setWalkinSearch, walkinSearchLoading,
+    customersList, selectedWalkinCustomer, onSelectCustomer,
+    onDeleteCustomer, deletingCustomerId,
+    showNewCustomerForm, setShowNewCustomerForm,
+    walkInCustomer, setWalkInCustomer,
+    saveToDb, setSaveToDb, onClearCustomer,
+    location, setLocation,
+    editingCustomer, setEditingCustomer,
+    editForm, setEditForm, editLoading, onSaveEdit,
+}) {
+    return (
+        <div className="px-4 py-3 space-y-4">
+            {/* Selected Customer Banner */}
+            {selectedWalkinCustomer && !editingCustomer && (
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-emerald-500/[0.08] border border-emerald-500/20">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center shrink-0">
+                        <span className="text-xs font-bold text-emerald-400">
+                            {selectedWalkinCustomer.name?.charAt(0)?.toUpperCase()}
+                        </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-white truncate">
+                            {selectedWalkinCustomer.name}
+                        </p>
+                        <p className="text-[10px] text-white/40 font-mono">
+                            {selectedWalkinCustomer.phone}
+                        </p>
+                    </div>
+                    <button
+                        onClick={onClearCustomer}
+                        className="w-7 h-7 rounded-lg hover:bg-white/[0.06] flex items-center justify-center"
+                    >
+                        <X className="w-3.5 h-3.5 text-white/40" />
+                    </button>
+                </div>
+            )}
+
+            {/* Search */}
+            {!selectedWalkinCustomer && !editingCustomer && (
+                <>
+                    <div>
+                        <label className="text-[10px] text-white/40 font-medium mb-2 block uppercase tracking-wide">
+                            Find Customer
+                        </label>
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30" />
+                            <input
+                                type="text"
+                                value={walkinSearch}
+                                onChange={(e) => setWalkinSearch(e.target.value)}
+                                placeholder="Search by name or phone..."
+                                className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-white placeholder-white/30 focus:outline-none focus:border-white/20"
+                            />
+                            {walkinSearchLoading && (
+                                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30 animate-spin" />
+                            )}
                         </div>
                     </div>
-                </motion.div>
-            </motion.div>
-        </>
+
+                    {/* Customer List */}
+                    {customersList.length > 0 && (
+                        <div className="space-y-1.5">
+                            <p className="text-[9px] text-white/30 font-semibold uppercase tracking-wide px-1">
+                                {walkinSearch.length >= 2 ? 'Search Results' : 'Recent Customers'}
+                            </p>
+                            <div className="space-y-1 max-h-48 overflow-y-auto">
+                                {customersList.map((c) => (
+                                    <CustomerRow
+                                        key={c._id}
+                                        customer={c}
+                                        selected={selectedWalkinCustomer?._id === c._id}
+                                        onSelect={() => onSelectCustomer(c)}
+                                        onDelete={() => onDeleteCustomer(c._id)}
+                                        onEdit={() => {
+                                            setEditingCustomer(c);
+                                            setEditForm({
+                                                name: c.name,
+                                                phone: c.phone,
+                                                address: c.address || '',
+                                                city: c.city || '',
+                                            });
+                                        }}
+                                        deleting={deletingCustomerId === c._id}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* New Customer */}
+                    {!showNewCustomerForm ? (
+                        <button
+                            onClick={() => {
+                                setShowNewCustomerForm(true);
+                                setSaveToDb(true);
+                            }}
+                            className="w-full p-3 rounded-xl border border-dashed border-white/10 hover:border-white/20 hover:bg-white/[0.02] transition-all flex items-center justify-center gap-2 text-white/40 hover:text-white/60"
+                        >
+                            <UserPlus className="w-3.5 h-3.5" />
+                            <span className="text-[11px] font-medium">New Customer</span>
+                        </button>
+                    ) : (
+                        <NewCustomerForm
+                            walkInCustomer={walkInCustomer}
+                            setWalkInCustomer={setWalkInCustomer}
+                            saveToDb={saveToDb}
+                            setSaveToDb={setSaveToDb}
+                            onCancel={() => setShowNewCustomerForm(false)}
+                        />
+                    )}
+                </>
+            )}
+
+            {/* Edit Customer */}
+            {editingCustomer && (
+                <EditCustomerForm
+                    editForm={editForm}
+                    setEditForm={setEditForm}
+                    editLoading={editLoading}
+                    onSave={onSaveEdit}
+                    onCancel={() => setEditingCustomer(null)}
+                />
+            )}
+
+            {/* Location */}
+            <div className="space-y-2">
+                <label className="text-[10px] text-white/40 font-medium uppercase tracking-wide">
+                    Service Location
+                </label>
+                <div className="space-y-2">
+                    <div className="relative">
+                        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30" />
+                        <input
+                            type="text"
+                            value={location.address}
+                            onChange={(e) => setLocation({ ...location, address: e.target.value })}
+                            placeholder="Address"
+                            className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-white placeholder-white/30 focus:outline-none focus:border-white/20"
+                        />
+                    </div>
+                    <input
+                        type="text"
+                        value={location.city}
+                        onChange={(e) => setLocation({ ...location, city: e.target.value })}
+                        placeholder="City"
+                        className="w-full px-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-white placeholder-white/30 focus:outline-none focus:border-white/20"
+                    />
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ============================================
+// CUSTOMER ROW
+// ============================================
+
+function CustomerRow({ customer, selected, onSelect, onDelete, onEdit, deleting }) {
+    const [expanded, setExpanded] = useState(false);
+
+    return (
+        <div
+            className={`flex items-center gap-2.5 p-2.5 rounded-lg transition-colors cursor-pointer group ${
+                selected
+                    ? 'bg-emerald-500/[0.08] border border-emerald-500/20'
+                    : 'bg-white/[0.02] hover:bg-white/[0.04] border border-transparent'
+            }`}
+            onClick={() => onSelect()}
+        >
+            <div className="w-7 h-7 rounded-md bg-white/[0.06] flex items-center justify-center text-[10px] font-semibold text-white/50 shrink-0">
+                {customer.name?.charAt(0)?.toUpperCase() || '?'}
+            </div>
+            <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                    <p className="text-[11px] font-medium text-white/80 truncate">
+                        {customer.name}
+                    </p>
+                    {customer.totalBookings > 0 && (
+                        <span className="flex items-center gap-0.5 px-1 py-0.5 rounded bg-emerald-500/15 text-[8px] text-emerald-400 font-semibold shrink-0">
+                            <Star className="w-2 h-2" />
+                            {customer.totalBookings}
+                        </span>
+                    )}
+                </div>
+                <p className="text-[9px] text-white/30 font-mono truncate">{customer.phone}</p>
+            </div>
+
+            {expanded ? (
+                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                    <button
+                        onClick={onEdit}
+                        className="w-6 h-6 rounded-md bg-white/[0.06] hover:bg-white/[0.1] flex items-center justify-center"
+                    >
+                        <Edit2 className="w-3 h-3 text-white/50" />
+                    </button>
+                    <button
+                        onClick={onDelete}
+                        disabled={deleting}
+                        className="w-6 h-6 rounded-md bg-red-500/10 hover:bg-red-500/20 flex items-center justify-center"
+                    >
+                        {deleting ? (
+                            <Loader2 className="w-3 h-3 text-red-400 animate-spin" />
+                        ) : (
+                            <Trash2 className="w-3 h-3 text-red-400" />
+                        )}
+                    </button>
+                </div>
+            ) : (
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setExpanded(true);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                    <MoreHorizontal className="w-3.5 h-3.5 text-white/20" />
+                </button>
+            )}
+        </div>
+    );
+}
+
+// ============================================
+// NEW CUSTOMER FORM
+// ============================================
+
+function NewCustomerForm({ walkInCustomer, setWalkInCustomer, saveToDb, setSaveToDb, onCancel }) {
+    return (
+        <div className="p-3 rounded-xl border border-white/[0.08] bg-white/[0.02] space-y-3">
+            <div className="flex items-center justify-between">
+                <span className="text-[10px] text-white/40 font-medium uppercase tracking-wide">
+                    New Customer
+                </span>
+                <button
+                    onClick={onCancel}
+                    className="text-[10px] text-white/30 hover:text-white/50"
+                >
+                    Cancel
+                </button>
+            </div>
+
+            {/* Save toggle */}
+            <div className="flex gap-1 p-1 bg-white/[0.04] rounded-lg">
+                <button
+                    onClick={() => setSaveToDb(true)}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-[10px] font-medium rounded-md transition-all ${
+                        saveToDb
+                            ? 'bg-emerald-500/20 text-emerald-400'
+                            : 'text-white/30 hover:text-white/50'
+                    }`}
+                >
+                    <Save className="w-3 h-3" />
+                    Save Regular
+                </button>
+                <button
+                    onClick={() => setSaveToDb(false)}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-[10px] font-medium rounded-md transition-all ${
+                        !saveToDb
+                            ? 'bg-white/10 text-white'
+                            : 'text-white/30 hover:text-white/50'
+                    }`}
+                >
+                    <Clock className="w-3 h-3" />
+                    One-time
+                </button>
+            </div>
+
+            <div className="space-y-2">
+                <div>
+                    <label className="text-[10px] text-white/40 font-medium mb-1.5 block uppercase tracking-wide">
+                        Name <span className="text-white/20">*</span>
+                    </label>
+                    <input
+                        type="text"
+                        value={walkInCustomer.name}
+                        onChange={(e) => setWalkInCustomer({ ...walkInCustomer, name: e.target.value })}
+                        placeholder="Customer name"
+                        className="w-full px-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-white placeholder-white/30 focus:outline-none focus:border-white/20"
+                    />
+                </div>
+                <div>
+                    <label className="text-[10px] text-white/40 font-medium mb-1.5 block uppercase tracking-wide">
+                        Phone <span className="text-white/20">*</span>
+                    </label>
+                    <input
+                        type="text"
+                        value={walkInCustomer.phone}
+                        onChange={(e) => setWalkInCustomer({ ...walkInCustomer, phone: e.target.value })}
+                        placeholder="Phone number"
+                        className="w-full px-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-white placeholder-white/30 focus:outline-none focus:border-white/20"
+                    />
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ============================================
+// EDIT CUSTOMER FORM
+// ============================================
+
+function EditCustomerForm({ editForm, setEditForm, editLoading, onSave, onCancel }) {
+    return (
+        <div className="p-3 rounded-xl border border-blue-500/20 bg-blue-500/[0.05] space-y-3">
+            <div className="flex items-center justify-between">
+                <span className="text-[10px] text-blue-400 font-medium uppercase tracking-wide">
+                    Edit Customer
+                </span>
+                <button
+                    onClick={onCancel}
+                    className="text-[10px] text-white/30 hover:text-white/50"
+                >
+                    Cancel
+                </button>
+            </div>
+
+            <div className="space-y-2">
+                <input
+                    type="text"
+                    value={editForm.name}
+                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                    placeholder="Name"
+                    className="w-full px-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-white placeholder-white/30 focus:outline-none focus:border-white/20"
+                />
+                <input
+                    type="text"
+                    value={editForm.phone}
+                    onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                    placeholder="Phone"
+                    className="w-full px-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-white placeholder-white/30 focus:outline-none focus:border-white/20"
+                />
+                <input
+                    type="text"
+                    value={editForm.address}
+                    onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                    placeholder="Address"
+                    className="w-full px-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-white placeholder-white/30 focus:outline-none focus:border-white/20"
+                />
+                <input
+                    type="text"
+                    value={editForm.city}
+                    onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
+                    placeholder="City"
+                    className="w-full px-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-white placeholder-white/30 focus:outline-none focus:border-white/20"
+                />
+            </div>
+
+            <button
+                onClick={onSave}
+                disabled={editLoading || !editForm.name || !editForm.phone}
+                className="w-full py-2.5 rounded-lg bg-white hover:bg-white/90 text-black text-xs font-semibold disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+                {editLoading ? 'Saving...' : 'Save Changes'}
+            </button>
+        </div>
+    );
+}
+
+// ============================================
+// STEP 2: SERVICE
+// ============================================
+
+function ServiceStep({
+    services, servicesLoading, selectedService,
+    setSelectedService, serviceSearch, setServiceSearch,
+}) {
+    if (servicesLoading) {
+        return (
+            <div className="flex flex-col items-center justify-center py-12">
+                <Loader2 className="w-5 h-5 text-white/30 animate-spin mb-2" />
+                <p className="text-[11px] text-white/30">Loading services...</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="px-4 py-3 space-y-3">
+            {/* Search */}
+            <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30" />
+                <input
+                    type="text"
+                    value={serviceSearch}
+                    onChange={(e) => setServiceSearch(e.target.value)}
+                    placeholder="Search services..."
+                    className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-white placeholder-white/30 focus:outline-none focus:border-white/20"
+                />
+            </div>
+
+            {/* Services List */}
+            {services.length === 0 ? (
+                <EmptyState icon={Package} title="No services found" desc="Try a different search" />
+            ) : (
+                <div className="space-y-1.5">
+                    {services.map((service) => (
+                        <button
+                            key={service._id}
+                            onClick={() => setSelectedService(service)}
+                            className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all active:scale-[0.99] ${
+                                selectedService?._id === service._id
+                                    ? 'bg-white text-black'
+                                    : 'bg-white/[0.03] hover:bg-white/[0.06]'
+                            }`}
+                        >
+                            <div
+                                className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${
+                                    selectedService?._id === service._id
+                                        ? 'bg-black/10'
+                                        : 'bg-white/[0.08] text-white/60'
+                                }`}
+                            >
+                                {service.name.charAt(0)}
+                            </div>
+                            <div className="flex-1 min-w-0 text-left">
+                                <p
+                                    className={`text-xs font-medium truncate ${
+                                        selectedService?._id === service._id
+                                            ? 'text-black'
+                                            : 'text-white/80'
+                                    }`}
+                                >
+                                    {service.name}
+                                </p>
+                                <p
+                                    className={`text-[10px] mt-0.5 ${
+                                        selectedService?._id === service._id
+                                            ? 'text-black/50'
+                                            : 'text-white/30'
+                                    }`}
+                                >
+                                    {service.category?.name || service.tier} · ₹
+                                    {(service.discountPrice || service.price || 0).toLocaleString('en-IN')}
+                                </p>
+                            </div>
+                            {selectedService?._id === service._id && (
+                                <div className="w-6 h-6 rounded-full bg-black/10 flex items-center justify-center shrink-0">
+                                    <Check className="w-3 h-3 text-black" />
+                                </div>
+                            )}
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ============================================
+// STEP 3: SCHEDULE
+// ============================================
+
+function ScheduleStep({
+    bookingDate, setBookingDate,
+    timeSlot, setTimeSlot,
+    availability, availabilityLoading,
+    paymentMethod, setPaymentMethod,
+    walkInCustomer, selectedService,
+}) {
+    return (
+        <div className="px-4 py-3 space-y-4">
+            {/* Date */}
+            <div>
+                <label className="text-[10px] text-white/40 font-medium mb-2 block uppercase tracking-wide">
+                    Date
+                </label>
+                <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30" />
+                    <input
+                        type="date"
+                        value={bookingDate}
+                        min={getTodayString()}
+                        onChange={(e) => {
+                            setBookingDate(e.target.value);
+                            setTimeSlot('');
+                        }}
+                        className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-white focus:outline-none focus:border-white/20 [color-scheme:dark]"
+                    />
+                </div>
+            </div>
+
+            {/* Time Slots */}
+            {bookingDate && (
+                <div>
+                    <label className="text-[10px] text-white/40 font-medium mb-2 block uppercase tracking-wide">
+                        Time Slot
+                    </label>
+
+                    {availabilityLoading ? (
+                        <div className="flex justify-center py-6">
+                            <Loader2 className="w-4 h-4 text-white/30 animate-spin" />
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {/* Regular Slots */}
+                            <div className="space-y-1.5">
+                                <p className="text-[9px] text-white/25 font-semibold uppercase tracking-wide px-1">
+                                    Regular Hours
+                                </p>
+                                <div className="grid grid-cols-2 gap-1.5">
+                                    {ALL_TIME_SLOTS.filter((s) => !isAdminOnlySlot(s)).map((slot) => {
+                                        const slotData = availability.find((a) => a.slot === slot);
+                                        const passed = isSlotPassed(slot, bookingDate);
+                                        const booked = slotData && !slotData.available && !passed;
+                                        const disabled = passed || booked;
+
+                                        return (
+                                            <TimeSlotChip
+                                                key={slot}
+                                                slot={slot}
+                                                selected={timeSlot === slot}
+                                                disabled={disabled}
+                                                passed={passed}
+                                                booked={booked}
+                                                onClick={() => !disabled && setTimeSlot(slot)}
+                                            />
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* Admin Slots */}
+                            <div className="space-y-1.5">
+                                <p className="text-[9px] text-purple-400/60 font-semibold uppercase tracking-wide px-1 flex items-center gap-1">
+                                    <span className="w-3 h-3 rounded-full bg-purple-500/20 flex items-center justify-center text-[7px] text-purple-400 font-bold">
+                                        A
+                                    </span>
+                                    Admin Hours
+                                </p>
+                                <div className="grid grid-cols-2 gap-1.5">
+                                    {ALL_TIME_SLOTS.filter((s) => isAdminOnlySlot(s)).map((slot) => {
+                                        const slotData = availability.find((a) => a.slot === slot);
+                                        const passed = isSlotPassed(slot, bookingDate);
+                                        const booked = slotData && !slotData.available && !passed;
+                                        const disabled = passed || booked;
+
+                                        return (
+                                            <TimeSlotChip
+                                                key={slot}
+                                                slot={slot}
+                                                selected={timeSlot === slot}
+                                                disabled={disabled}
+                                                passed={passed}
+                                                booked={booked}
+                                                isAdmin
+                                                onClick={() => !disabled && setTimeSlot(slot)}
+                                            />
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Payment */}
+            <div>
+                <label className="text-[10px] text-white/40 font-medium mb-2 block uppercase tracking-wide">
+                    Payment
+                </label>
+                <div className="flex gap-1.5">
+                    {[
+                        { key: 'cash', label: 'Cash', icon: CreditCard },
+                        { key: 'online', label: 'Online', icon: CreditCard },
+                        { key: 'pending', label: 'Pending', icon: Clock },
+                    ].map((m) => (
+                        <button
+                            key={m.key}
+                            onClick={() => setPaymentMethod(m.key)}
+                            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-[10px] font-medium transition-all ${
+                                paymentMethod === m.key
+                                    ? 'bg-white text-black'
+                                    : 'bg-white/[0.04] text-white/40 hover:bg-white/[0.08]'
+                            }`}
+                        >
+                            {paymentMethod === m.key && <Check className="w-3 h-3" />}
+                            {m.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* Summary */}
+            <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.04] space-y-2">
+                <p className="text-[9px] text-white/30 font-semibold uppercase tracking-wide">
+                    Summary
+                </p>
+                <SummaryItem label="Customer" value={walkInCustomer.name} />
+                <SummaryItem label="Service" value={selectedService?.name} />
+                <SummaryItem label="Date" value={bookingDate ? new Date(bookingDate + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : null} />
+                <SummaryItem label="Time" value={timeSlot} />
+                <SummaryItem label="Payment" value={paymentMethod} />
+                <div className="pt-2 border-t border-white/[0.04]">
+                    <SummaryItem
+                        label="Total"
+                        value={`₹${(selectedService?.discountPrice || selectedService?.price || 0).toLocaleString('en-IN')}`}
+                        highlight
+                    />
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ============================================
+// TIME SLOT CHIP
+// ============================================
+
+function TimeSlotChip({ slot, selected, disabled, passed, booked, isAdmin, onClick }) {
+    return (
+        <button
+            onClick={onClick}
+            disabled={disabled}
+            className={`relative p-2.5 rounded-lg border text-[10px] font-medium transition-all text-center ${
+                selected
+                    ? isAdmin
+                        ? 'border-purple-500/40 bg-purple-500/[0.15] text-white'
+                        : 'bg-white text-black border-white'
+                    : disabled
+                        ? 'border-white/[0.04] bg-white/[0.01] text-white/15 cursor-not-allowed'
+                        : isAdmin
+                            ? 'border-purple-500/10 bg-purple-500/[0.03] text-white/50 hover:bg-purple-500/[0.08]'
+                            : 'border-white/[0.06] bg-white/[0.02] text-white/50 hover:bg-white/[0.06]'
+            }`}
+        >
+            {isAdmin && !selected && (
+                <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-purple-500 text-white text-[7px] font-bold flex items-center justify-center">
+                    A
+                </span>
+            )}
+            <span className="block">{slot}</span>
+            {passed && <span className="block text-[8px] text-white/15 mt-0.5">Passed</span>}
+            {!passed && booked && <span className="block text-[8px] text-white/15 mt-0.5">Booked</span>}
+            {selected && (
+                <span className={`absolute top-1.5 left-1.5 w-3 h-3 rounded-full flex items-center justify-center ${isAdmin ? 'bg-purple-400' : 'bg-black/20'}`}>
+                    <Check className={`w-2 h-2 ${isAdmin ? 'text-white' : 'text-black'}`} />
+                </span>
+            )}
+        </button>
+    );
+}
+
+// ============================================
+// SUMMARY ITEM
+// ============================================
+
+function SummaryItem({ label, value, highlight }) {
+    return (
+        <div className="flex items-center justify-between gap-4">
+            <span className="text-[10px] text-white/30 shrink-0">{label}</span>
+            <span
+                className={`text-[11px] text-right truncate capitalize ${
+                    highlight
+                        ? 'text-white font-bold text-sm'
+                        : 'text-white/60'
+                }`}
+            >
+                {value || '—'}
+            </span>
+        </div>
+    );
+}
+
+// ============================================
+// EMPTY STATE
+// ============================================
+
+function EmptyState({ icon: Icon, title, desc }) {
+    return (
+        <div className="flex flex-col items-center justify-center py-10 px-4">
+            <div className="w-10 h-10 rounded-xl bg-white/[0.04] flex items-center justify-center mb-3">
+                <Icon className="w-4 h-4 text-white/20" />
+            </div>
+            <p className="text-xs font-medium text-white/60 mb-0.5">{title}</p>
+            <p className="text-[10px] text-white/30">{desc}</p>
+        </div>
     );
 }

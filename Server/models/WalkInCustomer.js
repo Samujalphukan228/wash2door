@@ -16,6 +16,23 @@ const walkInCustomerSchema = new mongoose.Schema({
         trim: true,
         match: [/^\+?[\d\s\-]{7,15}$/, 'Please enter a valid phone number']
     },
+
+    // ✅ NEW
+    address: {
+        type: String,
+        default: 'Walk-in / At Shop',
+        trim: true,
+        maxlength: [200, 'Address cannot exceed 200 characters']
+    },
+
+    // ✅ NEW
+    city: {
+        type: String,
+        default: 'Duliajan',
+        trim: true,
+        maxlength: [100, 'City cannot exceed 100 characters']
+    },
+
     notes: {
         type: String,
         default: '',
@@ -38,8 +55,8 @@ const walkInCustomerSchema = new mongoose.Schema({
         type: Boolean,
         default: true
     }
-}, { 
-    timestamps: true 
+}, {
+    timestamps: true
 });
 
 // Indexes
@@ -49,7 +66,7 @@ walkInCustomerSchema.index({ createdAt: -1 });
 walkInCustomerSchema.index({ totalBookings: -1 });
 
 // Static: Search customers
-walkInCustomerSchema.statics.search = async function(query, limit = 10) {
+walkInCustomerSchema.statics.search = async function (query, limit = 10) {
     const searchRegex = new RegExp(query, 'i');
     return this.find({
         isActive: true,
@@ -58,12 +75,12 @@ walkInCustomerSchema.statics.search = async function(query, limit = 10) {
             { phone: searchRegex }
         ]
     })
-    .sort({ totalBookings: -1, lastBookingDate: -1 })
-    .limit(limit);
+        .sort({ totalBookings: -1, lastBookingDate: -1 })
+        .limit(limit);
 };
 
 // Static: Increment booking count
-walkInCustomerSchema.statics.incrementBookingCount = async function(customerId) {
+walkInCustomerSchema.statics.incrementBookingCount = async function (customerId) {
     return this.findByIdAndUpdate(
         customerId,
         {

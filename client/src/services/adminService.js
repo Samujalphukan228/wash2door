@@ -1,11 +1,18 @@
 import axiosInstance from '@/lib/axios';
 
 const adminService = {
+
+    // ============================================
+    // DASHBOARD
+    // ============================================
     getDashboardStats: async () => {
         const response = await axiosInstance.get('/admin/dashboard/stats');
         return response.data;
     },
 
+    // ============================================
+    // USERS
+    // ============================================
     getAllUsers: async (params) => {
         const response = await axiosInstance.get('/admin/users', { params });
         return response.data;
@@ -37,6 +44,9 @@ const adminService = {
         return response.data;
     },
 
+    // ============================================
+    // BOOKINGS
+    // ============================================
     getAllBookings: async (params) => {
         const response = await axiosInstance.get('/admin/bookings', { params });
         return response.data;
@@ -67,19 +77,20 @@ const adminService = {
 
     cleanupOldBookings: async (olderThanDays = 90, status = 'completed', dryRun = false) => {
         const response = await axiosInstance.delete('/admin/bookings/cleanup', {
-            params: { 
-                olderThanDays, 
-                status, 
-                dryRun: dryRun ? 'true' : 'false' 
+            params: {
+                olderThanDays,
+                status,
+                dryRun: dryRun ? 'true' : 'false'
             }
         });
         return response.data;
     },
 
-    searchWalkInCustomers: async (query) => {
-        const response = await axiosInstance.get('/admin/walkin-customers/search', {
-            params: { q: query }
-        });
+    // ============================================
+    // WALK-IN CUSTOMERS
+    // ============================================
+    getAllWalkInCustomers: async (params) => {
+        const response = await axiosInstance.get('/admin/walkin-customers', { params });
         return response.data;
     },
 
@@ -90,18 +101,10 @@ const adminService = {
         return response.data;
     },
 
-    getAllWalkInCustomers: async (params) => {
-        const response = await axiosInstance.get('/admin/walkin-customers', { params });
-        return response.data;
-    },
-
-    getWalkInCustomerById: async (customerId) => {
-        const response = await axiosInstance.get(`/admin/walkin-customers/${customerId}`);
-        return response.data;
-    },
-
-    createWalkInCustomer: async (data) => {
-        const response = await axiosInstance.post('/admin/walkin-customers', data);
+    searchWalkInCustomers: async (query) => {
+        const response = await axiosInstance.get('/admin/walkin-customers/search', {
+            params: { q: query }
+        });
         return response.data;
     },
 
@@ -114,20 +117,23 @@ const adminService = {
     },
 
     deleteWalkInCustomer: async (customerId) => {
-        const response = await axiosInstance.delete(`/admin/walkin-customers/${customerId}`);
+        const response = await axiosInstance.delete(
+            `/admin/walkin-customers/${customerId}`
+        );
         return response.data;
     },
 
-    getAllReviews: async (params) => {
-        const response = await axiosInstance.get('/admin/reviews', { params });
+    // ✅ NEW: Fix all old customers missing address/city
+    bulkUpdateWalkInCustomers: async () => {
+        const response = await axiosInstance.put(
+            '/admin/walkin-customers/bulk-update'
+        );
         return response.data;
     },
 
-    toggleReviewVisibility: async (reviewId) => {
-        const response = await axiosInstance.put(`/admin/reviews/${reviewId}/toggle`);
-        return response.data;
-    },
-
+    // ============================================
+    // REPORTS
+    // ============================================
     getRevenueReport: async (params) => {
         const response = await axiosInstance.get('/admin/reports/revenue', { params });
         return response.data;
@@ -136,7 +142,21 @@ const adminService = {
     getBookingReport: async (params) => {
         const response = await axiosInstance.get('/admin/reports/bookings', { params });
         return response.data;
+    },
+
+    // ============================================
+    // REVIEWS
+    // ============================================
+    getAllReviews: async (params) => {
+        const response = await axiosInstance.get('/admin/reviews', { params });
+        return response.data;
+    },
+
+    toggleReviewVisibility: async (reviewId) => {
+        const response = await axiosInstance.put(`/admin/reviews/${reviewId}/toggle`);
+        return response.data;
     }
+
 };
 
 export default adminService;
