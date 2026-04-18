@@ -1,24 +1,18 @@
-// src/components/admin/subcategories/EditSubcategoryModal.jsx
 'use client';
 
 import { useState } from 'react';
-import { X, Loader2, ChevronLeft } from 'lucide-react';
+import { X, Loader2, Upload, ChevronLeft } from 'lucide-react';
 import subcategoryService from '@/services/subcategoryService';
 import toast from 'react-hot-toast';
 
-const EMOJI_OPTIONS = ['🚗', '🛋️', '👟', '🏠', '🧹', '🧺', '🪟', '🛵', '🚿', '✨'];
-
 export default function EditSubcategoryModal({ subcategory, categoryName, onClose, onSuccess }) {
     const [loading, setLoading] = useState(false);
-
     const [name, setName] = useState(subcategory.name || '');
     const [description, setDescription] = useState(subcategory.description || '');
-    const [icon, setIcon] = useState(subcategory.icon || '');
     const [displayOrder, setDisplayOrder] = useState(subcategory.displayOrder || 0);
     const [isActive, setIsActive] = useState(
         subcategory.isActive !== undefined ? subcategory.isActive : true
     );
-
     const [image, setImage] = useState(null);
     const [imagePreview, setImagePreview] = useState(null);
     const [existingImage] = useState(subcategory.image?.url || null);
@@ -37,23 +31,16 @@ export default function EditSubcategoryModal({ subcategory, categoryName, onClos
             toast.error('Subcategory name is required');
             return;
         }
-
         try {
             setLoading(true);
-
             const formData = new FormData();
             formData.append('name', name.trim());
             formData.append('description', description);
-            formData.append('icon', icon);
             formData.append('displayOrder', displayOrder);
             formData.append('isActive', isActive);
-
-            if (image) {
-                formData.append('image', image);
-            }
-
+            if (image) formData.append('image', image);
             await subcategoryService.update(subcategory._id, formData);
-            await new Promise(resolve => setTimeout(resolve, 300));
+            await new Promise((resolve) => setTimeout(resolve, 300));
             onClose();
             setTimeout(() => onSuccess(), 100);
         } catch (error) {
@@ -62,204 +49,225 @@ export default function EditSubcategoryModal({ subcategory, categoryName, onClos
         }
     };
 
+    const currentPreview =
+        imagePreview ||
+        (existingImage && !existingImage.includes('default') ? existingImage : null);
+
     return (
         <>
-            <div
-                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden sm:block"
-                onClick={onClose}
-            />
+            {/* Backdrop */}
+            <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50" onClick={onClose} />
 
-            <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center pointer-events-none">
-                <div className="pointer-events-auto w-full sm:max-w-lg sm:max-h-[92vh] h-full sm:h-auto flex flex-col bg-black sm:rounded-2xl border-0 sm:border sm:border-white/[0.08] shadow-2xl overflow-hidden">
+            {/* Modal */}
+            <div className="fixed inset-2 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[460px] sm:max-h-[85vh] bg-neutral-950 rounded-2xl overflow-hidden z-50 flex flex-col border border-white/[0.08]">
 
-                    {/* Header */}
-                    <div className="shrink-0 flex items-center gap-3 p-3 sm:p-4 border-b border-white/[0.06]">
-                        <button
-                            onClick={onClose}
-                            className="w-8 h-8 rounded-lg flex items-center justify-center border border-white/[0.08] bg-white/[0.02] text-gray-500 hover:text-white hover:bg-white/[0.04] transition-all"
-                        >
-                            <ChevronLeft className="w-4 h-4" />
-                        </button>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-[10px] text-gray-500 uppercase tracking-wider">
-                                Edit Subcategory
-                            </p>
-                            <p className="text-sm font-medium text-white mt-0.5 truncate">
-                                {subcategory.name}
-                            </p>
+                {/* Header */}
+                <div className="shrink-0 px-4 pt-4 pb-3">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                            <button
+                                onClick={onClose}
+                                className="w-8 h-8 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] flex items-center justify-center transition-colors"
+                            >
+                                <ChevronLeft className="w-4 h-4 text-white/60" />
+                            </button>
+                            <div>
+                                <h2 className="text-sm font-semibold text-white">
+                                    Edit Subcategory
+                                </h2>
+                                <p className="text-[10px] text-white/40 truncate max-w-[220px]">
+                                    {subcategory.name}
+                                </p>
+                            </div>
                         </div>
                         <button
                             onClick={onClose}
-                            className="w-8 h-8 rounded-lg flex items-center justify-center border border-white/[0.08] bg-white/[0.02] text-gray-500 hover:text-white hover:bg-white/[0.04] transition-all"
+                            className="w-8 h-8 rounded-lg hover:bg-white/[0.06] flex items-center justify-center transition-colors"
                         >
-                            <X className="w-3.5 h-3.5" />
+                            <X className="w-3.5 h-3.5 text-white/40" />
                         </button>
                     </div>
+                </div>
 
-                    {/* Content */}
-                    <div className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 space-y-5">
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-3 space-y-4">
 
-                        {/* Category Info */}
-                        <div className="p-3 sm:p-4 rounded-xl border border-white/[0.08] bg-white/[0.02]">
-                            <p className="text-[10px] text-gray-500 uppercase tracking-wider font-medium mb-1">
+                    {/* Category Info */}
+                    <div className="flex items-center gap-2.5 p-3 rounded-lg bg-white/[0.02] border border-white/[0.06]">
+                        <div className="flex-1 min-w-0">
+                            <p className="text-[9px] text-white/30 font-semibold uppercase tracking-wide mb-0.5">
                                 Category
                             </p>
-                            <p className="text-sm text-white">{categoryName}</p>
+                            <p className="text-xs text-white/70 truncate">{categoryName}</p>
                         </div>
-
-                        <FieldGroup label="Subcategory Name *">
-                            <input
-                                type="text"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                placeholder="Subcategory name"
-                                disabled={loading}
-                                className="w-full bg-white/[0.02] border border-white/[0.08] text-white text-sm placeholder-gray-600 px-3 py-2.5 rounded-xl focus:outline-none focus:border-white/[0.15] transition-colors disabled:opacity-50"
-                            />
-                        </FieldGroup>
-
-                        {/* Active Toggle */}
-                        <div className="p-3 sm:p-4 rounded-xl border border-white/[0.08] bg-white/[0.02]">
-                            <div className="flex items-center justify-between">
-                                <div className="flex-1">
-                                    <p className="text-sm font-medium text-white">Active Status</p>
-                                    <p className="text-[10px] text-gray-600 mt-0.5">
-                                        {isActive ? 'Visible to customers' : 'Hidden from customers'}
-                                    </p>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => setIsActive(!isActive)}
-                                    disabled={loading}
-                                    className={`
-                                        relative w-11 h-6 rounded-full transition-all
-                                        ${isActive ? 'bg-emerald-500' : 'bg-white/[0.08]'}
-                                        disabled:opacity-50
-                                    `}
-                                >
-                                    <div className={`
-                                        absolute top-1 w-4 h-4 rounded-full bg-white transition-transform
-                                        ${isActive ? 'translate-x-6' : 'translate-x-1'}
-                                    `} />
-                                </button>
-                            </div>
-                        </div>
-
-                        <FieldGroup label="Description">
-                            <textarea
-                                value={description}
-                                onChange={(e) => setDescription(e.target.value)}
-                                placeholder="Brief description..."
-                                rows={3}
-                                disabled={loading}
-                                className="w-full bg-white/[0.02] border border-white/[0.08] text-white text-sm placeholder-gray-600 px-3 py-2.5 rounded-xl focus:outline-none focus:border-white/[0.15] transition-colors resize-none disabled:opacity-50"
-                            />
-                        </FieldGroup>
-
-                        <FieldGroup label="Icon (Emoji)">
-                            <div className="flex flex-wrap gap-1.5 mb-2">
-                                {EMOJI_OPTIONS.map((emoji) => (
-                                    <button
-                                        key={emoji}
-                                        type="button"
-                                        onClick={() => setIcon(emoji)}
-                                        disabled={loading}
-                                        className={`
-                                            w-9 h-9 sm:w-10 sm:h-10 text-lg rounded-xl border transition-all
-                                            ${icon === emoji
-                                                ? 'border-white/[0.15] bg-white/[0.08]'
-                                                : 'border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.04]'
-                                            }
-                                            disabled:opacity-50
-                                        `}
-                                    >
-                                        {emoji}
-                                    </button>
-                                ))}
-                            </div>
-                            <input
-                                type="text"
-                                value={icon}
-                                onChange={(e) => setIcon(e.target.value)}
-                                placeholder="Or type custom emoji"
-                                disabled={loading}
-                                className="w-full bg-white/[0.02] border border-white/[0.08] text-white text-sm placeholder-gray-600 px-3 py-2.5 rounded-xl focus:outline-none focus:border-white/[0.15] transition-colors disabled:opacity-50"
-                            />
-                        </FieldGroup>
-
-                        <FieldGroup label="Subcategory Image">
-                            <div className="flex items-start gap-3">
-                                <div className="relative w-24 h-20 bg-white/[0.04] rounded-xl overflow-hidden shrink-0 border border-white/[0.08] flex items-center justify-center">
-                                    {imagePreview ? (
-                                        <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
-                                    ) : existingImage && !existingImage.includes('default') ? (
-                                        <img src={existingImage} alt="Current" className="w-full h-full object-cover" />
-                                    ) : (
-                                        <span className="text-2xl">{icon || '📂'}</span>
-                                    )}
-                                </div>
-                                <label className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-dashed border-white/[0.08] hover:border-white/[0.15] cursor-pointer transition-all text-[10px] sm:text-xs text-gray-400 hover:text-white bg-white/[0.02] hover:bg-white/[0.04]">
-                                    Change Image
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={handleImageChange}
-                                        disabled={loading}
-                                        className="hidden"
-                                    />
-                                </label>
-                            </div>
-                        </FieldGroup>
-
-                        <FieldGroup label="Display Order">
-                            <input
-                                type="number"
-                                value={displayOrder}
-                                onChange={(e) => setDisplayOrder(Number(e.target.value))}
-                                disabled={loading}
-                                className="w-full bg-white/[0.02] border border-white/[0.08] text-white text-sm placeholder-gray-600 px-3 py-2.5 rounded-xl focus:outline-none focus:border-white/[0.15] transition-colors disabled:opacity-50"
-                            />
-                            <p className="text-[10px] text-gray-600 mt-1.5">Lower numbers appear first</p>
-                        </FieldGroup>
                     </div>
 
-                    {/* Footer */}
-                    <div className="shrink-0 p-3 sm:p-4 border-t border-white/[0.06] flex gap-2">
-                        <button
-                            onClick={onClose}
+                    {/* Name */}
+                    <div>
+                        <label className="text-[10px] text-white/40 font-medium mb-2 block uppercase tracking-wide">
+                            Subcategory Name <span className="text-white/20">*</span>
+                        </label>
+                        <input
+                            type="text"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            placeholder="Subcategory name"
                             disabled={loading}
-                            className="hidden sm:flex items-center px-4 py-2.5 rounded-xl border border-white/[0.08] bg-white/[0.02] text-xs text-gray-400 hover:text-white hover:bg-white/[0.04] transition-all disabled:opacity-50"
-                        >
-                            Cancel
-                        </button>
+                            className="w-full px-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-white placeholder-white/30 focus:outline-none focus:border-white/20 transition-colors disabled:opacity-50"
+                        />
+                    </div>
+
+                    {/* Active Status */}
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-white/[0.02] border border-white/[0.06]">
+                        <div>
+                            <p className="text-xs font-medium text-white">Active Status</p>
+                            <p className="text-[10px] text-white/30 mt-0.5">
+                                {isActive ? 'Visible to customers' : 'Hidden from customers'}
+                            </p>
+                        </div>
                         <button
-                            onClick={handleSubmit}
-                            disabled={loading || !name.trim()}
-                            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white text-black text-sm font-medium hover:bg-white/90 active:bg-white/80 disabled:bg-white/[0.06] disabled:text-gray-600 disabled:cursor-not-allowed transition-all"
+                            type="button"
+                            onClick={() => setIsActive(!isActive)}
+                            disabled={loading}
+                            style={{ width: '40px', height: '22px' }}
+                            className={`relative rounded-full transition-all duration-200 shrink-0 disabled:opacity-50 ${
+                                isActive ? 'bg-white' : 'bg-white/10'
+                            }`}
                         >
-                            {loading ? (
-                                <>
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                    Saving…
-                                </>
-                            ) : (
-                                'Save Changes'
-                            )}
+                            <div
+                                className={`absolute top-[3px] w-4 h-4 rounded-full bg-neutral-950 transition-transform duration-200 ${
+                                    isActive ? 'translate-x-[21px]' : 'translate-x-[3px]'
+                                }`}
+                            />
                         </button>
                     </div>
+
+                    {/* Description */}
+                    <div>
+                        <label className="text-[10px] text-white/40 font-medium mb-2 block uppercase tracking-wide">
+                            Description
+                        </label>
+                        <textarea
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            placeholder="Brief description..."
+                            rows={3}
+                            disabled={loading}
+                            className="w-full px-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-white placeholder-white/30 focus:outline-none focus:border-white/20 resize-none transition-colors disabled:opacity-50"
+                        />
+                    </div>
+
+                    {/* Image */}
+                    <div>
+                        <label className="text-[10px] text-white/40 font-medium mb-2 block uppercase tracking-wide">
+                            Subcategory Image
+                        </label>
+                        <div className="flex items-start gap-3">
+                            <div className="relative w-20 h-16 bg-white/[0.04] rounded-lg overflow-hidden shrink-0 border border-white/[0.06]">
+                                {currentPreview ? (
+                                    <>
+                                        <img
+                                            src={currentPreview}
+                                            alt="Preview"
+                                            className="w-full h-full object-cover"
+                                        />
+                                        {imagePreview && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setImage(null);
+                                                    setImagePreview(null);
+                                                }}
+                                                disabled={loading}
+                                                className="absolute top-1 right-1 w-5 h-5 bg-black/80 rounded-md flex items-center justify-center text-white hover:bg-black transition-colors"
+                                            >
+                                                <X className="w-3 h-3" />
+                                            </button>
+                                        )}
+                                    </>
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center">
+                                        <span className="text-[10px] text-white/20">No image</span>
+                                    </div>
+                                )}
+                            </div>
+                            <label className="px-3 py-2 rounded-lg border border-dashed border-white/10 hover:border-white/20 cursor-pointer transition-all text-[10px] text-white/40 hover:text-white/60 bg-white/[0.02] hover:bg-white/[0.04]">
+                                Change Image
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleImageChange}
+                                    disabled={loading}
+                                    className="hidden"
+                                />
+                            </label>
+                        </div>
+                    </div>
+
+                    {/* Display Order */}
+                    <div>
+                        <label className="text-[10px] text-white/40 font-medium mb-2 block uppercase tracking-wide">
+                            Display Order
+                        </label>
+                        <input
+                            type="number"
+                            value={displayOrder}
+                            onChange={(e) => setDisplayOrder(Number(e.target.value))}
+                            disabled={loading}
+                            className="w-full px-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-white placeholder-white/30 focus:outline-none focus:border-white/20 transition-colors disabled:opacity-50"
+                        />
+                        <p className="text-[10px] text-white/25 mt-1.5">
+                            Lower numbers appear first
+                        </p>
+                    </div>
+
+                    {/* Summary */}
+                    <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.04] space-y-2">
+                        <p className="text-[9px] text-white/30 font-semibold uppercase tracking-wide">
+                            Summary
+                        </p>
+                        <SummaryItem label="Name" value={name} />
+                        <SummaryItem label="Category" value={categoryName} />
+                        <SummaryItem label="Status" value={isActive ? 'Active' : 'Inactive'} />
+                        <SummaryItem label="Order" value={String(displayOrder)} />
+                        <SummaryItem
+                            label="Image"
+                            value={
+                                imagePreview ? 'New image' : existingImage ? 'Current' : 'None'
+                            }
+                        />
+                    </div>
+                </div>
+
+                {/* Footer */}
+                <div className="shrink-0 p-3 border-t border-white/[0.06]">
+                    <button
+                        onClick={handleSubmit}
+                        disabled={loading || !name.trim()}
+                        className="w-full py-2.5 rounded-lg bg-white hover:bg-white/90 text-black text-xs font-semibold flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] disabled:opacity-20 disabled:cursor-not-allowed"
+                    >
+                        {loading ? (
+                            <>
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                Saving...
+                            </>
+                        ) : (
+                            'Save Changes'
+                        )}
+                    </button>
                 </div>
             </div>
         </>
     );
 }
 
-function FieldGroup({ label, children }) {
+function SummaryItem({ label, value }) {
     return (
-        <div>
-            <label className="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wider font-medium mb-2 block">
-                {label}
-            </label>
-            {children}
+        <div className="flex items-center justify-between gap-4">
+            <span className="text-[10px] text-white/30 shrink-0">{label}</span>
+            <span className="text-[11px] text-white/60 text-right truncate capitalize">
+                {value || '—'}
+            </span>
         </div>
     );
 }

@@ -9,16 +9,6 @@ import toast from 'react-hot-toast';
 
 const TIERS = ['basic', 'standard', 'premium', 'custom'];
 
-const inputCls = `
-    w-full bg-white/[0.03] border border-white/[0.08]
-    text-white/80 text-sm placeholder-white/20
-    px-3 py-2.5 rounded-lg
-    focus:outline-none focus:border-white/20 focus:bg-white/[0.05]
-    transition-all duration-150
-`;
-
-const sectionLabel = `text-[10px] text-white/25 uppercase tracking-widest font-medium mb-3 block`;
-
 export default function CreateServiceModal({ onClose, onSuccess }) {
     const [loading, setLoading] = useState(false);
     const [categories, setCategories] = useState([]);
@@ -37,101 +27,76 @@ export default function CreateServiceModal({ onClose, onSuccess }) {
     const [images, setImages] = useState([]);
     const [imagePreviews, setImagePreviews] = useState([]);
 
-    // Fetch categories
     useEffect(() => {
-        const fetchCategories = async () => {
+        (async () => {
             try {
                 const response = await categoryService.getAll({ limit: 100 });
                 const cats = response.data?.categories || response.data || [];
                 setCategories(Array.isArray(cats) ? cats : []);
-            } catch (error) {
-                console.error('Failed to load categories:', error);
+            } catch {
                 toast.error('Failed to load categories');
             } finally {
                 setLoadingCategories(false);
             }
-        };
-        fetchCategories();
+        })();
     }, []);
 
-    // Fetch subcategories
     useEffect(() => {
         if (!category) {
             setSubcategories([]);
             setSubcategory('');
             return;
         }
-
-        const fetchSubcategories = async () => {
+        (async () => {
             try {
                 setLoadingSubcategories(true);
                 const response = await subcategoryService.getByCategory(category);
-                
                 let subs = [];
                 if (response.data?.subcategories && Array.isArray(response.data.subcategories)) {
                     subs = response.data.subcategories;
                 } else if (Array.isArray(response.data)) {
                     subs = response.data;
                 }
-                
                 setSubcategories(Array.isArray(subs) ? subs : []);
                 setSubcategory('');
-            } catch (error) {
-                console.error('Failed to load subcategories:', error);
+            } catch {
                 toast.error('Failed to load subcategories');
                 setSubcategories([]);
             } finally {
                 setLoadingSubcategories(false);
             }
-        };
-        
-        fetchSubcategories();
+        })();
     }, [category]);
 
     const handleImageChange = (e) => {
         const files = Array.from(e.target.files);
-        if (images.length + files.length > 3) { 
-            toast.error('Maximum 3 images allowed'); 
-            return; 
+        if (images.length + files.length > 3) {
+            toast.error('Maximum 3 images allowed');
+            return;
         }
-        setImages(prev => [...prev, ...files]);
-        files.forEach(file => {
+        setImages((prev) => [...prev, ...files]);
+        files.forEach((file) => {
             const reader = new FileReader();
-            reader.onload = (ev) => setImagePreviews(prev => [...prev, ev.target.result]);
+            reader.onload = (ev) =>
+                setImagePreviews((prev) => [...prev, ev.target.result]);
             reader.readAsDataURL(file);
         });
     };
 
     const removeImage = (index) => {
-        setImages(prev => prev.filter((_, i) => i !== index));
-        setImagePreviews(prev => prev.filter((_, i) => i !== index));
+        setImages((prev) => prev.filter((_, i) => i !== index));
+        setImagePreviews((prev) => prev.filter((_, i) => i !== index));
     };
 
     const handleSubmit = async () => {
-        if (!name.trim()) { 
-            toast.error('Service name is required'); 
-            return; 
-        }
-        if (!category) { 
-            toast.error('Select a category'); 
-            return; 
-        }
-        if (!subcategory) { 
-            toast.error('Select a subcategory'); 
-            return; 
-        }
-        if (!price) { 
-            toast.error('Enter price'); 
-            return; 
-        }
-        if (!duration) { 
-            toast.error('Enter duration'); 
-            return; 
-        }
+        if (!name.trim()) { toast.error('Service name is required'); return; }
+        if (!category) { toast.error('Select a category'); return; }
+        if (!subcategory) { toast.error('Select a subcategory'); return; }
+        if (!price) { toast.error('Enter price'); return; }
+        if (!duration) { toast.error('Enter duration'); return; }
 
         try {
             setLoading(true);
-
             const formData = new FormData();
             formData.append('name', name.trim());
             formData.append('category', category);
@@ -140,17 +105,13 @@ export default function CreateServiceModal({ onClose, onSuccess }) {
             formData.append('price', Number(price));
             if (discountPrice) formData.append('discountPrice', Number(discountPrice));
             formData.append('duration', Number(duration));
-            formData.append('features', JSON.stringify(features.filter(f => f.trim())));
-
-            // Add images
-            images.forEach(img => formData.append('images', img));
-
+            formData.append('features', JSON.stringify(features.filter((f) => f.trim())));
+            images.forEach((img) => formData.append('images', img));
             await serviceService.create(formData);
             toast.success('Service created!');
             onClose();
             onSuccess();
         } catch (error) {
-            console.error('Create service error:', error);
             toast.error(error.response?.data?.message || 'Failed to create service');
         } finally {
             setLoading(false);
@@ -161,304 +122,293 @@ export default function CreateServiceModal({ onClose, onSuccess }) {
 
     return (
         <>
-            <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden sm:block" onClick={onClose} />
+            {/* Backdrop */}
+            <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50" onClick={onClose} />
 
-            <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center pointer-events-none">
-                <div className="
-                    pointer-events-auto
-                    w-full sm:max-w-lg sm:max-h-[92vh]
-                    h-full sm:h-auto
-                    flex flex-col
-                    bg-[#0a0a0a]
-                    sm:rounded-xl
-                    border-0 sm:border sm:border-white/[0.08]
-                    shadow-2xl shadow-black/80
-                    overflow-hidden
-                ">
-                    <div className="h-px w-full bg-gradient-to-r from-transparent via-white/15 to-transparent shrink-0" />
+            {/* Modal */}
+            <div className="fixed inset-2 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[460px] sm:max-h-[85vh] bg-neutral-950 rounded-2xl overflow-hidden z-50 flex flex-col border border-white/[0.08]">
 
-                    {/* Header */}
-                    <div className="shrink-0 flex items-center gap-3 px-4 py-4">
-                        <button
-                            onClick={onClose}
-                            className="w-8 h-8 rounded-lg flex items-center justify-center border border-white/[0.06] bg-white/[0.03] text-white/35 hover:text-white/70 transition-all duration-150"
-                        >
-                            <ChevronLeft className="w-4 h-4" />
-                        </button>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-[10px] text-white/25 uppercase tracking-widest">New Service</p>
-                            <p className="text-sm font-medium text-white/80 mt-0.5">Create Service</p>
+                {/* Header */}
+                <div className="shrink-0 px-4 pt-4 pb-3">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                            <button
+                                onClick={onClose}
+                                className="w-8 h-8 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] flex items-center justify-center transition-colors"
+                            >
+                                <ChevronLeft className="w-4 h-4 text-white/60" />
+                            </button>
+                            <div>
+                                <h2 className="text-sm font-semibold text-white">Create Service</h2>
+                                <p className="text-[10px] text-white/40">Add a new service</p>
+                            </div>
                         </div>
                         <button
                             onClick={onClose}
-                            className="w-8 h-8 rounded-lg flex items-center justify-center border border-white/[0.06] bg-white/[0.03] text-white/30 hover:text-white/70 transition-all duration-150"
+                            className="w-8 h-8 rounded-lg hover:bg-white/[0.06] flex items-center justify-center transition-colors"
                         >
-                            <X className="w-3.5 h-3.5" />
+                            <X className="w-3.5 h-3.5 text-white/40" />
                         </button>
                     </div>
+                </div>
 
-                    <div className="h-px bg-white/[0.05] shrink-0" />
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-3 space-y-4">
 
-                    {/* Content */}
-                    <div className="flex-1 overflow-y-auto px-4 py-5 space-y-5">
-                        
-                        {/* Service Name */}
-                        <div>
-                            <label className={sectionLabel}>Service Name *</label>
-                            <input
-                                type="text"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                placeholder="e.g. Professional Photography"
+                    {/* Service Name */}
+                    <div>
+                        <label className="text-[10px] text-white/40 font-medium mb-2 block uppercase tracking-wide">
+                            Service Name <span className="text-white/20">*</span>
+                        </label>
+                        <input
+                            type="text"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            placeholder="e.g. Professional Car Wash"
+                            disabled={loading}
+                            className="w-full px-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-white placeholder-white/30 focus:outline-none focus:border-white/20 transition-colors disabled:opacity-50"
+                        />
+                    </div>
+
+                    {/* Category */}
+                    <div>
+                        <label className="text-[10px] text-white/40 font-medium mb-2 block uppercase tracking-wide">
+                            Category <span className="text-white/20">*</span>
+                        </label>
+                        {loadingCategories ? (
+                            <div className="h-9 bg-white/[0.04] animate-pulse rounded-lg" />
+                        ) : (
+                            <select
+                                value={category}
+                                onChange={(e) => setCategory(e.target.value)}
                                 disabled={loading}
-                                className={inputCls}
-                            />
-                        </div>
-
-                        {/* Category */}
-                        <div>
-                            <label className={sectionLabel}>Category *</label>
-                            {loadingCategories ? (
-                                <div className="h-10 bg-white/[0.04] animate-pulse rounded-lg" />
-                            ) : (
-                                <select 
-                                    value={category} 
-                                    onChange={(e) => setCategory(e.target.value)} 
-                                    disabled={loading} 
-                                    className={inputCls}
-                                >
-                                    <option value="">Select category</option>
-                                    {categories.map(cat => (
-                                        <option key={cat._id} value={cat._id}>
-                                            {cat.icon} {cat.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            )}
-                        </div>
-
-                        {/* Subcategory */}
-                        <div>
-                            <label className={sectionLabel}>Subcategory *</label>
-                            {!category ? (
-                                <div className="p-4 rounded-lg border border-white/[0.07] bg-white/[0.02] text-center">
-                                    <p className="text-xs text-white/30">Select a category first</p>
-                                </div>
-                            ) : loadingSubcategories ? (
-                                <div className="space-y-2">
-                                    {[...Array(3)].map((_, i) => (
-                                        <div key={i} className="h-10 bg-white/[0.04] animate-pulse rounded-lg" />
-                                    ))}
-                                </div>
-                            ) : subcategories.length > 0 ? (
-                                <select 
-                                    value={subcategory} 
-                                    onChange={(e) => setSubcategory(e.target.value)} 
-                                    disabled={loading} 
-                                    className={inputCls}
-                                >
-                                    <option value="">Select subcategory</option>
-                                    {subcategories.map(sub => (
-                                        <option key={sub._id} value={sub._id}>
-                                            {sub.icon} {sub.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            ) : (
-                                <div className="p-4 rounded-lg border border-white/[0.07] bg-white/[0.02] text-center">
-                                    <p className="text-xs text-white/30">No subcategories available</p>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Tier */}
-                        <div>
-                            <label className={sectionLabel}>Service Tier</label>
-                            <div className="grid grid-cols-4 gap-2">
-                                {TIERS.map(t => (
-                                    <button
-                                        key={t}
-                                        type="button"
-                                        onClick={() => setTier(t)}
-                                        disabled={loading}
-                                        className={`
-                                            py-2.5 rounded-lg border text-xs capitalize transition-all duration-150
-                                            ${tier === t
-                                                ? 'border-white/25 bg-white/[0.06] text-white/80'
-                                                : 'border-white/[0.07] bg-white/[0.02] text-white/30 hover:border-white/[0.12]'
-                                            }
-                                            disabled:opacity-50
-                                        `}
-                                    >
-                                        {t}
-                                    </button>
+                                className="w-full px-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-white focus:outline-none focus:border-white/20 transition-colors disabled:opacity-50 [color-scheme:dark]"
+                            >
+                                <option value="">Select category</option>
+                                {categories.map((cat) => (
+                                    <option key={cat._id} value={cat._id}>
+                                        {cat.name}
+                                    </option>
                                 ))}
-                            </div>
-                        </div>
+                            </select>
+                        )}
+                    </div>
 
-                        {/* Price & Discount */}
-                        <div className="grid grid-cols-2 gap-3">
-                            <div>
-                                <label className={sectionLabel}>Price (₹) *</label>
-                                <input
-                                    type="number"
-                                    value={price}
-                                    onChange={(e) => setPrice(e.target.value)}
-                                    placeholder="500"
-                                    disabled={loading}
-                                    className={inputCls}
-                                />
+                    {/* Subcategory */}
+                    <div>
+                        <label className="text-[10px] text-white/40 font-medium mb-2 block uppercase tracking-wide">
+                            Subcategory <span className="text-white/20">*</span>
+                        </label>
+                        {!category ? (
+                            <div className="p-3 rounded-lg border border-white/[0.06] bg-white/[0.02] text-center">
+                                <p className="text-[10px] text-white/25">Select a category first</p>
                             </div>
-                            <div>
-                                <label className={sectionLabel}>Discount Price</label>
-                                <input
-                                    type="number"
-                                    value={discountPrice}
-                                    onChange={(e) => setDiscountPrice(e.target.value)}
-                                    placeholder="450"
-                                    disabled={loading}
-                                    className={inputCls}
-                                />
+                        ) : loadingSubcategories ? (
+                            <div className="h-9 bg-white/[0.04] animate-pulse rounded-lg" />
+                        ) : subcategories.length > 0 ? (
+                            <select
+                                value={subcategory}
+                                onChange={(e) => setSubcategory(e.target.value)}
+                                disabled={loading}
+                                className="w-full px-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-white focus:outline-none focus:border-white/20 transition-colors disabled:opacity-50 [color-scheme:dark]"
+                            >
+                                <option value="">Select subcategory</option>
+                                {subcategories.map((sub) => (
+                                    <option key={sub._id} value={sub._id}>
+                                        {sub.name}
+                                    </option>
+                                ))}
+                            </select>
+                        ) : (
+                            <div className="p-3 rounded-lg border border-white/[0.06] bg-white/[0.02] text-center">
+                                <p className="text-[10px] text-white/25">No subcategories available</p>
                             </div>
-                        </div>
+                        )}
+                    </div>
 
-                        {/* Duration */}
+                    {/* Tier */}
+                    <div>
+                        <label className="text-[10px] text-white/40 font-medium mb-2 block uppercase tracking-wide">
+                            Service Tier
+                        </label>
+                        <div className="grid grid-cols-4 gap-1.5">
+                            {TIERS.map((t) => (
+                                <button
+                                    key={t}
+                                    type="button"
+                                    onClick={() => setTier(t)}
+                                    disabled={loading}
+                                    className={`py-2 rounded-lg border text-[10px] font-medium capitalize transition-all disabled:opacity-50 ${
+                                        tier === t
+                                            ? 'border-white/20 bg-white/[0.08] text-white'
+                                            : 'border-white/[0.06] bg-white/[0.02] text-white/30 hover:border-white/[0.12] hover:text-white/50'
+                                    }`}
+                                >
+                                    {t}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Price & Discount */}
+                    <div className="grid grid-cols-2 gap-2">
                         <div>
-                            <label className={sectionLabel}>Duration (min) *</label>
+                            <label className="text-[10px] text-white/40 font-medium mb-2 block uppercase tracking-wide">
+                                Price (₹) <span className="text-white/20">*</span>
+                            </label>
                             <input
                                 type="number"
-                                value={duration}
-                                onChange={(e) => setDuration(e.target.value)}
-                                placeholder="60"
+                                value={price}
+                                onChange={(e) => setPrice(e.target.value)}
+                                placeholder="500"
                                 disabled={loading}
-                                className={inputCls}
+                                className="w-full px-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-white placeholder-white/30 focus:outline-none focus:border-white/20 transition-colors disabled:opacity-50"
                             />
                         </div>
-
-                        {/* Features */}
                         <div>
-                            <div className="flex items-center justify-between mb-3">
-                                <label className={sectionLabel} style={{ marginBottom: 0 }}>
-                                    Features ({features.filter(f => f.trim()).length}/10)
-                                </label>
-                                <button
-                                    type="button"
-                                    onClick={() => features.length < 10 && setFeatures(p => [...p, ''])}
-                                    disabled={loading || features.length >= 10}
-                                    className="text-[11px] text-white/30 hover:text-white/60 disabled:opacity-30 transition-all duration-150"
-                                >
-                                    + Add
-                                </button>
-                            </div>
-                            <div className="space-y-2">
-                                {features.map((f, i) => (
-                                    <div key={i} className="flex gap-2">
-                                        <input
-                                            type="text"
-                                            value={f}
-                                            onChange={(e) => {
-                                                const updated = [...features];
-                                                updated[i] = e.target.value;
-                                                setFeatures(updated);
-                                            }}
-                                            placeholder={`e.g. Feature ${i + 1}`}
-                                            disabled={loading}
-                                            className={inputCls}
-                                            maxLength={100}
-                                        />
-                                        {features.length > 1 && (
-                                            <button
-                                                type="button"
-                                                onClick={() => setFeatures(p => p.filter((_, idx) => idx !== i))}
-                                                disabled={loading}
-                                                className="w-8 h-10 rounded-lg flex items-center justify-center text-white/20 hover:text-white/60 hover:bg-white/[0.05] transition-all duration-150 shrink-0"
-                                            >
-                                                <X className="w-3.5 h-3.5" />
-                                            </button>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
+                            <label className="text-[10px] text-white/40 font-medium mb-2 block uppercase tracking-wide">
+                                Discount Price
+                            </label>
+                            <input
+                                type="number"
+                                value={discountPrice}
+                                onChange={(e) => setDiscountPrice(e.target.value)}
+                                placeholder="450"
+                                disabled={loading}
+                                className="w-full px-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-white placeholder-white/30 focus:outline-none focus:border-white/20 transition-colors disabled:opacity-50"
+                            />
                         </div>
+                    </div>
 
-                        {/* Images */}
-                        <div>
-                            <label className={sectionLabel}>Images (max 3)</label>
-                            <div className="grid grid-cols-3 gap-3">
-                                {imagePreviews.map((preview, i) => (
-                                    <div key={i} className="relative aspect-square bg-white/[0.03] rounded-lg overflow-hidden border border-white/[0.06]">
-                                        <img src={preview} alt="" className="w-full h-full object-cover" />
+                    {/* Duration */}
+                    <div>
+                        <label className="text-[10px] text-white/40 font-medium mb-2 block uppercase tracking-wide">
+                            Duration (min) <span className="text-white/20">*</span>
+                        </label>
+                        <input
+                            type="number"
+                            value={duration}
+                            onChange={(e) => setDuration(e.target.value)}
+                            placeholder="60"
+                            disabled={loading}
+                            className="w-full px-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-white placeholder-white/30 focus:outline-none focus:border-white/20 transition-colors disabled:opacity-50"
+                        />
+                    </div>
+
+                    {/* Features */}
+                    <div>
+                        <div className="flex items-center justify-between mb-2">
+                            <label className="text-[10px] text-white/40 font-medium uppercase tracking-wide">
+                                Features ({features.filter((f) => f.trim()).length}/10)
+                            </label>
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    features.length < 10 &&
+                                    setFeatures((p) => [...p, ''])
+                                }
+                                disabled={loading || features.length >= 10}
+                                className="text-[10px] text-white/30 hover:text-white/60 disabled:opacity-30 transition-colors"
+                            >
+                                + Add
+                            </button>
+                        </div>
+                        <div className="space-y-1.5">
+                            {features.map((f, i) => (
+                                <div key={i} className="flex gap-1.5">
+                                    <input
+                                        type="text"
+                                        value={f}
+                                        onChange={(e) => {
+                                            const updated = [...features];
+                                            updated[i] = e.target.value;
+                                            setFeatures(updated);
+                                        }}
+                                        placeholder={`Feature ${i + 1}`}
+                                        disabled={loading}
+                                        maxLength={100}
+                                        className="flex-1 px-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-white placeholder-white/30 focus:outline-none focus:border-white/20 transition-colors disabled:opacity-50"
+                                    />
+                                    {features.length > 1 && (
                                         <button
                                             type="button"
-                                            onClick={() => removeImage(i)}
+                                            onClick={() =>
+                                                setFeatures((p) =>
+                                                    p.filter((_, idx) => idx !== i)
+                                                )
+                                            }
                                             disabled={loading}
-                                            className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/80 rounded-md flex items-center justify-center text-white/70 hover:bg-black transition-all"
+                                            className="w-8 h-9 rounded-lg flex items-center justify-center text-white/20 hover:text-white/50 hover:bg-white/[0.04] transition-colors shrink-0"
                                         >
-                                            <X className="w-3 h-3" />
+                                            <X className="w-3.5 h-3.5" />
                                         </button>
-                                    </div>
-                                ))}
-
-                                {imagePreviews.length < 3 && (
-                                    <label className="aspect-square border-2 border-dashed border-white/[0.06] hover:border-white/[0.12] rounded-lg flex flex-col items-center justify-center cursor-pointer transition-all bg-white/[0.02]">
-                                        <Upload className="w-5 h-5 text-white/25 mb-1" />
-                                        <span className="text-[11px] text-white/25">Add</span>
-                                        <input 
-                                            type="file" 
-                                            accept="image/*" 
-                                            multiple 
-                                            onChange={handleImageChange} 
-                                            disabled={loading} 
-                                            className="hidden" 
-                                        />
-                                    </label>
-                                )}
-                            </div>
+                                    )}
+                                </div>
+                            ))}
                         </div>
                     </div>
 
-                    {/* Footer */}
-                    <div className="shrink-0 h-px bg-white/[0.05]" />
-                    <div className="shrink-0 px-4 py-4 flex gap-2">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            disabled={loading}
-                            className="
-                                hidden sm:flex items-center px-4 py-2.5 rounded-lg
-                                border border-white/[0.08] bg-white/[0.03]
-                                text-xs text-white/40 hover:text-white/70
-                                hover:border-white/[0.14] hover:bg-white/[0.05]
-                                transition-all duration-150
-                                disabled:opacity-50 disabled:cursor-not-allowed
-                            "
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleSubmit}
-                            disabled={loading || !canSubmit}
-                            className="
-                                flex-1 flex items-center justify-center gap-2
-                                py-2.5 rounded-lg
-                                bg-white text-black text-sm font-medium
-                                hover:bg-white/90 active:bg-white/80
-                                disabled:bg-white/10 disabled:text-white/20 disabled:cursor-not-allowed
-                                shadow-lg shadow-white/10
-                                transition-all duration-150
-                            "
-                        >
-                            {loading ? (
-                                <>
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                    Creating…
-                                </>
-                            ) : (
-                                'Create Service'
+                    {/* Images */}
+                    <div>
+                        <label className="text-[10px] text-white/40 font-medium mb-2 block uppercase tracking-wide">
+                            Images (max 3)
+                        </label>
+                        <div className="grid grid-cols-3 gap-2">
+                            {imagePreviews.map((preview, i) => (
+                                <div
+                                    key={i}
+                                    className="relative aspect-square bg-white/[0.04] rounded-lg overflow-hidden border border-white/[0.06]"
+                                >
+                                    <img
+                                        src={preview}
+                                        alt=""
+                                        className="w-full h-full object-cover"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => removeImage(i)}
+                                        disabled={loading}
+                                        className="absolute top-1.5 right-1.5 w-5 h-5 bg-black/80 rounded-md flex items-center justify-center text-white hover:bg-black transition-colors"
+                                    >
+                                        <X className="w-3 h-3" />
+                                    </button>
+                                </div>
+                            ))}
+                            {imagePreviews.length < 3 && (
+                                <label className="aspect-square border border-dashed border-white/10 hover:border-white/20 rounded-lg flex flex-col items-center justify-center cursor-pointer transition-all bg-white/[0.02] hover:bg-white/[0.04]">
+                                    <Upload className="w-3.5 h-3.5 text-white/30 mb-0.5" />
+                                    <span className="text-[9px] text-white/30">Add</span>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        multiple
+                                        onChange={handleImageChange}
+                                        disabled={loading}
+                                        className="hidden"
+                                    />
+                                </label>
                             )}
-                        </button>
+                        </div>
                     </div>
+                </div>
+
+                {/* Footer */}
+                <div className="shrink-0 p-3 border-t border-white/[0.06]">
+                    <button
+                        type="button"
+                        onClick={handleSubmit}
+                        disabled={loading || !canSubmit}
+                        className="w-full py-2.5 rounded-lg bg-white hover:bg-white/90 text-black text-xs font-semibold flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] disabled:opacity-20 disabled:cursor-not-allowed"
+                    >
+                        {loading ? (
+                            <>
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                Creating...
+                            </>
+                        ) : (
+                            'Create Service'
+                        )}
+                    </button>
                 </div>
             </div>
         </>
