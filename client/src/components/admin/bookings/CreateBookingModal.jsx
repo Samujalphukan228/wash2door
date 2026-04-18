@@ -601,11 +601,16 @@ function CustomerRow({ customer, selected, onSelect, onDelete, onEdit, deleting 
                     ? 'bg-emerald-500/[0.08] border border-emerald-500/20'
                     : 'bg-white/[0.02] hover:bg-white/[0.04] border border-transparent'
             }`}
-            onClick={() => onSelect()}
+            onClick={() => {
+                if (!expanded) onSelect();
+            }}
         >
+            {/* Avatar */}
             <div className="w-7 h-7 rounded-md bg-white/[0.06] flex items-center justify-center text-[10px] font-semibold text-white/50 shrink-0">
                 {customer.name?.charAt(0)?.toUpperCase() || '?'}
             </div>
+
+            {/* Info */}
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
                     <p className="text-[11px] font-medium text-white/80 truncate">
@@ -621,18 +626,31 @@ function CustomerRow({ customer, selected, onSelect, onDelete, onEdit, deleting 
                 <p className="text-[9px] text-white/30 font-mono truncate">{customer.phone}</p>
             </div>
 
-            {expanded ? (
-                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+            {/* Action buttons — shown when expanded */}
+            {expanded && (
+                <div
+                    className="flex items-center gap-1"
+                    onClick={(e) => e.stopPropagation()}
+                >
                     <button
-                        onClick={onEdit}
-                        className="w-6 h-6 rounded-md bg-white/[0.06] hover:bg-white/[0.1] flex items-center justify-center"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onEdit();
+                            setExpanded(false);
+                        }}
+                        className="w-6 h-6 rounded-md bg-white/[0.06] hover:bg-white/[0.1] active:bg-white/[0.15] flex items-center justify-center transition-colors"
+                        title="Edit"
                     >
                         <Edit2 className="w-3 h-3 text-white/50" />
                     </button>
                     <button
-                        onClick={onDelete}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onDelete();
+                        }}
                         disabled={deleting}
-                        className="w-6 h-6 rounded-md bg-red-500/10 hover:bg-red-500/20 flex items-center justify-center"
+                        className="w-6 h-6 rounded-md bg-red-500/10 hover:bg-red-500/20 active:bg-red-500/30 flex items-center justify-center transition-colors disabled:opacity-50"
+                        title="Delete"
                     >
                         {deleting ? (
                             <Loader2 className="w-3 h-3 text-red-400 animate-spin" />
@@ -641,17 +659,23 @@ function CustomerRow({ customer, selected, onSelect, onDelete, onEdit, deleting 
                         )}
                     </button>
                 </div>
-            ) : (
-                <button
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        setExpanded(true);
-                    }}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                    <MoreHorizontal className="w-3.5 h-3.5 text-white/20" />
-                </button>
             )}
+
+            {/* Always-visible toggle — works on touch & mouse */}
+            <button
+                onClick={(e) => {
+                    e.stopPropagation();
+                    setExpanded((prev) => !prev);
+                }}
+                className={`w-6 h-6 rounded-md flex items-center justify-center transition-colors shrink-0 ${
+                    expanded
+                        ? 'bg-white/[0.08] text-white/50'
+                        : 'bg-white/[0.04] text-white/25 hover:bg-white/[0.08] hover:text-white/50'
+                }`}
+                title="More options"
+            >
+                <MoreHorizontal className="w-3.5 h-3.5" />
+            </button>
         </div>
     );
 }
@@ -1023,7 +1047,18 @@ function ScheduleStep({
                 </p>
                 <SummaryItem label="Customer" value={walkInCustomer.name} />
                 <SummaryItem label="Service" value={selectedService?.name} />
-                <SummaryItem label="Date" value={bookingDate ? new Date(bookingDate + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : null} />
+                <SummaryItem
+                    label="Date"
+                    value={
+                        bookingDate
+                            ? new Date(bookingDate + 'T00:00:00').toLocaleDateString('en-IN', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                  year: 'numeric',
+                              })
+                            : null
+                    }
+                />
                 <SummaryItem label="Time" value={timeSlot} />
                 <SummaryItem label="Payment" value={paymentMethod} />
                 <div className="pt-2 border-t border-white/[0.04]">
@@ -1068,7 +1103,11 @@ function TimeSlotChip({ slot, selected, disabled, passed, booked, isAdmin, onCli
             {passed && <span className="block text-[8px] text-white/15 mt-0.5">Passed</span>}
             {!passed && booked && <span className="block text-[8px] text-white/15 mt-0.5">Booked</span>}
             {selected && (
-                <span className={`absolute top-1.5 left-1.5 w-3 h-3 rounded-full flex items-center justify-center ${isAdmin ? 'bg-purple-400' : 'bg-black/20'}`}>
+                <span
+                    className={`absolute top-1.5 left-1.5 w-3 h-3 rounded-full flex items-center justify-center ${
+                        isAdmin ? 'bg-purple-400' : 'bg-black/20'
+                    }`}
+                >
                     <Check className={`w-2 h-2 ${isAdmin ? 'text-white' : 'text-black'}`} />
                 </span>
             )}
@@ -1086,9 +1125,7 @@ function SummaryItem({ label, value, highlight }) {
             <span className="text-[10px] text-white/30 shrink-0">{label}</span>
             <span
                 className={`text-[11px] text-right truncate capitalize ${
-                    highlight
-                        ? 'text-white font-bold text-sm'
-                        : 'text-white/60'
+                    highlight ? 'text-white font-bold text-sm' : 'text-white/60'
                 }`}
             >
                 {value || '—'}
