@@ -72,6 +72,79 @@ function getTodayString() {
 const isAdminOnlySlot = (slot) => ADMIN_ONLY_SLOTS.includes(slot);
 
 // ============================================
+// DELETE CONFIRMATION POPUP
+// ============================================
+
+function DeleteConfirmPopup({ customer, onConfirm, onCancel, loading }) {
+    return (
+        <>
+            {/* Backdrop */}
+            <div className="fixed inset-0 bg-black/60 z-[60]" onClick={onCancel} />
+
+            {/* Popup */}
+            <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[70] w-[280px] bg-neutral-950 border border-white/[0.08] rounded-2xl p-4 space-y-4">
+
+                {/* Icon + Title */}
+                <div className="flex flex-col items-center text-center gap-2 pt-1">
+                    <div className="w-10 h-10 rounded-xl bg-white/[0.06] flex items-center justify-center">
+                        <Trash2 className="w-4 h-4 text-white/40" />
+                    </div>
+                    <div>
+                        <p className="text-xs font-semibold text-white">Delete Customer?</p>
+                        <p className="text-[10px] text-white/30 mt-0.5">
+                            This will permanently remove this customer
+                        </p>
+                    </div>
+                </div>
+
+                {/* Customer Info */}
+                <div className="flex items-center gap-2.5 p-2.5 rounded-lg bg-white/[0.04] border border-white/[0.06]">
+                    <div className="w-7 h-7 rounded-md bg-white/[0.06] flex items-center justify-center text-[10px] font-semibold text-white/50 shrink-0">
+                        {customer.name?.charAt(0)?.toUpperCase() || '?'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <p className="text-[11px] font-medium text-white/80 truncate">
+                            {customer.name}
+                        </p>
+                        <p className="text-[9px] text-white/30 font-mono truncate">
+                            {customer.phone}
+                        </p>
+                    </div>
+                </div>
+
+                {/* Buttons */}
+                <div className="flex gap-2">
+                    <button
+                        onClick={onCancel}
+                        disabled={loading}
+                        className="flex-1 py-2.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.09] text-white/60 text-[11px] font-medium transition-colors disabled:opacity-40"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={onConfirm}
+                        disabled={loading}
+                        className="flex-1 py-2.5 rounded-lg bg-white/[0.08] hover:bg-white/[0.12] text-white/80 text-[11px] font-semibold transition-colors disabled:opacity-40 flex items-center justify-center gap-1.5"
+                    >
+                        {loading ? (
+                            <>
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                                Deleting...
+                            </>
+                        ) : (
+                            <>
+                                <Trash2 className="w-3 h-3" />
+                                Delete
+                            </>
+                        )}
+                    </button>
+                </div>
+            </div>
+        </>
+    );
+}
+
+// ============================================
 // MAIN COMPONENT
 // ============================================
 
@@ -90,6 +163,7 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
     const [selectedWalkinCustomer, setSelectedWalkinCustomer] = useState(null);
     const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
     const [deletingCustomerId, setDeletingCustomerId] = useState(null);
+    const [deleteConfirmCustomer, setDeleteConfirmCustomer] = useState(null);
     const [editingCustomer, setEditingCustomer] = useState(null);
     const [editForm, setEditForm] = useState({ name: '', phone: '', address: '', city: '' });
     const [editLoading, setEditLoading] = useState(false);
@@ -198,20 +272,29 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
         setLocation({ address: 'Walk-in / At Shop', city: 'Duliajan' });
     }, []);
 
-    const handleDeleteWalkinCustomer = useCallback(async (id) => {
+    // Opens the confirm popup instead of deleting immediately
+    const handleDeleteWalkinCustomer = useCallback((customer) => {
+        setDeleteConfirmCustomer(customer);
+    }, []);
+
+    // Called when admin confirms deletion in the popup
+    const handleConfirmDelete = useCallback(async () => {
+        const customer = deleteConfirmCustomer;
+        if (!customer) return;
         try {
-            setDeletingCustomerId(id);
-            await adminService.deleteWalkInCustomer(id);
-            setSavedWalkinCustomers((prev) => prev.filter((c) => c._id !== id));
-            setRecentWalkinCustomers((prev) => prev.filter((c) => c._id !== id));
-            if (selectedWalkinCustomer?._id === id) handleClearCustomer();
+            setDeletingCustomerId(customer._id);
+            await adminService.deleteWalkInCustomer(customer._id);
+            setSavedWalkinCustomers((prev) => prev.filter((c) => c._id !== customer._id));
+            setRecentWalkinCustomers((prev) => prev.filter((c) => c._id !== customer._id));
+            if (selectedWalkinCustomer?._id === customer._id) handleClearCustomer();
             toast.success('Customer deleted');
+            setDeleteConfirmCustomer(null);
         } catch {
             toast.error('Failed to delete');
         } finally {
             setDeletingCustomerId(null);
         }
-    }, [selectedWalkinCustomer, handleClearCustomer]);
+    }, [deleteConfirmCustomer, selectedWalkinCustomer, handleClearCustomer]);
 
     const handleSaveEdit = useCallback(async () => {
         try {
@@ -425,6 +508,18 @@ export default function CreateBookingModal({ onClose, onSuccess }) {
                     </button>
                 </div>
             </div>
+
+            {/* Delete Confirmation Popup */}
+            {deleteConfirmCustomer && (
+                <DeleteConfirmPopup
+                    customer={deleteConfirmCustomer}
+                    onConfirm={handleConfirmDelete}
+                    onCancel={() => {
+                        if (!deletingCustomerId) setDeleteConfirmCustomer(null);
+                    }}
+                    loading={deletingCustomerId === deleteConfirmCustomer._id}
+                />
+            )}
         </>
     );
 }
@@ -506,7 +601,7 @@ function CustomerStep({
                                         customer={c}
                                         selected={selectedWalkinCustomer?._id === c._id}
                                         onSelect={() => onSelectCustomer(c)}
-                                        onDelete={() => onDeleteCustomer(c._id)}
+                                        onDelete={() => onDeleteCustomer(c)}
                                         onEdit={() => {
                                             setEditingCustomer(c);
                                             setEditForm({
@@ -647,21 +742,22 @@ function CustomerRow({ customer, selected, onSelect, onDelete, onEdit, deleting 
                         onClick={(e) => {
                             e.stopPropagation();
                             onDelete();
+                            setExpanded(false);
                         }}
                         disabled={deleting}
-                        className="w-6 h-6 rounded-md bg-red-500/10 hover:bg-red-500/20 active:bg-red-500/30 flex items-center justify-center transition-colors disabled:opacity-50"
+                        className="w-6 h-6 rounded-md bg-white/[0.06] hover:bg-white/[0.1] active:bg-white/[0.15] flex items-center justify-center transition-colors disabled:opacity-50"
                         title="Delete"
                     >
                         {deleting ? (
-                            <Loader2 className="w-3 h-3 text-red-400 animate-spin" />
+                            <Loader2 className="w-3 h-3 text-white/40 animate-spin" />
                         ) : (
-                            <Trash2 className="w-3 h-3 text-red-400" />
+                            <Trash2 className="w-3 h-3 text-white/40" />
                         )}
                     </button>
                 </div>
             )}
 
-            {/* Always-visible toggle — works on touch & mouse */}
+            {/* Always-visible toggle */}
             <button
                 onClick={(e) => {
                     e.stopPropagation();
