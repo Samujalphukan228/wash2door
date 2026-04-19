@@ -18,14 +18,10 @@ const bookingSchema = new mongoose.Schema({
         enum: BOOKING_TYPES,
         default: 'online'
     },
-
-    // Track if this booking uses an admin-only slot
     isAdminSlot: {
         type: Boolean,
         default: false
     },
-
-    // Customer
     customerId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
@@ -35,8 +31,6 @@ const bookingSchema = new mongoose.Schema({
         name: { type: String, default: '' },
         phone: { type: String, default: '' }
     },
-
-    // Category
     categoryId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Category',
@@ -46,8 +40,6 @@ const bookingSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-
-    // Subcategory
     subcategoryId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Subcategory',
@@ -57,8 +49,6 @@ const bookingSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-
-    // Service
     serviceId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Service',
@@ -76,12 +66,28 @@ const bookingSchema = new mongoose.Schema({
         type: Number,
         required: true
     },
+    originalPrice: {
+        type: Number,
+        default: 0
+    },
+    discountPercentage: {
+        type: Number,
+        default: 0,
+        min: 0,
+        max: 100
+    },
+    discountAmount: {
+        type: Number,
+        default: 0
+    },
+    discountReason: {
+        type: String,
+        default: ''
+    },
     duration: {
         type: Number,
         required: true
     },
-
-    // Date & Time
     bookingDate: {
         type: Date,
         required: [true, 'Booking date is required']
@@ -91,15 +97,11 @@ const bookingSchema = new mongoose.Schema({
         required: [true, 'Time slot is required'],
         enum: ALL_TIME_SLOTS
     },
-
-    // Slot lock
     slotLockKey: {
         type: String,
         default: null,
         sparse: true
     },
-
-    // ✅ FIXED: Location with defaults so validation never fails
     location: {
         address: {
             type: String,
@@ -109,22 +111,18 @@ const bookingSchema = new mongoose.Schema({
         city: {
             type: String,
             required: [true, 'City is required'],
-            default: 'Duliajan'         // ✅ THIS FIXES "City is required" ERROR
+            default: 'Duliajan'
         },
         landmark: {
             type: String,
             default: ''
         }
     },
-
-    // Contact phone number
     phone: {
         type: String,
         required: [true, 'Phone number is required'],
         match: [/^\+?[\d\s\-]{7,15}$/, 'Please enter a valid phone number']
     },
-
-    // Status
     status: {
         type: String,
         enum: BOOKING_STATUSES,
@@ -147,12 +145,10 @@ const bookingSchema = new mongoose.Schema({
         type: String,
         default: ''
     },
-
     isReviewed: {
         type: Boolean,
         default: false
     },
-
     paymentMethod: {
         type: String,
         enum: PAYMENT_METHODS,
@@ -163,37 +159,25 @@ const bookingSchema = new mongoose.Schema({
         enum: PAYMENT_STATUSES,
         default: 'pending'
     },
-
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         default: null
     },
-
-    // Special notes from customer
     specialNotes: {
         type: String,
         default: ''
     },
-
-    // Notes from admin
     adminNotes: {
         type: String,
         default: ''
     }
-
 }, { timestamps: true });
 
-// ============================================
-// PRE SAVE - Auto generate booking code + slot lock key
-// ============================================
 bookingSchema.pre('save', function (next) {
-
-    // Generate booking code
     if (!this.bookingCode) {
         const random = crypto.randomBytes(3).toString('hex').toUpperCase();
         const timestamp = Date.now().toString(36).toUpperCase().slice(-3);
-
         let prefix;
         if (this.bookingType === 'walkin') {
             prefix = 'WI';
@@ -202,11 +186,9 @@ bookingSchema.pre('save', function (next) {
         } else {
             prefix = 'BK';
         }
-
         this.bookingCode = `${prefix}-${timestamp}${random}`;
     }
 
-    // Generate slot lock key
     if (this.status === 'cancelled') {
         this.slotLockKey = `CANCELLED_${this._id}_${Date.now()}`;
     } else {
@@ -218,7 +200,6 @@ bookingSchema.pre('save', function (next) {
         this.slotLockKey = `${dateStr}|${this.timeSlot}`;
     }
 
-    // ✅ SAFETY NET: Ensure location always has values
     if (!this.location) {
         this.location = {
             address: 'Walk-in / At Shop',
@@ -236,13 +217,9 @@ bookingSchema.pre('save', function (next) {
             this.location.landmark = '';
         }
     }
-
     next();
 });
 
-// ============================================
-// INDEXES
-// ============================================
 bookingSchema.index({ customerId: 1 });
 bookingSchema.index({ status: 1 });
 bookingSchema.index({ bookingDate: 1 });
@@ -253,8 +230,6 @@ bookingSchema.index({ subcategoryId: 1 });
 bookingSchema.index({ bookingType: 1 });
 bookingSchema.index({ isAdminSlot: 1 });
 bookingSchema.index({ createdAt: -1 });
-
-// Unique slot lock index
 bookingSchema.index(
     { slotLockKey: 1 },
     {
@@ -266,9 +241,6 @@ bookingSchema.index(
     }
 );
 
-// ============================================
-// VIRTUALS
-// ============================================
 bookingSchema.virtual('isUpcoming').get(function () {
     if (['cancelled', 'completed'].includes(this.status)) return false;
     const bookingDateTime = new Date(this.bookingDate);
@@ -286,27 +258,18 @@ bookingSchema.virtual('canCancel').get(function () {
     return new Date() < cancelDeadline;
 });
 
-// ============================================
-// STATICS
-// ============================================
-
-// Get available slots (supports admin slots)
 bookingSchema.statics.getAvailableSlots = async function (date, includeAdminSlots = false) {
     const { TIME_SLOTS, ALL_TIME_SLOTS } = await import('../utils/constants.js');
-
     const dateStr = new Date(date).toISOString().split('T')[0];
     const slotsToCheck = includeAdminSlots ? ALL_TIME_SLOTS : TIME_SLOTS;
-
     const bookedSlots = await this.find({
         slotLockKey: { $regex: `^${dateStr}\\|` },
         status: { $in: ['pending', 'confirmed'] }
     }).select('timeSlot');
-
     const bookedSlotNames = bookedSlots.map(b => b.timeSlot);
     return slotsToCheck.filter(slot => !bookedSlotNames.includes(slot));
 };
 
-// Get user booking stats
 bookingSchema.statics.getUserStats = async function (userId) {
     const stats = await this.aggregate([
         { $match: { customerId: new mongoose.Types.ObjectId(userId) } },
@@ -322,7 +285,6 @@ bookingSchema.statics.getUserStats = async function (userId) {
             }
         }
     ]);
-
     const result = {
         total: 0,
         pending: 0,
@@ -331,16 +293,13 @@ bookingSchema.statics.getUserStats = async function (userId) {
         cancelled: 0,
         totalSpent: 0
     };
-
     stats.forEach(s => {
         result[s._id] = s.count;
         result.total += s.count;
         if (s._id === 'completed') result.totalSpent = s.totalSpent;
     });
-
     return result;
 };
 
 const Booking = mongoose.model('Booking', bookingSchema);
-
 export default Booking;

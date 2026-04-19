@@ -922,7 +922,9 @@ export const createAdminBooking = async (req, res) => {
             phone,
             paymentMethod,
             paymentStatus,
-            adminNotes
+            adminNotes,
+            discountPercentage = 0,
+            discountReason = ''
         } = req.body;
 
         const bookingLocation = {
@@ -934,10 +936,8 @@ export const createAdminBooking = async (req, res) => {
             return res.status(400).json({ success: false, message: 'bookingType must be "walkin" or "online"' });
         }
 
-        if (bookingType === 'walkin') {
-            if (!walkInCustomer?.name?.trim()) {
-                return res.status(400).json({ success: false, message: 'Walk-in customer name is required' });
-            }
+        if (bookingType === 'walkin' && !walkInCustomer?.name?.trim()) {
+            return res.status(400).json({ success: false, message: 'Walk-in customer name is required' });
         }
 
         if (bookingType === 'online') {
@@ -961,31 +961,17 @@ export const createAdminBooking = async (req, res) => {
             .populate('subcategory', 'name slug');
 
         if (!service) return res.status(404).json({ success: false, message: 'Service not found or not active' });
-        if (!service.category || !service.subcategory) return res.status(400).json({ success: false, message: 'Service category/subcategory missing' });
 
-        const finalPrice = service.discountPrice ?? service.price ?? 0;
+        const basePrice = service.discountPrice ?? service.price ?? 0;
+        const discountPct = Math.min(100, Math.max(0, parseFloat(discountPercentage) || 0));
+        const discountAmount = Math.round((basePrice * discountPct) / 100);
+        const finalPrice = basePrice - discountAmount;
+
         const duration = service.duration ?? 60;
-
-        if (!finalPrice) return res.status(400).json({ success: false, message: 'Service has no valid price' });
-
-        if (!bookingDate || !/^\d{4}-\d{2}-\d{2}$/.test(bookingDate)) {
-            return res.status(400).json({ success: false, message: 'Invalid date format. Use YYYY-MM-DD' });
-        }
-
         const [year, month, day] = bookingDate.split('-').map(Number);
         const requestedDate = new Date(year, month - 1, day, 12, 0, 0, 0);
 
-        if (isNaN(requestedDate.getTime())) return res.status(400).json({ success: false, message: 'Invalid date' });
-
-        const now = new Date();
-        const todayStr = getLocalDateStr(now);
-
-        if (bookingDate < todayStr) return res.status(400).json({ success: false, message: 'Booking date cannot be in the past' });
         if (isClosedDay(requestedDate)) return res.status(400).json({ success: false, message: CLOSED_DAY_MESSAGE });
-
-        if (!timeSlot || !isValidAnySlot(timeSlot)) {
-            return res.status(400).json({ success: false, message: `Invalid time slot. Valid slots: ${ALL_TIME_SLOTS.join(', ')}` });
-        }
 
         const isAdminSlot = isAdminOnlySlot(timeSlot);
         const slotLockKey = `${bookingDate}|${timeSlot}`;
@@ -999,99 +985,74 @@ export const createAdminBooking = async (req, res) => {
             return res.status(400).json({ success: false, message: `Time slot ${timeSlot} on ${bookingDate} is already booked` });
         }
 
-        let booking;
-
-        try {
-            booking = await Booking.create({
-                bookingType,
-                isAdminSlot,
-                customerId: bookingType === 'online' ? customerId : null,
-                walkInCustomer: bookingType === 'walkin'
-                    ? { name: walkInCustomer.name.trim(), phone }
-                    : { name: '', phone: '' },
-                categoryId: service.category._id,
-                categoryName: service.category.name,
-                subcategoryId: service.subcategory._id,
-                subcategoryName: service.subcategory.name,
-                serviceId: service._id,
-                serviceName: service.name,
-                serviceTier: service.tier || 'basic',
-                price: finalPrice,
-                duration,
-                bookingDate: requestedDate,
-                timeSlot,
-                location: bookingLocation,
-                phone,
-                paymentMethod: paymentMethod || 'cash',
-                paymentStatus: paymentStatus || 'pending',
-                createdBy: req.user._id,
-                status: 'confirmed',
-                adminNotes: adminNotes || ''
-            });
-        } catch (createError) {
-            if (createError.code === 11000) {
-                return res.status(400).json({ success: false, message: `Time slot ${timeSlot} on ${bookingDate} was just booked by someone else` });
-            }
-            throw createError;
-        }
+        const booking = await Booking.create({
+            bookingType,
+            isAdminSlot,
+            customerId: bookingType === 'online' ? customerId : null,
+            walkInCustomer: bookingType === 'walkin'
+                ? { name: walkInCustomer.name.trim(), phone }
+                : { name: '', phone: '' },
+            categoryId: service.category._id,
+            categoryName: service.category.name,
+            subcategoryId: service.subcategory._id,
+            subcategoryName: service.subcategory.name,
+            serviceId: service._id,
+            serviceName: service.name,
+            serviceTier: service.tier || 'basic',
+            price: finalPrice,
+            originalPrice: basePrice,
+            discountPercentage: discountPct,
+            discountAmount: discountAmount,
+            discountReason: discountReason || '',
+            duration,
+            bookingDate: requestedDate,
+            timeSlot,
+            location: bookingLocation,
+            phone,
+            paymentMethod: paymentMethod || 'cash',
+            paymentStatus: paymentStatus || 'pending',
+            createdBy: req.user._id,
+            status: 'confirmed',
+            adminNotes: adminNotes || ''
+        });
 
         await Service.findByIdAndUpdate(serviceId, { $inc: { totalBookings: 1 } });
 
-        // ✅ Save walk-in customer with address and city
         if (bookingType === 'walkin' && walkInCustomer?.name && phone) {
-            try {
-                let walkinCustomerDoc = await WalkInCustomer.findOne({
+            let walkinCustomerDoc = await WalkInCustomer.findOne({ phone: phone.trim(), isActive: true });
+            if (walkinCustomerDoc) {
+                walkinCustomerDoc.name = walkInCustomer.name.trim();
+                walkinCustomerDoc.address = bookingLocation.address;
+                walkinCustomerDoc.city = bookingLocation.city;
+                walkinCustomerDoc.totalBookings += 1;
+                walkinCustomerDoc.lastBookingDate = new Date();
+                await walkinCustomerDoc.save();
+            } else {
+                await WalkInCustomer.create({
+                    name: walkInCustomer.name.trim(),
                     phone: phone.trim(),
-                    isActive: true
+                    address: bookingLocation.address,
+                    city: bookingLocation.city,
+                    totalBookings: 1,
+                    lastBookingDate: new Date(),
+                    createdBy: req.user._id
                 });
-
-                if (walkinCustomerDoc) {
-                    walkinCustomerDoc.name = walkInCustomer.name.trim();
-                    walkinCustomerDoc.address = bookingLocation.address;
-                    walkinCustomerDoc.city = bookingLocation.city;
-                    walkinCustomerDoc.totalBookings += 1;
-                    walkinCustomerDoc.lastBookingDate = new Date();
-                    await walkinCustomerDoc.save();
-                } else {
-                    await WalkInCustomer.create({
-                        name: walkInCustomer.name.trim(),
-                        phone: phone.trim(),
-                        address: bookingLocation.address,
-                        city: bookingLocation.city,
-                        totalBookings: 1,
-                        lastBookingDate: new Date(),
-                        createdBy: req.user._id
-                    });
-                }
-            } catch (walkinError) {
-                console.error('Walk-in customer save error:', walkinError.message);
             }
         }
 
         const customerName = bookingType === 'walkin' ? walkInCustomer.name : 'Online Customer';
-
         emitNewBooking(booking, customerName);
         emitSlotBooked(bookingDate, timeSlot, serviceId);
         emitDashboardUpdate({ action: 'new_booking', bookingType, isAdminSlot });
 
         setImmediate(async () => {
-            try {
-                await sendAdminBookingTelegram(booking);
-                console.log('📱 Telegram: Admin booking notification sent');
-            } catch (e) {
-                console.error('Telegram admin booking notification failed:', e.message);
-            }
+            try { await sendAdminBookingTelegram(booking); } catch (e) { console.error(e); }
         });
 
-        res.status(201).json({
-            success: true,
-            message: 'Booking created successfully',
-            data: { ...booking.toObject(), isAdminSlot: booking.isAdminSlot }
-        });
+        res.status(201).json({ success: true, message: 'Booking created successfully', data: booking });
 
     } catch (error) {
-        console.error('Admin create booking error:', error);
-        res.status(500).json({ success: false, message: error.message || 'Failed to create booking' });
+        res.status(500).json({ success: false, message: error.message });
     }
 };
 
